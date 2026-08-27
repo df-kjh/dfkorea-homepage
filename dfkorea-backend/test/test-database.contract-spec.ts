@@ -62,8 +62,22 @@ describe("tender integration database guard", () => {
     "postgresql://test_user:test_password@live-e2e/dfkorea_e2e",
     "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=staging",
     "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=st%61ging",
+    "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=st%2561ging",
+    "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=st%252561ging",
+    "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=pr%256fd",
+    "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=l%252569ve",
+    "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=st%2525252561ging",
   ])("rejects forbidden environment tokens in a test database URL: %s", (url) => {
     process.env.TEST_DATABASE_URL = url;
+
+    expect(() => configureTestDatabase(true)).toThrow(
+      "Refusing tender integration database",
+    );
+  });
+
+  it("rejects malformed percent encoding in the full test database URL", () => {
+    process.env.TEST_DATABASE_URL =
+      "postgresql://test_user:test_password@localhost/dfkorea_e2e?environment=st%";
 
     expect(() => configureTestDatabase(true)).toThrow(
       "Refusing tender integration database",
@@ -103,5 +117,15 @@ describe("tender integration database guard", () => {
     expect(process.env.DB_HOST).toBe("localhost");
     expect(process.env.DB_PORT).toBe("5432");
     expect(process.env.DB_NAME).toBe("dfkorea_tender_e2e");
+  });
+
+  it("accepts a normally encoded local URL when its decoded target is safe", () => {
+    process.env.TEST_DATABASE_URL =
+      "postgresql://test_user:test_password@localhost:5432/dfkorea_%65%32%65";
+
+    configureTestDatabase(true);
+
+    expect(process.env.DB_HOST).toBe("localhost");
+    expect(process.env.DB_NAME).toBe("dfkorea_e2e");
   });
 });

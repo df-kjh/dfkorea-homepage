@@ -1,5 +1,7 @@
 const TEST_DATABASE_PATTERN = /(test|e2e)/i;
 const FORBIDDEN_ENVIRONMENT_PATTERN = /prod(?:uction)?|live|staging/i;
+const MAX_SAFETY_DECODE_PASSES = 4;
+const PERCENT_ENCODED_BYTE_PATTERN = /%[0-9a-f]{2}/i;
 const LOCAL_TEST_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
@@ -32,16 +34,19 @@ export function configureTestDatabase(required: boolean): void {
     return;
   }
 
-  assertSafeTestDatabase(configuration);
-  process.env.DB_HOST = configuration.host;
-  process.env.DB_PORT = configuration.port;
-  process.env.DB_USERNAME = configuration.username;
-  process.env.DB_PASSWORD = configuration.password;
-  process.env.DB_NAME = configuration.database;
+  const safeConfiguration = assertSafeTestDatabase(configuration);
+  process.env.DB_HOST = safeConfiguration.host;
+  process.env.DB_PORT = safeConfiguration.port;
+  process.env.DB_USERNAME = safeConfiguration.username;
+  process.env.DB_PASSWORD = safeConfiguration.password;
+  process.env.DB_NAME = safeConfiguration.database;
 }
 
 function readConfiguration(): TestDatabaseConfiguration | null {
   if (process.env.TEST_DATABASE_URL) {
+    // Validate the raw full URL too: URL parsing alone accepts malformed
+    // percent escapes in a query and would otherwise leave a safety bypass.
+    decodeForSafety(process.env.TEST_DATABASE_URL);
     let url: URL;
     try {
       url = new URL(process.env.TEST_DATABASE_URL);
@@ -78,16 +83,27 @@ function readConfiguration(): TestDatabaseConfiguration | null {
   return values as TestDatabaseConfiguration;
 }
 
-function assertSafeTestDatabase(configuration: TestDatabaseConfiguration): void {
+function assertSafeTestDatabase(
+  configuration: TestDatabaseConfiguration,
+): TestDatabaseConfiguration {
+  const normalized = {
+    ...configuration,
+    host: decodeForSafety(configuration.host),
+    database: decodeForSafety(configuration.database),
+    sourceUrl: configuration.sourceUrl
+      ? decodeForSafety(configuration.sourceUrl)
+      : undefined,
+  };
   if (
-    !LOCAL_TEST_HOSTS.has(configuration.host.toLowerCase()) ||
-    !TEST_DATABASE_PATTERN.test(configuration.database) ||
-    containsForbiddenEnvironmentToken(configuration)
+    !LOCAL_TEST_HOSTS.has(normalized.host.toLowerCase()) ||
+    !TEST_DATABASE_PATTERN.test(normalized.database) ||
+    containsForbiddenEnvironmentToken(normalized)
   ) {
     throw new Error(
       "Refusing tender integration database: use only a local host (localhost, 127.0.0.1, ::1, postgres, or db) and a database name containing test or e2e without prod/live/staging tokens",
     );
   }
+  return normalized;
 }
 
 function containsForbiddenEnvironmentToken(
@@ -95,15 +111,27 @@ function containsForbiddenEnvironmentToken(
 ): boolean {
   return [configuration.host, configuration.database, configuration.sourceUrl]
     .filter((value): value is string => Boolean(value))
-    .some((value) => FORBIDDEN_ENVIRONMENT_PATTERN.test(decodeForSafety(value)));
+    .some((value) => FORBIDDEN_ENVIRONMENT_PATTERN.test(value));
 }
 
 function decodeForSafety(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    // A malformed escape cannot make this target safer. Keep its literal form
-    // for the token check; URL parsing has already rejected malformed URLs.
-    return value;
+  let decoded = value;
+  for (let pass = 0; pass < MAX_SAFETY_DECODE_PASSES; pass += 1) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      throw new Error(
+        "Refusing tender integration database: malformed percent encoding is unsafe",
+      );
+    }
+    if (next === decoded) return decoded;
+    decoded = next;
   }
+  if (PERCENT_ENCODED_BYTE_PATTERN.test(decoded)) {
+    throw new Error(
+      "Refusing tender integration database: excessive percent encoding is unsafe",
+    );
+  }
+  return decoded;
 }
