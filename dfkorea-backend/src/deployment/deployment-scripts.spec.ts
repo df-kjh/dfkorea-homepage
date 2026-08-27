@@ -332,6 +332,31 @@ describe("deployment migration commands", () => {
     expect(deployment).not.toMatch(/npm run migration:revert(?!:prod)/);
   });
 
+  it("runs the canonical backend CI checks before a fresh compiled probe", () => {
+    const packageJson = JSON.parse(
+      readFileSync(join(backendRoot, "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    const ciSteps = packageJson.scripts["test:ci"]?.split(" && ");
+
+    expect(ciSteps).toEqual([
+      "npm run lint:check",
+      "npm test -- --runInBand",
+      "npm run test:tender:contract",
+      "npx tsc --noEmit",
+      "npm run clean:dist",
+      "npm run build",
+      "npm run test:production-process:compiled",
+      "npm run test:typeorm:compiled",
+    ]);
+    expect(packageJson.scripts["test:ci"]).not.toContain("npm run test:ci");
+    expect(packageJson.scripts["clean:dist"]).toBe(
+      "node test/clean-dist.js",
+    );
+    expect(packageJson.scripts["test:typeorm:compiled"]).toBe(
+      "node test/typeorm-compiled-discovery.js",
+    );
+  });
+
   it("documents a quiesced, freshly backed-up rollback in strict gate order", () => {
     const repositoryRoot = join(backendRoot, "..");
     const deployment = readFileSync(

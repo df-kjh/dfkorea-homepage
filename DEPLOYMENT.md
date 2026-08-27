@@ -347,15 +347,14 @@ Railway처럼 환경 변수를 플랫폼이 직접 주입하는 경로의 `migra
 
 Dockerfile과 `railway.json`도 `npm run migration:run:prod && npm run start:prod`를 사용한다. migration 실패를 `|| true` 등으로 무시하지 않는다.
 
-production runner의 빌드 산출물과 Nest bootstrap 설정 전달은 실제 DB 연결 없이 다음 순서로 검증한다.
+backend의 canonical CI는 다음 단일 명령으로 실행한다.
 
 ```bash
 cd dfkorea-backend
-npm run build
-npm run test:production-process:compiled
+npm run test:ci
 ```
 
-이 probe는 실제 compiled runner를 `file`/`ambient` start mode로 spawn하고 `dist/main.js`에 진입한다. 별도 preload hook이 main module load 직전에만 `NODE_ENV=test`로 전환해 test-only sanitized config probe에서 종료하므로 DB/network 연결을 만들지 않는다. 이 test-only probe는 `NODE_ENV=production`에서는 비활성화된다. 또한 missing file/변수의 사전 종료와 dev/test에서 PG alias를 무시하는 기존 Nest DB 옵션을 검증한다.
+`test:ci`는 lint, unit, contract, TypeScript 검사를 통과한 뒤 backend의 정확한 `dist` 디렉터리를 지우고 새로 build한다. 따라서 오래된 산출물로 compiled 검사가 통과할 수 없다. 이어서 실제 compiled runner를 `file`/`ambient` start mode로 spawn하여 `dist/main.js`에 진입하고 TypeORM entity/migration discovery도 검사한다. 별도 preload hook이 main module load 직전에만 `NODE_ENV=test`로 전환해 test-only sanitized config probe에서 종료하므로 DB/network 연결을 만들지 않는다. 이 test-only probe는 `NODE_ENV=production`에서는 비활성화되며 password를 기록하지 않는다. 또한 missing file/변수의 사전 종료와 dev/test에서 PG alias를 무시하는 기존 Nest DB 옵션을 검증한다.
 
 백엔드의 `PUBLIC_SITE_URL`, `PUBLIC_API_URL`, `CORS_ORIGIN`에는 실제 HTTPS URL을 넣고, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`에는 PostgreSQL 접속 값을 넣는다. 상세 변수는 `dfkorea-backend/.env.example`을 기준으로 한다.
 
