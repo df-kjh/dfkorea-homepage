@@ -1,0 +1,71 @@
+<style>
+  .admin-shell { display:grid; grid-template-columns:150px 1fr; min-height:640px; background:#f6f8fa; color:#263238; font-family:Arial,sans-serif; border:1px solid #dfe5e9; border-radius:12px; overflow:hidden; }
+  .side { background:#fff; border-right:1px solid #e5e7eb; padding:24px 14px; }
+  .brand { color:#22a8c3; font-weight:800; font-size:15px; margin-bottom:28px; }
+  .nav-item { padding:11px 10px; border-radius:8px; color:#6b7280; font-size:12px; margin:5px 0; }
+  .nav-item.active { background:#22a8c3; color:#fff; font-weight:700; }
+  .page { padding:24px; }
+  .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .eyebrow { color:#22a8c3; font-size:10px; font-weight:700; letter-spacing:.08em; }
+  .title { font-size:21px; font-weight:800; margin-top:3px; }
+  .actions { display:flex; gap:8px; }
+  .button { display:inline-flex; align-items:center; gap:5px; border:1px solid #d8e0e5; background:#fff; color:#42515a; padding:8px 11px; border-radius:7px; font-size:11px; font-weight:700; }
+  .button.primary { background:#22a8c3; color:#fff; border-color:#22a8c3; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:13px; }
+  .stat { background:#fff; border:1px solid #e5eaed; border-radius:8px; padding:12px; }
+  .stat span { color:#8a94a3; font-size:10px; }
+  .stat b { display:block; font-size:20px; margin-top:4px; }
+  .calendar { background:#fff; border:1px solid #e1e7ea; border-radius:10px; padding:14px; }
+  .cal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:11px; font-size:13px; font-weight:800; }
+  .week,.days { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .week div { text-align:center; color:#98a1ad; font-size:9px; padding:4px; }
+  .day { min-height:65px; border:1px solid #edf0f2; border-radius:6px; padding:6px; font-size:10px; }
+  .day.selected { border:2px solid #22a8c3; background:#f1fbfd; }
+  .badge { display:block; margin-top:4px; padding:3px 4px; border-radius:4px; background:#e5f8fb; color:#147d93; font-size:8px; }
+  .badge.potential { background:#fff2d1; color:#956000; }
+  .list { margin-top:12px; background:#fff; border:1px solid #e1e7ea; border-radius:10px; padding:14px; }
+  .list-head { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:800; }
+  .row { display:grid; grid-template-columns:90px 1fr 110px; gap:8px; align-items:center; border-top:1px solid #edf0f2; padding:10px 0; font-size:10px; }
+  .tag { display:inline-block; width:max-content; padding:3px 6px; border-radius:4px; background:#e5f8fb; color:#147d93; font-size:8px; font-weight:700; }
+  .tag.orange { background:#fff2d1; color:#956000; }
+  .muted { color:#8a94a3; font-size:9px; }
+</style>
+
+<h2>수정된 입찰 공고 화면</h2>
+<p class="subtitle">선택하신 A안에 맞춰 수집 현황을 제거하고, 실제 업무에 필요한 두 액션만 남겼습니다.</p>
+
+<div class="mockup">
+  <div class="mockup-header">입찰 공고 캘린더 · 데스크톱</div>
+  <div class="mockup-body" style="padding:0">
+    <div class="admin-shell">
+      <aside class="side">
+        <div class="brand">DF KOREA</div>
+        <div class="nav-item">▣ 제품</div><div class="nav-item">▤ 소식</div><div class="nav-item">◇ 인증서</div>
+        <div class="nav-item active">▦ 입찰 공고</div><div class="nav-item">⚙ 설정</div>
+      </aside>
+      <main class="page">
+        <div class="top">
+          <div><div class="eyebrow">ADMIN / TENDERS</div><div class="title">입찰 공고 캘린더</div></div>
+          <div class="actions"><button class="button">▽ 필터</button><button class="button primary">✉ 수신 설정</button></div>
+        </div>
+        <div class="stats"><div class="stat"><span>이번 달 전체</span><b>48</b></div><div class="stat"><span>💡 직접 관련</span><b>19</b></div><div class="stat"><span>⚡ 잠재 관련</span><b>29</b></div></div>
+        <div class="calendar">
+          <div class="cal-head"><button class="button">‹</button><span>2026년 8월</span><button class="button">›</button></div>
+          <div class="week"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+          <div class="days">
+            <div class="day">23</div><div class="day">24<span class="badge">💡 2건</span></div><div class="day">25<span class="badge potential">⚡ 3건</span></div><div class="day">26<span class="badge">💡 1건</span><span class="badge potential">⚡ 2건</span></div><div class="day selected">27<span class="badge">💡 4건</span><span class="badge potential">⚡ 3건</span></div><div class="day">28<span class="badge">💡 1건</span></div><div class="day">29</div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="list-head"><span>8월 27일 공고</span><span class="muted">총 7건</span></div>
+          <div class="row"><span class="tag">💡 직접 관련</span><div><b>LED 가로등 교체공사</b><div class="muted">조명·가로등 키워드 감지</div></div><div>서울시설공단<br><span class="muted">나라장터</span></div></div>
+          <div class="row"><span class="tag orange">⚡ 잠재 관련</span><div><b>지하주차장 전기시설 개선공사</b><div class="muted">전기시설 개선 키워드 감지</div></div><div>한빛아파트<br><span class="muted">K-apt</span></div></div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-toolbar" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>이 구성을 승인</h3><p>상단에는 필터와 수신 설정만 유지합니다.</p></div></div>
+</div>

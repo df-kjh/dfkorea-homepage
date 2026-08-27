@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: dev server",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "start:dev"],
+      "options": {
+        "cwd": "${workspaceFolder}/dfkorea-backend"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: dev server",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "dev", "--", "--host", "0.0.0.0"],
+      "options": {
+        "cwd": "${workspaceFolder}/led-lighting-website"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: backend + frontend",
+      "dependsOrder": "parallel",
+      "dependsOn": ["Backend: dev server", "Frontend: dev server"],
+      "problemMatcher": []
+    }
+  ]
+}

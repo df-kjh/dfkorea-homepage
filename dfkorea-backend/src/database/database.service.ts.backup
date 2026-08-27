@@ -1,0 +1,170 @@
+import { Injectable } from '@nestjs/common';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { Database, Product, Post } from '../types/database.types';
+
+@Injectable()
+export class DatabaseService {
+  private dbPath = path.join(process.cwd(), 'data', 'database.json');
+
+  constructor() {
+    // 환경에 따라 데이터 디렉토리 경로 설정
+    const dataDir = process.env.DATA_DIR || 'data';
+    this.dbPath = path.join(process.cwd(), dataDir, 'database.json');
+  }
+
+  async readDatabase(): Promise<Database> {
+    try {
+      // 데이터 디렉토리가 없으면 생성
+      const dataDir = path.dirname(this.dbPath);
+      await fs.mkdir(dataDir, { recursive: true });
+      
+      const data = await fs.readFile(this.dbPath, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      // 파일이 없으면 초기 데이터 생성
+      const initialData: Database = {
+        admin: {
+          username: 'admin',
+          password:
+            '$2b$10$xQXKZ9qZ9qZ9qZ9qZ9qZ9uP5lJ5QZ9qZ9qZ9qZ9qZ9qZ9qZ9qZ9qZ',
+        },
+        products: [],
+        posts: [],
+      };
+      await this.writeDatabase(initialData);
+      return initialData;
+    }
+  }
+
+  async writeDatabase(data: Database): Promise<void> {
+    // 데이터 디렉토리가 없으면 생성
+    const dataDir = path.dirname(this.dbPath);
+    await fs.mkdir(dataDir, { recursive: true });
+    
+    await fs.writeFile(this.dbPath, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  async getProducts(): Promise<Product[]> {
+    const db = await this.readDatabase();
+    return db.products;
+  }
+
+  async getProductById(id: string): Promise<Product | undefined> {
+    const db = await this.readDatabase();
+    return db.products.find((p) => p.id === id);
+  }
+
+  async createProduct(
+    product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>,
+  ): Promise<Product> {
+    const db = await this.readDatabase();
+    const newProduct: Product = {
+      ...product,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    db.products.push(newProduct);
+    await this.writeDatabase(db);
+    return newProduct;
+  }
+
+  async updateProduct(
+    id: string,
+    updates: Partial<Omit<Product, 'id' | 'createdAt'>>,
+  ): Promise<Product | null> {
+    const db = await this.readDatabase();
+    const index = db.products.findIndex((p) => p.id === id);
+    if (index === -1) return null;
+
+    db.products[index] = {
+      ...db.products[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.writeDatabase(db);
+    return db.products[index];
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    const db = await this.readDatabase();
+    const initialLength = db.products.length;
+    db.products = db.products.filter((p) => p.id !== id);
+    if (db.products.length < initialLength) {
+      await this.writeDatabase(db);
+      return true;
+    }
+    return false;
+  }
+
+  async getPosts(): Promise<Post[]> {
+    const db = await this.readDatabase();
+    return db.posts;
+  }
+
+  async getPostById(id: string): Promise<Post | undefined> {
+    const db = await this.readDatabase();
+    return db.posts.find((p) => p.id === id);
+  }
+
+  async createPost(
+    post: Omit<Post, 'id' | 'views' | 'createdAt' | 'updatedAt'>,
+  ): Promise<Post> {
+    const db = await this.readDatabase();
+    const newPost: Post = {
+      ...post,
+      id: Date.now().toString(),
+      views: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    db.posts.push(newPost);
+    await this.writeDatabase(db);
+    return newPost;
+  }
+
+  async updatePost(
+    id: string,
+    updates: Partial<Omit<Post, 'id' | 'views' | 'createdAt'>>,
+  ): Promise<Post | null> {
+    const db = await this.readDatabase();
+    const index = db.posts.findIndex((p) => p.id === id);
+    if (index === -1) return null;
+
+    db.posts[index] = {
+      ...db.posts[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.writeDatabase(db);
+    return db.posts[index];
+  }
+
+  async deletePost(id: string): Promise<boolean> {
+    const db = await this.readDatabase();
+    const initialLength = db.posts.length;
+    db.posts = db.posts.filter((p) => p.id !== id);
+    if (db.posts.length < initialLength) {
+      await this.writeDatabase(db);
+      return true;
+    }
+    return false;
+  }
+
+  async incrementPostViews(id: string): Promise<Post | null> {
+    const db = await this.readDatabase();
+    const post = db.posts.find((p) => p.id === id);
+    if (post) {
+      post.views += 1;
+      await this.writeDatabase(db);
+      return post;
+    }
+    return null;
+  }
+
+  async getAdmin(): Promise<{ username: string; password: string }> {
+    const db = await this.readDatabase();
+    return db.admin;
+  }
+}

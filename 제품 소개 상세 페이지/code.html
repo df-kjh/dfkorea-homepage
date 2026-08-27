@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Product Detail | Linear Beam Gen 2</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#007AFF",
+              "background": "#FFFFFF",
+              "surface": "#F2F4F6",
+              "text-main": "#191F28",
+              "text-sub": "#4E5968",
+              "text-desc": "#8B95A1"
+            },
+            fontFamily: {
+              "sans": ["Inter", "sans-serif"]
+            },
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-text-main font-sans antialiased;
+            }
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .sticky-summary {
+            top: 100px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="selection:bg-primary/20">
+<nav class="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-gray-100">
+<div class="flex items-center justify-between px-10 h-20 max-w-[1400px] mx-auto">
+<div class="flex items-center gap-2">
+<div class="size-7 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[16px] font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-lg font-bold tracking-tight">Lumina</h2>
+</div>
+<div class="hidden md:flex items-center gap-10">
+<a class="text-text-main text-sm font-semibold hover:text-primary transition-colors" href="#">Products</a>
+<a class="text-text-main text-sm font-semibold hover:text-primary transition-colors" href="#">Innovation</a>
+<a class="text-text-main text-sm font-semibold hover:text-primary transition-colors" href="#">About</a>
+<a class="text-text-main text-sm font-semibold hover:text-primary transition-colors" href="#">Support</a>
+</div>
+<button class="text-text-main p-2 hover:bg-surface rounded-full transition-colors">
+<span class="material-symbols-outlined text-2xl">share</span>
+</button>
+</div>
+</nav>
+<main class="pt-20">
+<section class="max-w-[1400px] mx-auto px-10 py-12 lg:py-20">
+<div class="grid lg:grid-cols-12 gap-16 items-start">
+<div class="lg:col-span-7 space-y-8">
+<div class="w-full aspect-[4/5] rounded-3xl overflow-hidden bg-surface">
+<img alt="Lumina LED Fixture" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+<div class="grid grid-cols-2 gap-8">
+<div class="aspect-square bg-surface rounded-3xl overflow-hidden">
+<img alt="Detail view" class="w-full h-full object-cover opacity-90" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+<div class="aspect-square bg-surface rounded-3xl overflow-hidden">
+<img alt="Usage view" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+</div>
+</div>
+<div class="lg:col-span-5 lg:sticky sticky-summary">
+<div class="max-w-md">
+<span class="text-primary font-bold text-sm tracking-widest uppercase mb-4 block">Smart Series</span>
+<h1 class="text-text-main text-5xl font-bold tracking-tight mb-4 leading-tight">Linear Beam<br/>Gen 2</h1>
+<p class="text-text-main text-3xl font-bold mb-10">$249.00</p>
+<div class="grid grid-cols-2 gap-4 mb-10">
+<div class="bg-surface p-5 rounded-2xl">
+<span class="material-symbols-outlined text-primary mb-2">bolt</span>
+<p class="text-[10px] text-text-desc font-bold uppercase tracking-wider">Power</p>
+<p class="text-text-main font-bold text-sm">24W / 2800lm</p>
+</div>
+<div class="bg-surface p-5 rounded-2xl">
+<span class="material-symbols-outlined text-primary mb-2">verified</span>
+<p class="text-[10px] text-text-desc font-bold uppercase tracking-wider">Certified</p>
+<p class="text-text-main font-bold text-sm">Energy Star</p>
+</div>
+<div class="bg-surface p-5 rounded-2xl">
+<span class="material-symbols-outlined text-primary mb-2">settings_input_antenna</span>
+<p class="text-[10px] text-text-desc font-bold uppercase tracking-wider">Protocol</p>
+<p class="text-text-main font-bold text-sm">Matter Pro</p>
+</div>
+<div class="bg-surface p-5 rounded-2xl">
+<span class="material-symbols-outlined text-primary mb-2">palette</span>
+<p class="text-[10px] text-text-desc font-bold uppercase tracking-wider">CRI</p>
+<p class="text-text-main font-bold text-sm">95+ TrueColor</p>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<button class="w-full bg-primary text-white font-bold h-16 rounded-2xl text-xl shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all transform hover:-translate-y-1">
+                                Add to Cart
+                            </button>
+<button class="w-full bg-white border border-gray-200 text-text-main font-bold h-16 rounded-2xl text-lg hover:bg-surface transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">favorite</span>
+                                Save to Wishlist
+                            </button>
+</div>
+<p class="mt-8 text-text-desc text-sm leading-relaxed">
+                            Complimentary shipping on orders over $500. <br/> 
+                            Available for immediate dispatch.
+                        </p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-white border-t border-gray-100">
+<div class="max-w-4xl mx-auto px-10">
+<h2 class="text-text-main text-4xl lg:text-5xl font-bold mb-10 leading-tight">A Symphony of Light and Form.</h2>
+<div class="prose prose-xl max-w-none">
+<p class="text-text-sub text-2xl leading-relaxed mb-12 font-light">
+                        The Linear Beam Gen 2 isn't just a light fixture; it's a precision instrument. Crafted from aircraft-grade aluminum, it delivers a flicker-free, edge-to-edge illumination that mimics the natural properties of morning sunlight.
+                    </p>
+</div>
+<div class="grid md:grid-cols-2 gap-10 items-center my-20">
+<div class="rounded-3xl overflow-hidden shadow-2xl">
+<img alt="Lifestyle Application" class="w-full aspect-[3/4] object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+<div class="space-y-8">
+<div class="p-10 bg-surface rounded-3xl">
+<p class="text-text-main text-xl italic leading-relaxed mb-6">
+                                "The way it integrates with my circadian rhythm has completely changed how I work from home."
+                            </p>
+<p class="text-text-main font-bold text-sm">— Architectural Digest</p>
+</div>
+<div>
+<h3 class="text-text-main text-2xl font-bold mb-4">Seamless Integration</h3>
+<p class="text-text-sub text-lg leading-relaxed">
+                                Equipped with the latest Matter-compatible chipsets, the Linear Beam connects instantly to your preferred smart home ecosystem. No hubs, no complexity—just pure, effortless light controlled by your voice or your presence.
+                            </p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="bg-surface py-24">
+<div class="max-w-[1400px] mx-auto px-10">
+<div class="max-w-3xl">
+<h2 class="text-text-main text-3xl font-bold mb-12">Technical Specifications</h2>
+<div class="grid md:grid-cols-2 gap-x-20 gap-y-2">
+<div class="flex justify-between py-6 border-b border-gray-300/50">
+<span class="text-text-sub text-sm uppercase tracking-widest font-semibold">Dimensions</span>
+<span class="text-text-main text-sm font-bold">1200 x 45 x 60 mm</span>
+</div>
+<div class="flex justify-between py-6 border-b border-gray-300/50">
+<span class="text-text-sub text-sm uppercase tracking-widest font-semibold">Color Temp</span>
+<span class="text-text-main text-sm font-bold">2700K - 6500K</span>
+</div>
+<div class="flex justify-between py-6 border-b border-gray-300/50">
+<span class="text-text-sub text-sm uppercase tracking-widest font-semibold">Lifespan</span>
+<span class="text-text-main text-sm font-bold">50,000 Hours</span>
+</div>
+<div class="flex justify-between py-6 border-b border-gray-300/50">
+<span class="text-text-sub text-sm uppercase tracking-widest font-semibold">Material</span>
+<span class="text-text-main text-sm font-bold">Anodized Aluminum</span>
+</div>
+<div class="flex justify-between py-6 border-b border-gray-300/50">
+<span class="text-text-sub text-sm uppercase tracking-widest font-semibold">Weight</span>
+<span class="text-text-main text-sm font-bold">2.4 kg</span>
+</div>
+<div class="flex justify-between py-6 border-b border-gray-300/50">
+<span class="text-text-sub text-sm uppercase tracking-widest font-semibold">Warranty</span>
+<span class="text-text-main text-sm font-bold">5 Years</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<footer class="bg-white pt-24 pb-12 px-10 border-t border-gray-100">
+<div class="max-w-[1400px] mx-auto">
+<div class="grid md:grid-cols-4 gap-12 mb-20">
+<div class="col-span-1">
+<div class="flex items-center gap-2 mb-6">
+<div class="size-6 bg-primary rounded-md flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[14px] font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-base font-bold tracking-tight">Lumina</h2>
+</div>
+<p class="text-text-desc text-sm leading-relaxed max-w-xs">
+                        Leading the transition to sustainable, human-centric lighting solutions for the modern workspace.
+                    </p>
+</div>
+<div>
+<h4 class="font-bold text-sm mb-6 uppercase tracking-widest">Products</h4>
+<ul class="space-y-4 text-sm text-text-sub">
+<li><a class="hover:text-primary" href="#">Linear Series</a></li>
+<li><a class="hover:text-primary" href="#">Spot Series</a></li>
+<li><a class="hover:text-primary" href="#">Smart Controls</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-sm mb-6 uppercase tracking-widest">Company</h4>
+<ul class="space-y-4 text-sm text-text-sub">
+<li><a class="hover:text-primary" href="#">Our Story</a></li>
+<li><a class="hover:text-primary" href="#">Sustainability</a></li>
+<li><a class="hover:text-primary" href="#">Press</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-sm mb-6 uppercase tracking-widest">Legal</h4>
+<ul class="space-y-4 text-sm text-text-sub">
+<li><a class="hover:text-primary" href="#">Privacy Policy</a></li>
+<li><a class="hover:text-primary" href="#">Terms of Use</a></li>
+</ul>
+</div>
+</div>
+<div class="pt-8 border-t border-gray-100">
+<p class="text-text-desc text-[12px] leading-relaxed">
+                    © 2024 LUMINA LIGHTING SOLUTIONS AB. All architectural designs protected by law. Designed with precision in Stockholm.
+                </p>
+</div>
+</div>
+</footer>
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:hidden">
+<div class="bg-white/90 backdrop-blur-lg px-6 py-4 rounded-3xl border border-gray-100 shadow-2xl flex items-center gap-6">
+<div>
+<p class="text-[10px] text-text-desc font-bold uppercase">Linear Beam</p>
+<p class="text-text-main font-bold">$249.00</p>
+</div>
+<button class="bg-primary text-white font-bold px-8 h-12 rounded-2xl shadow-lg shadow-primary/20">
+                Add to Cart
+            </button>
+</div>
+</div>
+
+</body></html>

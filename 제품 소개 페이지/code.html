@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Product List</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#007AFF",
+                        "background": "#FFFFFF",
+                        "surface": "#F2F4F6",
+                        "text-main": "#191F28",
+                        "text-sub": "#4E5968",
+                        "text-desc": "#8B95A1",
+                        "divider": "#EEEEEE"
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-text-main font-sans antialiased;
+            }
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="selection:bg-primary/20">
+<nav class="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-gray-100">
+<div class="flex items-center justify-between px-6 h-16 max-w-screen-xl mx-auto relative">
+<div class="flex items-center gap-2 z-10">
+<div class="size-7 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-lg font-bold tracking-tight">Lumina</h2>
+</div>
+<div class="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-10">
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Products</a>
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Technology</a>
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Projects</a>
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Support</a>
+</div>
+<div class="flex items-center gap-2 z-10">
+<button class="text-text-main p-2 hover:bg-surface rounded-full transition-colors hidden sm:block">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-text-main p-2 hover:bg-surface rounded-full transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</nav>
+<main class="pt-24 pb-12 max-w-screen-xl mx-auto">
+<header class="px-6 mb-8">
+<h1 class="text-3xl font-bold text-text-main">Collections</h1>
+</header>
+<div class="px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-12">
+<div class="group">
+<div class="aspect-[4/3] rounded-3xl overflow-hidden bg-surface mb-4">
+<img alt="Halo Pendant" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-lg font-bold text-text-main">Halo Pendant Light</h3>
+<p class="text-sm text-text-desc font-medium">15W / 1200lm / 3000K</p>
+<div class="flex gap-2 mt-2 opacity-60">
+<span class="material-symbols-outlined text-sm">settings_input_antenna</span>
+<span class="material-symbols-outlined text-sm">energy_savings_leaf</span>
+<span class="material-symbols-outlined text-sm">verified</span>
+</div>
+</div>
+<hr class="mt-8 border-divider"/>
+</div>
+<div class="group">
+<div class="aspect-[4/3] rounded-3xl overflow-hidden bg-surface mb-4">
+<img alt="Linear Surface" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqqDcaE4osbN0zR5Hw134Zp-ppIFhUG9hD8Y5MjdNZcw5pP8SyHD5NZ3Xtq1stPtolHHYR1FddL01wpuHpj1Y4aONTfSH5cBP6QT7lb9IDAkH3EQiEYe5t5kKr4aU5PtY5CU9yAg1CQo-ytdY4R6ma907ih0RD41X5gDfpfHMHtVLA2YmYcWQedt9UYLjzNdNTCKyhSf5U92sWkD6Ot---cQsr8ad_AZWjh7dRdQkNxJQUn0BWKkE98hqgXDf3U5cW7IAw_Pfwq4A"/>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-lg font-bold text-text-main">Linear Surface Mount</h3>
+<p class="text-sm text-text-desc font-medium">24W / 2100lm / Tunable</p>
+<div class="flex gap-2 mt-2 opacity-60">
+<span class="material-symbols-outlined text-sm">settings_input_antenna</span>
+<span class="material-symbols-outlined text-sm">verified</span>
+</div>
+</div>
+<hr class="mt-8 border-divider"/>
+</div>
+<div class="group">
+<div class="aspect-[4/3] rounded-3xl overflow-hidden bg-surface mb-4">
+<img alt="Vortex Spot" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8bZfMUm3FquqMUdANSyTiTHjLTKfvnCQalqUpBW__JcabaMpjxru0niqdl2x2NfCHhqvaBUHkBLr5DYiCgu1tBAdB-tjAPllNx_G9YpHbxlVl3W689-zmWZG_gLYkm82wUJfnS3kYPRBeGV0TvHFob7Idax7qaqAV2KUqt7AUSFTwpm6gEUqwCGmsuK7-DkrUR2KCEaF93Mv9TSPcnopvz3tI18UIylLcgh6EJzpc3XQRF1bRPKExn81QP16l3DLyX1OorDqUaAY"/>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-lg font-bold text-text-main">Vortex Spot Series</h3>
+<p class="text-sm text-text-desc font-medium">9W / 850lm / 95 CRI</p>
+<div class="flex gap-2 mt-2 opacity-60">
+<span class="material-symbols-outlined text-sm">energy_savings_leaf</span>
+<span class="material-symbols-outlined text-sm">verified</span>
+</div>
+</div>
+<hr class="mt-8 border-divider"/>
+</div>
+<div class="group">
+<div class="aspect-[4/3] rounded-3xl overflow-hidden bg-surface mb-4">
+<img alt="Orbit Ceiling" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpKC83SZs4OOO5rhVz72XlNTnl3PfkzngFK-aKM-uPtmOxxtigzJopefBTdnz6K1XQsbFyzyh8b1dIXvQW53ciEdqlGCYYO2HO80UyyN6mo7CNCuMXbG1WRudCoQR5tjJJ7RCZOb2wXpJ7teSkF4pVISgHNzaItZmBZi3eZ927Pjw6UrXgEDnmFWAETNO9mncLMAN7hOcxBakQWLluvx9noKZFFEEWin0rgwgYtPA79Uc7iioP9a_ieVPt_39pkY_ZxaGqr210rvc"/>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-lg font-bold text-text-main">Orbit Smart Flush</h3>
+<p class="text-sm text-text-desc font-medium">18W / 1600lm / RGBW</p>
+<div class="flex gap-2 mt-2 opacity-60">
+<span class="material-symbols-outlined text-sm">settings_input_antenna</span>
+<span class="material-symbols-outlined text-sm">energy_savings_leaf</span>
+<span class="material-symbols-outlined text-sm">award_star</span>
+</div>
+</div>
+<hr class="mt-8 border-divider md:hidden"/>
+</div>
+</div>
+</main>
+<footer class="bg-surface py-16 px-8 mt-12">
+<div class="max-w-screen-xl mx-auto">
+<div class="max-w-md">
+<div class="flex items-center gap-2 mb-8">
+<div class="size-6 bg-primary rounded-md flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[14px] font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-base font-bold tracking-tight">Lumina</h2>
+</div>
+<div class="grid grid-cols-2 gap-8 mb-12">
+<div>
+<h4 class="text-text-main font-bold text-sm mb-4">Shop</h4>
+<ul class="space-y-3 text-text-sub text-sm">
+<li><a class="hover:text-primary transition-colors" href="#">New Arrivals</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Smart Series</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Architectural</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-4">Support</h4>
+<ul class="space-y-3 text-text-sub text-sm">
+<li><a class="hover:text-primary transition-colors" href="#">Shipping</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Returns</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Manuals</a></li>
+</ul>
+</div>
+</div>
+<div class="pt-8 border-t border-gray-200">
+<p class="text-text-desc text-[12px] leading-relaxed">
+                        © 2024 LUMINA LIGHTING SOLUTIONS AB. <br/>All architectural designs protected by law.
+                    </p>
+<div class="flex gap-4 mt-6">
+<a class="text-text-sub text-xs font-semibold hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="text-text-sub text-xs font-semibold hover:text-primary transition-colors" href="#">Terms of Use</a>
+</div>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

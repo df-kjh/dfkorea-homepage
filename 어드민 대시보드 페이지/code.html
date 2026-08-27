@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Admin Dashboard Overview</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Space Grotesk -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#22a8c3",
+                        "background-light": "#ffffff",
+                        "background-dark": "#1c1f22",
+                        "surface-light": "#f9fafb",
+                        "surface-dark": "#2a2d31",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .ios-tab-bar {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-[#121617] dark:text-gray-100 font-display transition-colors duration-200">
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+<div class="flex items-center justify-between px-5 h-16">
+<div class="flex items-center gap-3">
+<div class="size-8 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[20px]">lightbulb</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight">Lumina</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="size-9 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden border border-gray-200 dark:border-gray-600">
+<img class="w-full h-full object-cover" data-alt="User profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaFH61gC2NcOPgepDAmuvyfABwZGM2HzxMa8qKakizpMCb2p0MI8oSH7zXeoCnOebXnd8ywcMJKaOPud8AO7bNYaoD7QSPR6lClMvWHgY9kNAYGPFixV7h0koCX6aVd98w0QNIR7zU-nIIGtJ2tw5qAjJ3EB366Kz1jzspEBUngftpP_LtFUNyxch32wam0WlzTDAlP9ClL0tCwBuzIC2WIsUKYcf9WoA3LuCdmzZRYldMZn7s2bzmCuWW5_MjEP6rjrg3mMxeJZ0"/>
+</div>
+</div>
+</div>
+</header>
+<main class="pb-24">
+<!-- Dashboard Greeting -->
+<section class="px-5 pt-8 pb-4">
+<p class="text-sm font-medium text-primary uppercase tracking-widest mb-1">Overview</p>
+<h2 class="text-3xl font-extrabold tracking-tight">Management</h2>
+</section>
+<!-- Product Management Section -->
+<section class="mt-4 px-4">
+<div class="bg-surface-light dark:bg-surface-dark rounded-xl p-1 border border-gray-100 dark:border-gray-800 shadow-sm">
+<div class="flex items-center justify-between px-4 py-4">
+<h3 class="text-lg font-bold">Product Management</h3>
+<span class="text-sm font-medium text-gray-400">24 Items</span>
+</div>
+<div class="px-3 pb-3">
+<button class="w-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center gap-2 h-12 rounded-lg font-bold transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined">add</span>
+<span>Add Product</span>
+</button>
+</div>
+<div class="space-y-1 px-1 pb-2">
+<!-- Product Item 1 -->
+<div class="flex items-center gap-4 p-3 bg-white dark:bg-background-dark rounded-lg border border-transparent hover:border-gray-100 dark:hover:border-gray-700 transition-all">
+<div class="size-14 rounded-lg bg-gray-100 dark:bg-gray-800 overflow-hidden shrink-0 border border-gray-50 dark:border-gray-700">
+<img class="w-full h-full object-cover" data-alt="Minimalist LED bulb design" src="https://lh3.googleusercontent.com/aida-public/AB6AXuClC6_vN_MPTJ7ZErV5CazpQk8oFFzDvBkSa2OLHZfx8zOjkekiFfrhKs1izW6-sFZmLAhDtfF_jYrbTqTjtMA4bMNis_8ZuzfVOPpS7L36ULuFsPjZUXEYNp8VH1TvZC1Ke44WgynYZCEXVnkn8iZrm8u4jo42Y9SFTuxlEljcM2rUtbQa6DtWT6BNwjX6udVfNnrl4P0nzJdFyt1-S7oC-dpm_8Nvg_r-BEJHdyHy_aiwoQH0djqCqDhddJPpShvpvoQczaC4ZIM"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="font-bold text-base truncate">Aura LED Bulb</p>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="size-2 rounded-full bg-green-500"></span>
+<p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Active</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-300">chevron_right</span>
+</div>
+<!-- Product Item 2 -->
+<div class="flex items-center gap-4 p-3 bg-white dark:bg-background-dark rounded-lg border border-transparent">
+<div class="size-14 rounded-lg bg-gray-100 dark:bg-gray-800 overflow-hidden shrink-0 border border-gray-50 dark:border-gray-700">
+<img class="w-full h-full object-cover" data-alt="Smart light strip visual" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbixjl43l_bUfvcKCxNtRKRBGw6MZHvW7t8b5h0kDSkWK2EUsWrh7R2kEpkEE07Bn5AhyajygOAyACo-ICsHlgsx434uDcOtssY_chVer1t9x0tI2iHIXDaKD9lBSRc-YlCWFmEsjqi70LHHzojByWlQlmJQi4lhxctIyO0LV5sgvEtEY-foFjoGO0vUQUWkSUK0Ts9Av_7gR6M04JLt9dmyJcK0uJqbq_Je830NCI8NarXvvPeIirFX_C2ivV5JTdlhYnr2IHgEk"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="font-bold text-base truncate">Lumina Smart Strip</p>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="size-2 rounded-full bg-orange-400"></span>
+<p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Draft</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-300">chevron_right</span>
+</div>
+<!-- Product Item 3 -->
+<div class="flex items-center gap-4 p-3 bg-white dark:bg-background-dark rounded-lg border border-transparent">
+<div class="size-14 rounded-lg bg-gray-100 dark:bg-gray-800 overflow-hidden shrink-0 border border-gray-50 dark:border-gray-700">
+<img class="w-full h-full object-cover" data-alt="Outdoor floodlight product image" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-QwCNIhilrrKrCVEzt-pPT36G4gpj2rnsiWv7X6wMvTjqm7TFr1ixtd7Qm8PVCLHhKTsN8gvhhwZ5S1LAcFRltgiZWwT6E96Q0VzsyYVYYyw__pDfpLfLc_SbZPcSEuG039TNtWhJfO0qR6-BjH3ltP5B_2AksIi1j8BKGVU9u_c9FCh7YM_0tKmCcdwsFo9lREBJiixf5JEGGf321BR1DeS22QVzD4c82XjCmTrxSTg85uebMTX5GyepTF3I1w9hxzXKag4Gj3c"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="font-bold text-base truncate">Neon Floodlight V2</p>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="size-2 rounded-full bg-green-500"></span>
+<p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Active</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-300">chevron_right</span>
+</div>
+</div>
+<button class="w-full py-4 text-sm font-bold text-gray-400 border-t border-gray-50 dark:border-gray-800">
+                    Show All Products
+                </button>
+</div>
+</section>
+<!-- News Management Section -->
+<section class="mt-8 px-4">
+<div class="bg-surface-light dark:bg-surface-dark rounded-xl p-1 border border-gray-100 dark:border-gray-800 shadow-sm">
+<div class="flex items-center justify-between px-4 py-4">
+<h3 class="text-lg font-bold">News Management</h3>
+<span class="material-symbols-outlined text-gray-400">more_horiz</span>
+</div>
+<div class="px-3 pb-3">
+<button class="w-full bg-white dark:bg-background-dark border border-gray-200 dark:border-gray-700 text-[#121617] dark:text-white flex items-center justify-center gap-2 h-12 rounded-lg font-bold transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-primary">post_add</span>
+<span>Add News Article</span>
+</button>
+</div>
+<div class="px-1 pb-2 divide-y divide-gray-50 dark:divide-gray-800">
+<!-- News Item 1 -->
+<div class="p-4 bg-white dark:bg-background-dark rounded-lg mb-1">
+<div class="flex justify-between items-start mb-2">
+<span class="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">Corporate</span>
+<span class="text-[11px] font-medium text-gray-400">Oct 24, 2023</span>
+</div>
+<p class="font-bold text-base leading-tight mb-2">New Sustainable Manufacturing Plant in Seoul</p>
+<p class="text-xs text-gray-500 line-clamp-2">Lumina is proud to announce our new zero-emission facility starting operations next month...</p>
+</div>
+<!-- News Item 2 -->
+<div class="p-4 bg-white dark:bg-background-dark rounded-lg mb-1">
+<div class="flex justify-between items-start mb-2">
+<span class="px-2 py-0.5 rounded bg-blue-50 text-blue-500 dark:bg-blue-500/10 text-[10px] font-bold uppercase tracking-wider">Product</span>
+<span class="text-[11px] font-medium text-gray-400">Oct 18, 2023</span>
+</div>
+<p class="font-bold text-base leading-tight mb-2">Firmware Update 2.4: Matter Support Added</p>
+<p class="text-xs text-gray-500 line-clamp-2">All Lumina Gen 3 bulbs now support the Matter smart home standard for better interoperability...</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- iOS Styled Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 ios-tab-bar bg-white/80 dark:bg-background-dark/80 border-t border-gray-100 dark:border-gray-800 px-6 pb-8 pt-3 flex justify-between items-center z-[60]">
+<div class="flex flex-col items-center gap-1 group cursor-pointer text-primary">
+<span class="material-symbols-outlined !text-[26px]">grid_view</span>
+<span class="text-[10px] font-bold">Dashboard</span>
+</div>
+<div class="flex flex-col items-center gap-1 group cursor-pointer text-gray-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined !text-[26px]">inventory_2</span>
+<span class="text-[10px] font-bold">Products</span>
+</div>
+<div class="flex flex-col items-center gap-1 group cursor-pointer text-gray-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined !text-[26px]">newspaper</span>
+<span class="text-[10px] font-bold">News</span>
+</div>
+<div class="flex flex-col items-center gap-1 group cursor-pointer text-gray-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined !text-[26px]">settings</span>
+<span class="text-[10px] font-bold">Settings</span>
+</div>
+</nav>
+</body></html>

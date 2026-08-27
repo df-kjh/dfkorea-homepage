@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina LED Main Page Variant 2</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#00bcd1",
+              "background-light": "#f5f8f8",
+              "background-dark": "#0f2123",
+            },
+            fontFamily: {
+              "display": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            @apply bg-background-dark;
+        }
+        .glass-nav {
+            background: rgba(15, 33, 35, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-white selection:bg-primary selection:text-background-dark">
+<nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 glass-nav border-b border-white/5">
+<div class="flex items-center justify-between px-6 py-4 max-w-screen-xl mx-auto h-20">
+<div class="flex items-center gap-2 flex-1">
+<div class="size-8 bg-primary rounded-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-background-dark text-xl font-bold">lightbulb</span>
+</div>
+<h2 class="text-white text-xl font-bold tracking-tighter uppercase">Lumina</h2>
+</div>
+<div class="hidden md:flex items-center justify-center gap-10 flex-[2]">
+<a class="text-sm font-medium tracking-widest uppercase text-white/70 hover:text-primary transition-colors" href="#">Products</a>
+<a class="text-sm font-medium tracking-widest uppercase text-white/70 hover:text-primary transition-colors" href="#">Innovation</a>
+<a class="text-sm font-medium tracking-widest uppercase text-white/70 hover:text-primary transition-colors" href="#">About</a>
+<a class="text-sm font-medium tracking-widest uppercase text-white/70 hover:text-primary transition-colors" href="#">Support</a>
+</div>
+<div class="flex items-center justify-end gap-6 flex-1">
+<button class="text-white/80 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-white/80 hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined">shopping_bag</span>
+<span class="absolute -top-1 -right-1 size-2 bg-primary rounded-full"></span>
+</button>
+<button class="md:hidden text-white/80 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</nav>
+<section class="relative h-[90vh] flex flex-col items-center justify-center overflow-hidden">
+<div class="absolute inset-0 z-0">
+<div class="absolute inset-0 bg-gradient-to-b from-background-dark/40 via-transparent to-background-dark z-10"></div>
+<div class="w-full h-full bg-center bg-cover scale-110" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM");'>
+</div>
+</div>
+<div class="relative z-20 text-center px-6 max-w-2xl">
+<span class="text-primary font-medium tracking-[0.3em] uppercase text-xs mb-4 block">New Architectural Collection</span>
+<h1 class="text-white text-5xl md:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
+            Light Your Life.
+        </h1>
+<p class="text-white/70 text-lg md:text-xl font-light leading-relaxed mb-10 max-w-md mx-auto">
+            Experience the future of architectural illumination. Precision-engineered for modern spaces.
+        </p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="bg-primary text-background-dark px-10 py-4 rounded-sm font-bold text-sm tracking-widest uppercase hover:bg-white transition-all">
+                Shop Collection
+            </button>
+<button class="bg-white/10 backdrop-blur-md text-white border border-white/20 px-10 py-4 rounded-sm font-bold text-sm tracking-widest uppercase hover:bg-white/20 transition-all">
+                The Film
+            </button>
+</div>
+</div>
+<div class="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 animate-bounce opacity-50">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</section>
+<section class="py-20 px-6 border-b border-white/5">
+<div class="max-w-screen-xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+<div class="flex flex-col items-center text-center gap-2">
+<span class="text-primary text-3xl font-bold">95+</span>
+<span class="text-white/40 text-xs uppercase tracking-widest">Color Rendering</span>
+</div>
+<div class="flex flex-col items-center text-center gap-2">
+<span class="text-primary text-3xl font-bold">50k</span>
+<span class="text-white/40 text-xs uppercase tracking-widest">Hours Lifetime</span>
+</div>
+<div class="flex flex-col items-center text-center gap-2">
+<span class="text-primary text-3xl font-bold">Matter</span>
+<span class="text-white/40 text-xs uppercase tracking-widest">Compatible</span>
+</div>
+<div class="flex flex-col items-center text-center gap-2">
+<span class="text-primary text-3xl font-bold">A++</span>
+<span class="text-white/40 text-xs uppercase tracking-widest">Energy Rating</span>
+</div>
+</div>
+</section>
+<section class="py-32 px-6 overflow-hidden">
+<div class="max-w-screen-xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
+<div class="order-2 lg:order-1 relative">
+<div class="relative z-10 grid grid-cols-2 gap-4">
+<div class="aspect-[9/16] bg-neutral-900 rounded-xl overflow-hidden shadow-2xl border border-white/10" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD4Z2k-8HAL2HzR8v5njxL5G8kLqqi45qVqf2CAS1YINq652g3XXj-ATnqH79Hn5W9kYwXavXBNim48xFA07fuzvvsLUVhjGPXlgs71yi22dLp9i2cpSBqhBfMN2dAm1VjSx-5LlqbaPEFMQLW2Vu9lvdh-OJudjH74jdu0NraVZTWRhXt6SboiotKKxlIxBLKQBo4A_vTQLRaioX1v9tE0-iDnUzVzxOPp8T7b0-Cbji8uGxJ6XFjVlpPG7Qw8sSb2tJW1xAizpMI"); background-size: cover;'>
+</div>
+<div class="aspect-[9/16] bg-neutral-900 rounded-xl overflow-hidden shadow-2xl border border-white/10 mt-12" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCUxRalyHXoyrkdBuKZxpxag-p6WXVL9sd-l-4I-KLia4BqGkRK1u8IqG8iblSf6qnoC0uBUVzHtRNzLyC34IwYAok7rdMj9XK_VxNWOcZ8G8guNw3Sy104Q5XN6ESuaZ_-Ftl7CWAXF6qiPqcPrQxPveFmMlBPQYAHebDungvooHdnwQvt56tp1gX7SEz-Tt5FT5byETuAjYLBKwXNZ0vuArjN_7VM4jNRcWxsB854NVB3EIWDQArO-ExVHw-AJ_pNP3s5EA7XtX8"); background-size: cover;'>
+</div>
+</div>
+<div class="absolute -top-20 -left-20 size-80 bg-primary/20 blur-[100px] rounded-full"></div>
+</div>
+<div class="order-1 lg:order-2">
+<h2 class="text-white text-4xl md:text-5xl font-bold leading-tight mb-8">
+                Seamless Control. <br/>Precision Design.
+            </h2>
+<p class="text-white/60 text-lg leading-relaxed mb-10">
+                Adjust brightness, color temperature, and atmospheric moods directly from your palm. Our Matter-enabled hardware integrates natively with Apple Home, Google, and Alexa.
+            </p>
+<ul class="space-y-6 mb-12">
+<li class="flex items-center gap-4 group">
+<div class="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-background-dark transition-all">
+<span class="material-symbols-outlined text-xl">schedule</span>
+</div>
+<span class="text-white/80 font-medium">Circadian Rhythm Scheduling</span>
+</li>
+<li class="flex items-center gap-4 group">
+<div class="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-background-dark transition-all">
+<span class="material-symbols-outlined text-xl">palette</span>
+</div>
+<span class="text-white/80 font-medium">16 Million Precision Colors</span>
+</li>
+<li class="flex items-center gap-4 group">
+<div class="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-background-dark transition-all">
+<span class="material-symbols-outlined text-xl">sensors</span>
+</div>
+<span class="text-white/80 font-medium">Occupancy Motion Tracking</span>
+</li>
+</ul>
+<button class="flex items-center gap-3 text-primary font-bold tracking-widest uppercase group">
+                Explore Ecosystem 
+                <span class="material-symbols-outlined group-hover:translate-x-2 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<section class="py-32 bg-background-light/5">
+<div class="px-6 max-w-screen-xl mx-auto flex justify-between items-end mb-12">
+<div>
+<span class="text-primary font-medium tracking-widest uppercase text-xs mb-4 block">Our Categories</span>
+<h2 class="text-white text-3xl font-bold">Architectural Lighting</h2>
+</div>
+<div class="hidden md:flex gap-4">
+<button class="size-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="size-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="flex overflow-x-auto px-6 pb-8 gap-6 no-scrollbar snap-x">
+<div class="min-w-[300px] md:min-w-[400px] snap-start group cursor-pointer">
+<div class="aspect-[3/4] rounded-sm overflow-hidden mb-6 relative">
+<div class="absolute inset-0 bg-background-dark/20 group-hover:bg-transparent transition-colors"></div>
+<img alt="Recessed Linear Lighting" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVdsJZhyj1VOSPck7yELo_LQpzSGXO3Dx3xlRk2-QwuGGFCofmTTVDCDTiaOBQ5fqi0QoNdgDPX3JU2lpV3WciLZrnUEAmext0WRKiiqlZ4nggTCMa4zLt8eFXbAjcePC9GHx24IUmSYlm_-w0Y6TJE6mp20YVIbOefQB_VsG0dewIKcSTmq1YeqZ6FK5LcSiRbQK2Tuh9H6m912V0BbQRz6QSGLWD_mQJ-NowGnmZbPcdvVIDPCJW9dEzZM6zNVw7r79zCE9_V58"/>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-white text-xl font-bold mb-1">Recessed Linear</h3>
+<p class="text-white/40 text-sm">Precision architectural lines</p>
+</div>
+<span class="text-primary font-mono text-sm">FROM $249</span>
+</div>
+</div>
+<div class="min-w-[300px] md:min-w-[400px] snap-start group cursor-pointer">
+<div class="aspect-[3/4] rounded-sm overflow-hidden mb-6 relative">
+<div class="absolute inset-0 bg-background-dark/20 group-hover:bg-transparent transition-colors"></div>
+<img alt="Smart Ambient Lighting" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGCT4189ECsviD1-KuiXj-fMxQrfhAkhqdJ97SYtTkawiDQBwow1r9xVukPF5077rUKBuDCIxIX3HrWvvLf6wgDL58lWnAGvnyFGgEszyWX0aQG3ei83pACtABGc9ttIB8FF1kElcbOZSZBja3NZx3la8SvpaIRh_-xo01FjksnbOHla1jD__ebRVlNKTiqclRW6weDu84cShwfEKFmlbar-3fblwG7WYvVL9-MCZjTg531dvwTEjUeCSAn-BbZMTOT6d9sO3V65I"/>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-white text-xl font-bold mb-1">Smart Ambient</h3>
+<p class="text-white/40 text-sm">Cinematic atmosphere control</p>
+</div>
+<span class="text-primary font-mono text-sm">FROM $189</span>
+</div>
+</div>
+<div class="min-w-[300px] md:min-w-[400px] snap-start group cursor-pointer">
+<div class="aspect-[3/4] rounded-sm overflow-hidden mb-6 relative">
+<div class="absolute inset-0 bg-background-dark/20 group-hover:bg-transparent transition-colors"></div>
+<img alt="Task Lighting" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCanaghycUd5nXhj-sWvuIYmaFhz3Tr_jX5gkrzzyGoyTJv9dfF6qSMXrYFKiiS3BA2Qs6Uh_FVv4mn3LXFAsL-MH3n_T0wSUxMkldv8OrZ-4edVeWUdZiURPbG6xqGI_o6McfrXg8OCu6h2DxYgcNNjq3iFY_c3h5j691qyYLZtcqEYG_k613I5S5P5nYatTDvQRX1xiMvN0726P-m8kTC7jwwBWy5q1p2Lqh6C58wIh2lsQyN0TTOuYh0WMsj1zv-gx5uI0DdfHg"/>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-white text-xl font-bold mb-1">Task Lighting</h3>
+<p class="text-white/40 text-sm">Professional focus-driven series</p>
+</div>
+<span class="text-primary font-mono text-sm">FROM $320</span>
+</div>
+</div>
+</div>
+</section>
+<section class="py-32 px-6">
+<div class="max-w-screen-md mx-auto text-center border border-white/10 p-12 rounded-sm bg-gradient-to-br from-white/5 to-transparent">
+<h2 class="text-white text-3xl font-bold mb-4">Stay Illuminated</h2>
+<p class="text-white/50 mb-8">Join our inner circle for early access to new collections and lighting design insights.</p>
+<form class="flex flex-col sm:flex-row gap-4">
+<input class="flex-1 bg-background-dark border-white/20 focus:border-primary text-white rounded-sm py-4 px-6 outline-none transition-all" placeholder="Email Address" type="email"/>
+<button class="bg-primary text-background-dark font-bold px-8 py-4 rounded-sm hover:bg-white transition-colors" type="submit">Subscribe</button>
+</form>
+</div>
+</section>
+<footer class="pt-20 pb-10 px-6 border-t border-white/5">
+<div class="max-w-screen-xl mx-auto">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-10 mb-20">
+<div class="col-span-2 lg:col-span-2">
+<div class="flex items-center gap-2 mb-6">
+<div class="size-6 bg-primary rounded-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-background-dark text-xs font-bold">lightbulb</span>
+</div>
+<h2 class="text-white text-lg font-bold tracking-tighter uppercase">Lumina</h2>
+</div>
+<p class="text-white/40 text-sm leading-relaxed max-w-xs">
+                    Architectural grade LED solutions for visionary homes and workspaces. Designed in Stockholm, enjoyed globally.
+                </p>
+</div>
+<div>
+<h4 class="text-white font-bold text-sm mb-6 uppercase tracking-widest">Shop</h4>
+<ul class="space-y-4 text-white/40 text-sm">
+<li><a class="hover:text-primary transition-colors" href="#">Collection</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Smart Bulbs</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Track Lighting</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-white font-bold text-sm mb-6 uppercase tracking-widest">Support</h4>
+<ul class="space-y-4 text-white/40 text-sm">
+<li><a class="hover:text-primary transition-colors" href="#">Installation</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Warranty</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Contact</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-white font-bold text-sm mb-6 uppercase tracking-widest">Company</h4>
+<ul class="space-y-4 text-white/40 text-sm">
+<li><a class="hover:text-primary transition-colors" href="#">Our Story</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Impact</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Careers</a></li>
+</ul>
+</div>
+<div class="flex flex-col gap-6">
+<h4 class="text-white font-bold text-sm uppercase tracking-widest">Social</h4>
+<div class="flex gap-4">
+<a class="size-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary/20 transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">public</span>
+</a>
+<a class="size-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary/20 transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">camera</span>
+</a>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-center pt-10 border-t border-white/5 gap-4">
+<span class="text-white/20 text-xs">© 2024 LUMINA LIGHTING SOLUTIONS AB. ALL RIGHTS RESERVED.</span>
+<div class="flex gap-8 text-white/20 text-xs uppercase tracking-widest">
+<a class="hover:text-white transition-colors" href="#">Privacy</a>
+<a class="hover:text-white transition-colors" href="#">Terms</a>
+<a class="hover:text-white transition-colors" href="#">Cookies</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Company News List</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#007AFF",
+              "background": "#FFFFFF",
+              "surface": "#F2F4F6",
+              "text-main": "#191F28",
+              "text-sub": "#4E5968",
+              "text-desc": "#8B95A1",
+              "divider": "#EEEEEE"
+            },
+            fontFamily: {
+              "sans": ["Inter", "sans-serif"]
+            },
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-text-main font-sans antialiased;
+            }
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="selection:bg-primary/20">
+<nav class="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-gray-100">
+<div class="flex items-center justify-between px-6 md:px-12 h-16 max-w-screen-xl mx-auto">
+<div class="flex items-center gap-2 shrink-0">
+<div class="size-7 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-lg font-bold tracking-tight">Lumina</h2>
+</div>
+<div class="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
+<a class="text-text-sub hover:text-primary font-medium text-[15px] transition-colors" href="#">Products</a>
+<a class="text-text-sub hover:text-primary font-medium text-[15px] transition-colors border-b-2 border-primary pb-0.5" href="#">News</a>
+<a class="text-text-sub hover:text-primary font-medium text-[15px] transition-colors" href="#">Projects</a>
+<a class="text-text-sub hover:text-primary font-medium text-[15px] transition-colors" href="#">Support</a>
+<a class="text-text-sub hover:text-primary font-medium text-[15px] transition-colors" href="#">Contact</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-text-main p-2 hover:bg-gray-100 rounded-full transition-colors hidden md:block">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-text-main p-2 md:hidden">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<button class="hidden md:block bg-primary text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-blue-600 transition-colors">
+                Get Started
+            </button>
+</div>
+</div>
+</nav>
+<main class="pt-32 pb-24 max-w-screen-xl mx-auto">
+<header class="px-6 md:px-12 mb-12">
+<h1 class="text-4xl md:text-5xl font-bold text-text-main tracking-tight">Latest News</h1>
+<p class="text-text-sub mt-4 text-lg max-w-2xl">Stay updated with the latest breakthroughs in LED technology, design awards, and our journey toward sustainability.</p>
+</header>
+<div class="px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-16">
+<article class="group">
+<div class="aspect-[16/10] rounded-3xl overflow-hidden bg-surface mb-6">
+<img alt="Next generation LED technology" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<span class="px-2.5 py-1 rounded-full bg-blue-50 text-primary text-[11px] font-bold uppercase tracking-wider">Innovation</span>
+<time class="text-xs text-text-desc font-medium">Mar 12, 2024</time>
+</div>
+<h3 class="text-2xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors">Redefining Luminosity: Our Next-Gen Quantum LED Chip</h3>
+<p class="text-[16px] text-text-sub leading-relaxed line-clamp-2">We've achieved a breakthrough in efficiency, reducing power consumption by 40% while increasing total lumen output across the architectural series.</p>
+</div>
+</article>
+<article class="group">
+<div class="aspect-[16/10] rounded-3xl overflow-hidden bg-surface mb-6">
+<img alt="Design Award 2024" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqqDcaE4osbN0zR5Hw134Zp-ppIFhUG9hD8Y5MjdNZcw5pP8SyHD5NZ3Xtq1stPtolHHYR1FddL01wpuHpj1Y4aONTfSH5cBP6QT7lb9IDAkH3EQiEYe5t5kKr4aU5PtY5CU9yAg1CQo-ytdY4R6ma907ih0RD41X5gDfpfHMHtVLA2YmYcWQedt9UYLjzNdNTCKyhSf5U92sWkD6Ot---cQsr8ad_AZWjh7dRdQkNxJQUn0BWKkE98hqgXDf3U5cW7IAw_Pfwq4A"/>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<span class="px-2.5 py-1 rounded-full bg-gray-100 text-text-sub text-[11px] font-bold uppercase tracking-wider">Event</span>
+<time class="text-xs text-text-desc font-medium">Feb 28, 2024</time>
+</div>
+<h3 class="text-2xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors">Lumina Takes Gold at the International Design Awards</h3>
+<p class="text-[16px] text-text-sub leading-relaxed line-clamp-2">The Halo Pendant collection has been recognized for its minimalist circular form and revolutionary light distribution technology.</p>
+</div>
+</article>
+<article class="group">
+<div class="aspect-[16/10] rounded-3xl overflow-hidden bg-surface mb-6">
+<img alt="Sustainability Report" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8bZfMUm3FquqMUdANSyTiTHjLTKfvnCQalqUpBW__JcabaMpjxru0niqdl2x2NfCHhqvaBUHkBLr5DYiCgu1tBAdB-tjAPllNx_G9YpHbxlVl3W689-zmWZG_gLYkm82wUJfnS3kYPRBeGV0TvHFob7Idax7qaqAV2KUqt7AUSFTwpm6gEUqwCGmsuK7-DkrUR2KCEaF93Mv9TSPcnopvz3tI18UIylLcgh6EJzpc3XQRF1bRPKExn81QP16l3DLyX1OorDqUaAY"/>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<span class="px-2.5 py-1 rounded-full bg-green-50 text-green-600 text-[11px] font-bold uppercase tracking-wider">Sustainability</span>
+<time class="text-xs text-text-desc font-medium">Feb 15, 2024</time>
+</div>
+<h3 class="text-2xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors">Our Path to Net Zero: 2024 Sustainability Report</h3>
+<p class="text-[16px] text-text-sub leading-relaxed line-clamp-2">Lumina is committed to a greener future. Explore our latest progress in circular manufacturing and recycled aluminum sourcing.</p>
+</div>
+</article>
+<article class="group">
+<div class="aspect-[16/10] rounded-3xl overflow-hidden bg-surface mb-6">
+<img alt="Smart Lighting Integration" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpKC83SZs4OOO5rhVz72XlNTnl3PfkzngFK-aKM-uPtmOxxtigzJopefBTdnz6K1XQsbFyzyh8b1dIXvQW53ciEdqlGCYYO2HO80UyyN6mo7CNCuMXbG1WRudCoQR5tjJJ7RCZOb2wXpJ7teSkF4pVISgHNzaItZmBZi3eZ927Pjw6UrXgEDnmFWAETNO9mncLMAN7hOcxBakQWLluvx9noKZFFEEWin0rgwgYtPA79Uc7iioP9a_ieVPt_39pkY_ZxaGqr210rvc"/>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<span class="px-2.5 py-1 rounded-full bg-blue-50 text-primary text-[11px] font-bold uppercase tracking-wider">Product Update</span>
+<time class="text-xs text-text-desc font-medium">Jan 22, 2024</time>
+</div>
+<h3 class="text-2xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors">Matter Integration Now Live for All Smart Series</h3>
+<p class="text-[16px] text-text-sub leading-relaxed line-clamp-2">We are rolling out OTA updates to enable Matter support across our entire ecosystem, ensuring seamless connectivity with your favorite home hubs.</p>
+</div>
+</article>
+</div>
+<div class="px-6 md:px-12 mt-20 text-center">
+<button class="bg-surface text-text-main font-semibold px-12 py-5 rounded-2xl hover:bg-gray-200 transition-colors inline-flex items-center gap-2">
+            View Older News
+            <span class="material-symbols-outlined text-lg">expand_more</span>
+</button>
+</div>
+</main>
+<footer class="bg-surface py-20 px-6 md:px-12 mt-12">
+<div class="max-w-screen-xl mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-12">
+<div class="col-span-1 md:col-span-1">
+<div class="flex items-center gap-2 mb-6">
+<div class="size-6 bg-primary rounded-md flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[14px] font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-base font-bold tracking-tight">Lumina</h2>
+</div>
+<p class="text-text-desc text-sm leading-relaxed max-w-xs">
+                    Redefining architectural lighting through innovation and sustainable design since 2012.
+                </p>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-6 uppercase tracking-wider">Shop</h4>
+<ul class="space-y-4 text-text-sub text-[15px]">
+<li><a class="hover:text-primary transition-colors" href="#">New Arrivals</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Smart Series</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Architectural</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Outdoor Series</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-6 uppercase tracking-wider">Company</h4>
+<ul class="space-y-4 text-text-sub text-[15px]">
+<li><a class="hover:text-primary transition-colors" href="#">About Us</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Newsroom</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Sustainability</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Careers</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-6 uppercase tracking-wider">Support</h4>
+<ul class="space-y-4 text-text-sub text-[15px]">
+<li><a class="hover:text-primary transition-colors" href="#">Shipping</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Returns</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Manuals</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Help Center</a></li>
+</ul>
+</div>
+</div>
+<div class="pt-12 mt-16 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-6">
+<p class="text-text-desc text-[13px]">
+                © 2024 LUMINA LIGHTING SOLUTIONS AB. All architectural designs protected by law.
+            </p>
+<div class="flex gap-8">
+<a class="text-text-sub text-xs font-semibold hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="text-text-sub text-xs font-semibold hover:text-primary transition-colors" href="#">Terms of Use</a>
+<a class="text-text-sub text-xs font-semibold hover:text-primary transition-colors" href="#">Cookie Policy</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

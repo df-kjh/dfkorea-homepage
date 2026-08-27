@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Admin Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#007AFF",
+                        "background": "#FFFFFF",
+                        "surface": "#F2F4F6",
+                        "text-main": "#191F28",
+                        "text-sub": "#4E5968",
+                        "text-desc": "#8B95A1",
+                        "divider": "#EEEEEE"
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-text-main font-sans antialiased overflow-x-hidden;
+            }
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        input:focus {
+            @apply ring-0 border-primary outline-none !important;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="selection:bg-primary/20 min-h-screen flex flex-col">
+<nav class="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-gray-100">
+<div class="flex items-center justify-between px-6 h-16 max-w-screen-xl mx-auto relative">
+<div class="flex items-center gap-2 z-10">
+<div class="size-7 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-lg font-bold tracking-tight">Lumina</h2>
+</div>
+<div class="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-10">
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Products</a>
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Technology</a>
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Projects</a>
+<a class="text-[15px] font-semibold text-text-sub hover:text-primary transition-colors" href="#">Support</a>
+</div>
+<div class="flex items-center gap-2 z-10">
+<button class="text-text-main p-2 hover:bg-surface rounded-full transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-text-main p-2 hover:bg-surface rounded-full transition-colors md:hidden">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</nav>
+<main class="flex-grow flex items-center justify-center px-6 pt-16">
+<div class="w-full max-w-[400px] py-12">
+<div class="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-gray-50">
+<div class="flex flex-col items-center mb-10">
+<div class="size-12 bg-primary rounded-2xl flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-white text-3xl font-bold">lightbulb</span>
+</div>
+<h1 class="text-2xl font-bold text-text-main tracking-tight">Admin Login</h1>
+<p class="text-text-desc text-sm mt-2">Secure access for Lumina administrators</p>
+</div>
+<form class="space-y-4" onsubmit="event.preventDefault();">
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-text-sub ml-1 uppercase tracking-wider" for="id">ID / Email</label>
+<input class="w-full px-4 py-4 rounded-xl bg-surface border-transparent text-text-main text-[15px] font-medium transition-all placeholder:text-text-desc" id="id" name="id" placeholder="Enter your ID or email" type="text"/>
+</div>
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-text-sub ml-1 uppercase tracking-wider" for="password">Password</label>
+<input class="w-full px-4 py-4 rounded-xl bg-surface border-transparent text-text-main text-[15px] font-medium transition-all placeholder:text-text-desc" id="password" name="password" placeholder="Enter your password" type="password"/>
+</div>
+<div class="pt-4">
+<button class="w-full bg-primary text-white font-bold py-4 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all text-[16px]" type="submit">
+                            Login
+                        </button>
+</div>
+</form>
+<div class="mt-8 pt-8 border-t border-divider text-center">
+<p class="text-[13px] text-text-desc">
+                        System access is monitored. Unauthorized attempts will be logged.
+                    </p>
+</div>
+</div>
+<div class="mt-6 text-center">
+<a class="text-sm font-semibold text-text-desc hover:text-text-sub transition-colors" href="#">Forgot your password?</a>
+</div>
+</div>
+</main>
+<footer class="py-8 px-6 border-t border-gray-100">
+<div class="max-w-screen-xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-text-desc text-[12px]">
+                © 2024 LUMINA LIGHTING SOLUTIONS AB.
+            </p>
+<div class="flex gap-6">
+<a class="text-text-desc text-xs font-semibold hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="text-text-desc text-xs font-semibold hover:text-primary transition-colors" href="#">Security Policy</a>
+<a class="text-text-desc text-xs font-semibold hover:text-primary transition-colors" href="#">Terms</a>
+</div>
+</div>
+</footer>
+
+</body></html>

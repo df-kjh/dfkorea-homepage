@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina News Article Detail | The Next Evolution</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#007AFF",
+                        "background": "#FFFFFF",
+                        "surface": "#F2F4F6",
+                        "text-main": "#191F28",
+                        "text-sub": "#4E5968",
+                        "text-desc": "#8B95A1",
+                        "divider": "#EEEEEE"
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"]
+                    },
+                    maxWidth: {
+                        "article": "720px",
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-text-main font-sans antialiased;
+            }
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .article-content p {
+            @apply text-text-sub leading-[1.8] mb-8 text-[19px];
+        }
+        .article-content h2 {
+            @apply text-text-main text-3xl font-bold mt-14 mb-6 tracking-tight;
+        }
+        .nav-link {
+            @apply text-text-sub hover:text-primary transition-colors font-medium text-[15px] px-4 py-2;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="selection:bg-primary/20">
+<nav class="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-gray-100">
+<div class="flex items-center justify-between px-8 h-16 max-w-[1200px] mx-auto">
+<div class="flex items-center gap-2 w-1/4">
+<a class="size-8 bg-primary rounded-lg flex items-center justify-center" href="#">
+<span class="material-symbols-outlined text-white text-xl font-bold">lightbulb</span>
+</a>
+<h2 class="text-text-main text-xl font-bold tracking-tight">Lumina</h2>
+</div>
+<div class="hidden md:flex items-center justify-center flex-1">
+<div class="flex gap-2">
+<a class="nav-link" href="#">Products</a>
+<a class="nav-link" href="#">Innovation</a>
+<a class="nav-link" href="#">About</a>
+<a class="nav-link" href="#">Support</a>
+</div>
+</div>
+<div class="flex items-center justify-end gap-2 w-1/4">
+<button class="bg-primary text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-blue-600 transition-all">
+                    Contact Sales
+                </button>
+<button class="text-text-main p-2 md:hidden">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</nav>
+<main class="pt-16">
+<div class="w-full h-[60vh] min-h-[400px] max-h-[600px] overflow-hidden bg-surface">
+<img alt="The Future of Lighting" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6h_wvVHQ1HFe1p8C7JpgyidDBPNv8v1YXLfHyXsgxO3ueqq7SN_2BxtgvEClF_GJTJ4DaH4dLXf5Vtg_DzqYtL3rssd2teGxxJ7Id3CX3uURpXhgM-urGfBLGCFAfUe7XKWfZaTlphtw5b3nsgVzMY9z3kCXSDhyOujjjs83J3D2LQ0akLtp3_BmdPr7lYfky5v6ogSTMGQSX8Frv-YbJ0AHFNfjEtK80m9YoxSux_p6AJO6pnnJMTbZJjcBYwnx2LspBsjbRCM"/>
+</div>
+<article class="max-w-article mx-auto px-6 py-16 md:py-24">
+<header class="mb-12">
+<div class="flex items-center gap-2 mb-6">
+<span class="bg-primary/10 text-primary text-[13px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Technology</span>
+</div>
+<h1 class="text-4xl md:text-5xl font-extrabold text-text-main leading-[1.15] tracking-tight mb-8">
+                    The Next Evolution: Matter Integration in Smart Architectural Lighting
+                </h1>
+<div class="flex items-center justify-between border-y border-divider py-6">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-full bg-surface overflow-hidden">
+<img alt="Marcus Chen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKSqq62po6bDLREyQYp9j1xv8DQIC7rOIDHhe0z3Llqm8uwr3YOAWTL8aJpX6q9-Avt3CKRlcaYtucynw2BQe7YNDklzurQ7-DhKMhLKSRnHBmp9sBJcIRTXl9_Habtai6PlxAfF4gI-avK_iF1VpJqslmBbSd7OLYG31Rw-hsIPZudQq4pyV2Wh_TxI_XwwaTz17OcQWq-D59o5o3Aru-Op73RVXul5fewudsO_uZqyon7xjRgX65oaetOrNbyFH3iVtlIveahhE"/>
+</div>
+<div class="flex flex-col">
+<span class="text-base font-bold text-text-main">Marcus Chen</span>
+<span class="text-sm text-text-desc">Technical Director · Oct 24, 2024</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-surface rounded-full transition-colors text-text-sub">
+<span class="material-symbols-outlined">share</span>
+</button>
+<button class="p-2 hover:bg-surface rounded-full transition-colors text-text-sub">
+<span class="material-symbols-outlined">bookmark</span>
+</button>
+</div>
+</div>
+</header>
+<div class="article-content">
+<p>
+                    The architectural lighting landscape is undergoing its most significant shift since the transition to LED. With the widespread adoption of the Matter protocol, we are finally seeing the walls between ecosystems crumble, allowing for a truly seamless smart home experience.
+                </p>
+<p>
+                    At Lumina, we believe that smart lighting should be felt, not managed. Our latest research into 95+ CRI (Color Rendering Index) combined with ultra-low latency wireless control is setting a new benchmark for both residential and commercial spaces.
+                </p>
+<div class="my-14 -mx-6 md:-mx-20">
+<div class="rounded-3xl overflow-hidden bg-surface aspect-video mb-4 shadow-sm">
+<img alt="LED Technology Detail" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqqDcaE4osbN0zR5Hw134Zp-ppIFhUG9hD8Y5MjdNZcw5pP8SyHD5NZ3Xtq1stPtolHHYR1FddL01wpuHpj1Y4aONTfSH5cBP6QT7lb9IDAkH3EQiEYe5t5kKr4aU5PtY5CU9yAg1CQo-ytdY4R6ma907ih0RD41X5gDfpfHMHtVLA2YmYcWQedt9UYLjzNdNTCKyhSf5U92sWkD6Ot---cQsr8ad_AZWjh7dRdQkNxJQUn0BWKkE98hqgXDf3U5cW7IAw_Pfwq4A"/>
+</div>
+<p class="text-sm text-text-desc text-center italic px-6">The internal circuitry of our new Matter-enabled driver architecture, designed for maximum reliability.</p>
+</div>
+<h2>Defining Human-Centric Design</h2>
+<p>
+                    Light influences our circadian rhythm more than any other environmental factor. By utilizing tunable white technology that automatically mimics the progression of natural daylight, we can improve focus during the day and restfulness at night.
+                </p>
+<p>
+                    Our upcoming Vortex Series will feature the first implementation of our "Aura-Sync" technology, which utilizes ambient light sensors to dynamically adjust the color temperature of indoor fixtures to match the sky outside.
+                </p>
+<div class="my-14 bg-surface rounded-[32px] p-10 md:p-14 border border-divider">
+<span class="material-symbols-outlined text-primary text-5xl mb-6">format_quote</span>
+<blockquote class="text-2xl md:text-3xl font-semibold text-text-main leading-snug italic mb-6">
+                        "True innovation in lighting isn't about more lumens; it's about the quality of every single photon and how it interacts with the human experience."
+                    </blockquote>
+<p class="text-base font-bold text-text-sub">— Elena Rossetti, Lead Industrial Designer</p>
+</div>
+<p>
+                    As we look toward 2025, the focus remains on sustainability. Not just in terms of energy consumption, which has been reduced by a further 12% in our latest lineup, but in the longevity of the hardware itself. Modular components mean that when the smart technology evolves, the high-quality aluminum fixtures stay on your ceiling, not in a landfill.
+                </p>
+</div>
+<div class="flex flex-wrap gap-2 mt-16 pt-8 border-t border-divider">
+<span class="px-5 py-2 bg-surface text-text-sub text-[13px] font-medium rounded-full">#SmartLighting</span>
+<span class="px-5 py-2 bg-surface text-text-sub text-[13px] font-medium rounded-full">#Architecture</span>
+<span class="px-5 py-2 bg-surface text-text-sub text-[13px] font-medium rounded-full">#Innovation</span>
+<span class="px-5 py-2 bg-surface text-text-sub text-[13px] font-medium rounded-full">#Sustainability</span>
+</div>
+</article>
+<section class="bg-surface py-20">
+<div class="max-w-article mx-auto px-6">
+<div class="flex items-center justify-between mb-10">
+<h3 class="text-2xl font-bold text-text-main">Related Articles</h3>
+<a class="text-primary font-bold text-sm flex items-center gap-1 group" href="#">
+                        View all news <span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</a>
+</div>
+<div class="grid md:grid-cols-2 gap-8">
+<a class="flex flex-col gap-4 group" href="#">
+<div class="aspect-[16/10] w-full rounded-2xl overflow-hidden bg-white">
+<img alt="Related" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8bZfMUm3FquqMUdANSyTiTHjLTKfvnCQalqUpBW__JcabaMpjxru0niqdl2x2NfCHhqvaBUHkBLr5DYiCgu1tBAdB-tjAPllNx_G9YpHbxlVl3W689-zmWZG_gLYkm82wUJfnS3kYPRBeGV0TvHFob7Idax7qaqAV2KUqt7AUSFTwpm6gEUqwCGmsuK7-DkrUR2KCEaF93Mv9TSPcnopvz3tI18UIylLcgh6EJzpc3XQRF1bRPKExn81QP16l3DLyX1OorDqUaAY"/>
+</div>
+<div class="flex flex-col gap-2">
+<span class="text-[11px] font-bold text-primary tracking-widest uppercase">Event</span>
+<h4 class="text-xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors">Lumina at Milan Design Week 2024: A New Perspective</h4>
+<span class="text-sm text-text-desc">Oct 12, 2024</span>
+</div>
+</a>
+<a class="flex flex-col gap-4 group" href="#">
+<div class="aspect-[16/10] w-full rounded-2xl overflow-hidden bg-white">
+<img alt="Related" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpKC83SZs4OOO5rhVz72XlNTnl3PfkzngFK-aKM-uPtmOxxtigzJopefBTdnz6K1XQsbFyzyh8b1dIXvQW53ciEdqlGCYYO2HO80UyyN6mo7CNCuMXbG1WRudCoQR5tjJJ7RCZOb2wXpJ7teSkF4pVISgHNzaItZmBZi3eZ927Pjw6UrXgEDnmFWAETNO9mncLMAN7hOcxBakQWLluvx9noKZFFEEWin0rgwgYtPA79Uc7iioP9a_ieVPt_39pkY_ZxaGqr210rvc"/>
+</div>
+<div class="flex flex-col gap-2">
+<span class="text-[11px] font-bold text-primary tracking-widest uppercase">Awards</span>
+<h4 class="text-xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors">Orbit Series wins Red Dot Design Award for Innovation</h4>
+<span class="text-sm text-text-desc">Sep 28, 2024</span>
+</div>
+</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="bg-white py-24 border-t border-divider">
+<div class="max-w-[1200px] mx-auto px-8">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
+<div class="col-span-1 md:col-span-1">
+<div class="flex items-center gap-2 mb-6">
+<div class="size-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg font-bold">lightbulb</span>
+</div>
+<h2 class="text-text-main text-xl font-bold tracking-tight">Lumina</h2>
+</div>
+<p class="text-text-sub text-sm leading-relaxed max-w-xs">
+                        Leading the future of human-centric architectural lighting solutions through innovation and sustainable design.
+                    </p>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-6 uppercase tracking-wider">Solutions</h4>
+<ul class="space-y-4 text-text-sub text-[15px]">
+<li><a class="hover:text-primary transition-colors" href="#">Office &amp; Commercial</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Residential Living</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Smart Controls</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Custom Projects</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-6 uppercase tracking-wider">Resources</h4>
+<ul class="space-y-4 text-text-sub text-[15px]">
+<li><a class="hover:text-primary transition-colors" href="#">Article Library</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Case Studies</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Whitepapers</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Documentation</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-text-main font-bold text-sm mb-6 uppercase tracking-wider">Contact</h4>
+<ul class="space-y-4 text-text-sub text-[15px]">
+<li><a class="hover:text-primary transition-colors" href="#">Instagram</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">LinkedIn</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Press Kit</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Contact Us</a></li>
+</ul>
+</div>
+</div>
+<div class="pt-8 border-t border-divider flex flex-col md:flex-row justify-between items-center gap-6">
+<p class="text-text-desc text-sm">
+                    © 2024 LUMINA LIGHTING SOLUTIONS AB. All architectural designs protected by law.
+                </p>
+<div class="flex gap-8">
+<a class="text-text-sub text-sm font-medium hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="text-text-sub text-sm font-medium hover:text-primary transition-colors" href="#">Terms of Use</a>
+<a class="text-text-sub text-sm font-medium hover:text-primary transition-colors" href="#">Cookie Settings</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

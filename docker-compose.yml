@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./dfkorea-backend
+      dockerfile: Dockerfile
+    container_name: led-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - ./dfkorea-backend/.env.production
+    volumes:
+      - ./dfkorea-backend/uploads:/app/uploads
+      - ./dfkorea-backend/database.json:/app/database.json
+    restart: unless-stopped
+    networks:
+      - led-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./led-lighting-website
+      dockerfile: Dockerfile
+    container_name: led-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - led-network
+
+networks:
+  led-network:
+    driver: bridge

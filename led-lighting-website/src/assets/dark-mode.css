@@ -1,0 +1,164 @@
+/* 다크모드 전역 스타일 */
+
+/* HTML과 body에 다크모드 클래스 적용 */
+html.dark {
+  color-scheme: dark;
+}
+
+/* 전역 다크모드 변수 오버라이드 */
+html.dark {
+  /* Element Plus 다크모드 변수 커스터마이징 */
+  --el-bg-color: #1a1a1a;
+  --el-bg-color-page: #141414;
+  --el-bg-color-overlay: #1d1e1f;
+  --el-text-color-primary: #e5eaf3;
+  --el-text-color-regular: #cfd3dc;
+  --el-text-color-secondary: #a3a6ad;
+  --el-text-color-placeholder: #8d9095;
+  --el-border-color: #414243;
+  --el-border-color-light: #363637;
+  --el-border-color-lighter: #2b2b2c;
+  --el-border-color-extra-light: #2b2b2c;
+  --el-fill-color: #303030;
+  --el-fill-color-light: #262727;
+  --el-fill-color-lighter: #1d1d1d;
+  --el-fill-color-extra-light: #191919;
+  --el-fill-color-blank: transparent;
+  --el-mask-color: rgba(0, 0, 0, 0.8);
+  --el-box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.5);
+  --el-box-shadow-light: 0 0 12px 0 rgba(0, 0, 0, 0.5);
+  --el-box-shadow-lighter: 0 0 6px 0 rgba(0, 0, 0, 0.5);
+  --el-box-shadow-dark: 0 2px 8px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* 다크모드 스크롤바 스타일 */
+html.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 5px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #505050;
+}
+
+/* 다크모드에서 카드 스타일 개선 */
+html.dark .el-card {
+  background-color: var(--el-fill-color);
+  border-color: var(--el-border-color);
+}
+
+html.dark .el-card:hover {
+  border-color: var(--el-border-color-light);
+}
+
+/* 다크모드 메뉴 스타일 */
+html.dark .el-menu {
+  background-color: transparent;
+}
+
+html.dark .el-menu-item {
+  color: var(--el-text-color-primary);
+}
+
+html.dark .el-menu-item:hover {
+  background-color: var(--el-fill-color-light);
+}
+
+html.dark .el-menu-item.is-active {
+  color: var(--el-color-primary);
+  background-color: var(--el-fill-color);
+}
+
+/* 다크모드 드로어 */
+html.dark .el-drawer {
+  background-color: var(--el-bg-color);
+}
+
+html.dark .el-drawer__header {
+  color: var(--el-text-color-primary);
+}
+
+/* 다크모드 다이얼로그 */
+html.dark .el-dialog {
+  background-color: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color);
+}
+
+html.dark .el-dialog__header {
+  color: var(--el-text-color-primary);
+}
+
+/* 다크모드 입력 필드 */
+html.dark .el-input__wrapper {
+  background-color: var(--el-fill-color);
+}
+
+html.dark .el-select .el-input__wrapper {
+  background-color: var(--el-fill-color);
+}
+
+/* 다크모드 페이지네이션 */
+html.dark .el-pagination {
+  color: var(--el-text-color-primary);
+}
+
+html.dark .el-pagination button {
+  background-color: var(--el-fill-color);
+  color: var(--el-text-color-primary);
+}
+
+html.dark .el-pager li {
+  background-color: var(--el-fill-color);
+  color: var(--el-text-color-primary);
+}
+
+/* 다크모드 태그 */
+html.dark .el-tag {
+  border-color: var(--el-border-color);
+}
+
+/* 다크모드 타임라인 */
+html.dark .el-timeline-item__wrapper {
+  color: var(--el-text-color-primary);
+}
+
+html.dark .el-timeline-item__timestamp {
+  color: var(--el-text-color-secondary);
+}
+
+/* 라이트 모드 기본 스타일 보장 */
+html:not(.dark) {
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f5f7fa;
+  --el-text-color-primary: #303133;
+  --el-text-color-regular: #606266;
+  --el-text-color-secondary: #909399;
+}
+
+/* 부드러운 전환 효과 */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+}
+
+/* 애니메이션이 필요없는 요소 제외 */
+*:not(.no-transition) {
+  transition-property: background-color, border-color, color;
+}
+
+/* 이미지는 전환 효과 제외 */
+img,
+svg,
+video {
+  transition: none;
+}

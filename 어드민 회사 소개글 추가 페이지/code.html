@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Admin - Add News</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#22a8c3",
+                        "background-light": "#ffffff",
+                        "background-dark": "#0a0a0a",
+                        "border-muted": "#dce3e5",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-[#121617] dark:text-white transition-colors duration-200">
+<div class="relative flex min-h-screen w-full flex-col max-w-[480px] mx-auto border-x border-border-muted/30 dark:border-white/10 overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-50 flex items-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md p-4 pb-2 justify-between border-b border-border-muted/50 dark:border-white/5">
+<div class="text-[#121617] dark:text-white flex size-10 shrink-0 items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">arrow_back</span>
+</div>
+<h2 class="text-[#121617] dark:text-white text-base font-bold leading-tight tracking-tight flex-1 text-center">Add News</h2>
+<div class="flex w-10 items-center justify-end">
+<button class="text-primary text-sm font-bold leading-normal tracking-wide shrink-0">Preview</button>
+</div>
+</header>
+<main class="flex-1 pb-32">
+<!-- HeadlineText -->
+<div class="px-4 pt-8 pb-4">
+<h1 class="text-[#121617] dark:text-white tracking-tight text-[32px] font-bold leading-tight">Create News Article</h1>
+<p class="text-[#658086] dark:text-zinc-400 text-sm mt-1">Lumina LED Global Communications</p>
+</div>
+<!-- Form Content -->
+<div class="space-y-2">
+<!-- Title TextField -->
+<div class="flex flex-col gap-2 px-4 py-3">
+<label class="flex flex-col w-full">
+<p class="text-[#121617] dark:text-zinc-200 text-xs font-bold uppercase tracking-wider pb-2">Article Title</p>
+<input class="form-input flex w-full rounded border border-border-muted dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#121617] dark:text-white focus:outline-0 focus:ring-1 focus:ring-primary focus:border-primary h-14 placeholder:text-[#658086] p-[15px] text-base font-normal leading-normal transition-all" placeholder="Enter headline..." value=""/>
+</label>
+</div>
+<!-- Summary TextField -->
+<div class="flex flex-col gap-2 px-4 py-3">
+<label class="flex flex-col w-full">
+<p class="text-[#121617] dark:text-zinc-200 text-xs font-bold uppercase tracking-wider pb-2">Brief Summary</p>
+<textarea class="form-input flex w-full min-w-0 flex-1 resize-none rounded text-[#121617] dark:text-white focus:outline-0 focus:ring-1 focus:ring-primary border border-border-muted dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:border-primary min-h-32 placeholder:text-[#658086] p-[15px] text-base font-normal leading-normal transition-all" placeholder="Quick hook for the reader..."></textarea>
+</label>
+</div>
+<!-- SectionHeader: Media -->
+<div class="px-4 pt-4">
+<h3 class="text-[#121617] dark:text-white text-xs font-bold uppercase tracking-wider">Cover Image</h3>
+</div>
+<!-- Custom Media Upload Component -->
+<div class="px-4 py-3">
+<div class="relative w-full aspect-video rounded-xl border-2 border-dashed border-border-muted dark:border-zinc-800 flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer overflow-hidden group">
+<span class="material-symbols-outlined text-primary text-4xl mb-2 group-hover:scale-110 transition-transform">add_photo_alternate</span>
+<p class="text-[#658086] dark:text-zinc-400 text-sm font-medium">Tap to upload banner</p>
+<p class="text-[#658086]/60 dark:text-zinc-500 text-[10px] mt-1">Recommended: 1200x630px</p>
+</div>
+</div>
+<!-- Metadata Row (Category & Date) -->
+<div class="flex gap-4 px-4 py-3">
+<label class="flex flex-col flex-1">
+<p class="text-[#121617] dark:text-zinc-200 text-xs font-bold uppercase tracking-wider pb-2">Category</p>
+<select class="form-select flex w-full rounded border border-border-muted dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#121617] dark:text-white focus:outline-0 focus:ring-1 focus:ring-primary h-14 px-[15px] text-base font-normal">
+<option>Innovation</option>
+<option>Company News</option>
+<option>Case Study</option>
+<option>Events</option>
+</select>
+</label>
+<label class="flex flex-col flex-1">
+<p class="text-[#121617] dark:text-zinc-200 text-xs font-bold uppercase tracking-wider pb-2">Post Date</p>
+<input class="form-input flex w-full rounded border border-border-muted dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#121617] dark:text-white focus:outline-0 focus:ring-1 focus:ring-primary h-14 px-[15px] text-base font-normal" type="date" value="2023-10-27"/>
+</label>
+</div>
+<!-- SectionHeader: Editor -->
+<div class="px-4 pt-4">
+<h3 class="text-[#121617] dark:text-white text-xs font-bold uppercase tracking-wider">Body Content</h3>
+</div>
+<!-- RichHTML Editor Mockup -->
+<div class="px-4 py-2">
+<div class="flex flex-col rounded-xl border border-border-muted dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden min-h-[400px]">
+<!-- Editor Toolbar -->
+<div class="flex items-center gap-1 p-2 border-b border-border-muted dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 overflow-x-auto no-scrollbar">
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">format_bold</span>
+</button>
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">format_italic</span>
+</button>
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors text-primary">
+<span class="material-symbols-outlined text-[20px]">format_underlined</span>
+</button>
+<div class="w-px h-6 bg-border-muted dark:bg-zinc-800 mx-1"></div>
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">format_list_bulleted</span>
+</button>
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">link</span>
+</button>
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">image</span>
+</button>
+<div class="w-px h-6 bg-border-muted dark:bg-zinc-800 mx-1"></div>
+<button class="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">code</span>
+</button>
+</div>
+<!-- Editor Area -->
+<div class="p-4 flex-1 text-base leading-relaxed text-[#121617] dark:text-zinc-300 outline-none min-h-[300px]" contenteditable="true">
+<p>Our latest series of high-efficiency LED drivers represents a quantum leap in lighting technology. Designed with Lumina's proprietary ultra-low thermal resistance architecture, these components offer 98% efficiency...</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Fixed Action Footer -->
+<footer class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-xl border-t border-border-muted dark:border-zinc-800 p-4 pb-8 flex flex-col gap-3 z-50">
+<button class="flex w-full h-14 items-center justify-center rounded bg-primary text-white font-bold text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
+                Publish Article
+            </button>
+<button class="flex w-full h-12 items-center justify-center rounded border border-border-muted dark:border-zinc-800 text-[#658086] dark:text-zinc-400 font-bold text-sm active:bg-zinc-50 dark:active:bg-zinc-900 transition-all">
+                Save as Draft
+            </button>
+</footer>
+<!-- Mobile Nav Indicator (Optional Visual) -->
+<div class="h-1 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-2 fixed bottom-2 left-1/2 -translate-x-1/2 z-[60]"></div>
+</div>
+</body></html>
