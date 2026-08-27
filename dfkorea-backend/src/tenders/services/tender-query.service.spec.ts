@@ -105,7 +105,7 @@ describe("TenderQueryService", () => {
 
     const result = await service.getTenders({
       registeredDate: "2026-08-10",
-      keyword: "100%_LED\\",
+      keyword: "100%_LED!\\",
       source: TenderSource.G2B,
       region: "서울",
       procurementType: ProcurementType.CONSTRUCTION,
@@ -122,8 +122,8 @@ describe("TenderQueryService", () => {
       totalPages: 3,
     });
     expect(builder.andWhere).toHaveBeenCalledWith(
-      "(tender.title ILIKE :keyword ESCAPE '\\\\' OR tender.orderingOrganization ILIKE :keyword ESCAPE '\\\\' OR tender.demandOrganization ILIKE :keyword ESCAPE '\\\\')",
-      { keyword: "%100\\%\\_LED\\\\%" },
+      "(tender.title ILIKE :keyword ESCAPE '!' OR tender.orderingOrganization ILIKE :keyword ESCAPE '!' OR tender.demandOrganization ILIKE :keyword ESCAPE '!')",
+      { keyword: "%100!%!_LED!!\\%" },
     );
     expect(builder.orderBy).toHaveBeenCalledWith("tender.registeredAt", "DESC");
     expect(builder.addOrderBy).toHaveBeenCalledWith("tender.id", "ASC");

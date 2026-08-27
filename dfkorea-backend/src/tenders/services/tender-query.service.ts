@@ -11,6 +11,7 @@ import {
 import { Tender } from "../entities/tender.entity";
 
 const KST_OFFSET_HOURS = -9;
+const LIKE_ESCAPE_CHARACTER = "!";
 @Injectable()
 export class TenderQueryService {
   constructor(
@@ -76,7 +77,7 @@ export class TenderQueryService {
     }
     if (query.keyword) {
       builder.andWhere(
-        "(tender.title ILIKE :keyword ESCAPE '\\\\' OR tender.orderingOrganization ILIKE :keyword ESCAPE '\\\\' OR tender.demandOrganization ILIKE :keyword ESCAPE '\\\\')",
+        "(tender.title ILIKE :keyword ESCAPE '!' OR tender.orderingOrganization ILIKE :keyword ESCAPE '!' OR tender.demandOrganization ILIKE :keyword ESCAPE '!')",
         { keyword: `%${this.escapeLikeKeyword(query.keyword)}%` },
       );
     }
@@ -201,6 +202,6 @@ export class TenderQueryService {
   }
 
   private escapeLikeKeyword(keyword: string): string {
-    return keyword.replace(/[\\%_]/g, "\\$&");
+    return keyword.replace(/[!%_]/g, `${LIKE_ESCAPE_CHARACTER}$&`);
   }
 }
