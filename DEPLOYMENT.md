@@ -377,7 +377,7 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
   npm run test:tender:integration
 ```
 
-또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 값이 하나라도 없거나, host가 localhost/test/e2e/postgres 계열이 아니거나, DB 이름에 `test` 또는 `e2e`가 없으면 AppModule을 시작하기 전에 실패한다. migration을 적용하고 tender 테이블만 truncate하며, 실제 API 어댑터와 SMTP 전송기만 이중으로 교체한다. 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
+또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 **로컬** `localhost`, `127.0.0.1`, `::1` 또는 명시된 Docker 서비스 `postgres`/`db`만 허용한다. DB 이름에는 `test` 또는 `e2e`가 있어야 하고 URL·host·DB 이름 어디에도 `prod`, `production`, `live`, `staging`이 있으면 AppModule을 시작하기 전에 실패한다. 원격 스테이징 DB는 이 파괴적 통합 러너의 대상이 아니다. migration을 적용하고 명시된 tender 테이블 여섯 개만 트랜잭션으로 truncate하며, 종료 시에도 같은 범위만 정리한 뒤 앱을 닫는다. 실제 API 어댑터와 SMTP 전송기만 이중으로 교체하며 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
 
 ### 스테이징 라이브 스모크 체크리스트
 

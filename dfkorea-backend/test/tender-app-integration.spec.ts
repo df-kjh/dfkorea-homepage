@@ -26,15 +26,10 @@ import {
   TenderMailService,
 } from "../src/tenders/services/tender-mail.service";
 import migrationDataSource from "../src/database/typeorm.config";
-
-const TENDER_TABLES = [
-  '"tender_mail_items"',
-  '"tender_mail_deliveries"',
-  '"tender_recipients"',
-  '"tender_subscriptions"',
-  '"tender_sync_runs"',
-  '"tenders"',
-].join(", ");
+import {
+  clearTenderIntegrationTables,
+  closeTenderIntegrationResources,
+} from "./tender-test-cleanup";
 
 const NOTICE: NormalizedTender = {
   source: TenderSource.G2B,
@@ -80,8 +75,11 @@ describe("Tender AppModule PostgreSQL integration", () => {
     // This DataSource receives only TEST_DB_* / TEST_DATABASE_URL aliases from
     // setup-test-env. The dedicated command refuses absent or unsafe targets.
     await migrationDataSource.initialize();
-    await migrationDataSource.runMigrations();
-    await migrationDataSource.destroy();
+    try {
+      await migrationDataSource.runMigrations();
+    } finally {
+      if (migrationDataSource.isInitialized) await migrationDataSource.destroy();
+    }
 
     // The transport itself is overridden below, but the real mail service
     // validates this config before calling that boundary.
@@ -113,7 +111,7 @@ describe("Tender AppModule PostgreSQL integration", () => {
     await app.init();
     dataSource = app.get(DataSource);
 
-    await dataSource.query(`TRUNCATE TABLE ${TENDER_TABLES} RESTART IDENTITY`);
+    await clearTenderIntegrationTables(dataSource);
     await dataSource.getRepository(Admin).upsert(
       {
         username: "admin",
@@ -132,11 +130,13 @@ describe("Tender AppModule PostgreSQL integration", () => {
     g2b.fetchNotices.mockReset();
     kapt.fetchNotices.mockReset();
     kepco.fetchNotices.mockReset();
-    await dataSource.query(`TRUNCATE TABLE ${TENDER_TABLES} RESTART IDENTITY`);
+    await clearTenderIntegrationTables(dataSource);
   });
 
   afterAll(async () => {
-    await app.close();
+    await closeTenderIntegrationResources(dataSource, async () => {
+      if (app) await app.close();
+    });
   });
 
   it("uses real TypeORM storage for mocked-adapter ingestion and authenticated queries", async () => {
