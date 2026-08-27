@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { modalStack } from './modal-stack'
 
 interface Props {
   modelValue: boolean
@@ -106,7 +107,7 @@ interface Emits {
 const emit = defineEmits<Emits>()
 const dialogElement = ref<HTMLElement | null>(null)
 const titleId = `modal-title-${Math.random().toString(36).slice(2)}`
-let previouslyFocused: HTMLElement | null = null
+const modalId = `modal-${Math.random().toString(36).slice(2)}`
 
 const handleClose = () => {
   emit('update:modelValue', false)
@@ -114,12 +115,13 @@ const handleClose = () => {
 }
 
 const handleOverlayClick = () => {
-  if (props.closeOnOverlayClick) {
+  if (props.closeOnOverlayClick && modalStack.isTop(modalId)) {
     handleClose()
   }
 }
 
 const handleKeyDown = (event: KeyboardEvent) => {
+  if (!modalStack.isTop(modalId)) return
   if (event.key === 'Escape' && props.closeOnEsc && props.modelValue) {
     handleClose()
     return
@@ -162,6 +164,12 @@ const getFocusableElements = (): HTMLElement[] => {
   })
 }
 
+const focusInitialElement = () => {
+  const [firstFocusable] = getFocusableElements()
+  const initialFocus = firstFocusable ?? dialogElement.value
+  initialFocus?.focus()
+}
+
 // Body scroll lock
 watch(
   () => props.modelValue,
@@ -169,16 +177,15 @@ watch(
     // Teleported dialogs are not rendered in the server DOM.
     if (typeof document === 'undefined') return
     if (isOpen) {
-      previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      document.body.style.overflow = 'hidden'
+      modalStack.register({
+        id: modalId,
+        restoreFocus: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+        focus: focusInitialElement,
+      })
       await nextTick()
-      const [firstFocusable] = getFocusableElements()
-      const initialFocus = firstFocusable ?? dialogElement.value
-      initialFocus?.focus()
+      if (modalStack.isTop(modalId)) focusInitialElement()
     } else {
-      document.body.style.overflow = ''
-      previouslyFocused?.focus()
-      previouslyFocused = null
+      modalStack.unregister(modalId)
     }
   },
   { immediate: true },
@@ -189,8 +196,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyDown)
-  document.body.style.overflow = ''
+  if (typeof window !== 'undefined') window.removeEventListener('keydown', handleKeyDown)
+  modalStack.unregister(modalId)
 })
 </script>
 

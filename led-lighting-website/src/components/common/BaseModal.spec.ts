@@ -53,4 +53,84 @@ describe('BaseModal keyboard focus management', () => {
     expect(document.activeElement).toBe(document.body.querySelector('[role="dialog"]'))
     wrapper.unmount()
   })
+
+  it('keeps only the top modal interactive and preserves scroll lock until the modal stack empties', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = '첫 모달 열기'
+    document.body.append(trigger)
+    trigger.focus()
+
+    const first = mount(BaseModal, {
+      props: { modelValue: true, title: '첫 모달' },
+      slots: { default: '<button data-test="first-last">첫 모달 저장</button>' },
+      attachTo: document.body,
+    })
+    await nextTick()
+    const firstDialog = document.body.querySelectorAll<HTMLElement>('[role="dialog"]')[0]
+    const firstClose = firstDialog?.querySelector<HTMLButtonElement>('[aria-label="모달 닫기"]')
+    const firstLast = firstDialog?.querySelector<HTMLButtonElement>('[data-test="first-last"]')
+    if (!firstDialog || !firstClose || !firstLast) throw new Error('Expected first modal controls')
+
+    const second = mount(BaseModal, {
+      props: { modelValue: true, title: '두 번째 모달' },
+      slots: { default: '<button data-test="second-last">두 번째 모달 저장</button>' },
+      attachTo: document.body,
+    })
+    await nextTick()
+    const secondDialog = document.body.querySelectorAll<HTMLElement>('[role="dialog"]')[1]
+    const secondClose = secondDialog?.querySelector<HTMLButtonElement>('[aria-label="모달 닫기"]')
+    const secondLast = secondDialog?.querySelector<HTMLButtonElement>('[data-test="second-last"]')
+    if (!secondDialog || !secondClose || !secondLast) throw new Error('Expected second modal controls')
+
+    expect(document.body.style.overflow).toBe('hidden')
+    firstLast.focus()
+    firstLast.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    expect(document.activeElement).toBe(firstLast)
+    secondLast.focus()
+    secondLast.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    expect(document.activeElement).toBe(secondClose)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(second.emitted('update:modelValue')).toEqual([[false]])
+    expect(first.emitted('update:modelValue')).toBeUndefined()
+    await second.setProps({ modelValue: false })
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(document.activeElement).toBe(firstClose)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(first.emitted('update:modelValue')).toEqual([[false]])
+    await first.setProps({ modelValue: false })
+    expect(document.body.style.overflow).toBe('')
+    expect(document.activeElement).toBe(trigger)
+
+    first.unmount()
+    second.unmount()
+  })
+
+  it('does not unlock or steal focus when a non-top modal closes programmatically', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = '열기'
+    document.body.append(trigger)
+    trigger.focus()
+
+    const first = mount(BaseModal, { props: { modelValue: true, title: '첫 모달' }, attachTo: document.body })
+    await nextTick()
+    const second = mount(BaseModal, { props: { modelValue: true, title: '두 번째 모달' }, attachTo: document.body })
+    await nextTick()
+    const secondDialog = document.body.querySelectorAll<HTMLElement>('[role="dialog"]')[1]
+    const secondClose = secondDialog?.querySelector<HTMLButtonElement>('[aria-label="모달 닫기"]')
+    if (!secondClose) throw new Error('Expected top modal close control')
+    secondClose.focus()
+
+    await first.setProps({ modelValue: false })
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(document.activeElement).toBe(secondClose)
+
+    await second.setProps({ modelValue: false })
+    expect(document.body.style.overflow).toBe('')
+    expect(document.activeElement).toBe(trigger)
+
+    first.unmount()
+    second.unmount()
+  })
 })
