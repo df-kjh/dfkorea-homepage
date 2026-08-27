@@ -68,6 +68,7 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-test="apply-filter"]').trigger('click')
     await flushPromises()
 
+    expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: '서울' }))
     expect(api.getAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ registeredDate: '2026-08-27', keyword: '서울', page: 1 }),
     )
@@ -75,6 +76,7 @@ describe('TenderManagement', () => {
 
     await wrapper.get('[data-test="reset-filter"]').trigger('click')
     await flushPromises()
+    expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: undefined }))
     expect(api.getAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ registeredDate: '2026-08-27', keyword: undefined, page: 1 }),
     )

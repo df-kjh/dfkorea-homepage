@@ -30,7 +30,7 @@ export class TendersController {
 
   @Get("calendar")
   calendar(@Query() query: TenderCalendarQueryDto) {
-    return this.tenderQueryService.getCalendar(query.month);
+    return this.tenderQueryService.getCalendar(query.month, query);
   }
 
   @Get("subscription")

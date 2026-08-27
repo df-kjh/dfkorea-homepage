@@ -74,6 +74,39 @@ describe("TenderQueryService", () => {
     );
   });
 
+  it("applies the shared list filters before grouping calendar counts", async () => {
+    const builder = createQueryBuilder();
+    builder.getRawMany.mockResolvedValue([]);
+    repository.createQueryBuilder.mockReturnValue(builder);
+
+    await service.getCalendar("2026-08", {
+      keyword: "LED%_!",
+      source: TenderSource.G2B,
+      region: "서울",
+      procurementType: ProcurementType.GOODS,
+      relevance: TenderRelevance.DIRECT,
+    });
+
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "(tender.title ILIKE :keyword ESCAPE '!' OR tender.orderingOrganization ILIKE :keyword ESCAPE '!' OR tender.demandOrganization ILIKE :keyword ESCAPE '!')",
+      { keyword: "%LED!%!_!!%" },
+    );
+    expect(builder.andWhere).toHaveBeenCalledWith("tender.source = :source", {
+      source: TenderSource.G2B,
+    });
+    expect(builder.andWhere).toHaveBeenCalledWith("tender.region = :region", {
+      region: "서울",
+    });
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "tender.procurementType = :procurementType",
+      { procurementType: ProcurementType.GOODS },
+    );
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "tender.relevance = :relevance",
+      { relevance: TenderRelevance.DIRECT },
+    );
+  });
+
   it("combines independent list filters, escapes wildcard keyword input, and paginates newest first", async () => {
     const builder = createQueryBuilder();
     const tender = {

@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, SelectQueryBuilder } from "typeorm";
 import {
   PaginatedTenderDto,
+  TenderFilterQueryDto,
   TenderCalendarDayDto,
   TenderDetailDto,
   TenderListQueryDto,
@@ -19,11 +20,14 @@ export class TenderQueryService {
     private readonly tenderRepository: Repository<Tender>,
   ) {}
 
-  async getCalendar(month: string): Promise<TenderCalendarDayDto[]> {
+  async getCalendar(
+    month: string,
+    filters: TenderFilterQueryDto = {},
+  ): Promise<TenderCalendarDayDto[]> {
     const { start, end } = this.getKstMonthBounds(month);
     const localRegisteredDate =
       "(tender.registeredAt AT TIME ZONE 'Asia/Seoul')::date";
-    const rows = await this.tenderRepository
+    const builder = this.tenderRepository
       .createQueryBuilder("tender")
       .select(localRegisteredDate, "date")
       .addSelect("tender.relevance", "relevance")
@@ -31,7 +35,10 @@ export class TenderQueryService {
       .where("tender.registeredAt >= :start AND tender.registeredAt < :end", {
         start,
         end,
-      })
+      });
+
+    this.applyFilters(builder, filters);
+    const rows = await builder
       .groupBy(localRegisteredDate)
       .addGroupBy("tender.relevance")
       .orderBy(localRegisteredDate, "ASC")
@@ -75,28 +82,7 @@ export class TenderQueryService {
         { registeredStart: start, registeredEnd: end },
       );
     }
-    if (query.keyword) {
-      builder.andWhere(
-        "(tender.title ILIKE :keyword ESCAPE '!' OR tender.orderingOrganization ILIKE :keyword ESCAPE '!' OR tender.demandOrganization ILIKE :keyword ESCAPE '!')",
-        { keyword: `%${this.escapeLikeKeyword(query.keyword)}%` },
-      );
-    }
-    if (query.source) {
-      builder.andWhere("tender.source = :source", { source: query.source });
-    }
-    if (query.region) {
-      builder.andWhere("tender.region = :region", { region: query.region });
-    }
-    if (query.procurementType) {
-      builder.andWhere("tender.procurementType = :procurementType", {
-        procurementType: query.procurementType,
-      });
-    }
-    if (query.relevance) {
-      builder.andWhere("tender.relevance = :relevance", {
-        relevance: query.relevance,
-      });
-    }
+    this.applyFilters(builder, query);
 
     const [tenders, total] = await builder
       .orderBy("tender.registeredAt", "DESC")
@@ -149,6 +135,35 @@ export class TenderQueryService {
       relevanceScore: tender.relevanceScore,
       relevanceReasons: tender.relevanceReasons,
     };
+  }
+
+  /** Applies only admin display filters; subscription delivery never reads this DTO. */
+  private applyFilters(
+    builder: SelectQueryBuilder<Tender>,
+    query: TenderFilterQueryDto,
+  ): void {
+    if (query.keyword) {
+      builder.andWhere(
+        "(tender.title ILIKE :keyword ESCAPE '!' OR tender.orderingOrganization ILIKE :keyword ESCAPE '!' OR tender.demandOrganization ILIKE :keyword ESCAPE '!')",
+        { keyword: `%${this.escapeLikeKeyword(query.keyword)}%` },
+      );
+    }
+    if (query.source) {
+      builder.andWhere("tender.source = :source", { source: query.source });
+    }
+    if (query.region) {
+      builder.andWhere("tender.region = :region", { region: query.region });
+    }
+    if (query.procurementType) {
+      builder.andWhere("tender.procurementType = :procurementType", {
+        procurementType: query.procurementType,
+      });
+    }
+    if (query.relevance) {
+      builder.andWhere("tender.relevance = :relevance", {
+        relevance: query.relevance,
+      });
+    }
   }
 
   private getKstMonthBounds(month: string): { start: Date; end: Date } {

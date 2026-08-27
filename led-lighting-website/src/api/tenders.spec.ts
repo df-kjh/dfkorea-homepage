@@ -58,12 +58,12 @@ describe('tendersAPI', () => {
   })
 
   it('uses the protected tender calendar, detail, and subscription routes', () => {
-    tendersAPI.getCalendar('2026-08')
+    tendersAPI.getCalendar('2026-08', { keyword: 'LED', source: 'G2B', relevance: 'DIRECT' })
     tendersAPI.getOne('a4d643b6-6448-4cad-9096-a82ba8cd2d60')
     tendersAPI.getSubscription()
 
     expect(get).toHaveBeenNthCalledWith(1, '/tenders/calendar', {
-      params: { month: '2026-08' },
+      params: { month: '2026-08', keyword: 'LED', source: 'G2B', relevance: 'DIRECT' },
     })
     expect(get).toHaveBeenNthCalledWith(2, '/tenders/a4d643b6-6448-4cad-9096-a82ba8cd2d60')
     expect(get).toHaveBeenNthCalledWith(3, '/tenders/subscription')

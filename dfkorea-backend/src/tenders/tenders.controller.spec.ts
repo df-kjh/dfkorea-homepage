@@ -101,6 +101,14 @@ describe("TendersController", () => {
     expect(query.getTenders).toHaveBeenCalledWith(filters);
   });
 
+  it("passes shared query filters to calendar aggregation without email state", async () => {
+    query.getCalendar.mockResolvedValue([]);
+    const filters = { month: "2026-08", source: TenderSource.G2B };
+
+    await expect(controller.calendar(filters as never)).resolves.toEqual([]);
+    expect(query.getCalendar).toHaveBeenCalledWith("2026-08", filters);
+  });
+
   it("uses a standard Nest not-found response for an unknown tender", async () => {
     query.getTender.mockResolvedValue(null);
 

@@ -59,7 +59,7 @@ const fetchCalendar = async () => {
   calendarLoading.value = true
   calendarError.value = null
   try {
-    const { data } = await tendersAPI.getCalendar(month.value)
+    const { data } = await tendersAPI.getCalendar(month.value, { ...appliedFilters })
     if (request === calendarRequest) calendarDays.value = data
   } catch {
     if (request === calendarRequest) {

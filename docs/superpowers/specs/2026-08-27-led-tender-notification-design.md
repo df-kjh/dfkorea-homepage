@@ -156,7 +156,7 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 
 모든 엔드포인트는 기존 `JwtAuthGuard`로 보호한다.
 
-- `GET /tenders/calendar?month=YYYY-MM`: 월의 날짜별 전체·직접·잠재 건수
+- `GET /tenders/calendar?month=YYYY-MM&keyword&source&region&procurementType&relevance`: 월의 날짜별 전체·직접·잠재 건수. 목록과 같은 조회 전용 필터를 적용하며, 이메일 수신 대상에는 영향을 주지 않는다.
 - `GET /tenders`: `registeredDate`, `keyword`, `source`, `region`, `procurementType`, `relevance`, `page`, `pageSize`로 목록 조회
 - `GET /tenders/:id`: 상세 공고와 판정 근거 조회
 - `GET /tenders/subscription`: 수신 사용 여부, 이메일 목록, 발송 시각 조회

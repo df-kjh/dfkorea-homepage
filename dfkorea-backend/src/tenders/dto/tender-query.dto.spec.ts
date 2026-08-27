@@ -1,7 +1,10 @@
 import "reflect-metadata";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
-import { TenderListQueryDto } from "./tender-query.dto";
+import {
+  TenderCalendarQueryDto,
+  TenderListQueryDto,
+} from "./tender-query.dto";
 
 describe("TenderListQueryDto", () => {
   it("transforms numeric pagination and accepts the documented registered-date filter", async () => {
@@ -25,5 +28,23 @@ describe("TenderListQueryDto", () => {
     const dto = plainToInstance<TenderListQueryDto, object>(TenderListQueryDto, input);
 
     await expect(validate(dto)).resolves.not.toHaveLength(0);
+  });
+});
+
+describe("TenderCalendarQueryDto", () => {
+  it("accepts the same query-only filters as the date list", async () => {
+    const dto = plainToInstance<TenderCalendarQueryDto, object>(
+      TenderCalendarQueryDto,
+      {
+        month: "2026-08",
+        keyword: "LED%_!",
+        source: "G2B",
+        region: "서울",
+        procurementType: "GOODS",
+        relevance: "DIRECT",
+      },
+    );
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
   });
 });

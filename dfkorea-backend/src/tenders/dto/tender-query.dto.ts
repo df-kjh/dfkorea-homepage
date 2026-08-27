@@ -19,18 +19,7 @@ import {
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-export class TenderCalendarQueryDto {
-  @IsString()
-  @Matches(MONTH_PATTERN)
-  month: string;
-}
-
-export class TenderListQueryDto {
-  @IsOptional()
-  @IsDateString({ strict: true })
-  @Matches(DATE_PATTERN)
-  registeredDate?: string;
-
+export class TenderFilterQueryDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
@@ -52,6 +41,19 @@ export class TenderListQueryDto {
   @IsOptional()
   @IsEnum(TenderRelevance)
   relevance?: TenderRelevance;
+}
+
+export class TenderCalendarQueryDto extends TenderFilterQueryDto {
+  @IsString()
+  @Matches(MONTH_PATTERN)
+  month: string;
+}
+
+export class TenderListQueryDto extends TenderFilterQueryDto {
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(DATE_PATTERN)
+  registeredDate?: string;
 
   @IsOptional()
   @Type(() => Number)

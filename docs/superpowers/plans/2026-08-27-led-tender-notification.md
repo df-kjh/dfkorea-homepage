@@ -378,7 +378,7 @@ git commit -m "feat: schedule tender collection"
 - Modify: `dfkorea-backend/src/tenders/tenders.module.ts`
 
 **Interfaces:**
-- Produces: `GET /tenders/calendar`, `GET /tenders`, `GET /tenders/:id`
+- Produces: `GET /tenders/calendar` (목록과 동일한 조회 전용 필터 지원), `GET /tenders`, `GET /tenders/:id`
 - Produces response types: `TenderCalendarDayDto`, `PaginatedTenderDto` with `{ data, total, page, pageSize, totalPages }`, `TenderDetailDto`
 
 - [ ] **Step 1: Write failing query and guard tests**

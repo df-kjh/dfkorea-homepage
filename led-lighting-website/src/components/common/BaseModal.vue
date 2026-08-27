@@ -122,7 +122,44 @@ const handleOverlayClick = () => {
 const handleKeyDown = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && props.closeOnEsc && props.modelValue) {
     handleClose()
+    return
   }
+
+  if (event.key !== 'Tab' || !props.modelValue) return
+  const focusable = getFocusableElements()
+  if (focusable.length === 0) {
+    event.preventDefault()
+    dialogElement.value?.focus()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (!first || !last) return
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+const getFocusableElements = (): HTMLElement[] => {
+  const dialog = dialogElement.value
+  if (!dialog || typeof window === 'undefined') return []
+  const selector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"]):not([disabled])',
+  ].join(',')
+  return Array.from(dialog.querySelectorAll<HTMLElement>(selector)).filter((element) => {
+    const style = window.getComputedStyle(element)
+    return !element.hidden && element.getAttribute('aria-hidden') !== 'true' && style.display !== 'none' && style.visibility !== 'hidden'
+  })
 }
 
 // Body scroll lock
@@ -135,7 +172,9 @@ watch(
       previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
       document.body.style.overflow = 'hidden'
       await nextTick()
-      dialogElement.value?.focus()
+      const [firstFocusable] = getFocusableElements()
+      const initialFocus = firstFocusable ?? dialogElement.value
+      initialFocus?.focus()
     } else {
       document.body.style.overflow = ''
       previouslyFocused?.focus()

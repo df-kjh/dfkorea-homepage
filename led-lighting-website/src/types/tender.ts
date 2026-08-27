@@ -54,6 +54,11 @@ export interface TenderQuery {
   pageSize?: number
 }
 
+export type TenderCalendarQuery = Pick<
+  TenderQuery,
+  'keyword' | 'source' | 'region' | 'procurementType' | 'relevance'
+>
+
 export interface PaginatedTenderResponse {
   data: Tender[]
   total: number

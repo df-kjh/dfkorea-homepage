@@ -209,6 +209,7 @@ export type {
   Tender,
   TenderCalendarCell,
   TenderCalendarDay,
+  TenderCalendarQuery,
   TenderProcurementType,
   TenderQuery,
   TenderRelevance,
