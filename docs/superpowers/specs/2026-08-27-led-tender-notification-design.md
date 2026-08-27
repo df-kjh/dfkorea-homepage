@@ -60,7 +60,7 @@
 
 ## 5. 아키텍처
 
-기존 NestJS 애플리케이션에 `tenders` 도메인을 추가한다. 초기에는 단일 백엔드 프로세스에서 실행하지만, 출처 어댑터와 예약 작업 실행부를 분리해 향후 별도 워커로 이동할 수 있게 한다.
+기존 NestJS 애플리케이션에 `tenders` 도메인을 추가한다. 출처 어댑터와 예약 작업 실행부를 분리하며, 현재 배포부터 여러 백엔드 replica가 동시에 실행될 수 있다고 가정한다. 예약 작업은 같은 PostgreSQL 세션에서 유지되는 advisory lock과 영속 고유 claim을 함께 사용한다.
 
 ### 5.1 백엔드 책임
 
@@ -76,11 +76,11 @@
 ### 5.2 스케줄
 
 - 공고 수집: 매일 `00:00`, `12:00`, `Asia/Seoul`
-- 메일 발송: 관리자가 저장한 시각에 매일 1회, `Asia/Seoul`
+- 메일 발송: 매분 공용 설정의 enabled·발송 시각·활성 수신자를 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 KST 영업일 고유 claim을 획득한 한 replica만 실행
 - 메일 재시도: 특정 주소의 1차 발송 실패 10분 뒤 해당 주소만 1회
 - 재시도 실패: 추가 자동 재시도 없이 실패 기록. 다음 날 해당 주소의 메일에 미발송 공고 재포함
 
-예약 작업 시작 시 PostgreSQL advisory lock을 획득해 여러 백엔드 인스턴스가 같은 작업을 동시에 실행하지 못하게 한다. 수집 조회 시작은 출처별 마지막 정상 수집 시각의 1시간 전으로 잡고 DB 고유 키로 중복을 제거한다. 최초 수집은 실행 시각 이전 24시간을 조회한다. 이 방식으로 일시 장애 뒤 누락을 회수한다.
+수집, 일일 메일, 재시도는 각각 전용 PostgreSQL advisory lock을 QueryRunner의 같은 연결 세션에서 획득·해제한다. 일일 메일은 추가로 `tender_daily_dispatches.businessDate` 고유 제약을 최종 idempotency 경계로 사용하므로 replica 중복 실행과 당일 발송 시각 변경에도 하루 한 번만 claim된다. 설정 PUT은 process-local cron을 재예약하지 않으며 다음 minute tick부터 모든 replica에 보인다. 수집 조회 시작은 출처별 마지막 정상 수집 시각의 1시간 전으로 잡고 DB 고유 키로 중복을 제거한다. 최초 수집은 실행 시각 이전 24시간을 조회한다.
 
 ## 6. 관련도 분류
 
@@ -128,6 +128,7 @@
 - 구독 설정 외래 키
 - 정규화된 이메일 주소
 - 이메일 주소 고유 제약
+- `isActive` soft activation. 설정에서 제거해도 행과 메일 이력을 삭제하지 않고, 다시 추가하면 같은 ID를 활성화
 - 생성 일시
 
 ### 7.4 `tender_sync_runs`
@@ -140,15 +141,23 @@
 ### 7.5 `tender_mail_deliveries`
 
 - 대상 수신 주소, 대상 기간, 시도 횟수 `1 | 2`
-- `PENDING | SENT | FAILED | RETRY_SCHEDULED | SKIPPED` 상태
-- SMTP 메시지 ID, 성공·실패 시각, 오류
+- `PENDING | SENT | FAILED | RETRY_SCHEDULED | SKIPPED | CANCELLED | DELIVERY_UNCERTAIN` 상태
+- SMTP 메시지 ID, durable `claimedAt`, 성공·실패·불확실 시각, 안전하게 정리된 오류
+- stale in-flight SMTP 결과는 terminal `DELIVERY_UNCERTAIN`이며 재시도하지 않음
 
 ### 7.6 `tender_mail_items`
 
-- 수신 주소와 공고의 발송 상태 `PENDING | SENT`
-- 마지막으로 시도한 메일 발송 외래 키와 성공 발송 시각
+- 수신 주소와 공고의 발송 상태 `PENDING | SENT | DELIVERY_UNCERTAIN`
+- 마지막으로 시도한 메일 발송 외래 키와 성공·불확실 시각
 - `recipientId + tenderId` 고유 제약
 - 실패 시 `PENDING`을 유지하고 다음 재시도 또는 다음 날 발송에 다시 포함
+
+### 7.7 `tender_daily_dispatches`
+
+- KST `businessDate` 고유 제약: 여러 replica와 당일 발송 시각 변경을 통틀어 하나의 일일 실행 identity
+- claim 시 관측한 공용 `deliveryTime`
+- `CLAIMED | COMPLETED` 상태와 claim·완료·생성·수정 시각
+- advisory lock과 별도로 DB unique insert가 최종 중복 방지 경계
 
 DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를 새로 만들고 테이블, 관계, 고유 제약, 인덱스를 최신 상태로 기록한다.
 
@@ -208,6 +217,8 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 공통 일일 발송 시각
 - 저장과 취소
 
+모달을 열 때마다 새 GET 요청을 시작한다. 단조 증가 request generation을 사용해 가장 최신 요청만 설정·loaded·loading·error 상태를 바꿀 수 있고, 닫기는 진행 중 세대를 무효화한다. 최신 조회가 실패하면 이전에 성공한 설정은 읽기 전용으로 보존하되 저장을 비활성화하고 실제 `다시 시도` 동작을 제공한다.
+
 메일 대상은 캘린더 필터와 무관하게 새로 수집된 모든 직접·잠재 관련 공고다.
 
 ### 9.6 반응형
@@ -246,9 +257,11 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 ### 10.4 실패 처리
 
 - 주소별 SMTP 결과를 기록한다.
-- 1차 실패 주소만 10분 뒤 한 번 재시도한다.
+- 확인된 1차 SMTP 실패 주소만 10분 뒤 한 번 재시도한다.
 - SMTP 성공 응답 뒤에만 해당 주소와 공고 조합을 성공 발송으로 확정한다.
 - 재시도 실패 공고는 다음 날 해당 주소의 대상 선정에 다시 포함한다.
+- SMTP 승인과 그 뒤 DB commit은 원자화할 수 없다. in-flight claim이 stale이면 SMTP가 이미 승인했을 수 있으므로 delivery와 item을 terminal `DELIVERY_UNCERTAIN`으로 표시하고 재전송하지 않는다. 이는 이미 승인된 주소의 중복을 우선 방지하며, 극히 드문 메일 누락 가능성을 명시적으로 감수하는 절충이다.
+- stale 전이와 늦게 도착한 확인된 실패는 조건부 lease update로 경합하므로 `DELIVERY_UNCERTAIN`이 retry 상태로 되살아나지 않는다. 늦은 SMTP 성공은 실제 승인을 `SENT`로 확정할 수 있다.
 
 ## 11. 오류 및 보안
 
@@ -274,6 +287,8 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 수신 주소별 미발송 공고 선정
 - 1차 실패 후 10분 재시도와 최대 2회 제한
 - 성공 주소 제외 및 실패 주소 다음 날 재포함
+- stale SMTP claim의 terminal uncertainty, 늦은 성공·실패 경합, 재선정 금지
+- minute due check의 이전/새 발송 시각과 두 replica의 KST business-date 단일 claim
 
 ### 12.2 백엔드 통합 테스트
 
@@ -291,6 +306,7 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 필터 적용·초기화 및 이메일 설정과의 독립성
 - 이메일 추가·삭제·중복·형식 오류
 - 수신 사용 여부와 발송 시각 저장
+- 모달 재오픈·재시도와 out-of-order 구독 요청 generation 격리
 - 로딩, 공고 없음, API 오류, 모바일 레이아웃
 
 ## 13. 운영 및 문서화
@@ -312,4 +328,6 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 모든 신규 관련 공고가 주소별로 하루 한 번만 발송된다.
 - 특정 주소 실패 시 10분 뒤 한 번만 재시도하며 다른 주소의 성공 상태는 유지된다.
 - 재시도 실패 공고가 다음 날 해당 주소 발송 대상에서 누락되지 않는다.
+- SMTP 결과가 불확실한 stale claim은 `DELIVERY_UNCERTAIN`으로 종결되어 중복 재전송되지 않는다.
+- 여러 replica와 설정 시각 변경에서도 KST 영업일별 일일 dispatch claim은 하나뿐이다.
 - 인증, 분류, 중복 제거, 집계, 발송 재시도 핵심 테스트가 통과한다.

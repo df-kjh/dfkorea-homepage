@@ -43,6 +43,22 @@ const listResponse = {
   totalPages: 1,
 }
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+const closeSubscriptionModal = () => {
+  document.body
+    .querySelector<HTMLButtonElement>('[aria-label="닫기"]')
+    ?.click()
+}
+
 describe('TenderManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -130,6 +146,79 @@ describe('TenderManagement', () => {
     save?.click()
     await flushPromises()
     expect(api.updateSubscription).not.toHaveBeenCalled()
+  })
+
+  it('keeps the latest failed load authoritative when an older success resolves afterward', async () => {
+    const first = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    const second = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    api.getSubscription
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    closeSubscriptionModal()
+    await flushPromises()
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    second.reject(new Error('current request failed'))
+    await flushPromises()
+    first.resolve({
+      data: { enabled: true, deliveryTime: '08:00', recipients: ['stale@dfkorea.co.kr'] },
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('수신 설정을 불러오지 못했습니다')
+    expect(document.body.textContent).not.toContain('stale@dfkorea.co.kr')
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
+  })
+
+  it('keeps the latest successful load when an older failure rejects afterward', async () => {
+    const first = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    const second = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    api.getSubscription
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    closeSubscriptionModal()
+    await flushPromises()
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    second.resolve({
+      data: { enabled: true, deliveryTime: '10:30', recipients: ['latest@dfkorea.co.kr'] },
+    })
+    await flushPromises()
+    first.reject(new Error('stale request failed'))
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('latest@dfkorea.co.kr')
+    expect(document.body.textContent).not.toContain('수신 설정을 불러오지 못했습니다')
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+  })
+
+  it('retries the current failed load from the modal and enables save only after that retry succeeds', async () => {
+    api.getSubscription
+      .mockRejectedValueOnce(new Error('transient failure'))
+      .mockResolvedValueOnce({
+        data: { enabled: true, deliveryTime: '11:45', recipients: ['retry@dfkorea.co.kr'] },
+      })
+    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
+
+    const retry = document.body.querySelector<HTMLButtonElement>('[data-test="retry-subscription"]')
+    expect(retry).not.toBeNull()
+    retry?.click()
+    await flushPromises()
+
+    expect(api.getSubscription).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).toContain('retry@dfkorea.co.kr')
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
   })
 
   it('renders loading, error, and empty list states instead of stale notices', async () => {

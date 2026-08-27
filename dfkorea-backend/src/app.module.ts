@@ -56,7 +56,8 @@ import { TendersModule } from "./tenders/tenders.module";
           TenderMailItem,
           TenderDailyDispatch,
         ],
-        // 처음 배포: true, 이후: false로 변경하여 데이터 보호
+        // Shared and production databases are migration-only. Keep this false
+        // there; synchronize is limited to explicitly isolated local work.
         synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',
         logging: configService.get('NODE_ENV') !== 'production',
       }),

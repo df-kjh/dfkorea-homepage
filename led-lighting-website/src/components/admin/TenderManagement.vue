@@ -49,6 +49,7 @@ const subscriptionError = ref<string | null>(null)
 const subscription = ref<TenderSubscription>({ enabled: false, deliveryTime: '09:00', recipients: [] })
 let calendarRequest = 0
 let listRequest = 0
+let subscriptionRequest = 0
 
 const summary = computed(() => calendarDays.value.reduce(
   (total, day) => ({ total: total.total + day.total, direct: total.direct + day.direct, potential: total.potential + day.potential }),
@@ -91,17 +92,22 @@ const fetchList = async (page = 1) => {
 }
 
 const fetchSubscription = async () => {
+  const request = ++subscriptionRequest
   subscriptionLoaded.value = false
   subscriptionLoading.value = true
   subscriptionError.value = null
   try {
     const { data } = await tendersAPI.getSubscription()
-    subscription.value = data
-    subscriptionLoaded.value = true
+    if (request === subscriptionRequest) {
+      subscription.value = data
+      subscriptionLoaded.value = true
+    }
   } catch {
-    subscriptionError.value = '수신 설정을 불러오지 못했습니다. 다시 시도해 주세요.'
+    if (request === subscriptionRequest) {
+      subscriptionError.value = '수신 설정을 불러오지 못했습니다. 다시 시도해 주세요.'
+    }
   } finally {
-    subscriptionLoading.value = false
+    if (request === subscriptionRequest) subscriptionLoading.value = false
   }
 }
 
@@ -112,18 +118,31 @@ const applyFilters = (filters: CalendarFilters) => { Object.assign(appliedFilter
 const resetFilters = () => { Object.assign(appliedFilters, { keyword: undefined, source: undefined, region: undefined, procurementType: undefined, relevance: undefined }); fetchCalendar(); fetchList(1) }
 const openDetail = (tender: Tender) => { selectedTender.value = tender; detailOpen.value = true }
 const openSubscription = () => { subscriptionOpen.value = true; void fetchSubscription() }
+const closeSubscription = () => {
+  ++subscriptionRequest
+  subscriptionOpen.value = false
+  subscriptionLoaded.value = false
+  subscriptionLoading.value = false
+  subscriptionError.value = null
+}
+const setSubscriptionOpen = (open: boolean) => { if (open) openSubscription(); else closeSubscription() }
 const saveSubscription = async (next: TenderSubscription) => {
   if (!subscriptionLoaded.value) return
+  const request = subscriptionRequest
   subscriptionLoading.value = true
   subscriptionError.value = null
   try {
     const { data } = await tendersAPI.updateSubscription(next)
-    subscription.value = data
-    subscriptionOpen.value = false
+    if (request === subscriptionRequest) {
+      subscription.value = data
+      closeSubscription()
+    }
   } catch {
-    subscriptionError.value = '수신 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    if (request === subscriptionRequest) {
+      subscriptionError.value = '수신 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    }
   } finally {
-    subscriptionLoading.value = false
+    if (request === subscriptionRequest) subscriptionLoading.value = false
   }
 }
 
@@ -149,7 +168,7 @@ onMounted(() => { fetchCalendar(); fetchList() })
     <BaseCard :hoverable="false" custom-class="tender-calendar-card"><div class="tender-management__calendar-scroll"><TenderCalendar :month="month" :selected-date="selectedDate" :days="calendarDays" :loading="calendarLoading" @change-month="changeMonth" @select-date="selectDate" @today="goToday" /></div></BaseCard>
     <TenderList :response="listResponse" :loading="listLoading" :error="listError" :selected-date="selectedDate" @select="openDetail" @retry="fetchList(listResponse.page)" @page-change="fetchList" />
     <TenderDetailModal v-model="detailOpen" :tender="selectedTender" />
-    <TenderSubscriptionModal v-model="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :loaded="subscriptionLoaded" :error="subscriptionError" @save="saveSubscription" />
+    <TenderSubscriptionModal :model-value="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :loaded="subscriptionLoaded" :error="subscriptionError" @update:model-value="setSubscriptionOpen" @retry="fetchSubscription" @save="saveSubscription" />
   </section>
 </template>
 
