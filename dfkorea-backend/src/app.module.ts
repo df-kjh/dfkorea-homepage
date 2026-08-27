@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule, ConfigService } from "@nestjs/config";
-import { TypeOrmModule } from "@nestjs/typeorm";
+import { ConfigModule } from "@nestjs/config";
+import { TypeOrmModule, TypeOrmModuleOptions } from "@nestjs/typeorm";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AuthModule } from "./auth/auth.module";
@@ -24,44 +24,45 @@ import { TenderMailDelivery } from "./tenders/entities/tender-mail-delivery.enti
 import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
 import { TenderDailyDispatch } from "./tenders/entities/tender-daily-dispatch.entity";
 import { TendersModule } from "./tenders/tenders.module";
+import { resolveDatabaseConnectionOptions } from "./config/production-environment";
+
+export const createApplicationDatabaseOptions = (
+  environment: NodeJS.ProcessEnv,
+): TypeOrmModuleOptions => ({
+  type: "postgres",
+  ...resolveDatabaseConnectionOptions(environment),
+  entities: [
+    Product,
+    Post,
+    Admin,
+    Certificate,
+    Tender,
+    TenderSubscription,
+    TenderRecipient,
+    TenderSyncRun,
+    TenderMailDelivery,
+    TenderMailItem,
+    TenderDailyDispatch,
+  ],
+  // Shared and production databases are migration-only. Keep this false there;
+  // synchronize remains available only for explicitly isolated local work.
+  synchronize:
+    environment.NODE_ENV === "production"
+      ? false
+      : environment.TYPEORM_SYNCHRONIZE === "true",
+  logging: environment.NODE_ENV !== "production",
+});
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath:
-        process.env.NODE_ENV === "production"
-          ? ".env.production"
-          : ".env.development",
+      envFilePath: ".env.development",
+      ignoreEnvFile: process.env.NODE_ENV === "production",
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST') || 'localhost',
-        port: parseInt(configService.get('DB_PORT') || '5432'),
-        username: configService.get('DB_USERNAME') || 'postgres',
-        password: configService.get('DB_PASSWORD') || 'postgres',
-        database: configService.get('DB_NAME') || 'dfkorea',
-        entities: [
-          Product,
-          Post,
-          Admin,
-          Certificate,
-          Tender,
-          TenderSubscription,
-          TenderRecipient,
-          TenderSyncRun,
-          TenderMailDelivery,
-          TenderMailItem,
-          TenderDailyDispatch,
-        ],
-        // Shared and production databases are migration-only. Keep this false
-        // there; synchronize is limited to explicitly isolated local work.
-        synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',
-        logging: configService.get('NODE_ENV') !== 'production',
-      }),
-      inject: [ConfigService],
+      useFactory: () => createApplicationDatabaseOptions(process.env),
     }),
     TypeOrmModule.forFeature([Admin]),
     AuthModule,

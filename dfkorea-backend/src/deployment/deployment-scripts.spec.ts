@@ -166,21 +166,31 @@ describe("deployment migration commands", () => {
       "utf8",
     );
     const dockerfile = readFileSync(join(backendRoot, "Dockerfile"), "utf8");
+    const appModule = readFileSync(
+      join(backendRoot, "src", "app.module.ts"),
+      "utf8",
+    );
 
     expect(packageJson.scripts["start:prod"]).toBe(
-      "NODE_ENV=production node dist/main",
+      "node dist/scripts/run-production-process.js ambient start",
+    );
+    expect(packageJson.scripts["start:prod:env"]).toBe(
+      "node dist/scripts/run-production-process.js file start",
     );
     expect(packageJson.scripts["migration:revert:prod"]).toBe(
-      "NODE_ENV=production typeorm migration:revert -d dist/database/typeorm.config.js",
+      "node dist/scripts/run-production-process.js ambient migration:revert",
     );
     expect(packageJson.scripts["migration:run:prod"]).toBe(
-      "NODE_ENV=production typeorm migration:run -d dist/database/typeorm.config.js",
+      "node dist/scripts/run-production-process.js ambient migration:run",
     );
     expect(packageJson.scripts["migration:run:prod:env"]).toBe(
-      "node dist/scripts/run-production-migration.js run",
+      "node dist/scripts/run-production-process.js file migration:run",
     );
     expect(packageJson.scripts["migration:revert:prod:env"]).toBe(
-      "node dist/scripts/run-production-migration.js revert",
+      "node dist/scripts/run-production-process.js file migration:revert",
+    );
+    expect(appModule).toMatch(
+      /ignoreEnvFile:\s*process\.env\.NODE_ENV === ["']production["']/,
     );
     expect(dockerfile).toContain("RUN npm run build");
     expect(dockerfile).toContain("COPY --from=builder /app/dist ./dist");
@@ -208,31 +218,97 @@ describe("deployment migration commands", () => {
       "#### Gate 8 — 모니터링과 중단 기준",
     ];
 
+    const gateSections = orderedGates.map((gate, index) => {
+      const start = rollback.indexOf(gate);
+      const next = orderedGates[index + 1];
+      const end = next ? rollback.indexOf(next) : rollback.length;
+      return rollback.slice(start, end);
+    });
+
     expect(rollback).not.toBe("");
     const gatePositions = orderedGates.map((gate) => rollback.indexOf(gate));
     expect(gatePositions.every((position) => position >= 0)).toBe(true);
     expect(gatePositions).toEqual([...gatePositions].sort((a, b) => a - b));
 
-    expect(rollback).toContain("모든 backend replica");
-    expect(rollback).toContain("scheduler와 API traffic");
-    expect(rollback).toContain("실행 중인 instance, connection, job이 0개");
-    expect(rollback).toContain(
+    expect(gateSections[0]).toContain(
+      "ACTION: DECLARE INCIDENT AND CHANGE WINDOW",
+    );
+    expect(gateSections[1]).toContain("ACTION: STOP INGRESS");
+    expect(gateSections[1]).toContain(
+      "ACTION: STOP ALL BACKEND REPLICAS, SCHEDULERS, AND API TRAFFIC",
+    );
+    expect(gateSections[1]).toContain(
       "구독 비활성화나 자격 증명 제거는 replica 정지를 대체하지 않는다",
     );
-    expect(rollback).toContain("destructive action 직전 시점의 timestamp");
-    expect(rollback).toContain("checksum");
-    expect(rollback).toContain("restore/listing");
-    expect(rollback).toContain(
-      "DB restore 또는 migration 1단계 revert 중 하나만",
+    expect(gateSections[2]).toContain(
+      "ACTION: VERIFY ZERO RUNNING INSTANCES, APPLICATION CONNECTIONS, AND JOBS",
     );
-    expect(rollback).toContain("npm run migration:revert:prod:env");
+    expect(gateSections[3]).toContain(
+      "ACTION: CREATE FRESH TIMESTAMPED POSTGRESQL BACKUP NOW",
+    );
+    expect(gateSections[3]).toContain(
+      "ACTION: CREATE AND VERIFY BACKUP CHECKSUM",
+    );
+    expect(gateSections[3]).toContain(
+      "ACTION: RESTORE FRESH BACKUP INTO ISOLATED TEMPORARY DATABASE",
+    );
+    expect(gateSections[3]).toContain(
+      "ACTION: VALIDATE RESTORED SCHEMA, TABLE COUNTS, AND KEY DATA",
+    );
+    expect(gateSections[3]).toContain(
+      "ACTION: CLEAN UP ISOLATED RESTORE TARGET AND RECORD EVIDENCE",
+    );
+    expect(gateSections[3]).toContain(
+      "backup archive listing만으로는 충분하지 않다",
+    );
+    expect(gateSections[3]).toContain(
+      "listing은 supplemental evidence일 뿐이다",
+    );
+    expect(gateSections[4]).toContain(
+      "ACTION: APPROVE EXACTLY ONE RECOVERY METHOD",
+    );
+    expect(gateSections[5]).toContain(
+      "ACTION: EXECUTE APPROVED RESTORE OR ONE-STEP COMPILED REVERT WITH EXPLICIT PRODUCTION ENV",
+    );
+    expect(gateSections[5]).toContain("npm run migration:revert:prod:env");
     expect(rollback).not.toContain("npm run migration:revert:prod\n");
+    expect(gateSections[6]).toContain(
+      "ACTION: DEPLOY SCHEMA-COMPATIBLE PRIOR CODE",
+    );
+    expect(gateSections[6]).toContain(
+      "ACTION: RUN MIGRATION STATUS, SCHEMA, AND HEALTH CHECKS",
+    );
+    expect(gateSections[7]).toContain("ACTION: START BACKEND REPLICAS");
+    expect(gateSections[7]).toContain("ACTION: REOPEN INGRESS");
+    expect(gateSections[8]).toContain("ACTION: MONITOR ROLLBACK HEALTH");
+    expect(gateSections[8]).toContain("ACTION: ABORT ON DEFINED CRITERIA");
 
-    const stopVerifiedAt = rollback.indexOf(orderedGates[2]);
-    const freshBackupAt = rollback.indexOf(orderedGates[3]);
-    const destructiveChoiceAt = rollback.indexOf(orderedGates[4]);
-    expect(freshBackupAt).toBeGreaterThan(stopVerifiedAt);
-    expect(destructiveChoiceAt).toBeGreaterThan(freshBackupAt);
+    const orderedActions = [
+      "ACTION: DECLARE INCIDENT AND CHANGE WINDOW",
+      "ACTION: STOP INGRESS",
+      "ACTION: STOP ALL BACKEND REPLICAS, SCHEDULERS, AND API TRAFFIC",
+      "ACTION: VERIFY ZERO RUNNING INSTANCES, APPLICATION CONNECTIONS, AND JOBS",
+      "ACTION: CREATE FRESH TIMESTAMPED POSTGRESQL BACKUP NOW",
+      "ACTION: CREATE AND VERIFY BACKUP CHECKSUM",
+      "ACTION: RESTORE FRESH BACKUP INTO ISOLATED TEMPORARY DATABASE",
+      "ACTION: VALIDATE RESTORED SCHEMA, TABLE COUNTS, AND KEY DATA",
+      "ACTION: CLEAN UP ISOLATED RESTORE TARGET AND RECORD EVIDENCE",
+      "ACTION: APPROVE EXACTLY ONE RECOVERY METHOD",
+      "ACTION: EXECUTE APPROVED RESTORE OR ONE-STEP COMPILED REVERT WITH EXPLICIT PRODUCTION ENV",
+      "ACTION: DEPLOY SCHEMA-COMPATIBLE PRIOR CODE",
+      "ACTION: RUN MIGRATION STATUS, SCHEMA, AND HEALTH CHECKS",
+      "ACTION: START BACKEND REPLICAS",
+      "ACTION: REOPEN INGRESS",
+      "ACTION: MONITOR ROLLBACK HEALTH",
+      "ACTION: ABORT ON DEFINED CRITERIA",
+    ];
+    const actionPositions = orderedActions.map((action) =>
+      rollback.indexOf(action),
+    );
+    expect(actionPositions.every((position) => position >= 0)).toBe(true);
+    expect(actionPositions).toEqual(
+      [...actionPositions].sort((a, b) => a - b),
+    );
   });
 
   it("preserves the AI feature guide without making it deployment authority", () => {

@@ -2,7 +2,8 @@ module.exports = {
   apps: [
     {
       name: "led-backend",
-      script: "./dist/main.js",
+      script: "./dist/scripts/run-production-process.js",
+      args: "file start",
       instances: "max",
       exec_mode: "cluster",
       env: {

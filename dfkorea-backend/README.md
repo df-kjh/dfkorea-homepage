@@ -35,7 +35,7 @@ $ npm install
 ## Compile and run the project
 
 운영 환경 변수, 백업, 검증 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용합니다. 운영 서버는 PostgreSQL compiled migration이 성공한 뒤에만 시작합니다.
-수동 운영 서버에서는 `.env.production`을 명시적으로 검증·로드하는 `npm run migration:run:prod:env`와 `npm run migration:revert:prod:env`를 사용합니다. `start:prod`도 production mode를 강제해 같은 파일을 선택합니다. Railway/container처럼 환경을 직접 주입하는 경로는 모든 `DB_*`가 필수이며, 누락 시 datasource가 기본 DB로 fallback하지 않습니다.
+수동 운영 서버에서는 하나의 production runner의 `file` mode인 `migration:run:prod:env`, `migration:revert:prod:env`, `start:prod:env` script를 사용합니다. 세 script는 모두 `.env.production`의 값을 ambient 값보다 우선하며, DB identity는 반드시 파일 자체에 있어야 합니다. Railway/container용 `migration:run:prod`, `migration:revert:prod`, `start:prod`는 파일을 읽지 않는 `ambient` mode입니다. 두 mode 모두 `NODE_ENV=production`과 모든 `DB_*`가 필수이며, 누락 시 datasource가 기본 DB로 fallback하지 않습니다.
 
 ```bash
 # development

@@ -1,7 +1,7 @@
 import {
   getTypeOrmPaths,
-  resolveDatabaseConnectionOptions,
 } from "./typeorm.config";
+import { resolveDatabaseConnectionOptions } from "../config/production-environment";
 
 describe("TypeORM migration discovery paths", () => {
   it.each([
@@ -64,7 +64,7 @@ describe("TypeORM production database configuration", () => {
         PGDATABASE: "fallback-db",
       }),
     ).toThrow(
-      "Production database configuration is incomplete: DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_NAME",
+      "Production environment is incomplete: DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_NAME",
     );
   });
 
