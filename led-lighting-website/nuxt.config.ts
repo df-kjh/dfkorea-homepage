@@ -87,7 +87,7 @@ export default defineNuxtConfig({
       script: [
         {
           type: "application/ld+json",
-          children: JSON.stringify({
+          innerHTML: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
             name: "디에프코리아",

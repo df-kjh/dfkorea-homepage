@@ -107,7 +107,7 @@ useHead({
   script: [
     {
       type: "application/ld+json",
-      children: computed(() =>
+      innerHTML: computed(() =>
         JSON.stringify({
           "@context": "https://schema.org",
           "@type": "BlogPosting",

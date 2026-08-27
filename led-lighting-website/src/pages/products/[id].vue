@@ -111,7 +111,7 @@ const selectedImage = computed(() => {
   const index = selectedImageIndex.value
   if (index === null || index < 0 || index >= galleryImages.value.length) return null
 
-  return galleryImages.value[index]
+  return galleryImages.value[index] ?? null
 })
 
 const productSpecs = computed(() => {
@@ -235,7 +235,6 @@ useSeoMeta({
     `${product.value!.name}, ${product.value!.category}, ${product.value!.modelName}, LED 조명, 디에프코리아`,
   ogTitle: () => product.value!.name,
   ogDescription: () => plainDescription.value,
-  ogType: 'product',
   ogUrl: () => canonicalUrl.value,
   ogImage: () => mainImage.value,
   twitterCard: 'summary_large_image',
@@ -245,6 +244,12 @@ useSeoMeta({
 })
 
 useHead({
+  meta: [
+    {
+      property: 'og:type',
+      content: 'product',
+    },
+  ],
   link: [
     {
       rel: 'canonical',
@@ -254,7 +259,7 @@ useHead({
   script: [
     {
       type: 'application/ld+json',
-      children: computed(() =>
+      innerHTML: computed(() =>
         JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'Product',
