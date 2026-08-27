@@ -18,6 +18,7 @@ const relevanceMeta = {
 
 <template>
   <span
+    role="img"
     :class="[
       'tender-relevance-badge',
       `tender-relevance-badge--${relevance.toLowerCase()}`,
