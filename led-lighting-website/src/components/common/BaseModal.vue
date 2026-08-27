@@ -25,6 +25,11 @@
         >
           <div
             v-if="modelValue"
+            ref="dialogElement"
+            role="dialog"
+            aria-modal="true"
+            :aria-labelledby="title ? titleId : undefined"
+            tabindex="-1"
             class="relative bg-white rounded-2xl shadow-2xl overflow-auto"
             :class="contentClass"
             :style="{ width, maxWidth, maxHeight }"
@@ -33,6 +38,7 @@
             <button
               v-if="showCloseButton"
               @click="handleClose"
+              aria-label="모달 닫기"
               class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
             >
               <span class="material-symbols-outlined text-gray-600">close</span>
@@ -40,7 +46,7 @@
 
             <!-- Title (if provided) -->
             <div v-if="title" class="px-6 pt-6 pb-4" :class="{ 'pr-14': showCloseButton }">
-              <h3 class="text-2xl font-bold text-text-main">{{ title }}</h3>
+              <h3 :id="titleId" class="text-2xl font-bold text-text-main">{{ title }}</h3>
               <p v-if="subtitle" class="text-text-secondary mt-1">{{ subtitle }}</p>
             </div>
 
@@ -61,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 interface Props {
   modelValue: boolean
@@ -98,6 +104,9 @@ interface Emits {
 }
 
 const emit = defineEmits<Emits>()
+const dialogElement = ref<HTMLElement | null>(null)
+const titleId = `modal-title-${Math.random().toString(36).slice(2)}`
+let previouslyFocused: HTMLElement | null = null
 
 const handleClose = () => {
   emit('update:modelValue', false)
@@ -119,13 +128,21 @@ const handleKeyDown = (event: KeyboardEvent) => {
 // Body scroll lock
 watch(
   () => props.modelValue,
-  (isOpen) => {
+  async (isOpen) => {
+    // Teleported dialogs are not rendered in the server DOM.
+    if (typeof document === 'undefined') return
     if (isOpen) {
+      previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
       document.body.style.overflow = 'hidden'
+      await nextTick()
+      dialogElement.value?.focus()
     } else {
       document.body.style.overflow = ''
+      previouslyFocused?.focus()
+      previouslyFocused = null
     }
-  }
+  },
+  { immediate: true },
 )
 
 onMounted(() => {

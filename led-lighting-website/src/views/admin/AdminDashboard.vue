@@ -94,6 +94,11 @@
           <CertificateManagement />
         </div>
 
+        <!-- Tender notices -->
+        <div v-else-if="activeTab === 'tenders'">
+          <TenderManagement />
+        </div>
+
         <!-- Settings Placeholder -->
         <div v-else-if="activeTab === 'settings'" class="py-12 text-center">
           <span class="material-symbols-outlined text-gray-300 text-8xl">settings</span>
@@ -112,6 +117,7 @@ import { useToast } from '@/composables/useToast'
 import ProductManagement from '@/components/admin/ProductManagement.vue'
 import PostManagement from '@/components/admin/PostManagement.vue'
 import CertificateManagement from '@/components/admin/CertificateManagement.vue'
+import TenderManagement from '@/components/admin/TenderManagement.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -123,6 +129,7 @@ const tabs = [
   { id: 'products', icon: 'inventory_2', label: '제품' },
   { id: 'news', icon: 'newspaper', label: '소식' },
   { id: 'certificates', icon: 'workspace_premium', label: '인증서' },
+  { id: 'tenders', icon: 'calendar_month', label: '입찰 공고' },
   { id: 'settings', icon: 'settings', label: '설정' },
 ]
 
