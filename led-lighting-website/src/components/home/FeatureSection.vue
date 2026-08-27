@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 
 interface FeatureSection {
   title: string
@@ -38,9 +39,9 @@ const sectionRefs = ref<HTMLElement[]>([])
 const isVisible = ref<boolean[]>([false, false, false])
 
 // ref 배열에 요소 할당하는 함수
-const setRef = (el: any, index: number) => {
-  if (el) {
-    sectionRefs.value[index] = el as HTMLElement
+const setRef = (el: Element | ComponentPublicInstance | null, index: number) => {
+  if (el instanceof HTMLElement) {
+    sectionRefs.value[index] = el
   }
 }
 

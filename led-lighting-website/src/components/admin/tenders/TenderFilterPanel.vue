@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
-import type { TenderProcurementType, TenderQuery, TenderRelevance, TenderSource } from '@/types'
+import type { TenderQuery } from '@/types'
 
 type CalendarFilters = Pick<TenderQuery, 'keyword' | 'source' | 'region' | 'procurementType' | 'relevance'>
 interface Props { filters: CalendarFilters }

@@ -9,7 +9,7 @@ interface Props {
   subtitle?: string
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   title: 'Featured Collection',
   subtitle: '',
 })

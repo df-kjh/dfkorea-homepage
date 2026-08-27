@@ -90,3 +90,11 @@ Unique constraint: `UQ_tender_mail_item_recipient_tender` on (`recipientId`, `te
 ## Update rule
 
 Whenever a migration changes this schema, update this root `database-schema.md` in the same change with affected tables, relationships, foreign-key deletion behavior, unique constraints, and indexes.
+
+## Tender migration sequence
+
+- `1787819500000-CreateTenderTables` creates the six tender tables, the UUID extension, baseline foreign keys, unique constraints, and query indexes.
+- `1787819600000-AddTenderSubscriptionSingletonKey` adds the required shared subscription key and `UQ_tender_subscription_singleton_key`.
+- `1787819700000-AddTenderMailDeliveryClaimedAt` adds the durable delivery lease timestamp and `IDX_tender_mail_delivery_status_claimed_at`.
+
+The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.

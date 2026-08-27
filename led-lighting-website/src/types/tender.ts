@@ -73,4 +73,4 @@ export interface TenderSubscription {
   recipients: string[]
 }
 
-export interface UpdateTenderSubscription extends TenderSubscription {}
+export type UpdateTenderSubscription = TenderSubscription

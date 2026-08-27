@@ -62,7 +62,6 @@
 
 <script setup lang="ts">
 import { ref, inject } from 'vue'
-import { UPLOAD_CONFIG } from '@/constants'
 import { useToast } from '@/composables/useToast'
 import type { useImageUpload } from '@/composables/useImageUpload'
 

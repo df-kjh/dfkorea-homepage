@@ -55,7 +55,7 @@ describe('TenderSubscriptionModal', () => {
   })
 
   it('rejects duplicate and invalid email addresses without adding them', async () => {
-    const wrapper = mount(TenderSubscriptionModal, {
+    mount(TenderSubscriptionModal, {
       props: { modelValue: true, subscription },
       attachTo: document.body,
     })
@@ -88,7 +88,7 @@ describe('TenderSubscriptionModal', () => {
   })
 
   it('keeps the settings dialog accessible and leaves calendar filters out of the form', () => {
-    const wrapper = mount(TenderSubscriptionModal, {
+    mount(TenderSubscriptionModal, {
       props: { modelValue: true, subscription },
       attachTo: document.body,
     })

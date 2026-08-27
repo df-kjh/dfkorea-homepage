@@ -18,6 +18,7 @@ import { TenderQueryService } from "./services/tender-query.service";
 import { UpdateTenderSubscriptionDto } from "./dto/update-tender-subscription.dto";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
+import { TenderSubscriptionQueryDto } from "./dto/tender-subscription-query.dto";
 
 @Controller("tenders")
 @UseGuards(JwtAuthGuard)
@@ -34,7 +35,10 @@ export class TendersController {
   }
 
   @Get("subscription")
-  subscription() {
+  subscription(@Query() _query?: TenderSubscriptionQueryDto) {
+    // Reading the empty DTO is intentional: it activates the global whitelist
+    // so display filters cannot silently become email-delivery filters.
+    void _query;
     return this.tenderSubscriptionService.getOrCreate();
   }
 

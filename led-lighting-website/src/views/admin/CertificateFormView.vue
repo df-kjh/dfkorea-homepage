@@ -128,7 +128,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { useImageUpload } from '@/composables/useImageUpload'
 import { certificatesAPI } from '@/api'
-import type { Certificate, CreateCertificateDto, UpdateCertificateDto } from '@/types'
+import type { Certificate, CreateCertificateDto } from '@/types'
 import ImageUploader from '@/components/common/ImageUploader.vue'
 import BaseSelectBox from '@/components/common/BaseSelectBox.vue'
 import PDFUploader from '@/components/common/PDFUploader.vue'
@@ -260,8 +260,8 @@ const handleSubmit = async (): Promise<void> => {
 
     const fromTab = route.query.from as string || 'certificates'
     router.push({ path: '/admin/dashboard', query: { tab: fromTab } })
-  } catch (error: any) {
-    const errorMessage = error.response?.data?.message || '저장에 실패했습니다'
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '저장에 실패했습니다'
     toast.error(errorMessage)
   } finally {
     submitting.value = false

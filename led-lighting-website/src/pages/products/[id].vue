@@ -224,7 +224,8 @@ const closeImageViewer = () => {
     return
   }
 
-  const { image: _image, ...query } = route.query
+  const query = { ...route.query }
+  delete query.image
   router.replace({ query })
 }
 

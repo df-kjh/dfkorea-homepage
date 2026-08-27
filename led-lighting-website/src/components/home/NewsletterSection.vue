@@ -40,7 +40,7 @@ const handleSubmit = async () => {
       email.value = ''
       isSubmitting.value = false
     }, 1000)
-  } catch (error) {
+  } catch {
     message.value = 'Something went wrong. Please try again.'
     isSubmitting.value = false
   }

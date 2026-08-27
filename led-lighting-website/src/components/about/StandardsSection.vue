@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { certificatesAPI } from '@/api'
 import type { Certificate } from '@/types'
 import BaseModal from '@/components/common/BaseModal.vue'
@@ -47,7 +47,7 @@ const updateContainerWidth = () => {
   }
 }
 
-const handlePdfLoad = (pdf: any) => {
+const handlePdfLoad = () => {
   pdfLoading.value = false
 }
 

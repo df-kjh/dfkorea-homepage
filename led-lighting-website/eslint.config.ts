@@ -14,10 +14,27 @@ export default defineConfigWithVueTs(
     files: ['**/*.{vue,ts,mts,tsx}'],
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
+  // Nuxt writes type declarations and bundled server code here. They are build
+  // artifacts, not authored application files, and linting them creates false
+  // positives after a normal type-check or production build.
+  globalIgnores([
+    '**/.nuxt/**',
+    '**/.output/**',
+    '**/dist/**',
+    '**/dist-ssr/**',
+    '**/coverage/**',
+  ]),
 
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
+
+  // Nuxt file-system routes are intentionally named `index`, `new`, or `[id]`.
+  // These route component names are generated from their paths, not reused Vue
+  // component identifiers, so the multi-word convention does not apply here.
+  {
+    files: ['src/pages/**/*.vue'],
+    rules: { 'vue/multi-word-component-names': 'off' },
+  },
 
   skipFormatting,
 )

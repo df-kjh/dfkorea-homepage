@@ -316,3 +316,63 @@ sudo kill -9 <PID>
 1. 로그 파일
 2. 환경 변수 설정
 3. 네트워크 및 방화벽 설정
+
+---
+
+## LED 입찰 공고 운영
+
+### PostgreSQL 마이그레이션과 배포 순서
+
+입찰 기능은 PostgreSQL과 TypeORM migration을 사용한다. `TYPEORM_SYNCHRONIZE=false`를 유지하고, 배포 전 DB 백업을 만든다. 아래 단계 중 하나라도 실패하면 이후 단계를 실행하지 않는다.
+
+```bash
+cd dfkorea-backend
+npm ci
+npm run build
+npm run migration:run:prod
+npm run start:prod
+```
+
+Railway 등의 pre-deploy 명령도 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 설정한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다. Start 명령은 `cd dfkorea-backend && npm run start:prod`다.
+
+백엔드의 `PUBLIC_SITE_URL`, `PUBLIC_API_URL`, `CORS_ORIGIN`에는 실제 HTTPS URL을 넣고, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`에는 PostgreSQL 접속 값을 넣는다. 상세 변수는 `dfkorea-backend/.env.example`을 기준으로 한다.
+
+### 공식 데이터 키
+
+- [조달청 나라장터 입찰공고정보서비스](https://www.data.go.kr/data/15129394/openapi.do)와 [공동주택 입찰공고 정보제공 서비스](https://www.data.go.kr/data/15058166/openapi.do)를 공공데이터포털에서 활용 신청한 뒤 `PUBLIC_DATA_SERVICE_KEY`를 설정한다.
+- 포털은 URL 인코딩된 키와 디코딩된(원문) 키를 함께 보여줄 수 있다. 디코딩/원문 키가 있으면 그대로 넣고, 포털이 직접 API 호출용으로 지정한 값만 사용한다. 키를 복사한 뒤 다시 URL 인코딩하지 않는다. HTTP 클라이언트가 쿼리 값을 정확히 한 번 인코딩한다.
+- 한전 전자입찰계약정보는 현재 LINK API다. [공식 데이터셋](https://www.data.go.kr/data/15148223/openapi.do)에서 활용 승인을 받고 실제 OpenAPI 매뉴얼의 URL·operation·인증 파라미터·응답 필드를 `docs/references/kepco-tender-api-contract.md`와 비교하기 전에는 `KEPCO_TENDER_ENABLED=false`를 유지한다.
+
+API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣지 않는다.
+
+### NAVER WORKS SMTP
+
+1. NAVER WORKS 관리자 콘솔에서 발신 계정의 SMTP 사용을 허용한다.
+2. 발신 계정의 외부 앱 비밀번호를 만들고, 일반 로그인 비밀번호 대신 `SMTP_APP_PASSWORD`에만 저장한다.
+3. `SMTP_HOST=smtp.worksmobile.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=도메인_포함_발신_이메일`, `SMTP_FROM_NAME`을 설정한다.
+4. 앱 비밀번호 노출 또는 발신 계정 변경 시 기존 비밀번호를 폐기하고, 새 값을 배포 플랫폼에 주입한 뒤 스테이징 메일함으로 다시 검증한다.
+
+수신 주소에는 개별 메일을 전송하므로 서로의 주소가 노출되지 않는다. SMTP 자격 증명은 구독 설정 API 또는 DB에 저장되지 않는다.
+
+### 예약 작업과 여러 서버 인스턴스
+
+- 공고 수집은 `Asia/Seoul` 기준 매일 `00:00`, `12:00`에만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
+- 일일 메일은 저장된 공통 시각에 한 번 발송한다. 주소별 첫 실패만 10분 뒤 한 번 재시도한다.
+- 수집, 일일 메일, 재시도는 각각 PostgreSQL advisory lock을 같은 연결 세션에서 획득하므로 Railway/PM2 replica가 여러 개여도 한 인스턴스만 작업한다.
+- `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
+
+관리자에는 수집 현황 버튼이 없다. 실패는 `tender_sync_runs`에 출처별로 남고 다음 정규 수집이 겹치는 시간 범위를 회수한다.
+
+### 스테이징 라이브 스모크 체크리스트
+
+실제 API·SMTP 자격 증명 없이 이 저장소에서 외부 호출을 수행하지 않는다. 별도 스테이징에서 다음을 확인한다.
+
+1. 전용 DB를 백업하고 migration을 실행한 뒤 여섯 tender 테이블과 singleton/claim migration이 적용됐는지 확인한다.
+2. 나라장터·K-apt 키를 주입해 실제 응답을 한 번 수집하고, 공고 ID·차수 중복이 없으며 키가 로그·응답에 없는지 확인한다. 한전은 승인된 매뉴얼 검증 전까지 비활성화한다.
+3. 다음 `00:00` 또는 `12:00` KST 실행 뒤 `tender_sync_runs`가 출처별 성공/실패를 분리하고, 캘린더의 등록일 기준 직접/잠재 건수가 DB 집계와 같은지 확인한다.
+4. 관리자 JWT로 calendar, list, detail을 확인한다. 캘린더는 42칸이고, 화면 필터가 메일 수신 대상에 영향을 주지 않아야 한다.
+5. 스테이징 수신 주소와 다음 발송 시각을 저장해 digest 한 번을 확인한다. 한 주소를 고의 실패시켜 그 주소만 10분 뒤 한 번 재시도되고, 성공 주소에는 중복 메일이 없는지 확인한다.
+
+### 롤백
+
+먼저 구독을 비활성화하거나 SMTP/API 변수를 제거해 외부 호출을 멈춘다. 이미 적용한 migration은 무조건 되돌리면 데이터가 손실될 수 있으므로, 스테이징에서 백업 복원과 `npm run migration:revert`를 검증한 승인된 복구 계획으로 한 단계씩 롤백한다. 코드만 이전 버전으로 되돌린 뒤에도 수집 lock, 비밀값 노출, 캘린더 집계, 메일 중복을 다시 점검한다.
