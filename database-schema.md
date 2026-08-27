@@ -32,6 +32,7 @@ Indexes: `IDX_tender_registered_at`, `IDX_tender_source`, `IDX_tender_relevance`
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | UUID | Primary key; the service maintains one shared row |
+| `singletonKey` | varchar(16) | Always `shared`; unique through `UQ_tender_subscription_singleton_key` so concurrent bootstrap requests share one row |
 | `enabled` | boolean | Defaults to `false` |
 | `deliveryTime` | varchar(5) | `HH:mm`, defaults to `09:00`; scheduling uses the fixed `Asia/Seoul` time zone |
 | `createdAt`, `updatedAt` | timestamptz | Audit timestamps |

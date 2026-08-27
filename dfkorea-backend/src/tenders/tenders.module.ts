@@ -21,6 +21,7 @@ import { TenderSyncRun } from "./entities/tender-sync-run.entity";
 import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
+import { TenderSubscriptionService } from "./services/tender-subscription.service";
 import { TendersController } from "./tenders.controller";
 
 @Module({
@@ -73,7 +74,13 @@ import { TendersController } from "./tenders.controller";
     TenderIngestionService,
     TenderSchedulerService,
     TenderQueryService,
+    TenderSubscriptionService,
   ],
-  exports: [TenderIngestionService, TenderSchedulerService, TenderQueryService],
+  exports: [
+    TenderIngestionService,
+    TenderSchedulerService,
+    TenderQueryService,
+    TenderSubscriptionService,
+  ],
 })
 export class TendersModule {}
