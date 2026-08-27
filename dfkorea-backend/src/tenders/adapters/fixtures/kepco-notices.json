@@ -1,0 +1,40 @@
+{
+  "resultCode": "00",
+  "totalCount": 2,
+  "items": [
+    {
+      "noticeNo": "KEPCO-2026-0001",
+      "noticeSeq": "00",
+      "noticeTitle": "LED 보안등 구매",
+      "orderingOrganization": "한국전력공사",
+      "demandOrganization": "한국전력공사 경기본부",
+      "registeredAt": "2026-08-26T15:30:00+09:00",
+      "bidStartedAt": "2026-08-27T09:00:00+09:00",
+      "bidEndedAt": "2026-09-02T10:00:00+09:00",
+      "openedAt": "2026-09-02T11:00:00+09:00",
+      "region": "경기도",
+      "procurementType": "GOODS",
+      "contractMethod": "일반경쟁",
+      "estimatedAmount": "77000000",
+      "detailUrl": "https://example.invalid/kepco/bids/KEPCO-2026-0001",
+      "itemName": "LED 보안등"
+    },
+    {
+      "noticeNo": "KEPCO-2026-0002",
+      "noticeSeq": "00",
+      "noticeTitle": "변전소 전기설비 시설개선",
+      "orderingOrganization": "한국전력공사",
+      "demandOrganization": "한국전력공사 충남본부",
+      "registeredAt": "2026-08-26T16:00:00+09:00",
+      "bidStartedAt": "2026-08-27T09:00:00+09:00",
+      "bidEndedAt": "2026-09-03T10:00:00+09:00",
+      "openedAt": "2026-09-03T11:00:00+09:00",
+      "region": "충청남도",
+      "procurementType": "CONSTRUCTION",
+      "contractMethod": "제한경쟁",
+      "estimatedAmount": "152000000",
+      "detailUrl": "https://example.invalid/kepco/bids/KEPCO-2026-0002",
+      "itemName": "전기설비"
+    }
+  ]
+}

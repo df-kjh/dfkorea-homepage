@@ -1,0 +1,40 @@
+{
+  "response": {
+    "header": { "resultCode": "00", "resultMsg": "NORMAL SERVICE." },
+    "body": {
+      "totalCount": 2,
+      "items": [
+        {
+          "bidNtceNo": "R26BK00000001",
+          "bidNtceOrd": "000",
+          "bidNtceNm": "LED 가로등 교체공사",
+          "ntceInsttNm": "서울특별시 강남구",
+          "dminsttNm": "서울특별시 강남구",
+          "bidNtceDt": "202608261530",
+          "bidBeginDt": "202608270900",
+          "bidClseDt": "202609021000",
+          "opengDt": "202609021100",
+          "prtcptLmtRgnNm": "서울특별시",
+          "cntrctCnclsMthdNm": "제한경쟁",
+          "presmptPrce": "125000000",
+          "bidNtceDtlUrl": "https://www.g2b.go.kr/ep/tbid/tbidFwd.do?bidno=R26BK00000001&bidseq=000"
+        },
+        {
+          "bidNtceNo": "R26BK00000002",
+          "bidNtceOrd": "001",
+          "bidNtceNm": "지하주차장 전기시설 개선공사",
+          "ntceInsttNm": "한국주택관리공단",
+          "dminsttNm": "한국주택관리공단",
+          "bidNtceDt": "202608261600",
+          "bidBeginDt": "202608270900",
+          "bidClseDt": "202609031000",
+          "opengDt": "202609031100",
+          "prtcptLmtRgnNm": "경기도",
+          "cntrctCnclsMthdNm": "일반경쟁",
+          "presmptPrce": "98000000",
+          "bidNtceDtlUrl": "https://www.g2b.go.kr/ep/tbid/tbidFwd.do?bidno=R26BK00000002&bidseq=001"
+        }
+      ]
+    }
+  }
+}
