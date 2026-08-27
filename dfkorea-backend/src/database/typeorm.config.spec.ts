@@ -2,6 +2,7 @@ import {
   getTypeOrmPaths,
 } from "./typeorm.config";
 import { resolveDatabaseConnectionOptions } from "../config/production-environment";
+import { createApplicationDatabaseOptions } from "../app.module";
 
 describe("TypeORM migration discovery paths", () => {
   it.each([
@@ -75,6 +76,47 @@ describe("TypeORM production database configuration", () => {
       username: "postgres",
       password: "postgres",
       database: "dfkorea",
+    });
+  });
+
+  it("keeps actual Nest dev/test options on DB_* and ignores PG aliases", () => {
+    expect(
+      createApplicationDatabaseOptions({
+        NODE_ENV: "test",
+        PGHOST: "pg-only.internal",
+        PGPORT: "6543",
+        PGUSER: "pg-user",
+        PGPASSWORD: "pg-password",
+        PGDATABASE: "pg-database",
+      }),
+    ).toMatchObject({
+      host: "localhost",
+      port: 5432,
+      username: "postgres",
+      password: "postgres",
+      database: "dfkorea",
+    });
+
+    expect(
+      createApplicationDatabaseOptions({
+        NODE_ENV: "development",
+        DB_HOST: "db-wins.internal",
+        DB_PORT: "6432",
+        DB_USERNAME: "db-user",
+        DB_PASSWORD: "db-password",
+        DB_NAME: "db-database",
+        PGHOST: "pg-must-not-win.internal",
+        PGPORT: "6543",
+        PGUSER: "pg-user",
+        PGPASSWORD: "pg-password",
+        PGDATABASE: "pg-database",
+      }),
+    ).toMatchObject({
+      host: "db-wins.internal",
+      port: 6432,
+      username: "db-user",
+      password: "db-password",
+      database: "db-database",
     });
   });
 });

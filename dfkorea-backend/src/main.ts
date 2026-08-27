@@ -1,10 +1,20 @@
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
-import { AppModule } from "./app.module";
+import { AppModule, createApplicationDatabaseOptions } from "./app.module";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { join } from "path";
+import { maybeWriteTestBootstrapConfigProbe } from "./config/bootstrap-config-probe";
 
 async function bootstrap() {
+  if (
+    maybeWriteTestBootstrapConfigProbe(
+      process.env,
+      createApplicationDatabaseOptions(process.env),
+    )
+  ) {
+    return;
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // CORS 설정

@@ -79,10 +79,10 @@ export const resolveDatabaseConnectionOptions = (
   }
 
   return {
-    host: environment.DB_HOST || environment.PGHOST || "localhost",
-    port: parseInt(environment.DB_PORT || environment.PGPORT || "5432"),
-    username: environment.DB_USERNAME || environment.PGUSER || "postgres",
-    password: environment.DB_PASSWORD || environment.PGPASSWORD || "postgres",
-    database: environment.DB_NAME || environment.PGDATABASE || "dfkorea",
+    host: environment.DB_HOST || "localhost",
+    port: parseInt(environment.DB_PORT || "5432"),
+    username: environment.DB_USERNAME || "postgres",
+    password: environment.DB_PASSWORD || "postgres",
+    database: environment.DB_NAME || "dfkorea",
   };
 };

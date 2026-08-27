@@ -6,6 +6,130 @@ const backendRoot = join(__dirname, "..", "..");
 const archiveMarker =
   "# ARCHIVED / IMPLEMENTATION COMPLETE / NON-OPERATIONAL — 구현 완료·비운영 기록";
 
+const rollbackGateContract = [
+  {
+    heading: "#### Gate 0 — 변경 창과 책임자 선언",
+    markers: ["DECLARE INCIDENT AND CHANGE WINDOW"],
+  },
+  {
+    heading: "#### Gate 1 — ingress와 모든 backend replica 정지",
+    markers: [
+      "STOP INGRESS",
+      "STOP ALL BACKEND REPLICAS, SCHEDULERS, AND API TRAFFIC",
+    ],
+  },
+  {
+    heading: "#### Gate 2 — 정지 상태 검증",
+    markers: [
+      "VERIFY ZERO RUNNING INSTANCES, APPLICATION CONNECTIONS, AND JOBS",
+    ],
+  },
+  {
+    heading: "#### Gate 3 — 즉시 백업 및 복구 가능성 검증",
+    markers: [
+      "CREATE CURRENT-STATE SAFETY BACKUP NOW",
+      "CREATE AND VERIFY CURRENT-STATE BACKUP CHECKSUM",
+      "RESTORE CURRENT-STATE SAFETY BACKUP IN ISOLATED REHEARSAL TARGET",
+      "VALIDATE CURRENT-STATE REHEARSAL SCHEMA, TABLE COUNTS, AND KEY DATA",
+      "CLEAN UP CURRENT-STATE REHEARSAL TARGET AND RECORD EVIDENCE",
+    ],
+  },
+  {
+    heading: "#### Gate 4 — 복구 방식 하나 선택",
+    markers: [
+      "SELECT APPROVED PRE-CHANGE RESTORE ARTIFACT",
+      "VERIFY PRE-CHANGE ARTIFACT CHECKSUM",
+      "RESTORE PRE-CHANGE ARTIFACT IN ISOLATED REHEARSAL TARGET",
+      "VALIDATE PRE-CHANGE ARTIFACT AGAINST TARGET CODE, SCHEMA, COUNTS, AND KEY DATA",
+      "CLEAN UP PRE-CHANGE REHEARSAL TARGET AND RECORD EVIDENCE",
+      "APPROVE EXACTLY ONE RECOVERY METHOD",
+    ],
+  },
+  {
+    heading: "#### Gate 5 — 명시적 production env로 DB 작업",
+    markers: [
+      "EXECUTE APPROVED PRE-CHANGE RESTORE OR ONE-STEP COMPILED REVERT WITH EXPLICIT PRODUCTION ENV",
+    ],
+  },
+  {
+    heading: "#### Gate 6 — schema-compatible 코드와 검증",
+    markers: [
+      "DEPLOY SCHEMA-COMPATIBLE PRIOR CODE",
+      "RUN MIGRATION STATUS, SCHEMA, AND HEALTH CHECKS",
+    ],
+  },
+  {
+    heading: "#### Gate 7 — backend replica 후 ingress 순서로 재개",
+    markers: ["START BACKEND REPLICAS", "REOPEN INGRESS"],
+  },
+  {
+    heading: "#### Gate 8 — 모니터링과 중단 기준",
+    markers: ["MONITOR ROLLBACK HEALTH", "ABORT ON DEFINED CRITERIA"],
+  },
+] as const;
+
+const markerLine = (marker: string): string => `- [필수 작업: ${marker}]`;
+
+const validateRollbackMarkerContract = (deployment: string): void => {
+  const rollbackStart = deployment.indexOf("### 롤백");
+  if (rollbackStart < 0) {
+    throw new Error("Rollback section is missing");
+  }
+  const rollback = deployment.slice(rollbackStart);
+  const headings = rollbackGateContract.map(({ heading }) => heading);
+  const headingPositions = headings.map((heading) => rollback.indexOf(heading));
+  for (const [index, heading] of headings.entries()) {
+    if (rollback.split(heading).length - 1 !== 1) {
+      throw new Error(`Gate heading must occur exactly once: ${heading}`);
+    }
+    if (index > 0 && headingPositions[index] <= headingPositions[index - 1]) {
+      throw new Error(`Gate heading is out of order: ${heading}`);
+    }
+  }
+
+  const expectedLines = rollbackGateContract.flatMap(({ markers }) =>
+    markers.map(markerLine),
+  );
+  const anchoredLines = rollback
+    .split(/\r?\n/)
+    .filter((line) => /^- \[필수 작업: [^\]\r\n]+\]$/.test(line));
+  if (
+    anchoredLines.length !== expectedLines.length ||
+    anchoredLines.some((line) => !expectedLines.includes(line))
+  ) {
+    throw new Error("Rollback action markers do not match the exact contract");
+  }
+
+  const markerPositions: number[] = [];
+  rollbackGateContract.forEach(({ heading, markers }, gateIndex) => {
+    const sectionStart = rollback.indexOf(heading);
+    const nextHeading = rollbackGateContract[gateIndex + 1]?.heading;
+    const sectionEnd = nextHeading
+      ? rollback.indexOf(nextHeading)
+      : rollback.length;
+    const section = rollback.slice(sectionStart, sectionEnd);
+
+    for (const marker of markers) {
+      const line = markerLine(marker);
+      if (rollback.split(line).length - 1 !== 1) {
+        throw new Error(`Marker must occur exactly once: ${line}`);
+      }
+      if (!section.split(/\r?\n/).includes(line)) {
+        throw new Error(`Marker belongs to a different gate: ${line}`);
+      }
+      markerPositions.push(rollback.indexOf(line));
+    }
+  });
+
+  if (
+    markerPositions.some(
+      (position, index) => index > 0 && position <= markerPositions[index - 1],
+    )
+  ) {
+    throw new Error("Rollback action markers are out of order");
+  }
+};
+
 describe("deployment migration commands", () => {
   it("keeps primary deployment paths PostgreSQL-only and migration-first", () => {
     const repositoryRoot = join(backendRoot, "..");
@@ -189,6 +313,15 @@ describe("deployment migration commands", () => {
     expect(packageJson.scripts["migration:revert:prod:env"]).toBe(
       "node dist/scripts/run-production-process.js file migration:revert",
     );
+    expect(packageJson.scripts["test:production-process:compiled"]).toBe(
+      "node test/production-process-compiled-probe.js",
+    );
+    const compiledProbe = readFileSync(
+      join(backendRoot, "test", "production-process-compiled-probe.js"),
+      "utf8",
+    );
+    expect(compiledProbe).toContain('"dist"');
+    expect(compiledProbe).toContain('"run-production-process.js"');
     expect(appModule).toMatch(
       /ignoreEnvFile:\s*process\.env\.NODE_ENV === ["']production["']/,
     );
@@ -206,108 +339,65 @@ describe("deployment migration commands", () => {
       "utf8",
     );
     const rollback = deployment.slice(deployment.indexOf("### 롤백"));
-    const orderedGates = [
-      "#### Gate 0 — 변경 창과 책임자 선언",
-      "#### Gate 1 — ingress와 모든 backend replica 정지",
-      "#### Gate 2 — 정지 상태 검증",
-      "#### Gate 3 — 즉시 백업 및 복구 가능성 검증",
-      "#### Gate 4 — 복구 방식 하나 선택",
-      "#### Gate 5 — 명시적 production env로 DB 작업",
-      "#### Gate 6 — schema-compatible 코드와 검증",
-      "#### Gate 7 — backend replica 후 ingress 순서로 재개",
-      "#### Gate 8 — 모니터링과 중단 기준",
-    ];
 
-    const gateSections = orderedGates.map((gate, index) => {
-      const start = rollback.indexOf(gate);
-      const next = orderedGates[index + 1];
-      const end = next ? rollback.indexOf(next) : rollback.length;
-      return rollback.slice(start, end);
-    });
-
-    expect(rollback).not.toBe("");
-    const gatePositions = orderedGates.map((gate) => rollback.indexOf(gate));
-    expect(gatePositions.every((position) => position >= 0)).toBe(true);
-    expect(gatePositions).toEqual([...gatePositions].sort((a, b) => a - b));
-
-    expect(gateSections[0]).toContain(
-      "ACTION: DECLARE INCIDENT AND CHANGE WINDOW",
-    );
-    expect(gateSections[1]).toContain("ACTION: STOP INGRESS");
-    expect(gateSections[1]).toContain(
-      "ACTION: STOP ALL BACKEND REPLICAS, SCHEDULERS, AND API TRAFFIC",
-    );
-    expect(gateSections[1]).toContain(
+    expect(() => validateRollbackMarkerContract(deployment)).not.toThrow();
+    expect(rollback).toContain(
       "구독 비활성화나 자격 증명 제거는 replica 정지를 대체하지 않는다",
     );
-    expect(gateSections[2]).toContain(
-      "ACTION: VERIFY ZERO RUNNING INSTANCES, APPLICATION CONNECTIONS, AND JOBS",
+    expect(rollback).toContain("current-state safety backup");
+    expect(rollback).toContain("approved pre-change artifact");
+    expect(rollback).toContain(
+      "current-state safety backup은 intended rollback artifact가 아니다",
     );
-    expect(gateSections[3]).toContain(
-      "ACTION: CREATE FRESH TIMESTAMPED POSTGRESQL BACKUP NOW",
+    expect(rollback).toContain(
+      "restore branch는 approved pre-change artifact를 사용한다",
     );
-    expect(gateSections[3]).toContain(
-      "ACTION: CREATE AND VERIFY BACKUP CHECKSUM",
+    expect(rollback).toContain(
+      "revert branch는 current DB에 compiled migration down을 한 단계만 적용한다",
     );
-    expect(gateSections[3]).toContain(
-      "ACTION: RESTORE FRESH BACKUP INTO ISOLATED TEMPORARY DATABASE",
-    );
-    expect(gateSections[3]).toContain(
-      "ACTION: VALIDATE RESTORED SCHEMA, TABLE COUNTS, AND KEY DATA",
-    );
-    expect(gateSections[3]).toContain(
-      "ACTION: CLEAN UP ISOLATED RESTORE TARGET AND RECORD EVIDENCE",
-    );
-    expect(gateSections[3]).toContain(
-      "backup archive listing만으로는 충분하지 않다",
-    );
-    expect(gateSections[3]).toContain(
-      "listing은 supplemental evidence일 뿐이다",
-    );
-    expect(gateSections[4]).toContain(
-      "ACTION: APPROVE EXACTLY ONE RECOVERY METHOD",
-    );
-    expect(gateSections[5]).toContain(
-      "ACTION: EXECUTE APPROVED RESTORE OR ONE-STEP COMPILED REVERT WITH EXPLICIT PRODUCTION ENV",
-    );
-    expect(gateSections[5]).toContain("npm run migration:revert:prod:env");
+    expect(rollback).toContain("backup archive listing만으로는 충분하지 않다");
+    expect(rollback).toContain("listing은 supplemental evidence일 뿐이다");
+    expect(rollback).toContain("npm run migration:revert:prod:env");
     expect(rollback).not.toContain("npm run migration:revert:prod\n");
-    expect(gateSections[6]).toContain(
-      "ACTION: DEPLOY SCHEMA-COMPATIBLE PRIOR CODE",
-    );
-    expect(gateSections[6]).toContain(
-      "ACTION: RUN MIGRATION STATUS, SCHEMA, AND HEALTH CHECKS",
-    );
-    expect(gateSections[7]).toContain("ACTION: START BACKEND REPLICAS");
-    expect(gateSections[7]).toContain("ACTION: REOPEN INGRESS");
-    expect(gateSections[8]).toContain("ACTION: MONITOR ROLLBACK HEALTH");
-    expect(gateSections[8]).toContain("ACTION: ABORT ON DEFINED CRITERIA");
+  });
 
-    const orderedActions = [
-      "ACTION: DECLARE INCIDENT AND CHANGE WINDOW",
-      "ACTION: STOP INGRESS",
-      "ACTION: STOP ALL BACKEND REPLICAS, SCHEDULERS, AND API TRAFFIC",
-      "ACTION: VERIFY ZERO RUNNING INSTANCES, APPLICATION CONNECTIONS, AND JOBS",
-      "ACTION: CREATE FRESH TIMESTAMPED POSTGRESQL BACKUP NOW",
-      "ACTION: CREATE AND VERIFY BACKUP CHECKSUM",
-      "ACTION: RESTORE FRESH BACKUP INTO ISOLATED TEMPORARY DATABASE",
-      "ACTION: VALIDATE RESTORED SCHEMA, TABLE COUNTS, AND KEY DATA",
-      "ACTION: CLEAN UP ISOLATED RESTORE TARGET AND RECORD EVIDENCE",
-      "ACTION: APPROVE EXACTLY ONE RECOVERY METHOD",
-      "ACTION: EXECUTE APPROVED RESTORE OR ONE-STEP COMPILED REVERT WITH EXPLICIT PRODUCTION ENV",
-      "ACTION: DEPLOY SCHEMA-COMPATIBLE PRIOR CODE",
-      "ACTION: RUN MIGRATION STATUS, SCHEMA, AND HEALTH CHECKS",
-      "ACTION: START BACKEND REPLICAS",
-      "ACTION: REOPEN INGRESS",
-      "ACTION: MONITOR ROLLBACK HEALTH",
-      "ACTION: ABORT ON DEFINED CRITERIA",
-    ];
-    const actionPositions = orderedActions.map((action) =>
-      rollback.indexOf(action),
+  it("rejects duplicate, moved, and negated rollback markers", () => {
+    const validFixture = [
+      "### 롤백",
+      ...rollbackGateContract.flatMap(({ heading, markers }) => [
+        heading,
+        ...markers.map(markerLine),
+      ]),
+    ].join("\n");
+    expect(() => validateRollbackMarkerContract(validFixture)).not.toThrow();
+
+    const duplicate = validFixture.replace(
+      markerLine("STOP INGRESS"),
+      `${markerLine("STOP INGRESS")}\n${markerLine("STOP INGRESS")}`,
     );
-    expect(actionPositions.every((position) => position >= 0)).toBe(true);
-    expect(actionPositions).toEqual(
-      [...actionPositions].sort((a, b) => a - b),
+    expect(() => validateRollbackMarkerContract(duplicate)).toThrow(
+      "Rollback action markers do not match the exact contract",
+    );
+
+    const movedLine = markerLine(
+      "CREATE AND VERIFY CURRENT-STATE BACKUP CHECKSUM",
+    );
+    const moved = validFixture
+      .replace(`${movedLine}\n`, "")
+      .replace(
+        "#### Gate 2 — 정지 상태 검증",
+        `#### Gate 2 — 정지 상태 검증\n${movedLine}`,
+      );
+    expect(() => validateRollbackMarkerContract(moved)).toThrow(
+      "Marker belongs to a different gate",
+    );
+
+    const negated = validFixture.replace(
+      markerLine("REOPEN INGRESS"),
+      "- [필수 작업 아님: REOPEN INGRESS]",
+    );
+    expect(() => validateRollbackMarkerContract(negated)).toThrow(
+      "Rollback action markers do not match the exact contract",
     );
   });
 

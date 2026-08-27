@@ -20,6 +20,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "npm run test:tender:contract",
     "test:tender:contract": "jest --config ./test/jest-contract.json --runInBand",
+    "test:production-process:compiled": "node test/production-process-compiled-probe.js",
     "test:tender:integration": "ts-node test/verify-test-db.ts && REQUIRE_TEST_DATABASE=true jest --config ./test/jest-tender-integration.json --runInBand",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:generate": "npm run typeorm -- migration:generate -d src/database/typeorm.config.ts",

@@ -37,6 +37,8 @@ $ npm install
 운영 환경 변수, 백업, 검증 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용합니다. 운영 서버는 PostgreSQL compiled migration이 성공한 뒤에만 시작합니다.
 수동 운영 서버에서는 하나의 production runner의 `file` mode인 `migration:run:prod:env`, `migration:revert:prod:env`, `start:prod:env` script를 사용합니다. 세 script는 모두 `.env.production`의 값을 ambient 값보다 우선하며, DB identity는 반드시 파일 자체에 있어야 합니다. Railway/container용 `migration:run:prod`, `migration:revert:prod`, `start:prod`는 파일을 읽지 않는 `ambient` mode입니다. 두 mode 모두 `NODE_ENV=production`과 모든 `DB_*`가 필수이며, 누락 시 datasource가 기본 DB로 fallback하지 않습니다.
 
+`npm run build && npm run test:production-process:compiled`는 실제 DB/network 없이 compiled file/ambient wrapper가 Nest bootstrap까지 동일 DB identity를 전달하는지 검증합니다. 운영 rollback artifact 의미와 순서는 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 따릅니다.
+
 ```bash
 # development
 $ npm run start

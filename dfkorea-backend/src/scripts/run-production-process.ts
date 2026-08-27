@@ -10,6 +10,23 @@ export type ProductionProcessAction =
   | "migration:run"
   | "migration:revert";
 
+export type SpawnProductionProcess = (
+  executable: string,
+  arguments_: readonly string[],
+  options: {
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    stdio: "inherit";
+  },
+) => ChildProcess;
+
+export interface ProductionProcessDependencies {
+  environment?: NodeJS.ProcessEnv;
+  loadModule?: (modulePath: string) => unknown;
+  spawnProcess?: SpawnProductionProcess;
+  typeOrmCliPath?: string;
+}
+
 export const parseProductionProcessArguments = (
   arguments_: readonly string[],
 ): {
@@ -76,20 +93,30 @@ export const runProductionProcess = async (
   mode: ProductionEnvironmentMode,
   action: ProductionProcessAction,
   workingDirectory = process.cwd(),
+  dependencies: ProductionProcessDependencies = {},
 ): Promise<number> => {
-  prepareProductionEnvironment(mode, workingDirectory, process.env);
-  const command = getProductionProcessCommand(action, workingDirectory);
+  const environment = dependencies.environment ?? process.env;
+  prepareProductionEnvironment(mode, workingDirectory, environment);
+  const command = getProductionProcessCommand(
+    action,
+    workingDirectory,
+    dependencies.typeOrmCliPath,
+  );
   if (command.kind === "module") {
     // Keep Nest in this process so PM2 cluster workers retain their shared
     // listener and lifecycle semantics after the environment is prepared.
-    require(command.modulePath);
+    (dependencies.loadModule ?? require)(command.modulePath);
     return 0;
   }
 
   return new Promise<number>((resolve, reject) => {
-    const child = spawn(command.executable, command.arguments, {
+    const spawnProcess: SpawnProductionProcess =
+      dependencies.spawnProcess ??
+      ((executable, arguments_, options) =>
+        spawn(executable, [...arguments_], options));
+    const child = spawnProcess(command.executable, command.arguments, {
       cwd: workingDirectory,
-      env: process.env,
+      env: environment,
       stdio: "inherit",
     });
     const removeSignalListeners = forwardSignals(child);
