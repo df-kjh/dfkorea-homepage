@@ -1,5 +1,11 @@
 # Cloudflare R2 설정 빠른 가이드
 
+이 문서는 object storage 설정만 다룬다. 애플리케이션 운영 배포의 단일 기준은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)이며, PostgreSQL을 먼저 프로비저닝한 뒤 아래 fail-fast Start Command를 사용한다.
+
+```bash
+npm run migration:run:prod && npm run start:prod
+```
+
 ## 1단계: Cloudflare R2 버킷 생성 (5분)
 
 ### 1. Cloudflare 대시보드 접속
@@ -80,6 +86,7 @@ Railway Dashboard → Deployments → 최신 배포 → Logs
 
 다음 메시지 확인:
 ```
+compiled migrations completed
 ✅ Cloudflare R2 initialized
 ```
 

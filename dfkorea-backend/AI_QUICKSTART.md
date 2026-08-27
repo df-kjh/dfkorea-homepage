@@ -1,5 +1,7 @@
 # 🤖 AI 자동 블로그 생성 - 빠른 시작 가이드
 
+운영 배포의 단일 기준은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)다. PostgreSQL을 먼저 프로비저닝하고 compiled migration이 실패하면 애플리케이션도 시작되지 않게 한다.
+
 ## 1️⃣ API 키 발급 (2분)
 
 1. **Google AI Studio** 접속: https://aistudio.google.com/app/apikey
@@ -39,7 +41,7 @@ npm run start:dev
 
 # 프로덕션 환경
 npm run build
-npm run start:prod
+npm run migration:run:prod && npm run start:prod
 ```
 
 로그에서 확인:

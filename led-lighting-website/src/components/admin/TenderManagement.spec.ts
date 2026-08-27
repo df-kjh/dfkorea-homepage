@@ -54,9 +54,9 @@ const deferred = <T>() => {
 }
 
 const closeSubscriptionModal = () => {
-  document.body
-    .querySelector<HTMLButtonElement>('[aria-label="닫기"]')
-    ?.click()
+  const closeButton = document.body.querySelector<HTMLButtonElement>('[aria-label="모달 닫기"]')
+  if (!closeButton) throw new Error('Expected subscription modal close button')
+  closeButton.click()
 }
 
 describe('TenderManagement', () => {
@@ -129,14 +129,14 @@ describe('TenderManagement', () => {
     expect(api.getSubscription).toHaveBeenCalledTimes(1)
     expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
 
-    document.body
-      .querySelector<HTMLButtonElement>('[aria-label="닫기"]')
-      ?.click()
+    closeSubscriptionModal()
     await flushPromises()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     api.getSubscription.mockRejectedValueOnce(new Error('transient failure'))
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     await flushPromises()
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
 
     expect(api.getSubscription).toHaveBeenCalledTimes(2)
     expect(document.body.textContent).toContain('수신 설정을 불러오지 못했습니다')
@@ -160,7 +160,9 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     closeSubscriptionModal()
     await flushPromises()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
     second.reject(new Error('current request failed'))
     await flushPromises()
     first.resolve({
@@ -185,7 +187,9 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     closeSubscriptionModal()
     await flushPromises()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
     second.resolve({
       data: { enabled: true, deliveryTime: '10:30', recipients: ['latest@dfkorea.co.kr'] },
     })
@@ -212,12 +216,43 @@ describe('TenderManagement', () => {
     expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
 
     const retry = document.body.querySelector<HTMLButtonElement>('[data-test="retry-subscription"]')
-    expect(retry).not.toBeNull()
-    retry?.click()
+    if (!retry) throw new Error('Expected subscription retry button')
+    retry.click()
     await flushPromises()
 
     expect(api.getSubscription).toHaveBeenCalledTimes(2)
     expect(document.body.textContent).toContain('retry@dfkorea.co.kr')
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+  })
+
+  it('invalidates an in-flight load as soon as the modal closes', async () => {
+    const first = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    const second = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    api.getSubscription
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+    closeSubscriptionModal()
+    await flushPromises()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+
+    first.resolve({
+      data: { enabled: true, deliveryTime: '08:00', recipients: ['closed-stale@dfkorea.co.kr'] },
+    })
+    await flushPromises()
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    expect(document.body.textContent).not.toContain('closed-stale@dfkorea.co.kr')
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
+
+    second.resolve({
+      data: { enabled: true, deliveryTime: '12:15', recipients: ['current@dfkorea.co.kr'] },
+    })
+    await flushPromises()
+    expect(document.body.textContent).toContain('current@dfkorea.co.kr')
     expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
   })
 

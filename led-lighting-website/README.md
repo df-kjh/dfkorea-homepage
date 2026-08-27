@@ -7,6 +7,8 @@ Vue 3 + TypeScript + Tailwind CSS로 제작된 모던한 LED 조명 회사 웹�
 - [Vercel 배포 설정](./VERCEL_SETUP.md) - Vercel 환경 변수 설정 방법
 - [전체 배포 가이드](../DEPLOYMENT.md) - Docker, 수동 배포 등 전체 가이드
 
+전체 서비스를 배포할 때 백엔드는 PostgreSQL을 먼저 프로비저닝하고 compiled migration 실패 시 시작을 중단하는 `npm run migration:run:prod && npm run start:prod`를 사용합니다.
+
 ## 🌟 주요 기능
 
 ### 페이지 구성

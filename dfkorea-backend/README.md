@@ -34,6 +34,8 @@ $ npm install
 
 ## Compile and run the project
 
+운영 환경 변수, 백업, 검증 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용합니다. 운영 서버는 PostgreSQL compiled migration이 성공한 뒤에만 시작합니다.
+
 ```bash
 # development
 $ npm run start
