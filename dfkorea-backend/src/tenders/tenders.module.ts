@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import * as nodemailer from "nodemailer";
 import {
   G2B_TENDER_ADAPTER,
   KAPT_TENDER_ADAPTER,
@@ -22,6 +23,8 @@ import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
+import { TenderMailRenderer } from "./mail/tender-mail-renderer";
+import { TENDER_MAIL_TRANSPORT, TenderMailService } from "./services/tender-mail.service";
 import { TendersController } from "./tenders.controller";
 
 @Module({
@@ -72,6 +75,21 @@ import { TendersController } from "./tenders.controller";
       useFactory: (g2b, kapt, kepco) => [g2b, kapt, kepco],
     },
     TenderIngestionService,
+    TenderMailRenderer,
+    {
+      provide: TENDER_MAIL_TRANSPORT,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => nodemailer.createTransport({
+        host: config.get<string>("SMTP_HOST") ?? "smtp.worksmobile.com",
+        port: Number(config.get<string>("SMTP_PORT") ?? "465"),
+        secure: (config.get<string>("SMTP_SECURE") ?? "true") !== "false",
+        auth: {
+          user: config.get<string>("SMTP_USER") ?? "",
+          pass: config.get<string>("SMTP_APP_PASSWORD") ?? "",
+        },
+      }),
+    },
+    TenderMailService,
     TenderSchedulerService,
     TenderQueryService,
     TenderSubscriptionService,

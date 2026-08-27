@@ -1,0 +1,52 @@
+import { ProcurementType, TenderRelevance, TenderSource } from "../domain/tender.enums";
+import { Tender } from "../entities/tender.entity";
+import { TenderMailRenderer } from "./tender-mail-renderer";
+
+const tender = (overrides: Partial<Tender> = {}): Tender =>
+  ({
+    id: "00000000-0000-4000-8000-000000000001",
+    title: "<LED> 교체 & 공사",
+    orderingOrganization: "발주 <기관>",
+    demandOrganization: null,
+    source: TenderSource.G2B,
+    sourceNoticeId: "N-1",
+    revision: "00",
+    registeredAt: new Date("2026-08-26T15:00:00.000Z"),
+    bidStartedAt: null,
+    bidEndedAt: new Date("2026-08-30T15:00:00.000Z"),
+    openedAt: null,
+    region: "서울 & 경기",
+    procurementType: ProcurementType.CONSTRUCTION,
+    contractMethod: null,
+    estimatedAmount: "1200000",
+    sourceUrl: "https://example.com/?q=<unsafe>",
+    relevance: TenderRelevance.DIRECT,
+    relevanceScore: 100,
+    relevanceReasons: ["LED 조명"],
+    rawData: {},
+    firstCollectedAt: new Date(),
+    lastUpdatedAt: new Date(),
+    ...overrides,
+  }) as Tender;
+
+describe("TenderMailRenderer", () => {
+  it("separates direct and potential notices while escaping external HTML", () => {
+    const rendered = new TenderMailRenderer().render(new Date("2026-08-27T01:00:00.000Z"), [
+      tender(),
+      tender({
+        id: "00000000-0000-4000-8000-000000000002",
+        relevance: TenderRelevance.POTENTIAL,
+        title: "시설개선",
+      }),
+    ]);
+
+    expect(rendered.subject).toBe("[DF KOREA 입찰정보] 2026-08-27 신규 공고 2건");
+    expect(rendered.html).toContain("💡 직접 관련 (1건)");
+    expect(rendered.html).toContain("⚡ 잠재 관련 (1건)");
+    expect(rendered.html).toContain("&lt;LED&gt; 교체 &amp; 공사");
+    expect(rendered.html).not.toContain("<LED> 교체");
+    expect(rendered.html).toContain("https://example.com/?q=%3Cunsafe%3E");
+    expect(rendered.text).toContain("💡 직접 관련 (1건)");
+    expect(rendered.text).toContain("⚡ 잠재 관련 (1건)");
+  });
+});
