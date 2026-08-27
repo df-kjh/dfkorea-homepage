@@ -14,6 +14,8 @@ import type {
   PaginatedResponse,
 } from '@/types'
 
+export { tendersAPI } from './tenders'
+
 // 인증 API
 export const authAPI = {
   login: (credentials: LoginDto) => apiClient.post<LoginResponse>('/auth/login', credentials),

@@ -18,7 +18,7 @@ console.log('🌐 API Base URL:', apiClient.defaults.baseURL)
 // 요청 인터셉터: 토큰 자동 추가
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('admin_token')
+    const token = typeof localStorage === 'undefined' ? null : localStorage.getItem('admin_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -34,9 +34,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('admin_user')
-      window.location.href = '/admin/login'
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user')
+      }
+      if (typeof window !== 'undefined') {
+        window.location.href = '/admin/login'
+      }
     }
     return Promise.reject(error)
   },

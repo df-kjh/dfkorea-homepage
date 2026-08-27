@@ -10,6 +10,8 @@
     "preview": "nuxt preview",
     "build-only": "nuxt build",
     "type-check": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/"
   },
@@ -30,10 +32,12 @@
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^14.6.0",
+    "@vue/test-utils": "^2.4.11",
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.23",
     "eslint": "^9.39.2",
     "eslint-plugin-vue": "~10.6.2",
+    "happy-dom": "^20.11.9",
     "jiti": "^2.6.1",
     "npm-run-all2": "^8.0.4",
     "postcss": "^8.5.6",
@@ -41,6 +45,7 @@
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "vite": "^7.3.3",
+    "vitest": "^4.1.11",
     "vue-tsc": "^3.2.2"
   }
 }

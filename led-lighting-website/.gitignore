@@ -44,3 +44,4 @@ __screenshots__/
 
 # Nuxt generated files
 .nuxt/
+.output/

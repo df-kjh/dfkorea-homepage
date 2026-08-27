@@ -204,6 +204,20 @@ export interface FormRule {
 
 export type FormRules = Record<string, FormRule[]>
 
+export type {
+  PaginatedTenderResponse,
+  Tender,
+  TenderCalendarCell,
+  TenderCalendarDay,
+  TenderProcurementType,
+  TenderQuery,
+  TenderRelevance,
+  TenderRelevanceReason,
+  TenderSource,
+  TenderSubscription,
+  UpdateTenderSubscription,
+} from './tender'
+
 // ============================================
 // Component Props 타입
 // ============================================
