@@ -298,4 +298,78 @@ describe("TenderIngestionService", () => {
     );
     expect(lockRunner.release).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps a collection failure primary when advisory-lock cleanup also fails", async () => {
+    const collectionError = new Error("collection body failed");
+    const unlockError = new Error("unlock failed");
+    const releaseError = new Error("release failed");
+    lockRunner.query.mockReset();
+    lockRunner.query
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockRejectedValueOnce(unlockError);
+    lockRunner.release.mockRejectedValue(releaseError);
+    service = new TenderIngestionService(
+      dataSource as never,
+      syncRunRepository as never,
+      new TenderClassifier(),
+      new Proxy([] as TenderSourceAdapter[], {
+        get(target, property, receiver) {
+          if (property === "map") {
+            throw collectionError;
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      }),
+    );
+
+    await expect(service.collectAll(NOW)).rejects.toMatchObject({
+      name: "AggregateError",
+      errors: [collectionError, unlockError, releaseError],
+    });
+    expect(lockRunner.release.mock.invocationCallOrder[0]).toBeGreaterThan(
+      lockRunner.query.mock.invocationCallOrder[1],
+    );
+  });
+
+  it("propagates an unlock failure after a successful collection", async () => {
+    const unlockError = new Error("unlock failed");
+    lockRunner.query.mockReset();
+    lockRunner.query
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockRejectedValueOnce(unlockError);
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await expect(service.collectAll(NOW)).rejects.toBe(unlockError);
+    expect(lockRunner.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates a release failure after a successful collection", async () => {
+    const releaseError = new Error("release failed");
+    lockRunner.release.mockRejectedValue(releaseError);
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await expect(service.collectAll(NOW)).rejects.toBe(releaseError);
+  });
+
+  it("preserves both cleanup failures after a successful collection", async () => {
+    const unlockError = new Error("unlock failed");
+    const releaseError = new Error("release failed");
+    lockRunner.query.mockReset();
+    lockRunner.query
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockRejectedValueOnce(unlockError);
+    lockRunner.release.mockRejectedValue(releaseError);
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await expect(service.collectAll(NOW)).rejects.toMatchObject({
+      name: "AggregateError",
+      errors: [unlockError, releaseError],
+    });
+  });
 });

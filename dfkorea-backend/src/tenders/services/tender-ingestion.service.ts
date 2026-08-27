@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
-import { DataSource, In, Repository } from "typeorm";
+import { DataSource, In, QueryRunner, Repository } from "typeorm";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
@@ -53,6 +53,9 @@ export class TenderIngestionService {
     // accidentally run on different pool connections.
     const lockRunner = this.dataSource.createQueryRunner();
     let lockAcquired = false;
+    let summary: CollectionSummary | undefined;
+    let collectionError: unknown;
+
     try {
       await lockRunner.connect();
       const [lockResult] = await lockRunner.query(
@@ -61,38 +64,84 @@ export class TenderIngestionService {
       );
       lockAcquired = lockResult?.locked === true;
       if (!lockAcquired) {
-        return {
+        summary = {
           lockAcquired: false,
           collectedAt: now,
           sources: [],
           failedSources: [],
         };
+      } else {
+        const sources = await Promise.all(
+          this.adapters.map((adapter) => this.collectSource(adapter, now)),
+        );
+        summary = {
+          lockAcquired: true,
+          collectedAt: now,
+          sources,
+          failedSources: sources
+            .filter((source) => source.status === SyncRunStatus.FAILED)
+            .map((source) => source.source),
+        };
       }
+    } catch (error) {
+      collectionError = error;
+    }
 
-      const sources = await Promise.all(
-        this.adapters.map((adapter) => this.collectSource(adapter, now)),
-      );
-      return {
-        lockAcquired: true,
-        collectedAt: now,
-        sources,
-        failedSources: sources
-          .filter((source) => source.status === SyncRunStatus.FAILED)
-          .map((source) => source.source),
-      };
-    } finally {
+    const cleanupErrors = await this.cleanupCollectionLock(
+      lockRunner,
+      lockAcquired,
+    );
+    this.throwCollectionErrors(collectionError, cleanupErrors);
+    return summary!;
+  }
+
+  private async cleanupCollectionLock(
+    lockRunner: QueryRunner,
+    lockAcquired: boolean,
+  ): Promise<unknown[]> {
+    const cleanupErrors: unknown[] = [];
+
+    if (lockAcquired) {
       try {
-        if (lockAcquired) {
-          await lockRunner.query("SELECT pg_advisory_unlock($1) AS unlocked", [
-            COLLECTION_LOCK_ID,
-          ]);
-        }
-      } finally {
-        // Release is mandatory even when connection, acquisition, collection,
-        // or unlock fails. Unlock errors intentionally remain observable after
-        // the runner is released because they can leave a pooled session held.
-        await lockRunner.release();
+        await lockRunner.query("SELECT pg_advisory_unlock($1) AS unlocked", [
+          COLLECTION_LOCK_ID,
+        ]);
+      } catch (error) {
+        cleanupErrors.push(error);
       }
+    }
+
+    try {
+      await lockRunner.release();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+
+    return cleanupErrors;
+  }
+
+  private throwCollectionErrors(
+    collectionError: unknown,
+    cleanupErrors: unknown[],
+  ): void {
+    if (collectionError !== undefined) {
+      if (cleanupErrors.length === 0) {
+        throw collectionError;
+      }
+      // A normal finally would replace the source error with a later cleanup
+      // error. Preserve the collection error first while retaining every
+      // cleanup failure for operations diagnostics.
+      throw new AggregateError(
+        [collectionError, ...cleanupErrors],
+        "Tender collection failed and cleanup was incomplete",
+      );
+    }
+
+    if (cleanupErrors.length === 1) {
+      throw cleanupErrors[0];
+    }
+    if (cleanupErrors.length > 1) {
+      throw new AggregateError(cleanupErrors, "Tender collection cleanup failed");
     }
   }
 
