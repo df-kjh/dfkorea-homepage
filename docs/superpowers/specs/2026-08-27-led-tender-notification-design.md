@@ -140,7 +140,7 @@
 ### 7.5 `tender_mail_deliveries`
 
 - 대상 수신 주소, 대상 기간, 시도 횟수 `1 | 2`
-- `PENDING | SENT | FAILED | RETRY_SCHEDULED` 상태
+- `PENDING | SENT | FAILED | RETRY_SCHEDULED | SKIPPED` 상태
 - SMTP 메시지 ID, 성공·실패 시각, 오류
 
 ### 7.6 `tender_mail_items`
@@ -233,7 +233,7 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 해당 수신 주소에 성공 발송된 적 없는 공고
 - 수집 시각이나 캘린더 조회 필터와 무관
 - 직접 관련과 잠재 관련 모두 포함
-- 발송할 신규 공고가 없으면 메일을 보내지 않고 정상 무발송 이력을 기록
+- 발송할 신규 공고가 없으면 메일을 보내지 않고 `SKIPPED` 이력을 기록
 
 ### 10.3 본문
 
