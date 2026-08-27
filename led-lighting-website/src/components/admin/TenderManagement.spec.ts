@@ -59,6 +59,20 @@ const closeSubscriptionModal = () => {
   closeButton.click()
 }
 
+const mountedWrappers: Array<ReturnType<typeof mount>> = []
+const mountTenderManagement = (attachToBody = false) => {
+  const wrapper = mount(
+    TenderManagement,
+    attachToBody ? { attachTo: document.body } : {},
+  )
+  mountedWrappers.push(wrapper)
+  return wrapper
+}
+const cleanupMountedWrappers = () => {
+  const wrappers = mountedWrappers.splice(0).reverse()
+  for (const wrapper of wrappers) wrapper.unmount()
+}
+
 describe('TenderManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -73,11 +87,13 @@ describe('TenderManagement', () => {
   })
 
   afterEach(() => {
+    cleanupMountedWrappers()
     document.body.innerHTML = ''
+    vi.restoreAllMocks()
   })
 
   it('applies and resets calendar filters without showing a collection status control', async () => {
-    const wrapper = mount(TenderManagement)
+    const wrapper = mountTenderManagement()
     await flushPromises()
 
     await wrapper.get('[data-test="open-filter"]').trigger('click')
@@ -100,7 +116,7 @@ describe('TenderManagement', () => {
   })
 
   it('never copies calendar filters into the recipient settings payload', async () => {
-    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    const wrapper = mountTenderManagement(true)
     await flushPromises()
 
     await wrapper.get('[data-test="open-filter"]').trigger('click')
@@ -121,7 +137,7 @@ describe('TenderManagement', () => {
   })
 
   it('refetches settings on every modal open and disables save after a failed refresh without overwriting loaded settings', async () => {
-    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    const wrapper = mountTenderManagement(true)
     await flushPromises()
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
@@ -154,7 +170,7 @@ describe('TenderManagement', () => {
     api.getSubscription
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
-    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    const wrapper = mountTenderManagement(true)
     await flushPromises()
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
@@ -181,7 +197,7 @@ describe('TenderManagement', () => {
     api.getSubscription
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
-    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    const wrapper = mountTenderManagement(true)
     await flushPromises()
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
@@ -208,7 +224,7 @@ describe('TenderManagement', () => {
       .mockResolvedValueOnce({
         data: { enabled: true, deliveryTime: '11:45', recipients: ['retry@dfkorea.co.kr'] },
       })
-    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    const wrapper = mountTenderManagement(true)
     await flushPromises()
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
@@ -231,7 +247,7 @@ describe('TenderManagement', () => {
     api.getSubscription
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
-    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    const wrapper = mountTenderManagement(true)
     await flushPromises()
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
@@ -258,7 +274,7 @@ describe('TenderManagement', () => {
 
   it('renders loading, error, and empty list states instead of stale notices', async () => {
     api.getAll.mockRejectedValueOnce(new Error('network error'))
-    const wrapper = mount(TenderManagement)
+    const wrapper = mountTenderManagement()
     await flushPromises()
     expect(wrapper.get('[data-test="tender-list-error"]').text()).toContain('불러오지 못했습니다')
 
@@ -266,5 +282,21 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-date="2026-08-27"]').trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-test="tender-list-empty"]').text()).toContain('공고가 없습니다')
+  })
+
+  it('unmounts tracked wrappers and releases modal global state during cleanup', async () => {
+    const removeEventListener = vi.spyOn(window, 'removeEventListener')
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+    expect(document.body.style.overflow).toBe('hidden')
+
+    cleanupMountedWrappers()
+
+    expect(wrapper.exists()).toBe(false)
+    expect(document.body.style.overflow).toBe('')
+    expect(removeEventListener).toHaveBeenCalledWith('keydown', expect.any(Function))
   })
 })

@@ -1,5 +1,11 @@
 # Vercel 배포 가이드
 
+이 문서는 프론트엔드 환경 변수만 보충한다. 전체 서비스의 PostgreSQL, 백업, 백엔드 배포 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용한다. 백엔드는 compiled migration 성공 후에만 시작한다.
+
+```bash
+npm run migration:run:prod && npm run start:prod
+```
+
 ## 환경 변수 설정
 
 Vercel에 배포하기 전에 다음 환경 변수를 설정해야 합니다.

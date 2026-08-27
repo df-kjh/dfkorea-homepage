@@ -1,5 +1,11 @@
 # 백엔드 배포 가이드 (CORS 설정)
 
+이 문서는 CORS 설정만 보충한다. 전체 환경 변수, PostgreSQL, 백업, 배포 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용한다. 운영 Start Command는 compiled migration이 실패하면 시작도 중단한다.
+
+```bash
+npm run migration:run:prod && npm run start:prod
+```
+
 ## ✅ GitHub Codespaces CORS 문제 해결 완료!
 
 ### 🔍 문제

@@ -1,5 +1,11 @@
 # 이미지 최적화 가이드
 
+이 문서는 이미지 처리 동작만 설명한다. storage, PostgreSQL, 백업, 배포 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용한다. 운영 백엔드는 compiled migration 성공 후에만 시작한다.
+
+```bash
+npm run migration:run:prod && npm run start:prod
+```
+
 ## 적용된 최적화
 
 ### 백엔드 (자동 이미지 처리)
