@@ -133,7 +133,29 @@ describe("TenderMailService", () => {
         attemptCount: 1,
       }),
     );
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves a successful SMTP delivery leased when its atomic success persistence fails", async () => {
+    mailItemRepository.update.mockRejectedValueOnce(
+      new Error("simulated item-write failure"),
+    );
+
+    await service.sendDailyDigest(NOW);
+
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
+    expect(deliveryRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: MailDeliveryStatus.PENDING,
+        claimedAt: NOW,
+      }),
+    );
+    expect(deliveryRepository.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.SENT }),
+    );
+    expect(deliveryRepository.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.RETRY_SCHEDULED }),
+    );
   });
 
   it("schedules exactly one durable retry ten minutes after a first SMTP failure", async () => {

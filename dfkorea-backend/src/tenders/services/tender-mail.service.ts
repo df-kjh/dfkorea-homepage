@@ -298,19 +298,39 @@ export class TenderMailService {
     tenders: Tender[],
     now: Date,
   ): Promise<void> {
+    let result: { messageId?: string };
     try {
       const configuration = this.getConfiguration();
       const rendered = this.renderer.render(now, tenders);
-      const result = await this.transport.sendMail({
+      result = await this.transport.sendMail({
         from: `"${configuration.fromName.replace(/["\\]/g, "")}" <${configuration.user}>`,
         to: delivery.recipientEmail,
         ...rendered,
       });
-      await this.mailItemRepository.update(
+    } catch {
+      await this.persistFailure(delivery, now);
+      return;
+    }
+
+    // SMTP acknowledgement is outside a database transaction. Once received,
+    // however, item and delivery success state must commit or roll back as one
+    // unit; a failed commit leaves the durable lease for at-least-once recovery.
+    await this.persistSuccess(delivery, result, now);
+  }
+
+  private async persistSuccess(
+    delivery: TenderMailDelivery,
+    result: { messageId?: string },
+    now: Date,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const mailItemRepository = manager.getRepository(TenderMailItem);
+      const deliveryRepository = manager.getRepository(TenderMailDelivery);
+      await mailItemRepository.update(
         { lastDeliveryId: delivery.id },
         { status: MailItemStatus.SENT, sentAt: now },
       );
-      await this.deliveryRepository.save({
+      await deliveryRepository.save({
         ...delivery,
         status: MailDeliveryStatus.SENT,
         nextRetryAt: null,
@@ -320,9 +340,17 @@ export class TenderMailService {
         failedAt: null,
         errorMessage: null,
       });
-    } catch {
+    });
+  }
+
+  private async persistFailure(
+    delivery: TenderMailDelivery,
+    now: Date,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const deliveryRepository = manager.getRepository(TenderMailDelivery);
       if (delivery.attemptCount >= 2) {
-        await this.deliveryRepository.save({
+        await deliveryRepository.save({
           ...delivery,
           status: MailDeliveryStatus.FAILED,
           attemptCount: 2,
@@ -333,7 +361,7 @@ export class TenderMailService {
         });
         return;
       }
-      await this.deliveryRepository.save({
+      await deliveryRepository.save({
         ...delivery,
         status: MailDeliveryStatus.RETRY_SCHEDULED,
         attemptCount: 1,
@@ -342,7 +370,7 @@ export class TenderMailService {
         failedAt: now,
         errorMessage: "SMTP delivery failed",
       });
-    }
+    });
   }
 
   private getConfiguration(): { user: string; fromName: string } {

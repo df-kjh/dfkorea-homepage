@@ -19,6 +19,7 @@ import { TenderMailItem } from "./tender-mail-item.entity";
   "recipientEmail",
   "targetDate",
 ])
+@Index("IDX_tender_mail_delivery_status_claimed_at", ["status", "claimedAt"])
 export class TenderMailDelivery {
   @PrimaryGeneratedColumn("uuid")
   id: string;

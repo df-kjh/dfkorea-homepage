@@ -39,7 +39,10 @@ export class TenderSubscriptionService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const subscription = await this.getOrCreateEntity(manager);
+      // A shared-row lock serializes complete replacement payloads. Thus the
+      // last transaction to commit wins as one coherent recipient list rather
+      // than interleaving two administrators' add/remove diffs.
+      const subscription = await this.getOrCreateEntity(manager, true);
       const subscriptionRepository = manager.getRepository(TenderSubscription);
       const recipientRepository = manager.getRepository(TenderRecipient);
 
@@ -82,6 +85,7 @@ export class TenderSubscriptionService {
 
   private async getOrCreateEntity(
     manager: EntityManager,
+    lockForUpdate = false,
   ): Promise<TenderSubscription> {
     const subscriptionRepository = manager.getRepository(TenderSubscription);
 
@@ -94,6 +98,18 @@ export class TenderSubscriptionService {
       .values({ singletonKey: SHARED_SUBSCRIPTION_KEY })
       .orIgnore()
       .execute();
+
+    if (lockForUpdate) {
+      const lockedSubscription = await subscriptionRepository.findOne({
+        where: { singletonKey: SHARED_SUBSCRIPTION_KEY },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!lockedSubscription) {
+        throw new InternalServerErrorException(
+          "Unable to initialize tender subscription",
+        );
+      }
+    }
 
     const subscription = await subscriptionRepository.findOne({
       where: { singletonKey: SHARED_SUBSCRIPTION_KEY },

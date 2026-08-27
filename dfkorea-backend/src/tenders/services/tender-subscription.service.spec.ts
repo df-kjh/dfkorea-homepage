@@ -85,6 +85,14 @@ describe("TenderSubscriptionService", () => {
     );
     expect(recipientRepository.delete).not.toHaveBeenCalled();
     expect(recipientRepository.save).not.toHaveBeenCalled();
+    expect(subscriptionRepository.findOne).toHaveBeenNthCalledWith(1, {
+      where: { singletonKey: "shared" },
+      lock: { mode: "pessimistic_write" },
+    });
+    expect(subscriptionRepository.findOne).toHaveBeenNthCalledWith(2, {
+      where: { singletonKey: "shared" },
+      relations: { recipients: true },
+    });
   });
 
   it("adds and removes only changed addresses so retained recipient history survives", async () => {
