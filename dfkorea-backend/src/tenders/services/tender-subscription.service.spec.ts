@@ -1,5 +1,4 @@
 import { BadRequestException } from "@nestjs/common";
-import { TenderRecipient } from "../entities/tender-recipient.entity";
 import { TenderSubscription } from "../entities/tender-subscription.entity";
 import { TenderSubscriptionService } from "./tender-subscription.service";
 

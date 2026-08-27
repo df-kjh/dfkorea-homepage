@@ -44,7 +44,7 @@ async function bootstrap() {
     // Products 마이그레이션
     console.log('📦 Migrating products...');
     for (const product of jsonData.products) {
-      const { id, createdAt, updatedAt, ...productData } = product;
+      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...productData } = product;
       
       try {
         await dbService.createProduct(productData);
@@ -58,7 +58,7 @@ async function bootstrap() {
     // Posts 마이그레이션
     console.log('\n📝 Migrating posts...');
     for (const post of jsonData.posts) {
-      const { id, createdAt, updatedAt, ...postData } = post;
+      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...postData } = post;
       
       try {
         await dbService.createPost(postData);

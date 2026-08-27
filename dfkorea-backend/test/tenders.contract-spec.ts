@@ -31,7 +31,7 @@ import { TenderMailRenderer } from "../src/tenders/mail/tender-mail-renderer";
 const ADMIN_TOKEN = "test-admin-token";
 const TENDER_ID = "00000000-0000-4000-8000-000000000001";
 
-describe("Tender admin HTTP contract (e2e)", () => {
+describe("Tender admin HTTP contract", () => {
   let app: INestApplication;
   const query = {
     getCalendar: jest.fn(),
@@ -188,7 +188,7 @@ describe("Tender admin HTTP contract (e2e)", () => {
   });
 });
 
-describe("Tender collection and delivery integration contracts", () => {
+describe("Tender collection and delivery service contracts", () => {
   const now = new Date("2026-08-27T03:00:00.000Z");
 
   const notice = (overrides: Partial<NormalizedTender>): NormalizedTender => ({

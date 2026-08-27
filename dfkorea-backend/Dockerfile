@@ -43,4 +43,4 @@ EXPOSE 3000
 ENV NODE_ENV=production
 
 # Start application with migration
-CMD ["sh", "-c", "npm run migration:run:prod || true && node dist/main.js"]
+CMD ["sh", "-c", "npm run migration:run:prod && npm run start:prod"]

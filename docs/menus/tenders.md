@@ -22,7 +22,7 @@
 - 나라장터·K-apt는 공식 응답 fixture와 어댑터 계약 테스트만 통과했다. 공공데이터포털에서 승인된 실운영 키로 실제 응답을 받은 검증은 아직 하지 않았다.
 - 한전은 LINK API의 승인 계정·실제 OpenAPI 매뉴얼이 없어 기록 계약 fixture만 사용한다. `KEPCO_TENDER_ENABLED=false`가 기본이며, 실제 base URL·인증 파라미터·필드 매핑 검증 전에는 활성화하면 안 된다.
 - 네이버웍스 SMTP는 외부 앱 비밀번호가 없는 상태에서 전송기 이중(mock)과 영속 재시도 계약만 검증했다. 스테이징에서 실제 발신 권한, TLS 465 연결, 성공 주소 비중복, 실패 주소 10분 후 1회 재시도를 확인해야 한다.
-- HTTP 계약 테스트와 화면 테스트는 안전한 서비스/데이터 저장소 이중을 사용한다. 실제 PostgreSQL migration, KST SQL 집계, 다중 연결 lock, 권한 만료, 대량 데이터, 모바일 실기기 시각 검증은 배포 전 추가 확인이 필요하다.
+- 빠른 HTTP·서비스 계약 테스트와 화면 테스트는 안전한 이중(mock)을 사용한다. 별도 `test:tender:integration` 실행기는 실제 AppModule, JWT, TypeORM, migration을 검증하도록 준비했지만, 현재 disposable PostgreSQL이 없어 실행하지 못했다. KST SQL 집계, 다중 연결 lock, 권한 만료, 대량 데이터, 모바일 실기기 시각 검증은 배포 전 추가 확인이 필요하다.
 
 ## 관련 파일
 
@@ -33,7 +33,8 @@
 - `led-lighting-website/src/types/tender.ts`
 - `led-lighting-website/src/utils/tender-calendar.ts`
 - `dfkorea-backend/src/tenders/`
-- `dfkorea-backend/test/tenders.e2e-spec.ts`
+- `dfkorea-backend/test/tenders.contract-spec.ts`
+- `dfkorea-backend/test/tender-app-integration.spec.ts`
 - `DEPLOYMENT.md`
 
 ## 갱신 규칙

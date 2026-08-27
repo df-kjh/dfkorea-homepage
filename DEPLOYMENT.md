@@ -335,6 +335,8 @@ npm run start:prod
 
 Railway 등의 pre-deploy 명령도 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 설정한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다. Start 명령은 `cd dfkorea-backend && npm run start:prod`다.
 
+Dockerfile과 `railway.json`도 `npm run migration:run:prod && npm run start:prod`를 사용한다. migration 실패를 `|| true` 등으로 무시하지 않는다.
+
 백엔드의 `PUBLIC_SITE_URL`, `PUBLIC_API_URL`, `CORS_ORIGIN`에는 실제 HTTPS URL을 넣고, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`에는 PostgreSQL 접속 값을 넣는다. 상세 변수는 `dfkorea-backend/.env.example`을 기준으로 한다.
 
 ### 공식 데이터 키
@@ -362,6 +364,20 @@ API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣�
 - `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
 
 관리자에는 수집 현황 버튼이 없다. 실패는 `tender_sync_runs`에 출처별로 남고 다음 정규 수집이 겹치는 시간 범위를 회수한다.
+
+### 실제 AppModule 통합 테스트
+
+빠른 `npm run test:tender:contract`는 외부 경계와 저장소를 이중으로 바꾼 HTTP·서비스 **계약 테스트**다. 실제 PostgreSQL은 건드리지 않는다.
+
+실제 AppModule, JWT, TypeORM, migration을 확인하려면 disposable DB만 지정한 뒤 아래 전용 명령을 사용한다.
+
+```bash
+cd dfkorea-backend
+TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_tender_e2e' \
+  npm run test:tender:integration
+```
+
+또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 값이 하나라도 없거나, host가 localhost/test/e2e/postgres 계열이 아니거나, DB 이름에 `test` 또는 `e2e`가 없으면 AppModule을 시작하기 전에 실패한다. migration을 적용하고 tender 테이블만 truncate하며, 실제 API 어댑터와 SMTP 전송기만 이중으로 교체한다. 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
 
 ### 스테이징 라이브 스모크 체크리스트
 

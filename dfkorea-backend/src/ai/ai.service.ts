@@ -1,7 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import * as fs from "fs";
-import * as path from "path";
 import { Product } from "../entities/product.entity";
 
 export interface GeneratedPost {

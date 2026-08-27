@@ -5,6 +5,10 @@ export class InitialSchema1706200000000 implements MigrationInterface {
   name = 'InitialSchema1706200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // All baseline UUID primary keys use uuid_generate_v4(), so a pristine
+    // disposable database must enable the extension before its first table.
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+
     // Create products table
     await queryRunner.query(`
       CREATE TABLE "products" (

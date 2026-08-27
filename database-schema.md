@@ -93,7 +93,7 @@ Whenever a migration changes this schema, update this root `database-schema.md` 
 
 ## Tender migration sequence
 
-- `1787819500000-CreateTenderTables` creates the six tender tables, the UUID extension, baseline foreign keys, unique constraints, and query indexes.
+- `1706200000000-InitialSchema` enables `uuid-ossp` before the baseline UUID tables. `1787819500000-CreateTenderTables` repeats the idempotent extension guard and creates the six tender tables, baseline foreign keys, unique constraints, and query indexes.
 - `1787819600000-AddTenderSubscriptionSingletonKey` adds the required shared subscription key and `UQ_tender_subscription_singleton_key`.
 - `1787819700000-AddTenderMailDeliveryClaimedAt` adds the durable delivery lease timestamp and `IDX_tender_mail_delivery_status_claimed_at`.
 

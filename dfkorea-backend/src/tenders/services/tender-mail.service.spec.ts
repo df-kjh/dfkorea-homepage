@@ -7,9 +7,7 @@ import {
 } from "../domain/tender.enums";
 import { Tender } from "../entities/tender.entity";
 import { TenderMailDelivery } from "../entities/tender-mail-delivery.entity";
-import { TenderMailItem } from "../entities/tender-mail-item.entity";
 import { TenderRecipient } from "../entities/tender-recipient.entity";
-import { TenderSubscription } from "../entities/tender-subscription.entity";
 import { TenderMailRenderer } from "../mail/tender-mail-renderer";
 import { TenderMailService } from "./tender-mail.service";
 
