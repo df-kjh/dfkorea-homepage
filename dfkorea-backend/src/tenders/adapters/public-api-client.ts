@@ -111,20 +111,7 @@ export class PublicApiClient implements TenderApiClient {
     let abortListener: (() => void) | undefined;
 
     try {
-      const requestPromise = this.fetchAndReadJson(
-        url,
-        request.source,
-        controller.signal,
-      );
-      const timeoutPromise = new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => {
-          controller.abort();
-          reject(
-            new TenderSourceError(request.source, "REQUEST_TIMEOUT", null),
-          );
-        }, this.timeoutMs);
-      });
-      const pending: Promise<unknown>[] = [requestPromise, timeoutPromise];
+      const pending: Promise<unknown>[] = [];
 
       if (request.signal) {
         const callerAbortPromise = new Promise<never>((_resolve, reject) => {
@@ -139,7 +126,29 @@ export class PublicApiClient implements TenderApiClient {
           });
         });
         pending.push(callerAbortPromise);
+
+        // Abort can occur between the first check above and listener
+        // registration. Re-checking here closes that registration window.
+        if (request.signal.aborted) {
+          abortListener();
+          return await callerAbortPromise;
+        }
       }
+
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(
+            new TenderSourceError(request.source, "REQUEST_TIMEOUT", null),
+          );
+        }, this.timeoutMs);
+      });
+      const requestPromise = this.fetchAndReadJson(
+        url,
+        request.source,
+        controller.signal,
+      );
+      pending.push(timeoutPromise, requestPromise);
 
       return await Promise.race(pending);
     } catch (error) {

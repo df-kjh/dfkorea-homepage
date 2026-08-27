@@ -381,6 +381,74 @@ describe("PublicApiClient", () => {
     expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
   });
 
+  it("does not miss a caller abort triggered synchronously by the fetcher", async () => {
+    jest.useFakeTimers();
+    const caller = new AbortController();
+    let forwardedSignal: AbortSignal | undefined;
+    const fetcher = jest.fn((_url: string, init?: RequestInit) => {
+      forwardedSignal = init?.signal;
+      caller.abort();
+      return new Promise<Response>(() => undefined);
+    });
+    const client = new PublicApiClient(fetcher, { timeoutMs: 100 });
+    const request = client.getAllPages({
+      source: TenderSource.KEPCO,
+      baseUrl: "https://api.example.test/bids",
+      operation: "notices",
+      query: {},
+      signal: caller.signal,
+    });
+    const result = request.then(
+      () => fail("expected the caller abort to reject the request"),
+      (error) => error,
+    );
+
+    await jest.advanceTimersByTimeAsync(100);
+    await expect(result).resolves.toMatchObject({
+      source: TenderSource.KEPCO,
+      code: "REQUEST_ABORTED",
+    });
+    expect(forwardedSignal?.aborted).toBe(true);
+    jest.useRealTimers();
+  });
+
+  it("removes the one-shot caller listener after a completed request", async () => {
+    const caller = new AbortController();
+    const addListener = jest.spyOn(caller.signal, "addEventListener");
+    const removeListener = jest.spyOn(caller.signal, "removeEventListener");
+    let forwardedSignal: AbortSignal | undefined;
+    const fetcher = jest.fn((_url: string, init?: RequestInit) => {
+      forwardedSignal = init?.signal;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            response: {
+              header: { resultCode: "00" },
+              body: { totalCount: 0, items: [] },
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+    const client = new PublicApiClient(fetcher);
+
+    await client.getAllPages({
+      source: TenderSource.G2B,
+      baseUrl: "https://api.example.test/bids",
+      operation: "notices",
+      query: {},
+      signal: caller.signal,
+    });
+
+    expect(addListener).toHaveBeenCalledWith("abort", expect.any(Function), {
+      once: true,
+    });
+    expect(removeListener).toHaveBeenCalledTimes(1);
+    caller.abort();
+    expect(forwardedSignal?.aborted).toBe(false);
+  });
+
   it("preserves a network cause without exposing it in the public error message", async () => {
     const cause = new Error("network failed for serviceKey=secret-key");
     const fetcher = jest.fn().mockRejectedValue(cause);
