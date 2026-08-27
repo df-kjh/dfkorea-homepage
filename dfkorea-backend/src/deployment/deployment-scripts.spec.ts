@@ -3,6 +3,8 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 const backendRoot = join(__dirname, "..", "..");
+const archiveMarker =
+  "# ARCHIVED / IMPLEMENTATION COMPLETE / NON-OPERATIONAL — 구현 완료·비운영 기록";
 
 describe("deployment migration commands", () => {
   it("keeps primary deployment paths PostgreSQL-only and migration-first", () => {
@@ -25,10 +27,6 @@ describe("deployment migration commands", () => {
       [
         "docs/superpowers/plans/2026-08-27-led-tender-notification.md",
         "historical implementation plan, not an operational runbook",
-      ],
-      [
-        "docs/superpowers/specs/2026-08-27-led-tender-notification-design.md",
-        "historical design specification, not an operational runbook",
       ],
     ]);
     const auditableDocs = trackedMarkdown
@@ -78,6 +76,29 @@ describe("deployment migration commands", () => {
       expect(content).not.toMatch(
         /npm run start:prod|npm run migration:run|^#{1,4}.*배포/im,
       );
+      if (path.includes("docs/superpowers/plans/")) {
+        expect(content.startsWith(archiveMarker)).toBe(true);
+        expect(content).toContain(
+          "Do not execute or follow any command, code block, checkbox, or checklist below.",
+        );
+        expect(content).toContain("../../../DEPLOYMENT.md");
+        expect(content).toContain("../../../database-schema.md");
+        expect(content).toContain("../../menus/tenders.md");
+        expect(content).not.toContain("Perform a staging smoke test");
+        expect(content).not.toContain("truncate only the six tender tables");
+        expect(content).not.toContain("DB_PATH");
+        expect(content).not.toContain("DATA_DIR");
+        expect(content).not.toContain("database.json");
+        expect(content).not.toMatch(/SQLite/i);
+        expect(content).not.toMatch(
+          /(?:TYPEORM_)?SYNCHRONIZE\s*[:=]\s*true/i,
+        );
+        expect(content).not.toMatch(
+          /^#{1,4}.*(?:Deployment|배포|Staging|스테이징)/im,
+        );
+        expect(content).not.toMatch(/npm run migration:(?:run|revert)/);
+        expect(content).not.toMatch(/npm run start:prod/);
+      }
     }
 
     for (const { content } of auditableDocs) {
@@ -87,6 +108,7 @@ describe("deployment migration commands", () => {
       expect(content).not.toMatch(/SQLite/i);
       expect(content).not.toMatch(/(?:TYPEORM_)?SYNCHRONIZE\s*[:=]\s*true/i);
       expect(content).not.toMatch(/npm run migration:run(?!:prod)/);
+      expect(content).not.toMatch(/npm run migration:revert(?!:prod)/);
       expect(content).not.toMatch(
         /(?:첫 배포 후|배포 (?:완료|성공))[\s\S]{0,200}(?:railway run )?npm run migration:run/i,
       );
@@ -121,6 +143,49 @@ describe("deployment migration commands", () => {
         "npm run migration:run:prod && npm run start:prod",
       );
     }
+  });
+
+  it("uses only the compiled TypeORM rollback command in operations", () => {
+    const repositoryRoot = join(backendRoot, "..");
+    const packageJson = JSON.parse(
+      readFileSync(join(backendRoot, "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    const deployment = readFileSync(
+      join(repositoryRoot, "DEPLOYMENT.md"),
+      "utf8",
+    );
+    const dockerfile = readFileSync(join(backendRoot, "Dockerfile"), "utf8");
+
+    expect(packageJson.scripts["migration:revert:prod"]).toBe(
+      "typeorm migration:revert -d dist/database/typeorm.config.js",
+    );
+    expect(dockerfile).toContain("RUN npm run build");
+    expect(dockerfile).toContain("COPY --from=builder /app/dist ./dist");
+    expect(deployment).toContain("cd dfkorea-backend");
+    expect(deployment).toContain("npm run migration:revert:prod");
+    expect(deployment).not.toMatch(/npm run migration:revert(?!:prod)/);
+  });
+
+  it("preserves the AI feature guide without making it deployment authority", () => {
+    const aiGuide = readFileSync(
+      join(backendRoot, "AI_AUTO_BLOG_GUIDE.md"),
+      "utf8",
+    );
+    const quickstart = readFileSync(
+      join(backendRoot, "AI_QUICKSTART.md"),
+      "utf8",
+    );
+
+    expect(aiGuide).toContain("AI 자동 블로그 기능 가이드");
+    expect(aiGuide).toContain("POST /api/scheduler/trigger");
+    expect(aiGuide).toContain("POST /api/scheduler/trigger/product-company-news");
+    expect(aiGuide).toContain("GEMINI_API_KEY");
+    expect(aiGuide).toContain("CRON_TIMEZONE");
+    expect(aiGuide).toContain("DEPLOYMENT.md");
+    expect(aiGuide).not.toContain("DEPRECATED");
+    expect(quickstart).toContain("AI_AUTO_BLOG_GUIDE.md");
+    expect(quickstart).toContain("기능 가이드");
+    expect(quickstart).toContain("DEPLOYMENT.md");
   });
 
   it("fails the container start when a production migration fails", () => {

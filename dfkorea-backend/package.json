@@ -25,6 +25,7 @@
     "migration:run": "npm run typeorm -- migration:run -d src/database/typeorm.config.ts",
     "migration:run:prod": "typeorm migration:run -d dist/database/typeorm.config.js",
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/typeorm.config.ts",
+    "migration:revert:prod": "typeorm migration:revert -d dist/database/typeorm.config.js",
     "migrate:json": "ts-node -r tsconfig-paths/register src/scripts/migrate-json-to-postgres.ts"
   },
   "dependencies": {

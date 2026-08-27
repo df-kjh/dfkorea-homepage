@@ -402,4 +402,11 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
 
 ### 롤백
 
-먼저 구독을 비활성화하거나 SMTP/API 변수를 제거해 외부 호출을 멈춘다. 이미 적용한 migration은 무조건 되돌리면 데이터가 손실될 수 있으므로, 스테이징에서 백업 복원과 `npm run migration:revert`를 검증한 승인된 복구 계획으로 한 단계씩 롤백한다. 코드만 이전 버전으로 되돌린 뒤에도 수집 lock, 비밀값 노출, 캘린더 집계, 메일 중복을 다시 점검한다.
+먼저 구독을 비활성화하거나 SMTP/API 변수를 제거해 외부 호출을 멈춘다. 이미 적용한 migration은 무조건 되돌리면 데이터가 손실될 수 있으므로 백업 복원을 우선 검토하고, 승인된 경우에만 빌드 산출물의 TypeORM 설정으로 한 단계씩 되돌린다. 저장소 루트에서 실행한다면 backend 디렉터리로 먼저 이동해야 한다.
+
+```bash
+cd dfkorea-backend
+npm run migration:revert:prod
+```
+
+이 명령은 `dist/database/typeorm.config.js`를 사용하므로 배포 이미지에 `npm run build` 결과가 있어야 한다. 스테이징에서 동일 백업으로 복구와 compiled rollback을 검증한 뒤에만 운영에 적용한다. 코드만 이전 버전으로 되돌린 뒤에도 수집 lock, 비밀값 노출, 캘린더 집계, 메일 중복을 다시 점검한다.

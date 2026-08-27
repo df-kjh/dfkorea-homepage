@@ -1,6 +1,10 @@
-# LED Tender Calendar and Email Notification Implementation Plan
+# ARCHIVED / IMPLEMENTATION COMPLETE / NON-OPERATIONAL — 구현 완료·비운영 기록
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **경고 / WARNING:** 이 문서는 완료된 구현의 역사 기록일 뿐입니다. 아래 command, code block, checkbox 또는 checklist를 실행하거나 현재 작업 지시로 사용하지 마세요. 모든 항목은 완료 당시의 historical snapshot이며 현재 운영 절차가 아닙니다. / Historical record only. Do not execute or follow any command, code block, checkbox, or checklist below.
+>
+> 현재 운영의 단일 기준은 루트 [`DEPLOYMENT.md`](../../../DEPLOYMENT.md), 현재 스키마의 기준은 [`database-schema.md`](../../../database-schema.md), 메뉴 기능·제약의 기준은 [`docs/menus/tenders.md`](../../menus/tenders.md)입니다.
+
+# Historical LED Tender Calendar and Email Notification Implementation Plan
 
 **Goal:** 공식 입찰 API의 LED 관련 공고를 하루 두 번 수집하고, 어드민 월간 캘린더 조회와 네이버웍스 일일 이메일 발송을 제공한다.
 
@@ -120,9 +124,9 @@ export enum MailItemStatus { PENDING = 'PENDING', SENT = 'SENT' }
 
 Implement `Tender` with `@Unique('UQ_tender_source_notice_revision', ['source', 'sourceNoticeId', 'revision'])`, `timestamptz` schedule columns, `bigint` nullable estimated amount, JSONB relevance reasons/raw data, and indexes on `registeredAt`, `source`, `relevance`, `region`, and `procurementType`. Implement the remaining entities and relations exactly as section 7 of the spec defines. `TenderMailDelivery` must include `attemptCount`, `nextRetryAt`, `smtpMessageId`, and `errorMessage`; `TenderMailItem` must include `recipientId`, `tenderId`, `status`, `lastDeliveryId`, and `sentAt`.
 
-- [ ] **Step 4: Add the migration and register all six entities**
+- [ ] **Step 4 snapshot: Add the migration and register all seven final tender entities**
 
-The migration must enable `uuid-ossp`, create the six tables, foreign keys with `ON DELETE CASCADE` for subscription recipients and delivery items, both named unique constraints from Step 1, and the query indexes. Add the classes to the explicit `entities` array in `AppModule` and export them from `src/entities/index.ts`.
+The completed migration sequence enables `uuid-ossp` and creates the seven current tender tables, including the later daily-dispatch idempotency table. Current constraints and indexes are documented only in [`database-schema.md`](../../../database-schema.md).
 
 - [ ] **Step 5: Document the schema and run checks**
 
@@ -735,95 +739,8 @@ git commit -m "feat: add tender admin calendar"
 
 ---
 
-### Task 10: Deployment documentation and end-to-end verification
+### Historical completion note (non-operational)
 
-**Files:**
-- Modify: `DEPLOYMENT.md`
-- Modify: `dfkorea-backend/.env.example`
-- Modify: `database-schema.md`
-- Modify: `docs/menus/tenders.md`
-- Create: `dfkorea-backend/test/tenders.e2e-spec.ts`
-- Create: `dfkorea-backend/test/setup-test-env.ts`
-- Modify: `dfkorea-backend/test/jest-e2e.json`
+The implementation and verification work represented by the removed executable section was completed and later hardened during whole-branch review. Its old environment setup, outdated cleanup scope, live-smoke steps, and acceptance checklist were stale and are intentionally not retained as instructions.
 
-**Interfaces:**
-- Verifies the complete authenticated flow without live external API or SMTP calls
-
-- [ ] **Step 1: Write the failing e2e flow with mocked adapters and SMTP**
-
-The test app must override the three adapter tokens and mail transport provider. Test unauthorized rejection, collection creating one direct and one potential notice, calendar counts on registered date, filtered list, subscription storage, successful two-recipient send, and one-recipient retry without duplicate delivery to the successful recipient.
-
-```ts
-await request(app.getHttpServer())
-  .get('/tenders/calendar?month=2026-08')
-  .set('Authorization', `Bearer ${adminToken}`)
-  .expect(200)
-  .expect(({ body }) => expect(body).toContainEqual({ date: '2026-08-27', total: 2, direct: 1, potential: 1 }));
-```
-
-- [ ] **Step 2: Run e2e and verify failure before wiring final test overrides**
-
-Run: `cd dfkorea-backend && npm run test:e2e -- --runInBand test/tenders.e2e-spec.ts`
-
-Expected: FAIL until test database, adapter tokens, and SMTP transport overrides are connected.
-
-- [ ] **Step 3: Complete e2e harness and documentation**
-
-In `setup-test-env.ts`, copy `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, and `TEST_DB_NAME` into the existing `DB_*` variables before `AppModule` loads. Register the setup file through `setupFiles` in `jest-e2e.json`. Run the tender migration before the suite and truncate only the six tender tables between tests. Document public-data key applications, KEPCO key, Railway variables, migration command, NAVER WORKS SMTP permission, external app password creation, and safe key rotation. Never print secret example values.
-
-- [ ] **Step 4: Run complete backend verification**
-
-```bash
-cd dfkorea-backend
-npm run lint
-npm test -- --runInBand
-npm run test:e2e -- --runInBand test/tenders.e2e-spec.ts
-npm run build
-```
-
-Expected: lint exits 0, all unit/e2e tests PASS, and Nest build succeeds.
-
-- [ ] **Step 5: Run complete frontend verification**
-
-```bash
-cd led-lighting-website
-npm run lint
-npm test
-npm run type-check
-npm run build
-```
-
-Expected: lint exits 0, all Vitest tests PASS, type check succeeds, and Nuxt build succeeds.
-
-- [ ] **Step 6: Perform a staging smoke test with real credentials**
-
-Apply migrations to staging, configure the three API credentials and NAVER WORKS SMTP variables, deploy before the next scheduled `00:00` or `12:00` KST run, and verify after that run: source records exist, no secret appears in logs, calendar counts equal DB counts, and duplicate source identifiers are absent. Set one staging recipient and the next available daily delivery time, then verify one digest arrives and a second manual page refresh does not trigger another mail.
-
-- [ ] **Step 7: Update status documents from verified evidence**
-
-Move only staging-verified providers into `구현 완료`. Keep any provider without approved credentials or successful live response under `부족하거나 개선이 필요한 기능` with the exact failed prerequisite. Confirm `database-schema.md` matches the applied migration.
-
-- [ ] **Step 8: Commit verification and operations docs**
-
-```bash
-git add DEPLOYMENT.md dfkorea-backend/.env.example dfkorea-backend/test database-schema.md docs/menus/tenders.md
-git commit -m "docs: add tender operations and verification"
-```
-
----
-
-## Final Acceptance Checklist
-
-- [ ] `00:00` and `12:00` KST are the only collection schedules.
-- [ ] Initial window is 24 hours; later windows start one hour before each source's last success.
-- [ ] Provider failures are isolated and visible in `tender_sync_runs`.
-- [ ] Direct and potential classifications expose exact reasons.
-- [ ] Calendar groups by KST registration date and always renders 42 cells.
-- [ ] Calendar filters never alter the email payload or recipient selection.
-- [ ] Subscription accepts only enabled, recipients, and delivery time.
-- [ ] Successful recipients never receive a duplicate tender.
-- [ ] Failed recipients retry once after 10 minutes and retain pending items after final failure.
-- [ ] NAVER WORKS credentials and public API keys never appear in responses or logs.
-- [ ] `database-schema.md` and `docs/menus/tenders.md` match verified behavior.
-- [ ] Backend lint, unit tests, e2e tests, and build pass.
-- [ ] Frontend lint, unit tests, type-check, and build pass.
+Use [`DEPLOYMENT.md`](../../../DEPLOYMENT.md) for current operations, [`database-schema.md`](../../../database-schema.md) for the seven-table tender schema, and [`docs/menus/tenders.md`](../../menus/tenders.md) for verified feature status and remaining credential-gated checks.
