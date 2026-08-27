@@ -46,7 +46,7 @@ UPLOAD_DEST=./uploads
 DB_HOST=postgres-host
 DB_PORT=5432
 DB_USERNAME=postgres-user
-DB_PASSWORD=
+DB_PASSWORD=replace-with-secret-store-value
 DB_NAME=dfkorea
 TYPEORM_SYNCHRONIZE=false
 ```
@@ -102,8 +102,8 @@ npm run build
 # PM2 글로벌 설치
 npm install -g pm2
 
-# migration 성공 뒤에만 애플리케이션 시작
-npm run migration:run:prod && pm2 start ecosystem.config.js --env production
+# 정확히 .env.production을 검증·로드한 migration 성공 뒤에만 애플리케이션 시작
+npm run migration:run:prod:env && pm2 start ecosystem.config.js --env production
 
 # 부팅 시 자동 시작 설정
 pm2 startup
@@ -113,7 +113,7 @@ pm2 save
 #### 4. 또는 직접 실행
 
 ```bash
-npm run migration:run:prod && npm run start:prod
+npm run migration:run:prod:env && npm run start:prod
 ```
 
 ### 프론트엔드 배포
@@ -199,20 +199,20 @@ sudo cp -r dist/* /var/www/led-lighting/
 
 ### 백엔드 환경 변수
 
-| 변수명           | 설명                   | 예시                     |
-| ---------------- | ---------------------- | ------------------------ |
-| `NODE_ENV`       | 환경 모드              | `production`             |
-| `PORT`           | 서버 포트              | `3000`                   |
-| `JWT_SECRET`     | JWT 비밀키             | `your-secret-key`        |
-| `JWT_EXPIRES_IN` | JWT 만료 시간          | `7d`                     |
-| `CORS_ORIGIN`    | CORS 허용 도메인       | `https://yourdomain.com` |
-| `MAX_FILE_SIZE`  | 최대 업로드 크기       | `10485760` (10MB)        |
-| `UPLOAD_DEST`    | 업로드 디렉토리        | `./uploads`              |
-| `DB_HOST`        | PostgreSQL 호스트      | `postgres-host`          |
-| `DB_PORT`        | PostgreSQL 포트        | `5432`                   |
-| `DB_USERNAME`    | PostgreSQL 사용자      | `postgres-user`          |
-| `DB_PASSWORD`    | PostgreSQL 비밀번호    | 비밀 저장소에서 주입     |
-| `DB_NAME`        | PostgreSQL DB 이름     | `dfkorea`                |
+| 변수명                | 설명                | 예시                      |
+| --------------------- | ------------------- | ------------------------- |
+| `NODE_ENV`            | 환경 모드           | `production`              |
+| `PORT`                | 서버 포트           | `3000`                    |
+| `JWT_SECRET`          | JWT 비밀키          | `your-secret-key`         |
+| `JWT_EXPIRES_IN`      | JWT 만료 시간       | `7d`                      |
+| `CORS_ORIGIN`         | CORS 허용 도메인    | `https://yourdomain.com`  |
+| `MAX_FILE_SIZE`       | 최대 업로드 크기    | `10485760` (10MB)         |
+| `UPLOAD_DEST`         | 업로드 디렉토리     | `./uploads`               |
+| `DB_HOST`             | PostgreSQL 호스트   | `postgres-host`           |
+| `DB_PORT`             | PostgreSQL 포트     | `5432`                    |
+| `DB_USERNAME`         | PostgreSQL 사용자   | `postgres-user`           |
+| `DB_PASSWORD`         | PostgreSQL 비밀번호 | 비밀 저장소에서 주입      |
+| `DB_NAME`             | PostgreSQL DB 이름  | `dfkorea`                 |
 | `TYPEORM_SYNCHRONIZE` | TypeORM 자동 동기화 | 운영에서는 반드시 `false` |
 
 ---
@@ -282,7 +282,7 @@ cd dfkorea-backend
 git pull
 npm ci
 npm run build
-npm run migration:run:prod && pm2 restart led-backend
+npm run migration:run:prod:env && pm2 restart led-backend
 
 # 프론트엔드 업데이트
 cd ../led-lighting-website
@@ -334,16 +334,16 @@ sudo kill -9 <PID>
 
 ### PostgreSQL 마이그레이션과 배포 순서
 
-입찰 기능은 PostgreSQL과 TypeORM migration을 사용한다. `TYPEORM_SYNCHRONIZE=false`를 유지하고, 배포 전 DB 백업을 만든다. 아래 단계 중 하나라도 실패하면 이후 단계를 실행하지 않는다.
+입찰 기능은 PostgreSQL과 TypeORM migration을 사용한다. `TYPEORM_SYNCHRONIZE=false`를 유지하고, 배포 전 DB 백업을 만든다. 아래 단계 중 하나라도 실패하면 이후 단계를 실행하지 않는다. 수동 서버는 backend 디렉터리의 `.env.production`을 명시적으로 읽는 `:env` migration 명령을 사용한다. `start:prod`도 `NODE_ENV=production`을 강제해 같은 파일을 선택한다. 이 파일이 없거나 `NODE_ENV=production`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` 중 하나라도 비어 있으면 migration은 DB에 접속하기 전에 실패한다. 값은 오류에 출력하지 않는다.
 
 ```bash
 cd dfkorea-backend
 npm ci
 npm run build
-npm run migration:run:prod && npm run start:prod
+npm run migration:run:prod:env && npm run start:prod
 ```
 
-Railway 등의 pre-deploy 명령도 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 설정한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다. Start 명령 역시 `cd dfkorea-backend && npm run migration:run:prod && npm run start:prod`로 설정해 migration 없는 시작 경로를 만들지 않는다.
+Railway처럼 환경 변수를 플랫폼이 직접 주입하는 경로의 pre-deploy 명령은 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 설정한다. 이 compiled production script가 `NODE_ENV=production`을 강제하며, 플랫폼은 다섯 `DB_*`를 모두 주입해야 한다. production datasource는 누락 값을 localhost나 기본 DB로 대체하지 않고 실패한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다. Start 명령 역시 `cd dfkorea-backend && npm run migration:run:prod && npm run start:prod`로 설정해 migration 없는 시작 경로를 만들지 않는다.
 
 Dockerfile과 `railway.json`도 `npm run migration:run:prod && npm run start:prod`를 사용한다. migration 실패를 `|| true` 등으로 무시하지 않는다.
 
@@ -402,11 +402,48 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
 
 ### 롤백
 
-먼저 구독을 비활성화하거나 SMTP/API 변수를 제거해 외부 호출을 멈춘다. 이미 적용한 migration은 무조건 되돌리면 데이터가 손실될 수 있으므로 백업 복원을 우선 검토하고, 승인된 경우에만 빌드 산출물의 TypeORM 설정으로 한 단계씩 되돌린다. 저장소 루트에서 실행한다면 backend 디렉터리로 먼저 이동해야 한다.
+아래 gate는 순서대로 통과해야 한다. 하나라도 확인할 수 없으면 destructive action을 시작하지 않거나 즉시 중단한다.
+
+#### Gate 0 — 변경 창과 책임자 선언
+
+incident/change window, 작업 책임자, 승인자, 영향 범위, 관찰 지표와 중단 기준을 기록한다. 사용할 코드 revision과 목표 schema version을 함께 고정한다.
+
+#### Gate 1 — ingress와 모든 backend replica 정지
+
+외부 ingress를 차단한 다음 **모든 backend replica**를 0개로 축소하거나 완전히 정지한다. 여기에는 scheduler와 API traffic을 처리하는 Railway, Docker, PM2 instance가 전부 포함된다. 구독 비활성화나 자격 증명 제거는 replica 정지를 대체하지 않는다.
+
+#### Gate 2 — 정지 상태 검증
+
+배포 플랫폼과 PostgreSQL 양쪽에서 실행 중인 instance, connection, job이 0개인지 확인한다. 애플리케이션 DB connection, advisory lock, 수집·메일 job, queue 작업이 남아 있으면 Gate 1로 돌아간다. 운영자가 읽기 전용 관리 연결을 유지한다면 별도로 식별하고 기록한다.
+
+#### Gate 3 — 즉시 백업 및 복구 가능성 검증
+
+Gate 2 확인 뒤 destructive action 직전 시점의 timestamp가 붙은 **새 PostgreSQL backup**을 만든다. 과거 배포 전 백업만으로 이 gate를 통과할 수 없다. backup artifact의 listing과 checksum을 기록하고, 격리된 disposable PostgreSQL에서 restore/listing 검증 또는 공급자 restore 검증을 완료해 실제 복구 가능성을 확인한다. 백업 생성·검증 중 쓰기나 job이 감지되면 백업을 폐기하고 Gate 1부터 다시 시작한다.
+
+#### Gate 4 — 복구 방식 하나 선택
+
+승인자는 목표 schema와 데이터 보존 영향을 검토해 **DB restore 또는 migration 1단계 revert 중 하나만** 선택한다. 두 방법을 연속으로 또는 무조건 실행하지 않는다. migration down이 데이터를 삭제하거나 이전 코드와 호환되지 않으면 restore를 선택하며, 어느 쪽도 검증되지 않았다면 작업을 중단한다.
+
+#### Gate 5 — 명시적 production env로 DB 작업
+
+restore를 선택했다면 승인된 공급자 절차로 Gate 3 artifact 하나를 복원한다. revert를 선택했다면 저장소 루트가 아니라 backend 디렉터리에서 빌드 산출물과 정확한 `.env.production`을 사용해 **한 단계만** 실행한다.
 
 ```bash
 cd dfkorea-backend
-npm run migration:revert:prod
+npm run build
+npm run migration:revert:prod:env
 ```
 
-이 명령은 `dist/database/typeorm.config.js`를 사용하므로 배포 이미지에 `npm run build` 결과가 있어야 한다. 스테이징에서 동일 백업으로 복구와 compiled rollback을 검증한 뒤에만 운영에 적용한다. 코드만 이전 버전으로 되돌린 뒤에도 수집 lock, 비밀값 노출, 캘린더 집계, 메일 중복을 다시 점검한다.
+`:env` runner는 backend의 `.env.production`만 override-load하고 필수 production DB 변수를 검증한 뒤 `dist/database/typeorm.config.js`를 호출한다. 파일·변수 누락 시 DB 접속 전에 실패하며 비밀값을 출력하지 않는다. Railway/container처럼 환경을 직접 주입하는 자동 배포 경로는 기존 `migration:run:prod`를 사용하되 `NODE_ENV=production`과 모든 `DB_*`를 필수로 주입한다. 실제 revert 전에 동일 backup과 revision으로 스테이징 검증을 완료한다.
+
+#### Gate 6 — schema-compatible 코드와 검증
+
+선택한 DB 상태와 호환되는 이전 코드 revision을 배포하되 아직 replica를 시작하지 않는다. migration history와 실제 table/index/constraint schema를 목표 version과 비교하고, 읽기 전용 health/schema check를 실행한다. 불일치, pending migration 오판, 데이터 검증 실패가 있으면 시작하지 말고 Gate 5 이전 상태로 복구한다.
+
+#### Gate 7 — backend replica 후 ingress 순서로 재개
+
+backend replica를 먼저 최소 1개만 시작해 health와 scheduler lock 획득 상태를 확인한다. 그 다음 필요한 replica 수까지 늘리고 모두 정상임을 확인한 뒤 마지막에 ingress를 연다. ingress를 replica보다 먼저 열지 않는다.
+
+#### Gate 8 — 모니터링과 중단 기준
+
+오류율, DB connection, migration/schema 상태, 수집 lock, 메일 발송·중복, 캘린더 집계를 change window 동안 모니터링한다. schema 불일치, 예상 밖 쓰기, 중복 scheduler, 급격한 오류 증가 또는 backup 복구 불가가 확인되면 ingress를 닫고 모든 replica를 다시 정지하며 incident 책임자에게 escalate한다. 사전 정의한 중단 기준 없이 정상 종료로 선언하지 않는다.

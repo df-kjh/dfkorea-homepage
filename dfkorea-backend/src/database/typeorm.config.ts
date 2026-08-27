@@ -1,12 +1,61 @@
-import { DataSource } from 'typeorm';
-import { config } from 'dotenv';
-import { extname } from 'path';
+import { DataSource } from "typeorm";
+import { config } from "dotenv";
+import { extname } from "path";
 
-// .env 파일 로드 (로컬 개발용)
-config();
+// Production operational commands must inject a validated environment. Loading a
+// generic .env here could otherwise make a migration target the wrong database.
+if (process.env.NODE_ENV !== "production") {
+  config();
+}
 
-export const getTypeOrmPaths = (runtimeExtension: '.ts' | '.js') => {
-  const root = runtimeExtension === '.ts' ? 'src' : 'dist';
+const requiredProductionDatabaseVariables = [
+  "DB_HOST",
+  "DB_PORT",
+  "DB_USERNAME",
+  "DB_PASSWORD",
+  "DB_NAME",
+] as const;
+
+export const resolveDatabaseConnectionOptions = (
+  environment: NodeJS.ProcessEnv,
+) => {
+  if (environment.NODE_ENV === "production") {
+    const missing = requiredProductionDatabaseVariables.filter(
+      (variable) => !environment[variable]?.trim(),
+    );
+    if (missing.length > 0) {
+      throw new Error(
+        `Production database configuration is incomplete: ${missing.join(", ")}`,
+      );
+    }
+
+    const port = Number(environment.DB_PORT);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      throw new Error(
+        "Production database configuration has an invalid DB_PORT",
+      );
+    }
+
+    return {
+      host: environment.DB_HOST as string,
+      port,
+      username: environment.DB_USERNAME as string,
+      password: environment.DB_PASSWORD as string,
+      database: environment.DB_NAME as string,
+    };
+  }
+
+  return {
+    host: environment.DB_HOST || environment.PGHOST || "localhost",
+    port: parseInt(environment.DB_PORT || environment.PGPORT || "5432"),
+    username: environment.DB_USERNAME || environment.PGUSER || "postgres",
+    password: environment.DB_PASSWORD || environment.PGPASSWORD || "postgres",
+    database: environment.DB_NAME || environment.PGDATABASE || "dfkorea",
+  };
+};
+
+export const getTypeOrmPaths = (runtimeExtension: ".ts" | ".js") => {
+  const root = runtimeExtension === ".ts" ? "src" : "dist";
 
   return {
     entities: [
@@ -17,16 +66,13 @@ export const getTypeOrmPaths = (runtimeExtension: '.ts' | '.js') => {
   };
 };
 
-const runtimeExtension = extname(__filename) === '.js' ? '.js' : '.ts';
+const runtimeExtension = extname(__filename) === ".js" ? ".js" : ".ts";
 const typeOrmPaths = getTypeOrmPaths(runtimeExtension);
+const databaseConnectionOptions = resolveDatabaseConnectionOptions(process.env);
 
 export default new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || process.env.PGPORT || '5432'),
-  username: process.env.DB_USERNAME || process.env.PGUSER || 'postgres',
-  password: process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
-  database: process.env.DB_NAME || process.env.PGDATABASE || 'dfkorea',
+  type: "postgres",
+  ...databaseConnectionOptions,
   entities: typeOrmPaths.entities,
   migrations: typeOrmPaths.migrations,
   synchronize: false,
