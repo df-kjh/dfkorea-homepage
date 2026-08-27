@@ -1,0 +1,239 @@
+import { NormalizedTender } from "../domain/normalized-tender";
+import { TenderClassifier } from "../domain/tender-classifier";
+import { TenderSourceAdapter } from "../domain/tender-source.adapter";
+import {
+  ProcurementType,
+  SyncRunStatus,
+  TenderRelevance,
+  TenderSource,
+} from "../domain/tender.enums";
+import { TenderSourceError } from "../adapters/public-api-client";
+import { TenderIngestionService } from "./tender-ingestion.service";
+
+const NOW = new Date("2026-08-27T03:00:00.000Z");
+
+const directNotice: NormalizedTender = {
+  source: TenderSource.G2B,
+  sourceNoticeId: "G2B-1",
+  revision: "0",
+  title: "LED 가로등 교체공사",
+  orderingOrganization: "서울시",
+  demandOrganization: null,
+  registeredAt: new Date("2026-08-26T03:00:00.000Z"),
+  bidStartedAt: null,
+  bidEndedAt: null,
+  openedAt: null,
+  region: "서울",
+  procurementType: ProcurementType.CONSTRUCTION,
+  contractMethod: null,
+  estimatedAmount: "1000000",
+  sourceUrl: "https://example.invalid/g2b/1",
+  itemName: "LED 등기구",
+  description: "공용부 조명 교체",
+  attachmentNames: ["spec.pdf"],
+  rawData: { bidNtceNo: "G2B-1" },
+};
+
+const potentialNotice: NormalizedTender = {
+  ...directNotice,
+  source: TenderSource.KAPT,
+  sourceNoticeId: "KAPT-1",
+  title: "전기시설 개선공사",
+  itemName: "",
+  description: "",
+  rawData: { bidNum: "KAPT-1" },
+};
+
+const irrelevantNotice: NormalizedTender = {
+  ...directNotice,
+  sourceNoticeId: "G2B-irrelevant",
+  title: "구내식당 식자재 구매",
+  itemName: "",
+  description: "",
+};
+
+const createAdapter = (source: TenderSource): jest.Mocked<TenderSourceAdapter> =>
+  ({ source, fetchNotices: jest.fn() });
+
+describe("TenderIngestionService", () => {
+  let g2b: jest.Mocked<TenderSourceAdapter>;
+  let kapt: jest.Mocked<TenderSourceAdapter>;
+  let kepco: jest.Mocked<TenderSourceAdapter>;
+  let syncRunRepository: { findOne: jest.Mock; save: jest.Mock };
+  let tenderRepository: { find: jest.Mock; upsert: jest.Mock };
+  let dataSource: { query: jest.Mock; transaction: jest.Mock };
+  let service: TenderIngestionService;
+
+  beforeEach(() => {
+    g2b = createAdapter(TenderSource.G2B);
+    kapt = createAdapter(TenderSource.KAPT);
+    kepco = createAdapter(TenderSource.KEPCO);
+    syncRunRepository = {
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn().mockImplementation(async (value) => ({ id: "run-id", ...value })),
+    };
+    tenderRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockResolvedValue({ identifiers: [] }),
+    };
+    dataSource = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([{ unlocked: true }]),
+      transaction: jest.fn().mockImplementation(async (work) =>
+        work({ getRepository: () => tenderRepository }),
+      ),
+    };
+    service = new TenderIngestionService(
+      dataSource as never,
+      syncRunRepository as never,
+      new TenderClassifier(),
+      [g2b, kapt, kepco],
+    );
+  });
+
+  it("fetches each provider across the initial preceding 24 hours", async () => {
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await service.collectAll(NOW);
+
+    expect(g2b.fetchNotices).toHaveBeenCalledWith({
+      from: new Date("2026-08-26T03:00:00.000Z"),
+      to: NOW,
+    });
+  });
+
+  it("overlaps the previous successful source run by one hour", async () => {
+    syncRunRepository.findOne.mockResolvedValue({
+      finishedAt: new Date("2026-08-27T01:30:00.000Z"),
+    });
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await service.collectAll(NOW);
+
+    expect(g2b.fetchNotices).toHaveBeenCalledWith({
+      from: new Date("2026-08-27T00:30:00.000Z"),
+      to: NOW,
+    });
+  });
+
+  it("excludes irrelevant notices and persists classifier evidence for relevant notices", async () => {
+    g2b.fetchNotices.mockResolvedValue([directNotice, irrelevantNotice]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await service.collectAll(NOW);
+
+    expect(tenderRepository.upsert).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          source: TenderSource.G2B,
+          sourceNoticeId: "G2B-1",
+          relevance: TenderRelevance.DIRECT,
+          relevanceReasons: expect.arrayContaining([
+            expect.objectContaining({ keyword: "LED" }),
+          ]),
+          rawData: { bidNtceNo: "G2B-1" },
+        }),
+      ],
+      expect.objectContaining({
+        conflictPaths: ["source", "sourceNoticeId", "revision"],
+      }),
+    );
+    expect(syncRunRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: TenderSource.G2B,
+        status: SyncRunStatus.SUCCEEDED,
+        fetchedCount: 2,
+        excludedCount: 1,
+      }),
+    );
+  });
+
+  it("uses the source identity and revision to distinguish inserts from mutable updates", async () => {
+    tenderRepository.find.mockResolvedValue([
+      {
+        source: TenderSource.G2B,
+        sourceNoticeId: "G2B-1",
+        revision: "0",
+      },
+    ]);
+    g2b.fetchNotices.mockResolvedValue([directNotice]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await service.collectAll(NOW);
+
+    expect(syncRunRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: TenderSource.G2B,
+        createdCount: 0,
+        updatedCount: 1,
+      }),
+    );
+    expect(tenderRepository.upsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ title: "LED 가로등 교체공사" })],
+      expect.objectContaining({
+        conflictPaths: ["source", "sourceNoticeId", "revision"],
+      }),
+    );
+  });
+
+  it("continues after one provider fails and records each source outcome", async () => {
+    g2b.fetchNotices.mockRejectedValue(
+      new TenderSourceError(TenderSource.G2B, "HTTP_ERROR", 503),
+    );
+    kapt.fetchNotices.mockResolvedValue([potentialNotice]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    const summary = await service.collectAll(NOW);
+
+    expect(summary.failedSources).toEqual([TenderSource.G2B]);
+    expect(tenderRepository.upsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ source: TenderSource.KAPT })],
+      expect.anything(),
+    );
+    expect(syncRunRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: TenderSource.G2B,
+        status: SyncRunStatus.FAILED,
+        errorCode: "HTTP_ERROR",
+      }),
+    );
+    expect(syncRunRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: TenderSource.KAPT,
+        status: SyncRunStatus.SUCCEEDED,
+      }),
+    );
+  });
+
+  it("does not collect when another process owns the advisory lock", async () => {
+    dataSource.query.mockReset();
+    dataSource.query.mockResolvedValue([{ locked: false }]);
+
+    const summary = await service.collectAll(NOW);
+
+    expect(summary.lockAcquired).toBe(false);
+    expect(g2b.fetchNotices).not.toHaveBeenCalled();
+    expect(dataSource.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the advisory lock even when source collection fails", async () => {
+    g2b.fetchNotices.mockRejectedValue(new Error("upstream failed"));
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await service.collectAll(NOW);
+
+    expect(dataSource.query).toHaveBeenLastCalledWith(
+      "SELECT pg_advisory_unlock($1) AS unlocked",
+      [824001],
+    );
+  });
+});

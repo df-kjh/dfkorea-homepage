@@ -22,6 +22,7 @@ import { TenderRecipient } from "./tenders/entities/tender-recipient.entity";
 import { TenderSyncRun } from "./tenders/entities/tender-sync-run.entity";
 import { TenderMailDelivery } from "./tenders/entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
+import { TendersModule } from "./tenders/tenders.module";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
     SchedulerModule,
     CertificatesModule,
     SeoModule,
+    TendersModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

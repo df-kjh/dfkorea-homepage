@@ -1,3 +1,4 @@
+import { Injectable } from "@nestjs/common";
 import { TenderRelevance } from "./tender.enums";
 
 export type TenderClassificationField =
@@ -69,6 +70,7 @@ const CLASSIFICATION_RULES = [...DIRECT_RULES, ...POTENTIAL_RULES];
 // mentions a signboard, while these phrases identify LED display products.
 const EXCLUSION_PHRASES = ["LED 전광판", "LED 디스플레이"];
 
+@Injectable()
 export class TenderClassifier {
   classify(tender: TenderClassificationInput): TenderClassification | null {
     const searchableFields = this.getSearchableFields(tender);
