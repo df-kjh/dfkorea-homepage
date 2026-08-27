@@ -20,6 +20,8 @@ import { TenderSubscription } from "./entities/tender-subscription.entity";
 import { TenderSyncRun } from "./entities/tender-sync-run.entity";
 import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
+import { TenderQueryService } from "./services/tender-query.service";
+import { TendersController } from "./tenders.controller";
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { TenderSchedulerService } from "./services/tender-scheduler.service";
       TenderMailItem,
     ]),
   ],
+  controllers: [TendersController],
   providers: [
     TenderClassifier,
     {
@@ -69,7 +72,8 @@ import { TenderSchedulerService } from "./services/tender-scheduler.service";
     },
     TenderIngestionService,
     TenderSchedulerService,
+    TenderQueryService,
   ],
-  exports: [TenderIngestionService, TenderSchedulerService],
+  exports: [TenderIngestionService, TenderSchedulerService, TenderQueryService],
 })
 export class TendersModule {}
