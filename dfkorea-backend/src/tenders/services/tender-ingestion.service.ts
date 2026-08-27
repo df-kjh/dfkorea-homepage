@@ -54,6 +54,7 @@ export class TenderIngestionService {
     const lockRunner = this.dataSource.createQueryRunner();
     let lockAcquired = false;
     let summary: CollectionSummary | undefined;
+    let hasCollectionError = false;
     let collectionError: unknown;
 
     try {
@@ -84,6 +85,9 @@ export class TenderIngestionService {
         };
       }
     } catch (error) {
+      // JavaScript permits `throw undefined`, `throw null`, and primitive
+      // values, so failure must be tracked separately from its thrown value.
+      hasCollectionError = true;
       collectionError = error;
     }
 
@@ -91,8 +95,15 @@ export class TenderIngestionService {
       lockRunner,
       lockAcquired,
     );
-    this.throwCollectionErrors(collectionError, cleanupErrors);
-    return summary!;
+    this.throwCollectionErrors(
+      hasCollectionError,
+      collectionError,
+      cleanupErrors,
+    );
+    if (!summary) {
+      throw new Error("Tender collection finished without a result");
+    }
+    return summary;
   }
 
   private async cleanupCollectionLock(
@@ -121,10 +132,11 @@ export class TenderIngestionService {
   }
 
   private throwCollectionErrors(
+    hasCollectionError: boolean,
     collectionError: unknown,
     cleanupErrors: unknown[],
   ): void {
-    if (collectionError !== undefined) {
+    if (hasCollectionError) {
       if (cleanupErrors.length === 0) {
         throw collectionError;
       }

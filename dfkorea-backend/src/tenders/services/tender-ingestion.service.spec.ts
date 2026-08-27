@@ -55,6 +55,16 @@ const irrelevantNotice: NormalizedTender = {
 const createAdapter = (source: TenderSource): jest.Mocked<TenderSourceAdapter> =>
   ({ source, fetchNotices: jest.fn() });
 
+const createBodyThrowingAdapters = (thrown: unknown): TenderSourceAdapter[] =>
+  new Proxy([] as TenderSourceAdapter[], {
+    get(target, property, receiver) {
+      if (property === "map") {
+        throw thrown;
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
 describe("TenderIngestionService", () => {
   let g2b: jest.Mocked<TenderSourceAdapter>;
   let kapt: jest.Mocked<TenderSourceAdapter>;
@@ -370,6 +380,37 @@ describe("TenderIngestionService", () => {
     await expect(service.collectAll(NOW)).rejects.toMatchObject({
       name: "AggregateError",
       errors: [unlockError, releaseError],
+    });
+  });
+
+  it("propagates an undefined collection throw instead of returning a summary", async () => {
+    service = new TenderIngestionService(
+      dataSource as never,
+      syncRunRepository as never,
+      new TenderClassifier(),
+      createBodyThrowingAdapters(undefined),
+    );
+
+    await expect(service.collectAll(NOW)).rejects.toBeUndefined();
+    expect(lockRunner.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves a null collection throw before cleanup errors", async () => {
+    const unlockError = new Error("unlock failed");
+    lockRunner.query.mockReset();
+    lockRunner.query
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockRejectedValueOnce(unlockError);
+    service = new TenderIngestionService(
+      dataSource as never,
+      syncRunRepository as never,
+      new TenderClassifier(),
+      createBodyThrowingAdapters(null),
+    );
+
+    await expect(service.collectAll(NOW)).rejects.toMatchObject({
+      name: "AggregateError",
+      errors: [null, unlockError],
     });
   });
 });
