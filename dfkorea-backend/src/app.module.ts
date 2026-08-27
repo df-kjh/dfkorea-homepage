@@ -16,6 +16,12 @@ import { Post } from "./entities/post.entity";
 import { Admin } from "./entities/admin.entity";
 import { Certificate } from "./entities/certificate.entity";
 import { DatabaseInitService } from "./database/database-init.service";
+import { Tender } from "./tenders/entities/tender.entity";
+import { TenderSubscription } from "./tenders/entities/tender-subscription.entity";
+import { TenderRecipient } from "./tenders/entities/tender-recipient.entity";
+import { TenderSyncRun } from "./tenders/entities/tender-sync-run.entity";
+import { TenderMailDelivery } from "./tenders/entities/tender-mail-delivery.entity";
+import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
 
 @Module({
   imports: [
@@ -35,7 +41,18 @@ import { DatabaseInitService } from "./database/database-init.service";
         username: configService.get('DB_USERNAME') || 'postgres',
         password: configService.get('DB_PASSWORD') || 'postgres',
         database: configService.get('DB_NAME') || 'dfkorea',
-        entities: [Product, Post, Admin, Certificate],
+        entities: [
+          Product,
+          Post,
+          Admin,
+          Certificate,
+          Tender,
+          TenderSubscription,
+          TenderRecipient,
+          TenderSyncRun,
+          TenderMailDelivery,
+          TenderMailItem,
+        ],
         // 처음 배포: true, 이후: false로 변경하여 데이터 보호
         synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',
         logging: configService.get('NODE_ENV') !== 'production',

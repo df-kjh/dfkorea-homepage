@@ -1,3 +1,9 @@
 export { Product } from './product.entity';
 export { Post } from './post.entity';
 export { Admin } from './admin.entity';
+export { Tender } from '../tenders/entities/tender.entity';
+export { TenderSubscription } from '../tenders/entities/tender-subscription.entity';
+export { TenderRecipient } from '../tenders/entities/tender-recipient.entity';
+export { TenderSyncRun } from '../tenders/entities/tender-sync-run.entity';
+export { TenderMailDelivery } from '../tenders/entities/tender-mail-delivery.entity';
+export { TenderMailItem } from '../tenders/entities/tender-mail-item.entity';
