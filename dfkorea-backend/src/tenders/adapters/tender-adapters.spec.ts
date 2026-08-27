@@ -5,6 +5,7 @@ import { G2bTenderAdapter } from "./g2b-tender.adapter";
 import { KaptTenderAdapter } from "./kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./kepco-tender.adapter";
 import {
+  parseKstDate,
   PublicApiClient,
   TenderApiClient,
   TenderSourceError,
@@ -121,6 +122,22 @@ describe("official tender adapters", () => {
         }),
     ).toThrow(TenderSourceError);
   });
+
+  it("skips G2B rows with impossible local calendar dates", async () => {
+    const client = createClient();
+    client.getAllPages.mockResolvedValue([
+      {
+        ...g2bFixture.response.body.items[0],
+        bidNtceDt: "202602311530",
+      },
+    ]);
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    await expect(adapter.fetchNotices(window)).resolves.toEqual([]);
+  });
 });
 
 describe("PublicApiClient", () => {
@@ -218,5 +235,79 @@ describe("PublicApiClient", () => {
         query: {},
       }),
     ).resolves.toEqual([{ noticeNo: "KEPCO-1" }]);
+  });
+
+  it("aborts a timed out provider request and preserves source context", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new Error("request aborted")),
+          );
+        }),
+    );
+    const client = new PublicApiClient(fetcher, { timeoutMs: 100 });
+    const request = client.getAllPages({
+      source: TenderSource.KAPT,
+      baseUrl: "https://api.example.test/bids",
+      operation: "notices",
+      query: {},
+    });
+    const expectation = expect(request).rejects.toMatchObject({
+      source: TenderSource.KAPT,
+      code: "REQUEST_TIMEOUT",
+      status: null,
+    });
+
+    await jest.advanceTimersByTimeAsync(100);
+    await expectation;
+    expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    jest.useRealTimers();
+  });
+
+  it("cleans up the request timeout after a successful response", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          response: {
+            header: { resultCode: "00" },
+            body: { totalCount: 0, items: [] },
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new PublicApiClient(fetcher, { timeoutMs: 100 });
+
+    await client.getAllPages({
+      source: TenderSource.G2B,
+      baseUrl: "https://api.example.test/bids",
+      operation: "notices",
+      query: {},
+    });
+
+    expect(jest.getTimerCount()).toBe(0);
+    jest.useRealTimers();
+  });
+});
+
+describe("parseKstDate", () => {
+  it.each([
+    "202602311530",
+    "202613011000",
+    "202608262400",
+    "202608261560",
+    "20260826153061",
+    "2026-02-31T09:00:00+09:00",
+  ])("rejects impossible local date %s", (value) => {
+    expect(parseKstDate(value)).toBeNull();
+  });
+
+  it("converts a valid offsetless KST date to UTC", () => {
+    expect(parseKstDate("2026-08-26 15:30:00")).toEqual(
+      new Date("2026-08-26T06:30:00.000Z"),
+    );
   });
 });

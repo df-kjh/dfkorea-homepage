@@ -6,10 +6,12 @@ export const KEPCO_TENDER_ADAPTER = Symbol("KEPCO_TENDER_ADAPTER");
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const SUCCESS_CODES = new Set(["00", "0", "0000", "NORMAL_SERVICE"]);
 
 export type TenderSourceErrorCode =
   | "CONFIGURATION_ERROR"
+  | "REQUEST_TIMEOUT"
   | "NETWORK_ERROR"
   | "HTTP_ERROR"
   | "INVALID_RESPONSE"
@@ -44,10 +46,22 @@ export interface TenderApiClient {
   ): Promise<T[]>;
 }
 
-type Fetcher = (input: string) => Promise<Response>;
+type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
+
+export interface PublicApiClientOptions {
+  /** Timeout per provider page request. Defaults to ten seconds. */
+  timeoutMs?: number;
+}
 
 export class PublicApiClient implements TenderApiClient {
-  constructor(private readonly fetcher: Fetcher = globalThis.fetch) {}
+  private readonly timeoutMs: number;
+
+  constructor(
+    private readonly fetcher: Fetcher = globalThis.fetch,
+    options: PublicApiClientOptions = {},
+  ) {
+    this.timeoutMs = this.toTimeoutMs(options.timeoutMs);
+  }
 
   async getAllPages<T extends Record<string, unknown>>(
     request: PublicApiRequest,
@@ -75,11 +89,36 @@ export class PublicApiClient implements TenderApiClient {
   ): Promise<unknown> {
     const url = this.createUrl(request, pageNo);
     let response: Response;
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
     try {
-      response = await this.fetcher(url);
-    } catch {
+      response = await Promise.race([
+        this.fetcher(url, { signal: controller.signal }),
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            controller.abort();
+            reject(
+              new TenderSourceError(request.source, "REQUEST_TIMEOUT", null),
+            );
+          }, this.timeoutMs);
+        }),
+      ]);
+    } catch (error) {
+      if (
+        error instanceof TenderSourceError &&
+        error.code === "REQUEST_TIMEOUT"
+      ) {
+        throw error;
+      }
+      if (controller.signal.aborted) {
+        throw new TenderSourceError(request.source, "REQUEST_TIMEOUT", null);
+      }
       throw new TenderSourceError(request.source, "NETWORK_ERROR", null);
+    } finally {
+      if (timeout !== undefined) {
+        clearTimeout(timeout);
+      }
     }
 
     if (!response.ok) {
@@ -188,6 +227,13 @@ export class PublicApiClient implements TenderApiClient {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
+
+  private toTimeoutMs(value: number | undefined): number {
+    if (!Number.isFinite(value) || value === undefined || value <= 0) {
+      return DEFAULT_REQUEST_TIMEOUT_MS;
+    }
+    return value;
+  }
 }
 
 /** Public data APIs commonly return date strings without an offset. */
@@ -197,27 +243,57 @@ export const parseKstDate = (value: unknown): Date | null => {
   }
 
   const trimmed = value.trim();
-  if (/([zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed)) {
-    const parsed = new Date(trimmed);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
   const match = trimmed.match(
-    /^(\d{4})[-.]?(\d{2})[-.]?(\d{2})(?:[ T]?(\d{2}):?(\d{2})?:?(\d{2})?)?$/,
+    /^(\d{4})[-.]?(\d{2})[-.]?(\d{2})(?:[ T]?(\d{2}):?(\d{2})?:?(\d{2})?(?:\.\d{1,3})?)?(?:[zZ]|[+-]\d{2}:?\d{2})?$/,
   );
   if (!match) {
     return null;
   }
 
   const [, year, month, day, hour = "00", minute = "00", second = "00"] = match;
+  const components = [year, month, day, hour, minute, second].map(Number);
+  const [
+    yearNumber,
+    monthNumber,
+    dayNumber,
+    hourNumber,
+    minuteNumber,
+    secondNumber,
+  ] = components;
+  const calendarValue = new Date(
+    Date.UTC(
+      yearNumber,
+      monthNumber - 1,
+      dayNumber,
+      hourNumber,
+      minuteNumber,
+      secondNumber,
+    ),
+  );
+  if (
+    calendarValue.getUTCFullYear() !== yearNumber ||
+    calendarValue.getUTCMonth() !== monthNumber - 1 ||
+    calendarValue.getUTCDate() !== dayNumber ||
+    calendarValue.getUTCHours() !== hourNumber ||
+    calendarValue.getUTCMinutes() !== minuteNumber ||
+    calendarValue.getUTCSeconds() !== secondNumber
+  ) {
+    return null;
+  }
+
+  if (/([zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed)) {
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
   const parsed = new Date(
     Date.UTC(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour) - 9,
-      Number(minute),
-      Number(second),
+      yearNumber,
+      monthNumber - 1,
+      dayNumber,
+      hourNumber - 9,
+      minuteNumber,
+      secondNumber,
     ),
   );
 
