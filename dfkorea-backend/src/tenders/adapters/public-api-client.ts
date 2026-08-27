@@ -12,6 +12,7 @@ const SUCCESS_CODES = new Set(["00", "0", "0000", "NORMAL_SERVICE"]);
 export type TenderSourceErrorCode =
   | "CONFIGURATION_ERROR"
   | "REQUEST_TIMEOUT"
+  | "REQUEST_ABORTED"
   | "NETWORK_ERROR"
   | "HTTP_ERROR"
   | "INVALID_RESPONSE"
@@ -23,13 +24,25 @@ export type TenderSourceErrorCode =
  * because all three can expose an API key or otherwise untrusted provider data.
  */
 export class TenderSourceError extends Error {
+  readonly cause?: unknown;
+
   constructor(
     readonly source: TenderSource,
     readonly code: TenderSourceErrorCode,
     readonly status: number | null = null,
+    cause?: unknown,
   ) {
     super(`${source} tender source error: ${code}`);
     this.name = "TenderSourceError";
+    // Keep provider failures available for internal diagnostics without making
+    // them enumerable in logs or serialised API responses.
+    if (cause !== undefined) {
+      Object.defineProperty(this, "cause", {
+        configurable: true,
+        enumerable: false,
+        value: cause,
+      });
+    }
   }
 }
 
@@ -38,6 +51,7 @@ export interface PublicApiRequest {
   baseUrl: string;
   operation: string;
   query: Record<string, string | number | undefined>;
+  signal?: AbortSignal;
 }
 
 export interface TenderApiClient {
@@ -87,56 +101,85 @@ export class PublicApiClient implements TenderApiClient {
     request: PublicApiRequest,
     pageNo: number,
   ): Promise<unknown> {
+    if (request.signal?.aborted) {
+      throw new TenderSourceError(request.source, "REQUEST_ABORTED", null);
+    }
+
     const url = this.createUrl(request, pageNo);
-    let response: Response;
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    let abortListener: (() => void) | undefined;
 
     try {
-      response = await Promise.race([
-        this.fetcher(url, { signal: controller.signal }),
-        new Promise<never>((_resolve, reject) => {
-          timeout = setTimeout(() => {
+      const requestPromise = this.fetchAndReadJson(
+        url,
+        request.source,
+        controller.signal,
+      );
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(
+            new TenderSourceError(request.source, "REQUEST_TIMEOUT", null),
+          );
+        }, this.timeoutMs);
+      });
+      const pending: Promise<unknown>[] = [requestPromise, timeoutPromise];
+
+      if (request.signal) {
+        const callerAbortPromise = new Promise<never>((_resolve, reject) => {
+          abortListener = () => {
             controller.abort();
             reject(
-              new TenderSourceError(request.source, "REQUEST_TIMEOUT", null),
+              new TenderSourceError(request.source, "REQUEST_ABORTED", null),
             );
-          }, this.timeoutMs);
-        }),
-      ]);
+          };
+          request.signal!.addEventListener("abort", abortListener, {
+            once: true,
+          });
+        });
+        pending.push(callerAbortPromise);
+      }
+
+      return await Promise.race(pending);
     } catch (error) {
-      if (
-        error instanceof TenderSourceError &&
-        error.code === "REQUEST_TIMEOUT"
-      ) {
+      if (error instanceof TenderSourceError) {
         throw error;
+      }
+      if (request.signal?.aborted) {
+        throw new TenderSourceError(request.source, "REQUEST_ABORTED", null);
       }
       if (controller.signal.aborted) {
         throw new TenderSourceError(request.source, "REQUEST_TIMEOUT", null);
       }
-      throw new TenderSourceError(request.source, "NETWORK_ERROR", null);
+      throw new TenderSourceError(request.source, "NETWORK_ERROR", null, error);
     } finally {
       if (timeout !== undefined) {
         clearTimeout(timeout);
       }
+      if (abortListener && request.signal) {
+        request.signal.removeEventListener("abort", abortListener);
+      }
     }
+  }
 
+  private async fetchAndReadJson(
+    url: string,
+    source: TenderSource,
+    signal: AbortSignal,
+  ): Promise<unknown> {
+    const response = await this.fetcher(url, { signal });
     if (!response.ok) {
-      throw new TenderSourceError(
-        request.source,
-        "HTTP_ERROR",
-        response.status,
-      );
+      throw new TenderSourceError(source, "HTTP_ERROR", response.status);
     }
 
     try {
       return await response.json();
-    } catch {
-      throw new TenderSourceError(
-        request.source,
-        "INVALID_RESPONSE",
-        response.status,
-      );
+    } catch (error) {
+      if (signal.aborted) {
+        throw error;
+      }
+      throw new TenderSourceError(source, "INVALID_RESPONSE", response.status);
     }
   }
 

@@ -291,6 +291,119 @@ describe("PublicApiClient", () => {
     expect(jest.getTimerCount()).toBe(0);
     jest.useRealTimers();
   });
+
+  it("times out an abort-aware response body that never resolves", async () => {
+    jest.useFakeTimers();
+    const json = jest.fn(
+      (signal: AbortSignal | undefined) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () =>
+            reject(new Error("body read aborted")),
+          );
+        }),
+    );
+    const fetcher = jest.fn(
+      (_url: string, init?: RequestInit): Promise<Response> =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => json(init?.signal),
+        } as Response),
+    );
+    const client = new PublicApiClient(fetcher, { timeoutMs: 100 });
+    const request = client.getAllPages({
+      source: TenderSource.KEPCO,
+      baseUrl: "https://api.example.test/bids",
+      operation: "notices",
+      query: {},
+    });
+    const expectation = expect(request).rejects.toMatchObject({
+      source: TenderSource.KEPCO,
+      code: "REQUEST_TIMEOUT",
+    });
+
+    await jest.advanceTimersByTimeAsync(0);
+    expect(json).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(100);
+    await expectation;
+    expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    jest.useRealTimers();
+  });
+
+  it("rejects an already-aborted caller signal without starting a request", async () => {
+    const caller = new AbortController();
+    const fetcher = jest.fn();
+    const client = new PublicApiClient(fetcher);
+    caller.abort();
+
+    await expect(
+      client.getAllPages({
+        source: TenderSource.G2B,
+        baseUrl: "https://api.example.test/bids",
+        operation: "notices",
+        query: {},
+        signal: caller.signal,
+      }),
+    ).rejects.toMatchObject({
+      source: TenderSource.G2B,
+      code: "REQUEST_ABORTED",
+      status: null,
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("forwards a mid-flight caller abort and distinguishes it from timeout", async () => {
+    const caller = new AbortController();
+    const fetcher = jest.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new Error("caller cancelled")),
+          );
+        }),
+    );
+    const client = new PublicApiClient(fetcher, { timeoutMs: 1000 });
+    const request = client.getAllPages({
+      source: TenderSource.KAPT,
+      baseUrl: "https://api.example.test/bids",
+      operation: "notices",
+      query: {},
+      signal: caller.signal,
+    });
+    const expectation = expect(request).rejects.toMatchObject({
+      source: TenderSource.KAPT,
+      code: "REQUEST_ABORTED",
+      status: null,
+    });
+
+    caller.abort();
+    await expectation;
+    expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  });
+
+  it("preserves a network cause without exposing it in the public error message", async () => {
+    const cause = new Error("network failed for serviceKey=secret-key");
+    const fetcher = jest.fn().mockRejectedValue(cause);
+    const client = new PublicApiClient(fetcher);
+
+    try {
+      await client.getAllPages({
+        source: TenderSource.G2B,
+        baseUrl: "https://api.example.test/bids",
+        operation: "notices",
+        query: { serviceKey: "secret-key" },
+      });
+      fail("expected a network error");
+    } catch (error) {
+      expect(error).toBeInstanceOf(TenderSourceError);
+      expect(error).toMatchObject({
+        source: TenderSource.G2B,
+        code: "NETWORK_ERROR",
+        cause,
+      });
+      expect((error as Error).message).not.toContain("secret-key");
+    }
+  });
 });
 
 describe("parseKstDate", () => {
