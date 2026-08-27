@@ -48,17 +48,27 @@ export class TenderIngestionService {
   ) {}
 
   async collectAll(now: Date): Promise<CollectionSummary> {
-    const lockAcquired = await this.acquireCollectionLock();
-    if (!lockAcquired) {
-      return {
-        lockAcquired: false,
-        collectedAt: now,
-        sources: [],
-        failedSources: [],
-      };
-    }
-
+    // PostgreSQL advisory locks belong to a connection session. Keep this
+    // runner connected for the entire collection so acquire and release cannot
+    // accidentally run on different pool connections.
+    const lockRunner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     try {
+      await lockRunner.connect();
+      const [lockResult] = await lockRunner.query(
+        "SELECT pg_try_advisory_lock($1) AS locked",
+        [COLLECTION_LOCK_ID],
+      );
+      lockAcquired = lockResult?.locked === true;
+      if (!lockAcquired) {
+        return {
+          lockAcquired: false,
+          collectedAt: now,
+          sources: [],
+          failedSources: [],
+        };
+      }
+
       const sources = await Promise.all(
         this.adapters.map((adapter) => this.collectSource(adapter, now)),
       );
@@ -71,9 +81,18 @@ export class TenderIngestionService {
           .map((source) => source.source),
       };
     } finally {
-      await this.dataSource.query("SELECT pg_advisory_unlock($1) AS unlocked", [
-        COLLECTION_LOCK_ID,
-      ]);
+      try {
+        if (lockAcquired) {
+          await lockRunner.query("SELECT pg_advisory_unlock($1) AS unlocked", [
+            COLLECTION_LOCK_ID,
+          ]);
+        }
+      } finally {
+        // Release is mandatory even when connection, acquisition, collection,
+        // or unlock fails. Unlock errors intentionally remain observable after
+        // the runner is released because they can leave a pooled session held.
+        await lockRunner.release();
+      }
     }
   }
 
@@ -260,14 +279,6 @@ export class TenderIngestionService {
     tender: Pick<Tender, "source" | "sourceNoticeId" | "revision">,
   ): string {
     return `${tender.source}:${tender.sourceNoticeId}:${tender.revision}`;
-  }
-
-  private async acquireCollectionLock(): Promise<boolean> {
-    const [result] = await this.dataSource.query(
-      "SELECT pg_try_advisory_lock($1) AS locked",
-      [COLLECTION_LOCK_ID],
-    );
-    return result?.locked === true;
   }
 
   private sanitizeError(error: unknown): {

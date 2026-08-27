@@ -61,7 +61,11 @@ describe("TenderIngestionService", () => {
   let kepco: jest.Mocked<TenderSourceAdapter>;
   let syncRunRepository: { findOne: jest.Mock; save: jest.Mock };
   let tenderRepository: { find: jest.Mock; upsert: jest.Mock };
-  let dataSource: { query: jest.Mock; transaction: jest.Mock };
+  let lockRunner: { query: jest.Mock; connect: jest.Mock; release: jest.Mock };
+  let dataSource: {
+    createQueryRunner: jest.Mock;
+    transaction: jest.Mock;
+  };
   let service: TenderIngestionService;
 
   beforeEach(() => {
@@ -76,11 +80,16 @@ describe("TenderIngestionService", () => {
       find: jest.fn().mockResolvedValue([]),
       upsert: jest.fn().mockResolvedValue({ identifiers: [] }),
     };
-    dataSource = {
+    lockRunner = {
       query: jest
         .fn()
         .mockResolvedValueOnce([{ locked: true }])
         .mockResolvedValueOnce([{ unlocked: true }]),
+      connect: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
+    };
+    dataSource = {
+      createQueryRunner: jest.fn().mockReturnValue(lockRunner),
       transaction: jest.fn().mockImplementation(async (work) =>
         work({ getRepository: () => tenderRepository }),
       ),
@@ -214,26 +223,79 @@ describe("TenderIngestionService", () => {
   });
 
   it("does not collect when another process owns the advisory lock", async () => {
-    dataSource.query.mockReset();
-    dataSource.query.mockResolvedValue([{ locked: false }]);
+    lockRunner.query.mockReset();
+    lockRunner.query.mockResolvedValue([{ locked: false }]);
 
     const summary = await service.collectAll(NOW);
 
     expect(summary.lockAcquired).toBe(false);
     expect(g2b.fetchNotices).not.toHaveBeenCalled();
-    expect(dataSource.query).toHaveBeenCalledTimes(1);
+    expect(lockRunner.query).toHaveBeenCalledWith(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [824001],
+    );
+    expect(lockRunner.release).toHaveBeenCalledTimes(1);
   });
 
-  it("releases the advisory lock even when source collection fails", async () => {
+  it("uses one session-pinned runner to acquire and release the advisory lock", async () => {
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
+
+    await service.collectAll(NOW);
+
+    expect(dataSource.createQueryRunner).toHaveBeenCalledTimes(1);
+    expect(lockRunner.connect).toHaveBeenCalledTimes(1);
+    expect(lockRunner.query).toHaveBeenNthCalledWith(
+      1,
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [824001],
+    );
+    expect(lockRunner.query).toHaveBeenNthCalledWith(
+      2,
+      "SELECT pg_advisory_unlock($1) AS unlocked",
+      [824001],
+    );
+  });
+
+  it("unlocks before releasing the session when source collection fails", async () => {
     g2b.fetchNotices.mockRejectedValue(new Error("upstream failed"));
     kapt.fetchNotices.mockResolvedValue([]);
     kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
-    expect(dataSource.query).toHaveBeenLastCalledWith(
+    expect(lockRunner.query).toHaveBeenLastCalledWith(
       "SELECT pg_advisory_unlock($1) AS unlocked",
       [824001],
     );
+    expect(lockRunner.release.mock.invocationCallOrder[0]).toBeGreaterThan(
+      lockRunner.query.mock.invocationCallOrder[1],
+    );
+  });
+
+  it("unlocks and releases the runner when the collection body throws", async () => {
+    const throwingAdapters = new Proxy([] as TenderSourceAdapter[], {
+      get(target, property, receiver) {
+        if (property === "map") {
+          throw new Error("collection body failed");
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    service = new TenderIngestionService(
+      dataSource as never,
+      syncRunRepository as never,
+      new TenderClassifier(),
+      throwingAdapters,
+    );
+
+    await expect(service.collectAll(NOW)).rejects.toThrow("collection body failed");
+
+    expect(lockRunner.query).toHaveBeenLastCalledWith(
+      "SELECT pg_advisory_unlock($1) AS unlocked",
+      [824001],
+    );
+    expect(lockRunner.release).toHaveBeenCalledTimes(1);
   });
 });
