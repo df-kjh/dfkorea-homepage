@@ -1,7 +1,6 @@
 const TEST_DATABASE_PATTERN = /(test|e2e)/i;
 const FORBIDDEN_ENVIRONMENT_PATTERN = /prod(?:uction)?|live|staging/i;
 const MAX_SAFETY_DECODE_PASSES = 4;
-const PERCENT_ENCODED_BYTE_PATTERN = /%[0-9a-f]{2}/i;
 const LOCAL_TEST_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
@@ -128,9 +127,9 @@ function decodeForSafety(value: string): string {
     if (next === decoded) return decoded;
     decoded = next;
   }
-  if (PERCENT_ENCODED_BYTE_PATTERN.test(decoded)) {
+  if (decoded.includes("%")) {
     throw new Error(
-      "Refusing tender integration database: excessive percent encoding is unsafe",
+      "Refusing tender integration database: residual percent encoding is unsafe",
     );
   }
   return decoded;

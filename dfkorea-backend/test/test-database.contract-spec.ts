@@ -84,6 +84,21 @@ describe("tender integration database guard", () => {
     );
   });
 
+  it.each(["dfkorea_test%25252525", "dfkorea_test%25252525G1"])(
+    "rejects a residual percent sequence after the decode bound: %s",
+    (database) => {
+      process.env.TEST_DB_HOST = "localhost";
+      process.env.TEST_DB_PORT = "5432";
+      process.env.TEST_DB_USERNAME = "test_user";
+      process.env.TEST_DB_PASSWORD = "test_password";
+      process.env.TEST_DB_NAME = database;
+
+      expect(() => configureTestDatabase(true)).toThrow(
+        "Refusing tender integration database",
+      );
+    },
+  );
+
   it("rejects a staging_test Docker hostname", () => {
     process.env.TEST_DB_HOST = "staging_test";
     process.env.TEST_DB_PORT = "5432";
