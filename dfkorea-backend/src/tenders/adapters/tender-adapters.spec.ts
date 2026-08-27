@@ -12,6 +12,7 @@ import {
 } from "./public-api-client";
 import { TenderFetchWindow } from "../domain/tender-source.adapter";
 import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import { TenderClassifier } from "../domain/tender-classifier";
 
 const window: TenderFetchWindow = {
   from: new Date("2026-08-26T00:00:00.000Z"),
@@ -51,6 +52,37 @@ describe("official tender adapters", () => {
       }),
     );
     expect(client.getAllPages).toHaveBeenCalledTimes(3);
+    expect(notice?.attachmentNames).toEqual(["LED 등기구 시방서.pdf"]);
+  });
+
+  it("classifies a notice from a documented G2B attachment filename", async () => {
+    const client = createClient();
+    client.getAllPages.mockResolvedValue([
+      {
+        ...g2bFixture.response.body.items[0],
+        bidNtceNm: "시설 자재 구매",
+        prdctClsfcNoNm: "",
+        bidNtceDtl: "",
+      },
+    ]);
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const [notice] = await adapter.fetchNotices(window);
+
+    expect(new TenderClassifier().classify(notice!)).toEqual(
+      expect.objectContaining({
+        reasons: expect.arrayContaining([
+          expect.objectContaining({
+            field: "attachmentNames",
+            keyword: "LED",
+            score: 100,
+          }),
+        ]),
+      }),
+    );
   });
 
   it("normalizes K-apt official fields without inventing unavailable values", async () => {
@@ -141,6 +173,58 @@ describe("official tender adapters", () => {
 });
 
 describe("PublicApiClient", () => {
+  it("sends the exact official G2B minute-window and pagination parameters for every operation", async () => {
+    const row = g2bFixture.response.body.items[0];
+    const fetcher = jest.fn(async (urlText: string) => {
+      const url = new URL(urlText);
+      const pageNo = url.searchParams.get("pageNo");
+      const items = pageNo === "1" ? Array.from({ length: 100 }, () => row) : [row];
+      return new Response(
+        JSON.stringify({
+          response: {
+            header: { resultCode: "00" },
+            body: { totalCount: 101, items },
+          },
+        }),
+        { status: 200 },
+      );
+    });
+    const adapter = new G2bTenderAdapter(new PublicApiClient(fetcher), {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    await adapter.fetchNotices(window);
+
+    const operations = [
+      "getBidPblancListInfoCnstwk",
+      "getBidPblancListInfoThng",
+      "getBidPblancListInfoServc",
+    ];
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    for (const operation of operations) {
+      for (const pageNo of ["1", "2"]) {
+        const request = fetcher.mock.calls
+          .map(([urlText]) => new URL(urlText))
+          .find(
+            (url) =>
+              url.pathname.endsWith(`/${operation}`) &&
+              url.searchParams.get("pageNo") === pageNo,
+          );
+        expect(request).toBeDefined();
+        expect(Object.fromEntries(request!.searchParams.entries())).toEqual({
+          serviceKey: "test-key",
+          type: "json",
+          inqryDiv: "1",
+          inqryBgnDt: "202608260900",
+          inqryEndDt: "202608270900",
+          pageNo,
+          numOfRows: "100",
+        });
+      }
+    }
+  });
+
   it("requests 100-row pages and stops at the provider total", async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => ({
       id: `row-${index + 1}`,

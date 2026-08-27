@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import TenderRelevanceBadge from './TenderRelevanceBadge.vue'
 import type { Tender } from '@/types'
+import { formatKstDateTime } from '@/utils/tender-format'
 
 interface Props { modelValue: boolean; tender: Tender | null }
 const props = defineProps<Props>()
@@ -11,7 +12,7 @@ const safeSourceUrl = computed(() => {
   if (!props.tender?.sourceUrl) return null
   try { const url = new URL(props.tender.sourceUrl); return ['http:', 'https:'].includes(url.protocol) ? url.href : null } catch { return null }
 })
-const dateTime = (value: string | null) => value ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '정보 없음'
+const dateTime = (value: string | null) => value ? formatKstDateTime(value) : '정보 없음'
 </script>
 
 <template>

@@ -4,8 +4,8 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import type { TenderSubscription, UpdateTenderSubscription } from '@/types'
 
-interface Props { modelValue: boolean; subscription: TenderSubscription; loading?: boolean; error?: string | null }
-const props = withDefaults(defineProps<Props>(), { loading: false, error: null })
+interface Props { modelValue: boolean; subscription: TenderSubscription; loading?: boolean; loaded?: boolean; error?: string | null }
+const props = withDefaults(defineProps<Props>(), { loading: false, loaded: true, error: null })
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; save: [subscription: UpdateTenderSubscription] }>()
 const form = reactive<TenderSubscription>({ enabled: false, deliveryTime: '09:00', recipients: [] })
 const email = ref('')
@@ -27,6 +27,7 @@ const addRecipient = () => {
 const removeRecipient = (recipient: string) => { form.recipients = form.recipients.filter((item) => item !== recipient) }
 const validTime = computed(() => /^([01]\d|2[0-3]):[0-5]\d$/.test(form.deliveryTime))
 const save = () => {
+  if (!props.loaded) return
   recipientError.value = null; timeError.value = null
   if (!validTime.value) { timeError.value = 'HH:mm 형식의 올바른 발송 시각을 선택하세요.'; return }
   if (form.enabled && form.recipients.length === 0) { recipientError.value = '수신 사용 시 이메일 주소를 한 개 이상 등록하세요.'; return }
@@ -36,7 +37,7 @@ const save = () => {
 
 <template>
   <BaseModal :model-value="modelValue" title="수신 설정" width="600px" max-width="95vw" @update:model-value="emit('update:modelValue', $event)">
-    <form class="subscription-form" @submit.prevent="save"><label class="subscription-toggle"><input v-model="form.enabled" type="checkbox" /><span>매일 신규 공고 이메일 수신</span></label><p class="subscription-note">캘린더 필터와 무관하게 모든 신규 관련 공고가 발송됩니다.</p><label><span class="subscription-label">공통 발송 시각</span><input data-test="delivery-time" v-model="form.deliveryTime" type="time" /><small v-if="timeError" class="subscription-error">{{ timeError }}</small></label><div><span class="subscription-label">수신 이메일 ({{ form.recipients.length }}/20)</span><div class="subscription-add"><input data-test="recipient-email" v-model="email" type="email" autocomplete="email" placeholder="name@dfkorea.co.kr" @keyup.enter.prevent="addRecipient" /><BaseButton data-test="add-recipient" type="button" size="small" @click="addRecipient">추가</BaseButton></div><small v-if="recipientError" data-test="recipient-error" class="subscription-error">{{ recipientError }}</small><ul class="subscription-chips"><li v-for="recipient in form.recipients" :key="recipient" data-test="recipient-chip"><span>{{ recipient }}</span><button type="button" :aria-label="`${recipient} 삭제`" @click="removeRecipient(recipient)">×</button></li></ul></div><p v-if="error" class="subscription-error" role="alert">{{ error }}</p><div class="subscription-actions"><BaseButton type="button" variant="default" :disabled="loading" @click="emit('update:modelValue', false)">취소</BaseButton><BaseButton data-test="save-subscription" type="submit" variant="primary" :loading="loading">저장</BaseButton></div></form>
+    <form class="subscription-form" @submit.prevent="save"><label class="subscription-toggle"><input v-model="form.enabled" type="checkbox" :disabled="!loaded" /><span>매일 신규 공고 이메일 수신</span></label><p class="subscription-note">캘린더 필터와 무관하게 모든 신규 관련 공고가 발송됩니다.</p><label><span class="subscription-label">공통 발송 시각</span><input data-test="delivery-time" v-model="form.deliveryTime" type="time" :disabled="!loaded" /><small v-if="timeError" class="subscription-error">{{ timeError }}</small></label><div><span class="subscription-label">수신 이메일 ({{ form.recipients.length }}/20)</span><div class="subscription-add"><input data-test="recipient-email" v-model="email" type="email" autocomplete="email" placeholder="name@dfkorea.co.kr" :disabled="!loaded" @keyup.enter.prevent="addRecipient" /><BaseButton data-test="add-recipient" type="button" size="small" :disabled="!loaded" @click="addRecipient">추가</BaseButton></div><small v-if="recipientError" data-test="recipient-error" class="subscription-error">{{ recipientError }}</small><ul class="subscription-chips"><li v-for="recipient in form.recipients" :key="recipient" data-test="recipient-chip"><span>{{ recipient }}</span><button type="button" :aria-label="`${recipient} 삭제`" :disabled="!loaded" @click="removeRecipient(recipient)">×</button></li></ul></div><p v-if="error" class="subscription-error" role="alert">{{ error }}</p><div class="subscription-actions"><BaseButton type="button" variant="default" :disabled="loading" @click="emit('update:modelValue', false)">취소</BaseButton><BaseButton data-test="save-subscription" type="submit" variant="primary" :disabled="!loaded" :loading="loading">저장</BaseButton></div></form>
   </BaseModal>
 </template>
 

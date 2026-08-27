@@ -30,4 +30,30 @@ describe('TenderList', () => {
     expect(wrapper.text()).toContain('입찰 마감')
     expect(wrapper.text()).toContain('-')
   })
+
+  it('renders registration, deadline, and bigint amounts with the shared KST format', () => {
+    const wrapper = mount(TenderList, {
+      props: {
+        response: {
+          data: [{
+            ...tender,
+            registeredAt: '2026-08-31T15:30:00.000Z',
+            bidEndedAt: '2026-09-01T15:30:00.000Z',
+            estimatedAmount: '9007199254740993123456789',
+          }],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+          totalPages: 1,
+        },
+        loading: false,
+        error: null,
+        selectedDate: '2026-09-01',
+      },
+    })
+
+    expect(wrapper.text()).toContain('2026. 9. 1. 00:30')
+    expect(wrapper.text()).toContain('2026. 9. 2. 00:30')
+    expect(wrapper.text()).toContain('9,007,199,254,740,993,123,456,789원')
+  })
 })

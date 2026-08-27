@@ -22,6 +22,7 @@ import { TenderRecipient } from "./tenders/entities/tender-recipient.entity";
 import { TenderSyncRun } from "./tenders/entities/tender-sync-run.entity";
 import { TenderMailDelivery } from "./tenders/entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
+import { TenderDailyDispatch } from "./tenders/entities/tender-daily-dispatch.entity";
 import { TendersModule } from "./tenders/tenders.module";
 
 @Module({
@@ -53,6 +54,7 @@ import { TendersModule } from "./tenders/tenders.module";
           TenderSyncRun,
           TenderMailDelivery,
           TenderMailItem,
+          TenderDailyDispatch,
         ],
         // 처음 배포: true, 이후: false로 변경하여 데이터 보호
         synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',

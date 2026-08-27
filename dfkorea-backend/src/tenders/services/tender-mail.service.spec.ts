@@ -8,6 +8,7 @@ import {
 import { Tender } from "../entities/tender.entity";
 import { TenderMailDelivery } from "../entities/tender-mail-delivery.entity";
 import { TenderRecipient } from "../entities/tender-recipient.entity";
+import { TenderDailyDispatch } from "../entities/tender-daily-dispatch.entity";
 import { TenderMailRenderer } from "../mail/tender-mail-renderer";
 import { TenderMailService } from "./tender-mail.service";
 
@@ -15,6 +16,7 @@ const NOW = new Date("2026-08-27T01:00:00.000Z");
 const RECIPIENT = {
   id: "recipient-1",
   email: "sales@dfkorea.co.kr",
+  isActive: true,
 } as TenderRecipient;
 const TENDER = {
   id: "tender-1",
@@ -35,7 +37,7 @@ const TENDER = {
   sourceUrl: "https://example.com",
   relevance: TenderRelevance.DIRECT,
   relevanceScore: 100,
-  relevanceReasons: ["LED"],
+  relevanceReasons: [{ field: "title", keyword: "LED", score: 100 }],
   rawData: {},
   firstCollectedAt: NOW,
   lastUpdatedAt: NOW,
@@ -47,6 +49,7 @@ describe("TenderMailService", () => {
   let tenderRepository: any;
   let deliveryRepository: any;
   let mailItemRepository: any;
+  let dailyDispatchRepository: any;
   let transport: { sendMail: jest.Mock };
   let dataSource: any;
   let service: TenderMailService;
@@ -55,18 +58,32 @@ describe("TenderMailService", () => {
     subscriptionRepository = {
       findOne: jest
         .fn()
-        .mockResolvedValue({ enabled: true, recipients: [RECIPIENT] }),
+        .mockResolvedValue({ enabled: true, deliveryTime: "09:00", recipients: [{ ...RECIPIENT, isActive: true }] }),
     };
     recipientRepository = { findOne: jest.fn().mockResolvedValue(RECIPIENT) };
     tenderRepository = { find: jest.fn().mockResolvedValue([TENDER]) };
     deliveryRepository = {
       save: jest.fn(async (value) => ({ id: "delivery-1", ...value })),
       find: jest.fn(),
-      update: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     mailItemRepository = {
       find: jest.fn().mockResolvedValue([]),
       save: jest.fn(async (value) => (Array.isArray(value) ? value : value)),
+      update: jest.fn(),
+    };
+    const dispatchBuilder = {
+      insert: jest.fn(),
+      values: jest.fn(),
+      orIgnore: jest.fn(),
+      returning: jest.fn(),
+      execute: jest.fn().mockResolvedValue({ raw: [{ id: "dispatch-1" }] }),
+    };
+    Object.values(dispatchBuilder).forEach((method) => {
+      if (method !== dispatchBuilder.execute) method.mockReturnValue(dispatchBuilder);
+    });
+    dailyDispatchRepository = {
+      createQueryBuilder: jest.fn().mockReturnValue(dispatchBuilder),
       update: jest.fn(),
     };
     transport = {
@@ -80,7 +97,9 @@ describe("TenderMailService", () => {
               ? tenderRepository
               : entity === TenderMailDelivery
                 ? deliveryRepository
-                : mailItemRepository,
+                : entity === TenderDailyDispatch
+                  ? dailyDispatchRepository
+                  : mailItemRepository,
           ),
         }),
       ),
@@ -97,6 +116,7 @@ describe("TenderMailService", () => {
       tenderRepository,
       deliveryRepository,
       mailItemRepository,
+      dailyDispatchRepository,
       {
         get: jest.fn(
           (key: string) =>
@@ -131,7 +151,59 @@ describe("TenderMailService", () => {
         attemptCount: 1,
       }),
     );
-    expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+    expect(dataSource.transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("lets only one of two replicas claim the same KST business date", async () => {
+    const secondService = new TenderMailService(
+      dataSource,
+      subscriptionRepository,
+      recipientRepository,
+      tenderRepository,
+      deliveryRepository,
+      mailItemRepository,
+      dailyDispatchRepository,
+      {
+        get: jest.fn(
+          (key: string) =>
+            ({
+              SMTP_HOST: "smtp.worksmobile.com",
+              SMTP_USER: "sender@dfkorea.co.kr",
+              SMTP_APP_PASSWORD: "secret",
+              SMTP_FROM_NAME: "DF KOREA",
+            })[key],
+        ),
+      } as never,
+      new TenderMailRenderer(),
+      transport as never,
+    );
+    dailyDispatchRepository
+      .createQueryBuilder()
+      .execute.mockResolvedValueOnce({ raw: [{ id: "dispatch-1" }] })
+      .mockResolvedValueOnce({ raw: [] });
+
+    await service.sendDailyDigest(NOW);
+    await secondService.sendDailyDigest(NOW);
+
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for the newly shared time, then claims the KST date once even if the time changes again", async () => {
+    subscriptionRepository.findOne
+      .mockResolvedValueOnce({ enabled: true, deliveryTime: "11:00", recipients: [{ ...RECIPIENT, isActive: true }] })
+      .mockResolvedValue({ enabled: true, deliveryTime: "09:00", recipients: [{ ...RECIPIENT, isActive: true }] });
+
+    await service.sendDailyDigest(NOW);
+    expect(transport.sendMail).not.toHaveBeenCalled();
+
+    await service.sendDailyDigest(NOW);
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
+    expect(dataSource.transaction).toHaveBeenCalled();
+    expect(dailyDispatchRepository.createQueryBuilder().orIgnore).toHaveBeenCalled();
+
+    dailyDispatchRepository.createQueryBuilder().execute.mockResolvedValueOnce({ raw: [] });
+    await service.sendDailyDigest(new Date("2026-08-27T05:00:00.000Z"));
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
   });
 
   it("leaves a successful SMTP delivery leased when its atomic success persistence fails", async () => {
@@ -163,7 +235,12 @@ describe("TenderMailService", () => {
 
     await service.sendDailyDigest(NOW);
 
-    expect(deliveryRepository.save).toHaveBeenLastCalledWith(
+    expect(deliveryRepository.update).toHaveBeenLastCalledWith(
+      {
+        id: "delivery-1",
+        status: MailDeliveryStatus.PENDING,
+        claimedAt: NOW,
+      },
       expect.objectContaining({
         status: MailDeliveryStatus.RETRY_SCHEDULED,
         attemptCount: 1,
@@ -171,6 +248,33 @@ describe("TenderMailService", () => {
       }),
     );
     expect(mailItemRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("does not revive a stale delivery-uncertain claim when a late known SMTP failure arrives", async () => {
+    deliveryRepository.update.mockResolvedValueOnce({ affected: 0 });
+    const staleClaim = {
+      id: "stale-delivery",
+      recipientEmail: RECIPIENT.email,
+      status: MailDeliveryStatus.PENDING,
+      attemptCount: 1,
+      claimedAt: NOW,
+    } as TenderMailDelivery;
+
+    await (service as unknown as {
+      persistFailure(delivery: TenderMailDelivery, now: Date): Promise<void>;
+    }).persistFailure(staleClaim, NOW);
+
+    expect(deliveryRepository.update).toHaveBeenCalledWith(
+      {
+        id: staleClaim.id,
+        status: MailDeliveryStatus.PENDING,
+        claimedAt: NOW,
+      },
+      expect.objectContaining({
+        status: MailDeliveryStatus.RETRY_SCHEDULED,
+      }),
+    );
+    expect(deliveryRepository.save).not.toHaveBeenCalled();
   });
 
   it("keeps a successful recipient sent when a different recipient's SMTP delivery fails", async () => {
@@ -184,6 +288,7 @@ describe("TenderMailService", () => {
     } as TenderRecipient;
     subscriptionRepository.findOne.mockResolvedValue({
       enabled: true,
+      deliveryTime: "09:00",
       recipients: [failedRecipient, successfulRecipient],
     });
     let deliveryNumber = 0;
@@ -205,7 +310,10 @@ describe("TenderMailService", () => {
     expect(transport.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({ to: successfulRecipient.email }),
     );
-    expect(deliveryRepository.save).toHaveBeenCalledWith(
+    expect(deliveryRepository.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: MailDeliveryStatus.PENDING,
+      }),
       expect.objectContaining({ status: MailDeliveryStatus.RETRY_SCHEDULED }),
     );
     expect(deliveryRepository.save).toHaveBeenCalledWith(
@@ -222,7 +330,9 @@ describe("TenderMailService", () => {
       nextRetryAt: new Date(NOW.getTime() - 1),
       targetDate: "2026-08-27",
     } as TenderMailDelivery;
-    deliveryRepository.find.mockResolvedValue([delivery]);
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
     deliveryRepository.update.mockResolvedValue({ affected: 1 });
     mailItemRepository.find.mockResolvedValue([
       { id: "item-1", tender: TENDER, lastDeliveryId: delivery.id },
@@ -243,7 +353,11 @@ describe("TenderMailService", () => {
         nextRetryAt: null,
       }),
     );
-    expect(deliveryRepository.save).toHaveBeenCalledWith(
+    expect(deliveryRepository.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: delivery.id,
+        status: MailDeliveryStatus.PENDING,
+      }),
       expect.objectContaining({
         status: MailDeliveryStatus.FAILED,
         attemptCount: 2,
@@ -265,7 +379,9 @@ describe("TenderMailService", () => {
       enabled: false,
       recipients: [RECIPIENT],
     });
-    deliveryRepository.find.mockResolvedValue([delivery]);
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
     deliveryRepository.update.mockResolvedValue({ affected: 1 });
     mailItemRepository.find.mockResolvedValue([
       {
@@ -297,7 +413,9 @@ describe("TenderMailService", () => {
       nextRetryAt: new Date(NOW.getTime() - 1),
       targetDate: "2026-08-27",
     } as TenderMailDelivery;
-    deliveryRepository.find.mockResolvedValue([delivery]);
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
     deliveryRepository.update.mockResolvedValue({ affected: 1 });
     mailItemRepository.find.mockResolvedValue([
       {
@@ -326,7 +444,9 @@ describe("TenderMailService", () => {
       nextRetryAt: new Date(NOW.getTime() - 1),
       targetDate: "2026-08-27",
     } as TenderMailDelivery;
-    deliveryRepository.find.mockResolvedValue([delivery]);
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
     deliveryRepository.update.mockResolvedValue({ affected: 0 });
 
     await service.retryDue(NOW);
@@ -335,7 +455,7 @@ describe("TenderMailService", () => {
     expect(mailItemRepository.find).not.toHaveBeenCalled();
   });
 
-  it("reclaims a stale first attempt as the one allowed retry after a process restart", async () => {
+  it("marks a stale SMTP claim and its items delivery-uncertain without retrying", async () => {
     const stale = {
       id: "stale-1",
       recipientEmail: RECIPIENT.email,
@@ -348,6 +468,7 @@ describe("TenderMailService", () => {
       .mockResolvedValueOnce([stale])
       .mockResolvedValueOnce([]);
     deliveryRepository.update.mockResolvedValue({ affected: 1 });
+    mailItemRepository.update.mockResolvedValue({ affected: 1 });
 
     await service.retryDue(NOW);
 
@@ -358,10 +479,47 @@ describe("TenderMailService", () => {
         claimedAt: expect.anything(),
       },
       expect.objectContaining({
-        status: MailDeliveryStatus.RETRY_SCHEDULED,
-        nextRetryAt: NOW,
+        status: MailDeliveryStatus.DELIVERY_UNCERTAIN,
+        uncertainAt: NOW,
       }),
     );
+    expect(mailItemRepository.update).toHaveBeenCalledWith(
+      { lastDeliveryId: stale.id, status: MailItemStatus.PENDING },
+      { status: MailItemStatus.DELIVERY_UNCERTAIN, uncertainAt: NOW },
+    );
+    expect(transport.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("does not reselect a terminal delivery-uncertain item on a later daily run", async () => {
+    mailItemRepository.find.mockResolvedValue([
+      {
+        recipientId: RECIPIENT.id,
+        tenderId: TENDER.id,
+        tender: TENDER,
+        status: MailItemStatus.DELIVERY_UNCERTAIN,
+        lastDelivery: { status: MailDeliveryStatus.DELIVERY_UNCERTAIN },
+      },
+    ]);
+
+    await service.sendDailyDigest(new Date("2026-08-28T01:00:00.000Z"));
+
+    expect(transport.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("does not reselect an old sent tender when the same recipient identity is reactivated", async () => {
+    mailItemRepository.find.mockResolvedValue([
+      {
+        recipientId: RECIPIENT.id,
+        tenderId: TENDER.id,
+        tender: TENDER,
+        status: MailItemStatus.SENT,
+        lastDelivery: { status: MailDeliveryStatus.SENT },
+      },
+    ]);
+
+    await service.sendDailyDigest(new Date("2026-08-28T01:00:00.000Z"));
+
+    expect(transport.sendMail).not.toHaveBeenCalled();
   });
 
   it("rejects header injection in SMTP identity without exposing configuration in the delivery error", async () => {
@@ -372,6 +530,7 @@ describe("TenderMailService", () => {
       tenderRepository,
       deliveryRepository,
       mailItemRepository,
+      dailyDispatchRepository,
       {
         get: jest.fn(
           (key: string) =>
@@ -390,7 +549,8 @@ describe("TenderMailService", () => {
     await service.sendDailyDigest(NOW);
 
     expect(transport.sendMail).not.toHaveBeenCalled();
-    expect(deliveryRepository.save).toHaveBeenLastCalledWith(
+    expect(deliveryRepository.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.PENDING }),
       expect.objectContaining({
         status: MailDeliveryStatus.RETRY_SCHEDULED,
         errorMessage: "SMTP delivery failed",
@@ -406,6 +566,7 @@ describe("TenderMailService", () => {
       tenderRepository,
       deliveryRepository,
       mailItemRepository,
+      dailyDispatchRepository,
       {
         get: jest.fn(
           (key: string) =>
@@ -424,7 +585,8 @@ describe("TenderMailService", () => {
     await service.sendDailyDigest(NOW);
 
     expect(transport.sendMail).not.toHaveBeenCalled();
-    expect(deliveryRepository.save).toHaveBeenLastCalledWith(
+    expect(deliveryRepository.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.PENDING }),
       expect.objectContaining({ errorMessage: "SMTP delivery failed" }),
     );
   });

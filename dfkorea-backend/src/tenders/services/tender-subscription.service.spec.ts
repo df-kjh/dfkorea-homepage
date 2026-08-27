@@ -94,7 +94,7 @@ describe("TenderSubscriptionService", () => {
     });
   });
 
-  it("adds and removes only changed addresses so retained recipient history survives", async () => {
+  it("soft-deactivates removed addresses instead of deleting their identity and history", async () => {
     const insertBuilder = createInsertBuilder();
     subscriptionRepository.createQueryBuilder.mockReturnValue(insertBuilder);
     subscriptionRepository.findOne.mockResolvedValue({
@@ -102,8 +102,8 @@ describe("TenderSubscriptionService", () => {
       enabled: true,
       deliveryTime: "09:00",
       recipients: [
-        { id: "retained-id", email: "sales@dfkorea.co.kr" },
-        { id: "removed-id", email: "old@dfkorea.co.kr" },
+        { id: "retained-id", email: "sales@dfkorea.co.kr", isActive: true },
+        { id: "removed-id", email: "old@dfkorea.co.kr", isActive: true },
       ],
     });
 
@@ -113,10 +113,69 @@ describe("TenderSubscriptionService", () => {
       recipients: ["sales@dfkorea.co.kr", "new@dfkorea.co.kr"],
     });
 
-    expect(recipientRepository.delete).toHaveBeenCalledWith(["removed-id"]);
+    expect(recipientRepository.delete).not.toHaveBeenCalled();
+    expect(recipientRepository.save).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "removed-id", isActive: false }),
+        expect.objectContaining({
+          subscriptionId: SUBSCRIPTION_ID,
+          email: "new@dfkorea.co.kr",
+          isActive: true,
+        }),
+      ]),
+    );
+  });
+
+  it("reactivates a removed address with the same recipient ID", async () => {
+    const insertBuilder = createInsertBuilder();
+    subscriptionRepository.createQueryBuilder.mockReturnValue(insertBuilder);
+    subscriptionRepository.findOne.mockResolvedValue({
+      id: SUBSCRIPTION_ID,
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: [
+        {
+          id: "recipient-history-id",
+          email: "sales@dfkorea.co.kr",
+          isActive: false,
+        },
+      ],
+    });
+
+    await service.update({
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: ["sales@dfkorea.co.kr"],
+    });
+
+    expect(recipientRepository.delete).not.toHaveBeenCalled();
     expect(recipientRepository.save).toHaveBeenCalledWith([
-      { subscriptionId: SUBSCRIPTION_ID, email: "new@dfkorea.co.kr" },
+      expect.objectContaining({
+        id: "recipient-history-id",
+        email: "sales@dfkorea.co.kr",
+        isActive: true,
+      }),
     ]);
+  });
+
+  it("returns only active addresses from shared settings", async () => {
+    const insertBuilder = createInsertBuilder();
+    subscriptionRepository.createQueryBuilder.mockReturnValue(insertBuilder);
+    subscriptionRepository.findOne.mockResolvedValue({
+      id: SUBSCRIPTION_ID,
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: [
+        { email: "active@dfkorea.co.kr", isActive: true },
+        { email: "removed@dfkorea.co.kr", isActive: false },
+      ],
+    });
+
+    await expect(service.getOrCreate()).resolves.toEqual({
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: ["active@dfkorea.co.kr"],
+    });
   });
 
   it("creates missing shared settings with an idempotent singleton insert", async () => {

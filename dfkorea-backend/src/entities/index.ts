@@ -7,3 +7,4 @@ export { TenderRecipient } from '../tenders/entities/tender-recipient.entity';
 export { TenderSyncRun } from '../tenders/entities/tender-sync-run.entity';
 export { TenderMailDelivery } from '../tenders/entities/tender-mail-delivery.entity';
 export { TenderMailItem } from '../tenders/entities/tender-mail-item.entity';
+export { TenderDailyDispatch } from '../tenders/entities/tender-daily-dispatch.entity';

@@ -53,6 +53,9 @@ export class TenderMailDelivery {
   @Column({ type: "timestamptz", nullable: true })
   failedAt: Date | null;
 
+  @Column({ type: "timestamptz", nullable: true })
+  uncertainAt: Date | null;
+
   @Column({ type: "text", nullable: true })
   errorMessage: string | null;
 

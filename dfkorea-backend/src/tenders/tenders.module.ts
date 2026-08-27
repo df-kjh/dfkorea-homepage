@@ -16,6 +16,7 @@ import { TENDER_SOURCE_ADAPTERS } from "./domain/tender-source.adapter";
 import { Tender } from "./entities/tender.entity";
 import { TenderMailDelivery } from "./entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "./entities/tender-mail-item.entity";
+import { TenderDailyDispatch } from "./entities/tender-daily-dispatch.entity";
 import { TenderRecipient } from "./entities/tender-recipient.entity";
 import { TenderSubscription } from "./entities/tender-subscription.entity";
 import { TenderSyncRun } from "./entities/tender-sync-run.entity";
@@ -36,6 +37,7 @@ import { TendersController } from "./tenders.controller";
       TenderSyncRun,
       TenderMailDelivery,
       TenderMailItem,
+      TenderDailyDispatch,
     ]),
   ],
   controllers: [TendersController],

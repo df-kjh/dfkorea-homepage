@@ -29,9 +29,16 @@ export enum MailDeliveryStatus {
   RETRY_SCHEDULED = "RETRY_SCHEDULED",
   SKIPPED = "SKIPPED",
   CANCELLED = "CANCELLED",
+  DELIVERY_UNCERTAIN = "DELIVERY_UNCERTAIN",
 }
 
 export enum MailItemStatus {
   PENDING = "PENDING",
   SENT = "SENT",
+  DELIVERY_UNCERTAIN = "DELIVERY_UNCERTAIN",
+}
+
+export enum DailyDispatchStatus {
+  CLAIMED = "CLAIMED",
+  COMPLETED = "COMPLETED",
 }

@@ -365,6 +365,22 @@ export const formatKstDate = (date: Date): string => {
   return `${value("year")}${value("month")}${value("day")}`;
 };
 
+export const formatKstDateTimeMinute = (date: Date): string => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value;
+
+  return `${value("year")}${value("month")}${value("day")}${value("hour")}${value("minute")}`;
+};
+
 export const toNullableText = (value: unknown): string | null => {
   if (typeof value !== "string" && typeof value !== "number") {
     return null;

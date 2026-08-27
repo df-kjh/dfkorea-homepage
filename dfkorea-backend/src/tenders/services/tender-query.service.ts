@@ -152,7 +152,9 @@ export class TenderQueryService {
       builder.andWhere("tender.source = :source", { source: query.source });
     }
     if (query.region) {
-      builder.andWhere("tender.region = :region", { region: query.region });
+      builder.andWhere("tender.region ILIKE :region ESCAPE '!'", {
+        region: `%${this.escapeLikeKeyword(query.region)}%`,
+      });
     }
     if (query.procurementType) {
       builder.andWhere("tender.procurementType = :procurementType", {

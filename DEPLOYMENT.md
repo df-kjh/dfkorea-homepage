@@ -18,6 +18,7 @@
 - npm 또는 yarn
 - Docker & Docker Compose (Docker 배포 시)
 - Nginx (수동 배포 시)
+- PostgreSQL (모든 백엔드 배포에서 필수)
 
 ---
 
@@ -42,7 +43,12 @@ JWT_EXPIRES_IN=7d
 CORS_ORIGIN=https://yourdomain.com
 MAX_FILE_SIZE=10485760
 UPLOAD_DEST=./uploads
-DB_PATH=./database.json
+DB_HOST=postgres-host
+DB_PORT=5432
+DB_USERNAME=postgres-user
+DB_PASSWORD=
+DB_NAME=dfkorea
+TYPEORM_SYNCHRONIZE=false
 ```
 
 ### 2. Docker Compose로 빌드 및 실행
@@ -96,8 +102,8 @@ npm run build
 # PM2 글로벌 설치
 npm install -g pm2
 
-# 애플리케이션 시작
-pm2 start ecosystem.config.js --env production
+# migration 성공 뒤에만 애플리케이션 시작
+npm run migration:run:prod && pm2 start ecosystem.config.js --env production
 
 # 부팅 시 자동 시작 설정
 pm2 startup
@@ -107,7 +113,7 @@ pm2 save
 #### 4. 또는 직접 실행
 
 ```bash
-npm run start:prod
+npm run migration:run:prod && npm run start:prod
 ```
 
 ### 프론트엔드 배포
@@ -202,7 +208,12 @@ sudo cp -r dist/* /var/www/led-lighting/
 | `CORS_ORIGIN`    | CORS 허용 도메인       | `https://yourdomain.com` |
 | `MAX_FILE_SIZE`  | 최대 업로드 크기       | `10485760` (10MB)        |
 | `UPLOAD_DEST`    | 업로드 디렉토리        | `./uploads`              |
-| `DB_PATH`        | 데이터베이스 파일 경로 | `./database.json`        |
+| `DB_HOST`        | PostgreSQL 호스트      | `postgres-host`          |
+| `DB_PORT`        | PostgreSQL 포트        | `5432`                   |
+| `DB_USERNAME`    | PostgreSQL 사용자      | `postgres-user`          |
+| `DB_PASSWORD`    | PostgreSQL 비밀번호    | 비밀 저장소에서 주입     |
+| `DB_NAME`        | PostgreSQL DB 이름     | `dfkorea`                |
+| `TYPEORM_SYNCHRONIZE` | TypeORM 자동 동기화 | 운영에서는 반드시 `false` |
 
 ---
 
@@ -271,7 +282,7 @@ cd dfkorea-backend
 git pull
 npm ci
 npm run build
-pm2 restart led-backend
+npm run migration:run:prod && pm2 restart led-backend
 
 # 프론트엔드 업데이트
 cd ../led-lighting-website
@@ -329,11 +340,10 @@ sudo kill -9 <PID>
 cd dfkorea-backend
 npm ci
 npm run build
-npm run migration:run:prod
-npm run start:prod
+npm run migration:run:prod && npm run start:prod
 ```
 
-Railway 등의 pre-deploy 명령도 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 설정한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다. Start 명령은 `cd dfkorea-backend && npm run start:prod`다.
+Railway 등의 pre-deploy 명령도 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 설정한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다. Start 명령 역시 `cd dfkorea-backend && npm run migration:run:prod && npm run start:prod`로 설정해 migration 없는 시작 경로를 만들지 않는다.
 
 Dockerfile과 `railway.json`도 `npm run migration:run:prod && npm run start:prod`를 사용한다. migration 실패를 `|| true` 등으로 무시하지 않는다.
 
@@ -359,7 +369,8 @@ API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣�
 ### 예약 작업과 여러 서버 인스턴스
 
 - 공고 수집은 `Asia/Seoul` 기준 매일 `00:00`, `12:00`에만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
-- 일일 메일은 저장된 공통 시각에 한 번 발송한다. 주소별 첫 실패만 10분 뒤 한 번 재시도한다.
+- 일일 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches.businessDate` 고유키를 먼저 claim한다. 설정 변경과 여러 replica가 있어도 KST 영업일별 한 번만 실행된다.
+- 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. SMTP 요청 뒤 결과를 DB에 확정하기 전에 프로세스가 종료된 stale claim은 `DELIVERY_UNCERTAIN`으로 종결하고 다시 보내지 않는다. SMTP 승인과 DB commit은 원자화할 수 없으므로, 이 정책은 드문 메일 손실 가능성을 감수해 이미 승인된 주소의 중복 발송을 우선 방지한다.
 - 수집, 일일 메일, 재시도는 각각 PostgreSQL advisory lock을 같은 연결 세션에서 획득하므로 Railway/PM2 replica가 여러 개여도 한 인스턴스만 작업한다.
 - `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
 
@@ -377,17 +388,17 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
   npm run test:tender:integration
 ```
 
-또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 **로컬** `localhost`, `127.0.0.1`, `::1` 또는 명시된 Docker 서비스 `postgres`/`db`만 허용한다. DB 이름에는 `test` 또는 `e2e`가 있어야 하고 URL·host·DB 이름 어디에도 `prod`, `production`, `live`, `staging`이 있으면 AppModule을 시작하기 전에 실패한다. URL 안전성 검사는 최대 4회 percent decode하며 malformed 또는 그 이후에도 남은 어떤 `%`도 거부한다. 원격 스테이징 DB는 이 파괴적 통합 러너의 대상이 아니다. migration을 적용하고 명시된 tender 테이블 여섯 개만 트랜잭션으로 truncate하며, 종료 시에도 같은 범위만 정리한 뒤 앱을 닫는다. 실제 API 어댑터와 SMTP 전송기만 이중으로 교체하며 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
+또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 **로컬** `localhost`, `127.0.0.1`, `::1` 또는 명시된 Docker 서비스 `postgres`/`db`만 허용한다. DB 이름에는 `test` 또는 `e2e`가 있어야 하고 URL·host·DB 이름 어디에도 `prod`, `production`, `live`, `staging`이 있으면 AppModule을 시작하기 전에 실패한다. URL 안전성 검사는 최대 4회 percent decode하며 malformed 또는 그 이후에도 남은 어떤 `%`도 거부한다. 원격 스테이징 DB는 이 파괴적 통합 러너의 대상이 아니다. migration을 적용하고 명시된 tender 테이블 일곱 개만 트랜잭션으로 truncate하며, 종료 시에도 같은 범위만 정리한 뒤 앱을 닫는다. 실제 API 어댑터와 SMTP 전송기만 이중으로 교체하며 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
 
 ### 스테이징 라이브 스모크 체크리스트
 
 실제 API·SMTP 자격 증명 없이 이 저장소에서 외부 호출을 수행하지 않는다. 별도 스테이징에서 다음을 확인한다.
 
-1. 전용 DB를 백업하고 migration을 실행한 뒤 여섯 tender 테이블과 singleton/claim migration이 적용됐는지 확인한다.
+1. 전용 DB를 백업하고 migration을 실행한 뒤 일곱 tender 테이블과 singleton/claim/recipient-activation migration이 적용됐는지 확인한다.
 2. 나라장터·K-apt 키를 주입해 실제 응답을 한 번 수집하고, 공고 ID·차수 중복이 없으며 키가 로그·응답에 없는지 확인한다. 한전은 승인된 매뉴얼 검증 전까지 비활성화한다.
 3. 다음 `00:00` 또는 `12:00` KST 실행 뒤 `tender_sync_runs`가 출처별 성공/실패를 분리하고, 캘린더의 등록일 기준 직접/잠재 건수가 DB 집계와 같은지 확인한다.
 4. 관리자 JWT로 calendar, list, detail을 확인한다. 캘린더는 42칸이고, 화면 필터가 메일 수신 대상에 영향을 주지 않아야 한다.
-5. 스테이징 수신 주소와 다음 발송 시각을 저장해 digest 한 번을 확인한다. 한 주소를 고의 실패시켜 그 주소만 10분 뒤 한 번 재시도되고, 성공 주소에는 중복 메일이 없는지 확인한다.
+5. 스테이징 수신 주소와 다음 발송 시각을 저장해 digest 한 번을 확인한다. 한 주소를 고의 실패시켜 그 주소만 10분 뒤 한 번 재시도되고, 성공 주소에는 중복 메일이 없는지 확인한다. SMTP 승인 직후 강제 종료 시험은 별도 승인된 테스트 계정에서만 수행하고, stale claim이 `DELIVERY_UNCERTAIN`으로 종결되어 재전송되지 않는지 확인한다.
 
 ### 롤백
 

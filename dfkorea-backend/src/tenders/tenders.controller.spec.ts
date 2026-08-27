@@ -14,17 +14,14 @@ describe("TendersController", () => {
     getOrCreate: jest.fn(),
     update: jest.fn(),
   };
-  const scheduler = { rescheduleDailyMail: jest.fn() };
   const controller = new TendersController(
     query as never,
     subscription as never,
-    scheduler as never,
   );
 
   beforeEach(() => {
     Object.values(query).forEach((method) => method.mockReset());
     Object.values(subscription).forEach((method) => method.mockReset());
-    scheduler.rescheduleDailyMail.mockReset();
   });
 
   it("protects every tender endpoint with the JWT guard", () => {
@@ -82,7 +79,6 @@ describe("TendersController", () => {
       recipients: ["sales@dfkorea.co.kr"],
     });
     expect(subscription.update).toHaveBeenCalledWith(update);
-    expect(scheduler.rescheduleDailyMail).toHaveBeenCalledWith("12:30", true);
   });
 
   it("passes independent calendar list filters through without adding email filter state", async () => {

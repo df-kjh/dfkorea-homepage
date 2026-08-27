@@ -22,7 +22,7 @@ const reset = () => {
     <div class="tender-filter__fields">
       <label><span>검색어</span><input data-test="filter-keyword" v-model.trim="form.keyword" type="search" placeholder="공고명 또는 발주기관" @keyup.enter="apply" /></label>
       <label><span>출처</span><select v-model="form.source"><option :value="undefined">전체</option><option value="G2B">나라장터</option><option value="KAPT">K-apt</option><option value="KEPCO">한전</option></select></label>
-      <label><span>지역</span><input v-model.trim="form.region" type="text" placeholder="예: 서울" /></label>
+      <label><span>지역</span><input v-model.trim="form.region" type="text" placeholder="지역명 일부 입력 (예: 서울)" /></label>
       <label><span>공고 유형</span><select v-model="form.procurementType"><option :value="undefined">전체</option><option value="GOODS">물품</option><option value="CONSTRUCTION">공사</option><option value="SERVICE">용역</option><option value="OTHER">기타</option></select></label>
       <label><span>관련도</span><select v-model="form.relevance"><option :value="undefined">전체</option><option value="DIRECT">💡 직접 관련</option><option value="POTENTIAL">⚡ 잠재 관련</option></select></label>
     </div>

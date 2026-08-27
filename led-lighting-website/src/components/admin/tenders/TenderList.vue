@@ -4,6 +4,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ThePagination from '@/components/common/ThePagination.vue'
 import TenderRelevanceBadge from './TenderRelevanceBadge.vue'
 import type { PaginatedTenderResponse, Tender } from '@/types'
+import { formatKstDateTime, formatTenderAmount } from '@/utils/tender-format'
 
 interface Props { response: PaginatedTenderResponse; loading: boolean; error: string | null; selectedDate: string }
 defineProps<Props>()
@@ -11,8 +12,7 @@ const emit = defineEmits<{ select: [tender: Tender]; retry: []; 'page-change': [
 
 const sourceLabel: Record<Tender['source'], string> = { G2B: '나라장터', KAPT: 'K-apt', KEPCO: '한전' }
 const procurementLabel: Record<Tender['procurementType'], string> = { GOODS: '물품', CONSTRUCTION: '공사', SERVICE: '용역', OTHER: '기타' }
-const dateLabel = (value: string | null) => value ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' }).format(new Date(value)) : '-'
-const currency = (value: string | null) => value ? `${Number(value).toLocaleString('ko-KR')}원` : '-'
+const dateLabel = (value: string | null) => value ? formatKstDateTime(value) : '-'
 </script>
 
 <template>
@@ -22,7 +22,7 @@ const currency = (value: string | null) => value ? `${Number(value).toLocaleStri
     <div v-else-if="error" data-test="tender-list-error" class="tender-list__feedback"><p>{{ error }}</p><button type="button" class="retry-button" @click="emit('retry')">다시 시도</button></div>
     <EmptyState v-else-if="response.data.length === 0" data-test="tender-list-empty" description="선택한 날짜에 등록된 관련 공고가 없습니다." />
     <template v-else>
-      <div class="hidden lg:block overflow-x-auto"><table class="w-full"><thead><tr><th>관련도</th><th>공고명</th><th>발주기관</th><th>출처</th><th>지역</th><th>유형</th><th>등록일</th><th>입찰 마감</th><th>금액</th></tr></thead><tbody><tr v-for="tender in response.data" :key="tender.id"><td><TenderRelevanceBadge :relevance="tender.relevance" /></td><td><strong>{{ tender.title }}</strong><p class="reason">{{ tender.relevanceReasons.map((reason) => reason.keyword).join(', ') }}</p><button :data-test="`tender-details-${tender.id}`" type="button" class="tender-list__details" @click="emit('select', tender)" @keydown.enter.prevent="emit('select', tender)" @keyup.space.prevent="emit('select', tender)">상세 보기</button></td><td>{{ tender.orderingOrganization }}</td><td>{{ sourceLabel[tender.source] }}</td><td>{{ tender.region || '-' }}</td><td>{{ procurementLabel[tender.procurementType] }}</td><td>{{ dateLabel(tender.registeredAt) }}</td><td>{{ dateLabel(tender.bidEndedAt) }}</td><td>{{ currency(tender.estimatedAmount) }}</td></tr></tbody></table></div>
+      <div class="hidden lg:block overflow-x-auto"><table class="w-full"><thead><tr><th>관련도</th><th>공고명</th><th>발주기관</th><th>출처</th><th>지역</th><th>유형</th><th>등록일</th><th>입찰 마감</th><th>금액</th></tr></thead><tbody><tr v-for="tender in response.data" :key="tender.id"><td><TenderRelevanceBadge :relevance="tender.relevance" /></td><td><strong>{{ tender.title }}</strong><p class="reason">{{ tender.relevanceReasons.map((reason) => reason.keyword).join(', ') }}</p><button :data-test="`tender-details-${tender.id}`" type="button" class="tender-list__details" @click="emit('select', tender)" @keydown.enter.prevent="emit('select', tender)" @keyup.space.prevent="emit('select', tender)">상세 보기</button></td><td>{{ tender.orderingOrganization }}</td><td>{{ sourceLabel[tender.source] }}</td><td>{{ tender.region || '-' }}</td><td>{{ procurementLabel[tender.procurementType] }}</td><td>{{ dateLabel(tender.registeredAt) }}</td><td>{{ dateLabel(tender.bidEndedAt) }}</td><td>{{ formatTenderAmount(tender.estimatedAmount) }}</td></tr></tbody></table></div>
       <div class="lg:hidden space-y-3"><button v-for="tender in response.data" :key="tender.id" type="button" class="tender-list__mobile-card" @click="emit('select', tender)"><div class="flex justify-between gap-2 text-left"><TenderRelevanceBadge :relevance="tender.relevance" /><span class="text-xs text-gray-500">{{ sourceLabel[tender.source] }}</span></div><strong class="block mt-2 text-left">{{ tender.title }}</strong><span class="block mt-2 text-left text-sm text-gray-600">{{ tender.orderingOrganization }} · {{ tender.region || '지역 미상' }}</span><span class="block mt-1 text-left text-sm text-gray-600">입찰 마감 {{ dateLabel(tender.bidEndedAt) }}</span></button></div>
       <ThePagination :current-page="response.page" :total-pages="response.totalPages" :total-items="response.total" @page-change="emit('page-change', $event)" />
     </template>

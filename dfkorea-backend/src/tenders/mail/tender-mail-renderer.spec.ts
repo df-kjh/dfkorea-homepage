@@ -26,7 +26,7 @@ const tender = (overrides: Partial<Tender> = {}): Tender =>
     sourceUrl: "https://example.com/?q=<unsafe>",
     relevance: TenderRelevance.DIRECT,
     relevanceScore: 100,
-    relevanceReasons: ["LED 조명"],
+    relevanceReasons: [{ field: "title", keyword: "<LED>", score: 100 }],
     rawData: {},
     firstCollectedAt: new Date(),
     lastUpdatedAt: new Date(),
@@ -57,6 +57,10 @@ describe("TenderMailRenderer", () => {
     expect(rendered.html).toContain("https://example.com/?q=%3Cunsafe%3E");
     expect(rendered.text).toContain("💡 직접 관련 (1건)");
     expect(rendered.text).toContain("⚡ 잠재 관련 (1건)");
+    expect(rendered.html).toContain("title · &lt;LED&gt; · 100점");
+    expect(rendered.text).toContain("title · <LED> · 100점");
+    expect(rendered.html).not.toContain("[object Object]");
+    expect(rendered.text).not.toContain("[object Object]");
   });
 
   it("omits non-HTTP official links rather than emitting an executable URL", () => {

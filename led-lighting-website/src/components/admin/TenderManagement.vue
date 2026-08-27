@@ -44,6 +44,7 @@ const selectedTender = ref<Tender | null>(null)
 const detailOpen = ref(false)
 const subscriptionOpen = ref(false)
 const subscriptionLoading = ref(false)
+const subscriptionLoaded = ref(false)
 const subscriptionError = ref<string | null>(null)
 const subscription = ref<TenderSubscription>({ enabled: false, deliveryTime: '09:00', recipients: [] })
 let calendarRequest = 0
@@ -90,12 +91,17 @@ const fetchList = async (page = 1) => {
 }
 
 const fetchSubscription = async () => {
+  subscriptionLoaded.value = false
+  subscriptionLoading.value = true
   subscriptionError.value = null
   try {
     const { data } = await tendersAPI.getSubscription()
     subscription.value = data
+    subscriptionLoaded.value = true
   } catch {
     subscriptionError.value = '수신 설정을 불러오지 못했습니다. 다시 시도해 주세요.'
+  } finally {
+    subscriptionLoading.value = false
   }
 }
 
@@ -105,7 +111,9 @@ const goToday = () => { const today = currentDateLabel(); month.value = today.sl
 const applyFilters = (filters: CalendarFilters) => { Object.assign(appliedFilters, filters); fetchCalendar(); fetchList(1) }
 const resetFilters = () => { Object.assign(appliedFilters, { keyword: undefined, source: undefined, region: undefined, procurementType: undefined, relevance: undefined }); fetchCalendar(); fetchList(1) }
 const openDetail = (tender: Tender) => { selectedTender.value = tender; detailOpen.value = true }
+const openSubscription = () => { subscriptionOpen.value = true; void fetchSubscription() }
 const saveSubscription = async (next: TenderSubscription) => {
+  if (!subscriptionLoaded.value) return
   subscriptionLoading.value = true
   subscriptionError.value = null
   try {
@@ -119,14 +127,14 @@ const saveSubscription = async (next: TenderSubscription) => {
   }
 }
 
-onMounted(() => { fetchCalendar(); fetchList(); fetchSubscription() })
+onMounted(() => { fetchCalendar(); fetchList() })
 </script>
 
 <template>
   <section class="tender-management" aria-label="입찰 공고 관리">
     <div class="tender-management__toolbar">
       <div><h3 class="text-lg sm:text-xl font-bold text-gray-900">입찰 공고</h3><p class="mt-1 text-sm text-gray-500">등록일 기준으로 LED 조명 관련 공고를 확인합니다.</p></div>
-      <div class="flex flex-wrap gap-2"><BaseButton data-test="open-filter" type="button" variant="default" size="small" icon-left="filter_alt" @click="filterVisible = !filterVisible">필터</BaseButton><BaseButton data-test="open-subscription" type="button" variant="primary" size="small" icon-left="mail" @click="subscriptionOpen = true">수신 설정</BaseButton></div>
+      <div class="flex flex-wrap gap-2"><BaseButton data-test="open-filter" type="button" variant="default" size="small" icon-left="filter_alt" @click="filterVisible = !filterVisible">필터</BaseButton><BaseButton data-test="open-subscription" type="button" variant="primary" size="small" icon-left="mail" @click="openSubscription">수신 설정</BaseButton></div>
     </div>
 
     <TenderFilterPanel v-if="filterVisible" :filters="appliedFilters" class="mt-4" @apply="applyFilters" @reset="resetFilters" />
@@ -141,7 +149,7 @@ onMounted(() => { fetchCalendar(); fetchList(); fetchSubscription() })
     <BaseCard :hoverable="false" custom-class="tender-calendar-card"><div class="tender-management__calendar-scroll"><TenderCalendar :month="month" :selected-date="selectedDate" :days="calendarDays" :loading="calendarLoading" @change-month="changeMonth" @select-date="selectDate" @today="goToday" /></div></BaseCard>
     <TenderList :response="listResponse" :loading="listLoading" :error="listError" :selected-date="selectedDate" @select="openDetail" @retry="fetchList(listResponse.page)" @page-change="fetchList" />
     <TenderDetailModal v-model="detailOpen" :tender="selectedTender" />
-    <TenderSubscriptionModal v-model="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :error="subscriptionError" @save="saveSubscription" />
+    <TenderSubscriptionModal v-model="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :loaded="subscriptionLoaded" :error="subscriptionError" @save="saveSubscription" />
   </section>
 </template>
 

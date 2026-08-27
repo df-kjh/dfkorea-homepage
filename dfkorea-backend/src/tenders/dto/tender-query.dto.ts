@@ -15,6 +15,7 @@ import {
   TenderRelevance,
   TenderSource,
 } from "../domain/tender.enums";
+import type { TenderClassificationReason } from "../domain/tender-classifier";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -95,7 +96,7 @@ export interface TenderSummaryDto {
   sourceUrl: string;
   relevance: TenderRelevance;
   relevanceScore: number;
-  relevanceReasons: unknown[];
+  relevanceReasons: TenderClassificationReason[];
 }
 
 export type TenderDetailDto = TenderSummaryDto;

@@ -34,6 +34,9 @@ export class TenderMailItem {
   @Column({ type: 'timestamptz', nullable: true })
   sentAt: Date | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  uncertainAt: Date | null;
+
   @ManyToOne(() => TenderRecipient, (recipient) => recipient.mailItems, {
     onDelete: 'CASCADE',
   })

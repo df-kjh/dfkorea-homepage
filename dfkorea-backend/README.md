@@ -42,7 +42,8 @@ $ npm run start
 $ npm run start:dev
 
 # production mode
-$ npm run start:prod
+$ npm run build
+$ npm run migration:run:prod && npm run start:prod
 ```
 
 ## Run tests

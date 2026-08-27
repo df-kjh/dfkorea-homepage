@@ -94,9 +94,10 @@ describe("TenderQueryService", () => {
     expect(builder.andWhere).toHaveBeenCalledWith("tender.source = :source", {
       source: TenderSource.G2B,
     });
-    expect(builder.andWhere).toHaveBeenCalledWith("tender.region = :region", {
-      region: "서울",
-    });
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "tender.region ILIKE :region ESCAPE '!'",
+      { region: "%서울%" },
+    );
     expect(builder.andWhere).toHaveBeenCalledWith(
       "tender.procurementType = :procurementType",
       { procurementType: ProcurementType.GOODS },
@@ -104,6 +105,19 @@ describe("TenderQueryService", () => {
     expect(builder.andWhere).toHaveBeenCalledWith(
       "tender.relevance = :relevance",
       { relevance: TenderRelevance.DIRECT },
+    );
+  });
+
+  it("partially matches regions while escaping PostgreSQL LIKE metacharacters", async () => {
+    const builder = createQueryBuilder();
+    builder.getRawMany.mockResolvedValue([]);
+    repository.createQueryBuilder.mockReturnValue(builder);
+
+    await service.getCalendar("2026-08", { region: "서울!%_" });
+
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "tender.region ILIKE :region ESCAPE '!'",
+      { region: "%서울!!!%!_%" },
     );
   });
 

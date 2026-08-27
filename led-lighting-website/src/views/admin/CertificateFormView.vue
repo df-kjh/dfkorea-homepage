@@ -132,6 +132,7 @@ import type { Certificate, CreateCertificateDto } from '@/types'
 import ImageUploader from '@/components/common/ImageUploader.vue'
 import BaseSelectBox from '@/components/common/BaseSelectBox.vue'
 import PDFUploader from '@/components/common/PDFUploader.vue'
+import { getServerValidationMessage } from '@/utils/http-error'
 
 const router = useRouter()
 const route = useRoute()
@@ -261,7 +262,9 @@ const handleSubmit = async (): Promise<void> => {
     const fromTab = route.query.from as string || 'certificates'
     router.push({ path: '/admin/dashboard', query: { tab: fromTab } })
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : '저장에 실패했습니다'
+    const errorMessage =
+      getServerValidationMessage(error) ??
+      (error instanceof Error ? error.message : '저장에 실패했습니다')
     toast.error(errorMessage)
   } finally {
     submitting.value = false

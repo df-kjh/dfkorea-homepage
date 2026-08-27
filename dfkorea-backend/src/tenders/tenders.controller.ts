@@ -17,7 +17,6 @@ import {
 import { TenderQueryService } from "./services/tender-query.service";
 import { UpdateTenderSubscriptionDto } from "./dto/update-tender-subscription.dto";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
-import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderSubscriptionQueryDto } from "./dto/tender-subscription-query.dto";
 
 @Controller("tenders")
@@ -26,7 +25,6 @@ export class TendersController {
   constructor(
     private readonly tenderQueryService: TenderQueryService,
     private readonly tenderSubscriptionService: TenderSubscriptionService,
-    private readonly tenderSchedulerService: TenderSchedulerService,
   ) {}
 
   @Get("calendar")
@@ -45,12 +43,6 @@ export class TendersController {
   @Put("subscription")
   async updateSubscription(@Body() updateDto: UpdateTenderSubscriptionDto) {
     const subscription = await this.tenderSubscriptionService.update(updateDto);
-    // Rescheduling occurs only after the transaction resolves, so an in-memory
-    // job can never point at a setting that was rolled back in PostgreSQL.
-    this.tenderSchedulerService.rescheduleDailyMail(
-      subscription.deliveryTime,
-      subscription.enabled,
-    );
     return subscription;
   }
 

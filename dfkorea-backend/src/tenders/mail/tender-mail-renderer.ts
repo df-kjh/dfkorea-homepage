@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TenderRelevance } from "../domain/tender.enums";
 import { Tender } from "../entities/tender.entity";
+import type { TenderClassificationReason } from "../domain/tender-classifier";
 
 export interface RenderedTenderMail {
   subject: string;
@@ -47,7 +48,7 @@ export class TenderMailRenderer {
         `<p>마감일: ${this.escape(tender.bidEndedAt ? this.toKstDateTime(tender.bidEndedAt) : "미정")}</p>` +
         `<p>지역: ${this.escape(tender.region ?? "미정")} · 유형: ${this.escape(tender.procurementType)}</p>` +
         `<p>금액: ${this.escape(tender.estimatedAmount ? `${tender.estimatedAmount}원` : "미정")}</p>` +
-        `<p>판정 근거: ${this.escape(tender.relevanceReasons.map(String).join(", ") || "없음")}</p>${link}</article>`;
+        `<p>판정 근거: ${this.escape(this.renderReasons(tender.relevanceReasons))}</p>${link}</article>`;
     }).join("")}`;
   }
 
@@ -61,7 +62,7 @@ export class TenderMailRenderer {
         `마감일: ${tender.bidEndedAt ? this.toKstDateTime(tender.bidEndedAt) : "미정"}`,
         `지역: ${tender.region ?? "미정"} | 유형: ${tender.procurementType}`,
         `금액: ${tender.estimatedAmount ? `${tender.estimatedAmount}원` : "미정"}`,
-        `판정 근거: ${tender.relevanceReasons.map(String).join(", ") || "없음"}`,
+        `판정 근거: ${this.renderReasons(tender.relevanceReasons)}`,
         this.safeUrl(tender.sourceUrl) ?? "",
       ].filter(Boolean).join("\n")),
     ].join("\n\n");
@@ -81,6 +82,19 @@ export class TenderMailRenderer {
     } catch {
       return null;
     }
+  }
+
+  private renderReasons(reasons: readonly unknown[]): string {
+    const formatted = reasons
+      .filter((reason): reason is TenderClassificationReason =>
+        typeof reason === "object" &&
+        reason !== null &&
+        typeof (reason as Record<string, unknown>).field === "string" &&
+        typeof (reason as Record<string, unknown>).keyword === "string" &&
+        typeof (reason as Record<string, unknown>).score === "number",
+      )
+      .map((reason) => `${reason.field} · ${reason.keyword} · ${reason.score}점`);
+    return formatted.join(", ") || "없음";
   }
 
   private escape(value: string): string {

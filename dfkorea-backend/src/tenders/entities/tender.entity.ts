@@ -12,6 +12,7 @@ import {
   TenderRelevance,
   TenderSource,
 } from '../domain/tender.enums';
+import type { TenderClassificationReason } from '../domain/tender-classifier';
 
 @Entity('tenders')
 @Unique('UQ_tender_source_notice_revision', [
@@ -81,7 +82,7 @@ export class Tender {
   relevanceScore: number;
 
   @Column({ type: 'jsonb' })
-  relevanceReasons: unknown[];
+  relevanceReasons: TenderClassificationReason[];
 
   @Column({ type: 'jsonb' })
   rawData: Record<string, unknown>;

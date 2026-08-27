@@ -45,6 +45,7 @@ const listResponse = {
 
 describe('TenderManagement', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     api.getCalendar.mockResolvedValue({ data: [{ date: '2026-08-27', total: 1, direct: 1, potential: 0 }] })
     api.getAll.mockResolvedValue({ data: listResponse })
     api.getSubscription.mockResolvedValue({
@@ -101,6 +102,34 @@ describe('TenderManagement', () => {
       deliveryTime: '09:00',
       recipients: ['sales@dfkorea.co.kr'],
     })
+  })
+
+  it('refetches settings on every modal open and disables save after a failed refresh without overwriting loaded settings', async () => {
+    const wrapper = mount(TenderManagement, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+    expect(api.getSubscription).toHaveBeenCalledTimes(1)
+    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+
+    document.body
+      .querySelector<HTMLButtonElement>('[aria-label="닫기"]')
+      ?.click()
+    await flushPromises()
+    api.getSubscription.mockRejectedValueOnce(new Error('transient failure'))
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+
+    expect(api.getSubscription).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).toContain('수신 설정을 불러오지 못했습니다')
+    expect(document.body.textContent).toContain('sales@dfkorea.co.kr')
+    const save = document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')
+    expect(save?.disabled).toBe(true)
+    save?.click()
+    await flushPromises()
+    expect(api.updateSubscription).not.toHaveBeenCalled()
   })
 
   it('renders loading, error, and empty list states instead of stale notices', async () => {

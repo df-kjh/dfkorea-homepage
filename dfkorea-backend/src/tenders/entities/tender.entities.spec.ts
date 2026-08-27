@@ -2,6 +2,8 @@ import { getMetadataArgsStorage } from "typeorm";
 import { Tender } from "./tender.entity";
 import { TenderMailItem } from "./tender-mail-item.entity";
 import { TenderMailDelivery } from "./tender-mail-delivery.entity";
+import { TenderRecipient } from "./tender-recipient.entity";
+import { TenderDailyDispatch } from "./tender-daily-dispatch.entity";
 
 describe("tender entity metadata", () => {
   it("deduplicates source notice revisions", () => {
@@ -32,5 +34,25 @@ describe("tender entity metadata", () => {
     );
 
     expect(index?.columns).toEqual(["status", "claimedAt"]);
+  });
+
+  it("keeps one daily dispatch identity per KST business date", () => {
+    const unique = getMetadataArgsStorage().uniques.find(
+      (item) =>
+        item.target === TenderDailyDispatch &&
+        item.name === "UQ_tender_daily_dispatch_business_date",
+    );
+
+    expect(unique?.columns).toEqual(["businessDate"]);
+  });
+
+  it("indexes active recipients within the shared subscription", () => {
+    const index = getMetadataArgsStorage().indices.find(
+      (item) =>
+        item.target === TenderRecipient &&
+        item.name === "IDX_tender_recipient_subscription_active",
+    );
+
+    expect(index?.columns).toEqual(["subscriptionId", "isActive"]);
   });
 });

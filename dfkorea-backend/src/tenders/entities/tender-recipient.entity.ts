@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -13,6 +14,7 @@ import { TenderSubscription } from './tender-subscription.entity';
 
 @Entity('tender_recipients')
 @Unique('UQ_tender_recipient_email', ['email'])
+@Index('IDX_tender_recipient_subscription_active', ['subscriptionId', 'isActive'])
 export class TenderRecipient {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -22,6 +24,9 @@ export class TenderRecipient {
 
   @Column({ type: 'varchar' })
   email: string;
+
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
 
   @ManyToOne(() => TenderSubscription, (subscription) => subscription.recipients, {
     onDelete: 'CASCADE',

@@ -5,7 +5,7 @@ import {
 } from "../domain/tender-source.adapter";
 import { ProcurementType, TenderSource } from "../domain/tender.enums";
 import {
-  formatKstDate,
+  formatKstDateTimeMinute,
   parseKstDate,
   TenderApiClient,
   toNullableText,
@@ -39,10 +39,10 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
           operation,
           query: {
             serviceKey: this.config.serviceKey,
-            _type: "json",
+            type: "json",
             inqryDiv: "1",
-            inqryBgnDt: formatKstDate(window.from),
-            inqryEndDt: formatKstDate(window.to),
+            inqryBgnDt: formatKstDateTimeMinute(window.from),
+            inqryEndDt: formatKstDateTimeMinute(window.to),
           },
         });
 
@@ -89,7 +89,9 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
         `https://www.g2b.go.kr/ep/tbid/tbidFwd.do?bidno=${encodeURIComponent(sourceNoticeId)}&bidseq=${encodeURIComponent(revision)}`,
       itemName: toNullableText(row.prdctClsfcNoNm) ?? "",
       description: toNullableText(row.bidNtceDtl) ?? "",
-      attachmentNames: [],
+      attachmentNames: Array.from({ length: 10 }, (_, index) =>
+        toNullableText(row[`ntceSpecDocNm${index + 1}`]),
+      ).filter((name): name is string => name !== null),
       rawData: row,
     };
   }

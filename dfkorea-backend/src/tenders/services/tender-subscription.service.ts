@@ -58,21 +58,28 @@ export class TenderSubscriptionService {
         ]),
       );
       const desiredEmails = new Set(recipients);
-      const removedIds = [...existingByEmail.entries()]
-        .filter(([email]) => !desiredEmails.has(email))
-        .map(([, recipient]) => recipient.id);
+      const changedRecipients = [...existingByEmail.entries()]
+        .filter(([email, recipient]) =>
+          (recipient.isActive !== false) !== desiredEmails.has(email),
+        )
+        .map(([email, recipient]) => ({
+          ...recipient,
+          isActive: desiredEmails.has(email),
+        }));
       const newRecipients = recipients
         .filter((email) => !existingByEmail.has(email))
-        .map((email) => ({ subscriptionId: subscription.id, email }));
+        .map((email) => ({
+          subscriptionId: subscription.id,
+          email,
+          isActive: true,
+        }));
 
-      // Retaining unchanged rows is essential: mail items reference recipient
-      // IDs, and deleting/recreating them would erase send history on a mere
-      // delivery-time change.
-      if (removedIds.length > 0) {
-        await recipientRepository.delete(removedIds);
-      }
-      if (newRecipients.length > 0) {
-        await recipientRepository.save(newRecipients);
+      // Recipient rows are never deleted by a settings diff. Mail items keep
+      // referring to the same normalized-email identity across removal and
+      // reactivation, so old notices cannot be selected as new after re-add.
+      const recipientsToSave = [...changedRecipients, ...newRecipients];
+      if (recipientsToSave.length > 0) {
+        await recipientRepository.save(recipientsToSave);
       }
 
       return {
@@ -134,7 +141,9 @@ export class TenderSubscriptionService {
       enabled: subscription.enabled,
       deliveryTime: subscription.deliveryTime,
       recipients: this.normalizeRecipients(
-        (subscription.recipients ?? []).map((recipient) => recipient.email),
+        (subscription.recipients ?? [])
+          .filter((recipient) => recipient.isActive !== false)
+          .map((recipient) => recipient.email),
       ),
     };
   }

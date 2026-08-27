@@ -8,7 +8,6 @@ import { Test } from "@nestjs/testing";
 import * as request from "supertest";
 import { JwtAuthGuard } from "../src/auth/jwt-auth.guard";
 import { TenderQueryService } from "../src/tenders/services/tender-query.service";
-import { TenderSchedulerService } from "../src/tenders/services/tender-scheduler.service";
 import { TenderSubscriptionService } from "../src/tenders/services/tender-subscription.service";
 import { TendersController } from "../src/tenders/tenders.controller";
 import { TenderClassifier } from "../src/tenders/domain/tender-classifier";
@@ -27,6 +26,7 @@ import { TenderRecipient } from "../src/tenders/entities/tender-recipient.entity
 import { TenderIngestionService } from "../src/tenders/services/tender-ingestion.service";
 import { TenderMailService } from "../src/tenders/services/tender-mail.service";
 import { TenderMailRenderer } from "../src/tenders/mail/tender-mail-renderer";
+import { TenderDailyDispatch } from "../src/tenders/entities/tender-daily-dispatch.entity";
 
 const ADMIN_TOKEN = "test-admin-token";
 const TENDER_ID = "00000000-0000-4000-8000-000000000001";
@@ -42,7 +42,6 @@ describe("Tender admin HTTP contract", () => {
     getOrCreate: jest.fn(),
     update: jest.fn(),
   };
-  const scheduler = { rescheduleDailyMail: jest.fn() };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -77,7 +76,6 @@ describe("Tender admin HTTP contract", () => {
       providers: [
         { provide: TenderQueryService, useValue: query },
         { provide: TenderSubscriptionService, useValue: subscription },
-        { provide: TenderSchedulerService, useValue: scheduler },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -171,7 +169,6 @@ describe("Tender admin HTTP contract", () => {
       .expect(200)
       .expect(({ body }) => expect(body).toEqual(payload));
     expect(subscription.update).toHaveBeenCalledWith(payload);
-    expect(scheduler.rescheduleDailyMail).toHaveBeenCalledWith("12:30", true);
 
     await request(app.getHttpServer())
       .put("/tenders/subscription")
@@ -319,10 +316,12 @@ describe("Tender collection and delivery service contracts", () => {
     const failedRecipient = {
       id: "recipient-failed",
       email: "failed@dfkorea.co.kr",
+      isActive: true,
     } as TenderRecipient;
     const successfulRecipient = {
       id: "recipient-success",
       email: "success@dfkorea.co.kr",
+      isActive: true,
     } as TenderRecipient;
     const tender = {
       id: TENDER_ID,
@@ -335,12 +334,14 @@ describe("Tender collection and delivery service contracts", () => {
     } as Tender;
     let deliverySequence = 0;
     let retryDelivery: TenderMailDelivery | undefined;
+    const deliveries = new Map<string, TenderMailDelivery>();
     const deliveryRepository = {
       save: jest.fn(async (value: Partial<TenderMailDelivery>) => {
         const saved = {
           id: value.id ?? `delivery-${++deliverySequence}`,
           ...value,
         } as TenderMailDelivery;
+        deliveries.set(saved.id, saved);
         if (saved.status === MailDeliveryStatus.RETRY_SCHEDULED) {
           retryDelivery = saved;
         }
@@ -354,7 +355,21 @@ describe("Tender collection and delivery service contracts", () => {
               ? [retryDelivery]
               : [],
       ),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      update: jest.fn(
+        async (
+          criteria: { id: string },
+          changes: Partial<TenderMailDelivery>,
+        ) => {
+          const current = deliveries.get(criteria.id);
+          if (!current) return { affected: 0 };
+          const updated = { ...current, ...changes } as TenderMailDelivery;
+          deliveries.set(updated.id, updated);
+          if (updated.recipientEmail === failedRecipient.email) {
+            retryDelivery = updated;
+          }
+          return { affected: 1 };
+        },
+      ),
     };
     const mailItemRepository = {
       find: jest.fn(async (options: { where: Record<string, string> }) => {
@@ -378,8 +393,23 @@ describe("Tender collection and delivery service contracts", () => {
       findOne: jest.fn().mockResolvedValue({
         id: "subscription",
         enabled: true,
+        deliveryTime: "09:00",
         recipients: [failedRecipient, successfulRecipient],
       }),
+    };
+    const dispatchBuilder = {
+      insert: jest.fn(),
+      values: jest.fn(),
+      orIgnore: jest.fn(),
+      returning: jest.fn(),
+      execute: jest.fn().mockResolvedValue({ raw: [{ id: "dispatch-1" }] }),
+    };
+    Object.values(dispatchBuilder).forEach((method) => {
+      if (method !== dispatchBuilder.execute) method.mockReturnValue(dispatchBuilder);
+    });
+    const dailyDispatchRepository = {
+      createQueryBuilder: jest.fn().mockReturnValue(dispatchBuilder),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     const transport = {
       sendMail: jest.fn(async (message: { to: string }) => {
@@ -399,6 +429,7 @@ describe("Tender collection and delivery service contracts", () => {
             if (entity === Tender)
               return { find: jest.fn().mockResolvedValue([tender]) };
             if (entity === TenderMailDelivery) return deliveryRepository;
+            if (entity === TenderDailyDispatch) return dailyDispatchRepository;
             return mailItemRepository;
           },
         }),
@@ -416,6 +447,7 @@ describe("Tender collection and delivery service contracts", () => {
       { find: jest.fn().mockResolvedValue([tender]) } as never,
       deliveryRepository as never,
       mailItemRepository as never,
+      dailyDispatchRepository as never,
       {
         get: jest.fn(
           (key: string) =>
