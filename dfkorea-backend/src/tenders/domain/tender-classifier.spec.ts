@@ -78,6 +78,42 @@ describe("TenderClassifier", () => {
     );
   });
 
+  it.each(["LED 전광판 설치", "LED 디스플레이 구매"])(
+    "excludes %s before direct and potential rules run",
+    (title) => {
+      expect(
+        classifier.classify({
+          title,
+          itemName: "",
+          description: "전기시설 개선",
+          attachmentNames: [],
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it("normalizes repeated whitespace in searchable text and attachment names", () => {
+    expect(
+      classifier.classify({
+        title: "에너지  절감 사업",
+        itemName: "",
+        description: "지하  주차장\n개선 공사",
+        attachmentNames: ["2026   LED\t등기구.pdf"],
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        relevance: TenderRelevance.DIRECT,
+        score: 280,
+        reasons: expect.arrayContaining([
+          { field: "title", keyword: "에너지 절감", score: 40 },
+          { field: "description", keyword: "주차장 개선", score: 40 },
+          { field: "attachmentNames", keyword: "LED", score: 100 },
+          { field: "attachmentNames", keyword: "등기구", score: 100 },
+        ]),
+      }),
+    );
+  });
+
   it("matches case-insensitively across every searchable field without duplicate evidence", () => {
     expect(
       classifier.classify({

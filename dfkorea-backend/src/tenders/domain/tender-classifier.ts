@@ -64,9 +64,20 @@ const POTENTIAL_RULES: readonly ClassificationRule[] = [
 
 const CLASSIFICATION_RULES = [...DIRECT_RULES, ...POTENTIAL_RULES];
 
+// These are deliberately full product phrases rather than broad terms such as
+// "전광판". A generic exclusion could hide a genuine lighting tender that also
+// mentions a signboard, while these phrases identify LED display products.
+const EXCLUSION_PHRASES = ["LED 전광판", "LED 디스플레이"];
+
 export class TenderClassifier {
   classify(tender: TenderClassificationInput): TenderClassification | null {
-    const reasons = this.collectReasons(tender);
+    const searchableFields = this.getSearchableFields(tender);
+
+    if (this.hasExcludedPhrase(searchableFields)) {
+      return null;
+    }
+
+    const reasons = this.collectReasons(searchableFields);
 
     if (reasons.length === 0) {
       return null;
@@ -83,15 +94,8 @@ export class TenderClassifier {
   }
 
   private collectReasons(
-    tender: TenderClassificationInput,
+    searchableFields: readonly [TenderClassificationField, string][],
   ): TenderClassificationReason[] {
-    const searchableFields: readonly [TenderClassificationField, string][] = [
-      ["title", tender.title],
-      ["itemName", tender.itemName],
-      ["description", tender.description],
-      ["attachmentNames", tender.attachmentNames.join(" ")],
-    ];
-
     return searchableFields.flatMap(([field, value]) =>
       CLASSIFICATION_RULES.filter((rule) =>
         this.includes(value, rule.keyword),
@@ -99,7 +103,32 @@ export class TenderClassifier {
     );
   }
 
+  private getSearchableFields(
+    tender: TenderClassificationInput,
+  ): readonly [TenderClassificationField, string][] {
+    return [
+      ["title", tender.title],
+      ["itemName", tender.itemName],
+      ["description", tender.description],
+      ["attachmentNames", tender.attachmentNames.join(" ")],
+    ];
+  }
+
+  private hasExcludedPhrase(
+    searchableFields: readonly [TenderClassificationField, string][],
+  ): boolean {
+    return searchableFields.some(([, value]) =>
+      EXCLUSION_PHRASES.some((phrase) => this.includes(value, phrase)),
+    );
+  }
+
   private includes(value: string, keyword: string): boolean {
-    return value.toLowerCase().includes(keyword.toLowerCase());
+    return this.normalizeWhitespace(value)
+      .toLowerCase()
+      .includes(this.normalizeWhitespace(keyword).toLowerCase());
+  }
+
+  private normalizeWhitespace(value: string): string {
+    return value.replace(/\s+/g, " ").trim();
   }
 }
