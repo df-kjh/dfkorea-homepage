@@ -48,14 +48,16 @@ describe("TenderSubscriptionService", () => {
     service = new TenderSubscriptionService(dataSource as never);
   });
 
-  it("normalizes, deduplicates, and replaces recipients in one transaction", async () => {
+  it("retains matching recipient rows when only the shared delivery time changes", async () => {
     const insertBuilder = createInsertBuilder();
     subscriptionRepository.createQueryBuilder.mockReturnValue(insertBuilder);
     subscriptionRepository.findOne.mockResolvedValue({
       id: SUBSCRIPTION_ID,
       enabled: false,
       deliveryTime: "09:00",
-      recipients: [{ email: "old@dfkorea.co.kr" }],
+      recipients: [
+        { id: "recipient-history-id", email: "sales@dfkorea.co.kr" },
+      ],
     });
     subscriptionRepository.save.mockResolvedValue(undefined);
     recipientRepository.delete.mockResolvedValue(undefined);
@@ -65,7 +67,7 @@ describe("TenderSubscriptionService", () => {
       service.update({
         enabled: true,
         deliveryTime: "09:00",
-        recipients: [" Sales@DFKorea.co.kr ", "sales@dfkorea.co.kr"],
+        recipients: [" Sales@DFKorea.co.kr "],
       }),
     ).resolves.toEqual({
       enabled: true,
@@ -81,14 +83,32 @@ describe("TenderSubscriptionService", () => {
         deliveryTime: "09:00",
       }),
     );
-    expect(recipientRepository.delete).toHaveBeenCalledWith({
-      subscriptionId: SUBSCRIPTION_ID,
+    expect(recipientRepository.delete).not.toHaveBeenCalled();
+    expect(recipientRepository.save).not.toHaveBeenCalled();
+  });
+
+  it("adds and removes only changed addresses so retained recipient history survives", async () => {
+    const insertBuilder = createInsertBuilder();
+    subscriptionRepository.createQueryBuilder.mockReturnValue(insertBuilder);
+    subscriptionRepository.findOne.mockResolvedValue({
+      id: SUBSCRIPTION_ID,
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: [
+        { id: "retained-id", email: "sales@dfkorea.co.kr" },
+        { id: "removed-id", email: "old@dfkorea.co.kr" },
+      ],
     });
+
+    await service.update({
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: ["sales@dfkorea.co.kr", "new@dfkorea.co.kr"],
+    });
+
+    expect(recipientRepository.delete).toHaveBeenCalledWith(["removed-id"]);
     expect(recipientRepository.save).toHaveBeenCalledWith([
-      expect.objectContaining({
-        subscriptionId: SUBSCRIPTION_ID,
-        email: "sales@dfkorea.co.kr",
-      }),
+      { subscriptionId: SUBSCRIPTION_ID, email: "new@dfkorea.co.kr" },
     ]);
   });
 

@@ -48,14 +48,28 @@ export class TenderSubscriptionService {
         enabled: updateDto.enabled,
         deliveryTime: updateDto.deliveryTime,
       });
-      await recipientRepository.delete({ subscriptionId: subscription.id });
-      if (recipients.length > 0) {
-        await recipientRepository.save(
-          recipients.map((email) => ({
-            subscriptionId: subscription.id,
-            email,
-          })),
-        );
+      const existingByEmail = new Map(
+        (subscription.recipients ?? []).map((recipient) => [
+          recipient.email.trim().toLowerCase(),
+          recipient,
+        ]),
+      );
+      const desiredEmails = new Set(recipients);
+      const removedIds = [...existingByEmail.entries()]
+        .filter(([email]) => !desiredEmails.has(email))
+        .map(([, recipient]) => recipient.id);
+      const newRecipients = recipients
+        .filter((email) => !existingByEmail.has(email))
+        .map((email) => ({ subscriptionId: subscription.id, email }));
+
+      // Retaining unchanged rows is essential: mail items reference recipient
+      // IDs, and deleting/recreating them would erase send history on a mere
+      // delivery-time change.
+      if (removedIds.length > 0) {
+        await recipientRepository.delete(removedIds);
+      }
+      if (newRecipients.length > 0) {
+        await recipientRepository.save(newRecipients);
       }
 
       return {

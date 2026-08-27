@@ -1,4 +1,8 @@
-import { ProcurementType, TenderRelevance, TenderSource } from "../domain/tender.enums";
+import {
+  ProcurementType,
+  TenderRelevance,
+  TenderSource,
+} from "../domain/tender.enums";
 import { Tender } from "../entities/tender.entity";
 import { TenderMailRenderer } from "./tender-mail-renderer";
 
@@ -31,16 +35,21 @@ const tender = (overrides: Partial<Tender> = {}): Tender =>
 
 describe("TenderMailRenderer", () => {
   it("separates direct and potential notices while escaping external HTML", () => {
-    const rendered = new TenderMailRenderer().render(new Date("2026-08-27T01:00:00.000Z"), [
-      tender(),
-      tender({
-        id: "00000000-0000-4000-8000-000000000002",
-        relevance: TenderRelevance.POTENTIAL,
-        title: "시설개선",
-      }),
-    ]);
+    const rendered = new TenderMailRenderer().render(
+      new Date("2026-08-27T01:00:00.000Z"),
+      [
+        tender(),
+        tender({
+          id: "00000000-0000-4000-8000-000000000002",
+          relevance: TenderRelevance.POTENTIAL,
+          title: "시설개선",
+        }),
+      ],
+    );
 
-    expect(rendered.subject).toBe("[DF KOREA 입찰정보] 2026-08-27 신규 공고 2건");
+    expect(rendered.subject).toBe(
+      "[DF KOREA 입찰정보] 2026-08-27 신규 공고 2건",
+    );
     expect(rendered.html).toContain("💡 직접 관련 (1건)");
     expect(rendered.html).toContain("⚡ 잠재 관련 (1건)");
     expect(rendered.html).toContain("&lt;LED&gt; 교체 &amp; 공사");
@@ -48,5 +57,16 @@ describe("TenderMailRenderer", () => {
     expect(rendered.html).toContain("https://example.com/?q=%3Cunsafe%3E");
     expect(rendered.text).toContain("💡 직접 관련 (1건)");
     expect(rendered.text).toContain("⚡ 잠재 관련 (1건)");
+  });
+
+  it("omits non-HTTP official links rather than emitting an executable URL", () => {
+    const rendered = new TenderMailRenderer().render(
+      new Date("2026-08-27T01:00:00.000Z"),
+      [tender({ sourceUrl: "javascript:alert(1)" })],
+    );
+
+    expect(rendered.html).not.toContain("javascript:");
+    expect(rendered.html).not.toContain("공식 원문 보기");
+    expect(rendered.text).not.toContain("javascript:");
   });
 });
