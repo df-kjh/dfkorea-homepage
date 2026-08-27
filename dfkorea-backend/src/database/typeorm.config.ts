@@ -1,11 +1,24 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
+import { extname } from 'path';
 
 // .env 파일 로드 (로컬 개발용)
 config();
 
-// Railway 환경에서는 process.env에서 직접 읽기
-const isProduction = process.env.NODE_ENV === 'production';
+export const getTypeOrmPaths = (runtimeExtension: '.ts' | '.js') => {
+  const root = runtimeExtension === '.ts' ? 'src' : 'dist';
+
+  return {
+    entities: [
+      `${root}/entities/*.entity${runtimeExtension}`,
+      `${root}/tenders/entities/*.entity${runtimeExtension}`,
+    ],
+    migrations: [`${root}/migrations/*${runtimeExtension}`],
+  };
+};
+
+const runtimeExtension = extname(__filename) === '.js' ? '.js' : '.ts';
+const typeOrmPaths = getTypeOrmPaths(runtimeExtension);
 
 export default new DataSource({
   type: 'postgres',
@@ -14,8 +27,8 @@ export default new DataSource({
   username: process.env.DB_USERNAME || process.env.PGUSER || 'postgres',
   password: process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
   database: process.env.DB_NAME || process.env.PGDATABASE || 'dfkorea',
-  entities: ['src/entities/*.entity.ts'],
-  migrations: ['src/migrations/*.ts'],
+  entities: typeOrmPaths.entities,
+  migrations: typeOrmPaths.migrations,
   synchronize: false,
   logging: true,
 });
