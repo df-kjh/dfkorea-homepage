@@ -1,4 +1,4 @@
-import { DataSource } from "typeorm";
+import { DataSource, DataSourceOptions } from "typeorm";
 import { config } from "dotenv";
 import { extname } from "path";
 import { resolveDatabaseConnectionOptions } from "../config/production-environment";
@@ -21,15 +21,25 @@ export const getTypeOrmPaths = (runtimeExtension: ".ts" | ".js") => {
   };
 };
 
-const runtimeExtension = extname(__filename) === ".js" ? ".js" : ".ts";
-const typeOrmPaths = getTypeOrmPaths(runtimeExtension);
-const databaseConnectionOptions = resolveDatabaseConnectionOptions(process.env);
+export const createTypeOrmDataSourceOptions = (
+  environment: NodeJS.ProcessEnv,
+  runtimeExtension: ".ts" | ".js",
+): DataSourceOptions => {
+  const typeOrmPaths = getTypeOrmPaths(runtimeExtension);
+  return {
+    type: "postgres",
+    ...resolveDatabaseConnectionOptions(environment),
+    entities: typeOrmPaths.entities,
+    migrations: typeOrmPaths.migrations,
+    synchronize: false,
+    // Production query/parameter logging stays off for migrations, rollback,
+    // admin provisioning and application startup. It is not env-toggleable.
+    logging: environment.NODE_ENV !== "production",
+  };
+};
 
-export default new DataSource({
-  type: "postgres",
-  ...databaseConnectionOptions,
-  entities: typeOrmPaths.entities,
-  migrations: typeOrmPaths.migrations,
-  synchronize: false,
-  logging: true,
-});
+const runtimeExtension = extname(__filename) === ".js" ? ".js" : ".ts";
+
+export default new DataSource(
+  createTypeOrmDataSourceOptions(process.env, runtimeExtension),
+);

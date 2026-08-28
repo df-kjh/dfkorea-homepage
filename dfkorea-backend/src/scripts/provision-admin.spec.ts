@@ -1,5 +1,6 @@
 import * as bcrypt from "bcrypt";
 import {
+  assertProvisioningQueryLoggingDisabled,
   getAdminProvisioningErrorMessage,
   provisionFirstAdmin,
   validateAdminProvisioningInput,
@@ -62,6 +63,54 @@ describe("production admin provisioning", () => {
     await expect(
       bcrypt.compare(validEnvironment.ADMIN_PASSWORD!, stored.password),
     ).resolves.toBe(true);
+  });
+
+  it("requires logging:false on the datasource used by production provisioning", () => {
+    expect(() =>
+      assertProvisioningQueryLoggingDisabled({
+        options: { logging: false },
+      } as never),
+    ).not.toThrow();
+    expect(() =>
+      assertProvisioningQueryLoggingDisabled({
+        options: { logging: true },
+      } as never),
+    ).toThrow("Production database query logging must be disabled");
+  });
+
+  it("does not write the admin password or bcrypt hash to stdout or stderr", async () => {
+    const repository = {
+      count: jest.fn().mockResolvedValue(0),
+      create: jest.fn((value) => value),
+      save: jest.fn(async (value) => value),
+    };
+    const dataSource = {
+      transaction: jest.fn(async (_level, callback) =>
+        callback({
+          query: jest.fn(),
+          getRepository: jest.fn(() => repository),
+        }),
+      ),
+    };
+    const stdout = jest.spyOn(process.stdout, "write").mockImplementation();
+    const stderr = jest.spyOn(process.stderr, "write").mockImplementation();
+    const consoleError = jest.spyOn(console, "error").mockImplementation();
+
+    try {
+      await provisionFirstAdmin(dataSource as never, validEnvironment);
+      const hash = repository.save.mock.calls[0][0].password;
+      const captured = JSON.stringify([
+        stdout.mock.calls,
+        stderr.mock.calls,
+        consoleError.mock.calls,
+      ]);
+      expect(captured).not.toContain(validEnvironment.ADMIN_PASSWORD);
+      expect(captured).not.toContain(hash);
+    } finally {
+      stdout.mockRestore();
+      stderr.mockRestore();
+      consoleError.mockRestore();
+    }
   });
 
   it("refuses to create another admin after the serialized count check", async () => {

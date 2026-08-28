@@ -347,6 +347,16 @@ describe("Tender collection and delivery service contracts", () => {
         }
         return saved;
       }),
+      findOne: jest.fn(
+        async (options: {
+          where: { dailyDispatchId: string; recipientId: string };
+        }) =>
+          [...deliveries.values()].find(
+            (delivery) =>
+              delivery.dailyDispatchId === options.where.dailyDispatchId &&
+              delivery.recipientId === options.where.recipientId,
+          ) ?? null,
+      ),
       find: jest.fn(
         async (options: { where: { status: MailDeliveryStatus } }) =>
           options.where.status === MailDeliveryStatus.PENDING

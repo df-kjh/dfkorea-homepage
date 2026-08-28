@@ -92,6 +92,49 @@ describe("TenderClassifier", () => {
     },
   );
 
+  it.each(["LED전광판 설치", "led\t 전광판 설치", "LeD\n디스플레이 구매"])(
+    "excludes compact or whitespace-varied display phrase %s",
+    (title) => {
+      expect(
+        classifier.classify({
+          title,
+          itemName: "",
+          description: "",
+          attachmentNames: [],
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it("does not treat a bare LED in another field as independent lighting evidence", () => {
+    expect(
+      classifier.classify({
+        title: "LED전광판 설치",
+        itemName: "LED",
+        description: "전기시설 개선",
+        attachmentNames: ["LED_사양서.pdf"],
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps a specific lighting term independent from a compact display phrase", () => {
+    expect(
+      classifier.classify({
+        title: "LED전광판 설치",
+        itemName: "",
+        description: "가로등 교체 포함",
+        attachmentNames: [],
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        relevance: TenderRelevance.DIRECT,
+        reasons: expect.arrayContaining([
+          { field: "description", keyword: "가로등", score: 100 },
+        ]),
+      }),
+    );
+  });
+
   it.each([
     {
       title: "LED 전광판 및 가로등 교체",

@@ -36,6 +36,16 @@ describe("tender entity metadata", () => {
     expect(index?.columns).toEqual(["status", "claimedAt"]);
   });
 
+  it("keeps one durable recipient outcome per daily dispatch", () => {
+    const unique = getMetadataArgsStorage().uniques.find(
+      (item) =>
+        item.target === TenderMailDelivery &&
+        item.name === "UQ_tender_mail_delivery_dispatch_recipient",
+    );
+
+    expect(unique?.columns).toEqual(["dailyDispatchId", "recipientId"]);
+  });
+
   it("keeps one daily dispatch identity per KST business date", () => {
     const unique = getMetadataArgsStorage().uniques.find(
       (item) =>

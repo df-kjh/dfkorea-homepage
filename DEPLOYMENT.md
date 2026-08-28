@@ -401,9 +401,10 @@ API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣�
 
 - 공고 수집은 `Asia/Seoul` 기준 매일 `00:00`, `12:00`에만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
 - 일일 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches.businessDate` 고유키를 먼저 claim한다. 설정 변경과 여러 replica가 있어도 KST 영업일별 한 번만 실행된다.
-- 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. `responseCode` 4xx/5xx의 명시적 거절, 또는 `command=CONN|AUTH|MAIL FROM|RCPT TO` 단계의 입증 가능한 연결·인증·envelope 실패만 confirmed failure다. `DATA` 중 timeout/reset, command 없는 `ETIMEDOUT`/`ECONNRESET`, 알 수 없는 오류는 즉시 terminal `DELIVERY_UNCERTAIN`으로 delivery/item을 함께 종결하며 재시도하지 않는다. Nodemailer 원본 오류는 메모리 내 typed classifier에만 전달하고 server response나 recipient 상세는 DB 오류 문자열에 저장하지 않는다.
-- 일일 dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST business date를 reclaim하여 durable delivery/no-work 상태가 없는 recipient만 처리한다. fresh lease와 `COMPLETED`는 건너뛴다.
+- 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. confirmed failure는 `responseCode` 4xx/5xx의 명시적 SMTP 거절(`535`의 `AUTH PLAIN`/`AUTH LOGIN`, `550`의 `RCPT TO` 포함) 또는 non-empty recipient `rejected`뿐이다. negative SMTP 응답이 없는 `ETIMEDOUT`, `ECONNECTION`, `ECONNRESET`, `ESOCKET` 등은 Nodemailer의 `command=CONN`이어도 pre-DATA를 입증하지 못하므로 즉시 terminal `DELIVERY_UNCERTAIN`으로 delivery/item을 함께 종결하며 재시도하지 않는다. 보수적 분류는 중복 방지를 우선해 드문 누락 가능성을 감수한다. 원본 오류는 메모리 내 typed classifier에만 전달하고 server response나 recipient 상세는 DB 오류 문자열에 저장하지 않는다.
+- 일일 dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST business date를 reclaim한다. `(dailyDispatchId, recipientId)` 고유 제약과 조회가 기존 `SENT`, `RETRY_SCHEDULED`, `PENDING`, `DELIVERY_UNCERTAIN`, `CANCELLED`, `FAILED`, `SKIPPED` outcome을 모두 재사용하므로 durable outcome이 전혀 없는 recipient만 처리한다. fresh lease와 `COMPLETED`는 건너뛴다.
 - 수집, 일일 메일, 재시도는 각각 PostgreSQL advisory lock을 같은 연결 세션에서 획득하므로 Railway/PM2 replica가 여러 개여도 한 인스턴스만 작업한다.
+- production TypeORM query/parameter logging은 app, migration, revert, 최초 관리자 provisioning 경로 모두 코드에서 `false`로 고정한다. 운영 환경 변수로 이를 켤 수 없으며 비밀번호·bcrypt hash·SMTP 응답을 stdout/stderr에 기록하지 않는다.
 - `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
 
 관리자에는 수집 현황 버튼이 없다. 실패는 `tender_sync_runs`에 출처별로 남고 다음 정규 수집이 겹치는 시간 범위를 회수한다.

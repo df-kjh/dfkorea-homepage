@@ -57,14 +57,17 @@ describe("TenderMailService", () => {
 
   beforeEach(() => {
     subscriptionRepository = {
-      findOne: jest
-        .fn()
-        .mockResolvedValue({ enabled: true, deliveryTime: "09:00", recipients: [{ ...RECIPIENT, isActive: true }] }),
+      findOne: jest.fn().mockResolvedValue({
+        enabled: true,
+        deliveryTime: "09:00",
+        recipients: [{ ...RECIPIENT, isActive: true }],
+      }),
     };
     recipientRepository = { findOne: jest.fn().mockResolvedValue(RECIPIENT) };
     tenderRepository = { find: jest.fn().mockResolvedValue([TENDER]) };
     deliveryRepository = {
       save: jest.fn(async (value) => ({ id: "delivery-1", ...value })),
+      findOne: jest.fn().mockResolvedValue(null),
       find: jest.fn(),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
@@ -81,7 +84,8 @@ describe("TenderMailService", () => {
       execute: jest.fn().mockResolvedValue({ raw: [{ id: "dispatch-1" }] }),
     };
     Object.values(dispatchBuilder).forEach((method) => {
-      if (method !== dispatchBuilder.execute) method.mockReturnValue(dispatchBuilder);
+      if (method !== dispatchBuilder.execute)
+        method.mockReturnValue(dispatchBuilder);
     });
     dailyDispatchRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(dispatchBuilder),
@@ -153,7 +157,110 @@ describe("TenderMailService", () => {
         attemptCount: 1,
       }),
     );
+    expect(deliveryRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dailyDispatchId: "dispatch-1",
+        recipientId: RECIPIENT.id,
+      }),
+    );
     expect(dataSource.transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    MailDeliveryStatus.SENT,
+    MailDeliveryStatus.RETRY_SCHEDULED,
+    MailDeliveryStatus.PENDING,
+    MailDeliveryStatus.DELIVERY_UNCERTAIN,
+    MailDeliveryStatus.CANCELLED,
+    MailDeliveryStatus.FAILED,
+    MailDeliveryStatus.SKIPPED,
+  ])(
+    "does not duplicate a recipient with durable %s state when a stale dispatch resumes",
+    async (status) => {
+      deliveryRepository.findOne.mockResolvedValue({
+        id: "existing-delivery",
+        dailyDispatchId: "dispatch-1",
+        recipientId: RECIPIENT.id,
+        status,
+      });
+
+      await service.sendDailyDigest(NOW);
+
+      expect(transport.sendMail).not.toHaveBeenCalled();
+      expect(deliveryRepository.save).not.toHaveBeenCalled();
+      expect(dailyDispatchRepository.update).toHaveBeenCalledWith(
+        "dispatch-1",
+        expect.objectContaining({ status: DailyDispatchStatus.COMPLETED }),
+      );
+    },
+  );
+
+  it("resumes only the recipient missing a durable dispatch outcome", async () => {
+    const durableRecipient = {
+      id: "recipient-durable",
+      email: "durable@dfkorea.co.kr",
+      isActive: true,
+    } as TenderRecipient;
+    const missingRecipient = {
+      id: "recipient-missing",
+      email: "missing@dfkorea.co.kr",
+      isActive: true,
+    } as TenderRecipient;
+    subscriptionRepository.findOne.mockResolvedValue({
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients: [durableRecipient, missingRecipient],
+    });
+    deliveryRepository.findOne.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where.recipientId === durableRecipient.id
+          ? { id: "durable-delivery", status: MailDeliveryStatus.SENT }
+          : null,
+      ),
+    );
+
+    await service.sendDailyDigest(NOW);
+
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
+    expect(transport.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: missingRecipient.email }),
+    );
+    expect(deliveryRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dailyDispatchId: "dispatch-1",
+        recipientId: missingRecipient.id,
+      }),
+    );
+  });
+
+  it("fetches and keeps the concurrent durable delivery after a unique conflict", async () => {
+    dataSource.transaction
+      .mockImplementationOnce((callback) =>
+        callback({
+          getRepository: jest.fn(() => dailyDispatchRepository),
+        }),
+      )
+      .mockRejectedValueOnce({ code: "23505" });
+    deliveryRepository.findOne.mockResolvedValue({
+      id: "winner-delivery",
+      dailyDispatchId: "dispatch-1",
+      recipientId: RECIPIENT.id,
+      status: MailDeliveryStatus.PENDING,
+    });
+
+    await expect(service.sendDailyDigest(NOW)).resolves.toBeUndefined();
+
+    expect(deliveryRepository.findOne).toHaveBeenCalledWith({
+      where: {
+        dailyDispatchId: "dispatch-1",
+        recipientId: RECIPIENT.id,
+      },
+    });
+    expect(transport.sendMail).not.toHaveBeenCalled();
+    expect(dailyDispatchRepository.update).toHaveBeenCalledWith(
+      "dispatch-1",
+      expect.objectContaining({ status: DailyDispatchStatus.COMPLETED }),
+    );
   });
 
   it("lets only one of two replicas claim the same KST business date", async () => {
@@ -192,8 +299,16 @@ describe("TenderMailService", () => {
 
   it("waits for the newly shared time, then claims the KST date once even if the time changes again", async () => {
     subscriptionRepository.findOne
-      .mockResolvedValueOnce({ enabled: true, deliveryTime: "11:00", recipients: [{ ...RECIPIENT, isActive: true }] })
-      .mockResolvedValue({ enabled: true, deliveryTime: "09:00", recipients: [{ ...RECIPIENT, isActive: true }] });
+      .mockResolvedValueOnce({
+        enabled: true,
+        deliveryTime: "11:00",
+        recipients: [{ ...RECIPIENT, isActive: true }],
+      })
+      .mockResolvedValue({
+        enabled: true,
+        deliveryTime: "09:00",
+        recipients: [{ ...RECIPIENT, isActive: true }],
+      });
 
     await service.sendDailyDigest(NOW);
     expect(transport.sendMail).not.toHaveBeenCalled();
@@ -201,9 +316,13 @@ describe("TenderMailService", () => {
     await service.sendDailyDigest(NOW);
     expect(transport.sendMail).toHaveBeenCalledTimes(1);
     expect(dataSource.transaction).toHaveBeenCalled();
-    expect(dailyDispatchRepository.createQueryBuilder().orIgnore).toHaveBeenCalled();
+    expect(
+      dailyDispatchRepository.createQueryBuilder().orIgnore,
+    ).toHaveBeenCalled();
 
-    dailyDispatchRepository.createQueryBuilder().execute.mockResolvedValueOnce({ raw: [] });
+    dailyDispatchRepository
+      .createQueryBuilder()
+      .execute.mockResolvedValueOnce({ raw: [] });
     await service.sendDailyDigest(new Date("2026-08-27T05:00:00.000Z"));
     expect(transport.sendMail).toHaveBeenCalledTimes(1);
   });
@@ -256,6 +375,8 @@ describe("TenderMailService", () => {
   });
 
   it.each([
+    { code: "ETIMEDOUT", command: "CONN" },
+    { code: "ECONNECTION", command: "CONN" },
     { code: "ETIMEDOUT", command: "DATA" },
     { code: "ECONNRESET", command: "DATA" },
     { code: "ETIMEDOUT" },
@@ -356,9 +477,11 @@ describe("TenderMailService", () => {
       claimedAt: NOW,
     } as TenderMailDelivery;
 
-    await (service as unknown as {
-      persistFailure(delivery: TenderMailDelivery, now: Date): Promise<void>;
-    }).persistFailure(staleClaim, NOW);
+    await (
+      service as unknown as {
+        persistFailure(delivery: TenderMailDelivery, now: Date): Promise<void>;
+      }
+    ).persistFailure(staleClaim, NOW);
 
     expect(deliveryRepository.update).toHaveBeenCalledWith(
       {

@@ -42,8 +42,8 @@ describe("shared production environment", () => {
       const cli = require('./src/database/typeorm.config').default.options;
       const app = require('./src/app.module').createApplicationDatabaseOptions(process.env);
       process.stdout.write(JSON.stringify({
-        cli: { host: cli.host, port: cli.port, username: cli.username, password: cli.password, database: cli.database },
-        app: { host: app.host, port: app.port, username: app.username, password: app.password, database: app.database },
+        cli: { host: cli.host, port: cli.port, username: cli.username, password: cli.password, database: cli.database, logging: cli.logging },
+        app: { host: app.host, port: app.port, username: app.username, password: app.password, database: app.database, logging: app.logging },
         jwt: process.env.JWT_SECRET,
         gemini: process.env.GEMINI_API_KEY,
         cors: process.env.CORS_ORIGIN,
@@ -74,6 +74,7 @@ describe("shared production environment", () => {
           username: "file-user",
           password: "file#password",
           database: "file-database",
+          logging: false,
         },
         app: {
           host: "file.internal",
@@ -81,6 +82,7 @@ describe("shared production environment", () => {
           username: "file-user",
           password: "file#password",
           database: "file-database",
+          logging: false,
         },
         jwt: "File-JWT-secret-with-32+Chars!2026",
         gemini: "ambient-gemini",
@@ -112,6 +114,32 @@ describe("shared production environment", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("keeps the actual ambient production datasource query logging disabled", () => {
+    const backendRoot = join(__dirname, "..", "..");
+    const probe = `
+      const { prepareProductionEnvironment } = require('./src/config/production-environment');
+      prepareProductionEnvironment('ambient', process.cwd(), process.env);
+      const options = require('./src/database/typeorm.config').default.options;
+      process.stdout.write(JSON.stringify({ logging: options.logging, host: options.host }));
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ["-r", "ts-node/register", "-e", probe],
+      {
+        cwd: backendRoot,
+        encoding: "utf8",
+        env: { ...process.env, ...completeAmbientEnvironment },
+      },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout)).toEqual({
+      logging: false,
+      host: "ambient.internal",
+    });
   });
 
   it("fails before connection when the exact file or a file DB value is absent", () => {

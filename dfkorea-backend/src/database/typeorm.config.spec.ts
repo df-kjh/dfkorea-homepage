@@ -1,4 +1,5 @@
 import {
+  createTypeOrmDataSourceOptions,
   getTypeOrmPaths,
 } from "./typeorm.config";
 import { resolveDatabaseConnectionOptions } from "../config/production-environment";
@@ -34,6 +35,26 @@ describe("TypeORM migration discovery paths", () => {
 });
 
 describe("TypeORM production database configuration", () => {
+  it.each(["file", "ambient"])(
+    "disables query logging for the %s production path",
+    () => {
+      expect(
+        createTypeOrmDataSourceOptions(
+          {
+            NODE_ENV: "production",
+            DB_HOST: "production-db.internal",
+            DB_PORT: "5432",
+            DB_USERNAME: "application",
+            DB_PASSWORD: "do-not-log-this",
+            DB_NAME: "dfkorea_production",
+            JWT_SECRET: "Production-JWT-secret-with-32+Chars!2026",
+          },
+          ".js",
+        ).logging,
+      ).toBe(false);
+    },
+  );
+
   it("uses only the explicit DB_* variables in production", () => {
     expect(
       resolveDatabaseConnectionOptions({

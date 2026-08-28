@@ -48,6 +48,14 @@ export const getAdminProvisioningErrorMessage = (error: unknown): string => {
   return "Admin provisioning failed; inspect secure database diagnostics";
 };
 
+export const assertProvisioningQueryLoggingDisabled = (
+  targetDataSource: Pick<DataSource, "options">,
+): void => {
+  if (targetDataSource.options.logging !== false) {
+    throw new Error("Production database query logging must be disabled");
+  }
+};
+
 export const provisionFirstAdmin = async (
   targetDataSource: Pick<DataSource, "transaction">,
   environment: NodeJS.ProcessEnv,
@@ -62,13 +70,16 @@ export const provisionFirstAdmin = async (
       throw new Error("Production admin already exists; provisioning refused");
     }
     const password = await bcrypt.hash(input.password, 12);
-    await repository.save(repository.create({ username: input.username, password }));
+    await repository.save(
+      repository.create({ username: input.username, password }),
+    );
   });
 };
 
 const run = async (): Promise<void> => {
   validateProductionEnvironment(process.env);
   validateAdminProvisioningInput(process.env);
+  assertProvisioningQueryLoggingDisabled(dataSource);
   let initializedHere = false;
   try {
     if (!dataSource.isInitialized) {

@@ -77,7 +77,11 @@ export class TenderMailService {
       if (!dispatchId) return;
       const results = await Promise.allSettled(
         (subscription.recipients ?? []).map(async (recipient) => {
-          const claim = await this.claimInitialDelivery(recipient, now);
+          const claim = await this.claimInitialDelivery(
+            dispatchId,
+            recipient,
+            now,
+          );
           if (!claim) return;
           try {
             await this.deliver(claim.delivery, claim.tenders, now);
@@ -88,7 +92,8 @@ export class TenderMailService {
         }),
       );
       const rejected = results.find(
-        (result): result is PromiseRejectedResult => result.status === "rejected",
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
       );
       if (rejected) {
         try {
@@ -225,81 +230,113 @@ export class TenderMailService {
   }
 
   private async claimInitialDelivery(
+    dailyDispatchId: string,
     recipient: TenderRecipient,
     now: Date,
   ): Promise<DeliveryClaim | null> {
-    return this.dataSource.transaction(async (manager) => {
-      const tenderRepository = manager.getRepository(Tender);
-      const deliveryRepository = manager.getRepository(TenderMailDelivery);
-      const mailItemRepository = manager.getRepository(TenderMailItem);
-      const existing = await mailItemRepository.find({
-        where: { recipientId: recipient.id },
-        relations: { tender: true, lastDelivery: true },
-      });
-      const knownTenderIds = new Set(existing.map((item) => item.tenderId));
-      const tenders = await tenderRepository.find({
-        where: {
-          relevance: In([TenderRelevance.DIRECT, TenderRelevance.POTENTIAL]),
-        },
-      });
-      const missing = tenders
-        .filter((tender) => !knownTenderIds.has(tender.id))
-        .map((tender) => ({
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const tenderRepository = manager.getRepository(Tender);
+        const deliveryRepository = manager.getRepository(TenderMailDelivery);
+        const mailItemRepository = manager.getRepository(TenderMailItem);
+        const durableOutcome = await deliveryRepository.findOne({
+          where: { dailyDispatchId, recipientId: recipient.id },
+        });
+        if (durableOutcome) return null;
+        const existing = await mailItemRepository.find({
+          where: { recipientId: recipient.id },
+          relations: { tender: true, lastDelivery: true },
+        });
+        const knownTenderIds = new Set(existing.map((item) => item.tenderId));
+        const tenders = await tenderRepository.find({
+          where: {
+            relevance: In([TenderRelevance.DIRECT, TenderRelevance.POTENTIAL]),
+          },
+        });
+        const missing = tenders
+          .filter((tender) => !knownTenderIds.has(tender.id))
+          .map((tender) => ({
+            recipientId: recipient.id,
+            tenderId: tender.id,
+            tender,
+            status: MailItemStatus.PENDING,
+            lastDeliveryId: null,
+            sentAt: null,
+            uncertainAt: null,
+          }));
+        const inserted =
+          missing.length > 0 ? await mailItemRepository.save(missing) : [];
+        const eligible = [
+          ...existing,
+          ...(inserted as TenderMailItem[]),
+        ].filter(
+          (item) =>
+            item.status === MailItemStatus.PENDING &&
+            (!item.lastDelivery ||
+              item.lastDelivery.status === MailDeliveryStatus.FAILED ||
+              item.lastDelivery.status === MailDeliveryStatus.CANCELLED),
+        );
+        const targetDate = this.toKstDate(now);
+        if (eligible.length === 0) {
+          await deliveryRepository.save({
+            dailyDispatchId,
+            recipientId: recipient.id,
+            recipientEmail: recipient.email,
+            targetDate,
+            attemptCount: 0,
+            status: MailDeliveryStatus.SKIPPED,
+            nextRetryAt: null,
+            claimedAt: null,
+            smtpMessageId: null,
+            sentAt: null,
+            failedAt: null,
+            uncertainAt: null,
+            errorMessage: null,
+          });
+          return null;
+        }
+        // The delivery and every linked item commit together before SMTP starts.
+        // If the SMTP outcome cannot later be proven, the expired lease becomes
+        // terminal DELIVERY_UNCERTAIN rather than risking a duplicate resend.
+        const delivery = await deliveryRepository.save({
+          dailyDispatchId,
           recipientId: recipient.id,
-          tenderId: tender.id,
-          tender,
-          status: MailItemStatus.PENDING,
-          lastDeliveryId: null,
-          sentAt: null,
-          uncertainAt: null,
-        }));
-      const inserted =
-        missing.length > 0 ? await mailItemRepository.save(missing) : [];
-      const eligible = [...existing, ...(inserted as TenderMailItem[])].filter(
-        (item) =>
-          item.status === MailItemStatus.PENDING &&
-          (!item.lastDelivery ||
-            item.lastDelivery.status === MailDeliveryStatus.FAILED ||
-            item.lastDelivery.status === MailDeliveryStatus.CANCELLED),
-      );
-      const targetDate = this.toKstDate(now);
-      if (eligible.length === 0) {
-        await deliveryRepository.save({
           recipientEmail: recipient.email,
           targetDate,
-          attemptCount: 0,
-          status: MailDeliveryStatus.SKIPPED,
+          attemptCount: 1,
+          status: MailDeliveryStatus.PENDING,
           nextRetryAt: null,
-          claimedAt: null,
+          claimedAt: now,
           smtpMessageId: null,
           sentAt: null,
           failedAt: null,
           uncertainAt: null,
           errorMessage: null,
         });
-        return null;
-      }
-      // The delivery and every linked item commit together before SMTP starts.
-      // If the SMTP outcome cannot later be proven, the expired lease becomes
-      // terminal DELIVERY_UNCERTAIN rather than risking a duplicate resend.
-      const delivery = await deliveryRepository.save({
-        recipientEmail: recipient.email,
-        targetDate,
-        attemptCount: 1,
-        status: MailDeliveryStatus.PENDING,
-        nextRetryAt: null,
-        claimedAt: now,
-        smtpMessageId: null,
-        sentAt: null,
-        failedAt: null,
-        uncertainAt: null,
-        errorMessage: null,
+        await mailItemRepository.save(
+          eligible.map((item) => ({ ...item, lastDeliveryId: delivery.id })),
+        );
+        return { delivery, tenders: eligible.map((item) => item.tender) };
       });
-      await mailItemRepository.save(
-        eligible.map((item) => ({ ...item, lastDeliveryId: delivery.id })),
-      );
-      return { delivery, tenders: eligible.map((item) => item.tender) };
-    });
+    } catch (error: unknown) {
+      if (!this.isUniqueViolation(error)) throw error;
+      const existing = await this.deliveryRepository.findOne({
+        where: { dailyDispatchId, recipientId: recipient.id },
+      });
+      if (existing) return null;
+      throw error;
+    }
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (typeof error !== "object" || error === null) return false;
+    const candidate = error as {
+      code?: unknown;
+      driverError?: { code?: unknown };
+    };
+    return (
+      candidate.code === "23505" || candidate.driverError?.code === "23505"
+    );
   }
 
   private async sendRetry(

@@ -1,6 +1,7 @@
 import { InitialSchema1706200000000 } from "./1706200000000-InitialSchema";
 import { RemoveInsecureDefaultAdmin1787819900000 } from "./1787819900000-RemoveInsecureDefaultAdmin";
 import { AddDailyDispatchLease1787820000000 } from "./1787820000000-AddDailyDispatchLease";
+import { LinkDailyDispatchDeliveries1787820100000 } from "./1787820100000-LinkDailyDispatchDeliveries";
 
 describe("security hardening migrations", () => {
   it("creates a fresh admins table without known credentials", async () => {
@@ -33,6 +34,20 @@ describe("security hardening migrations", () => {
       'ALTER TABLE "tender_daily_dispatches" ADD "lastError" text',
       'DROP INDEX "IDX_tender_daily_dispatch_status"',
       'CREATE INDEX "IDX_tender_daily_dispatch_status_lease" ON "tender_daily_dispatches" ("status", "leaseExpiresAt")',
+    ]);
+  });
+
+  it("links each new dispatch to at most one durable delivery per recipient", async () => {
+    const query = jest.fn().mockResolvedValue([]);
+
+    await new LinkDailyDispatchDeliveries1787820100000().up({ query } as never);
+
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'ALTER TABLE "tender_mail_deliveries" ADD "dailyDispatchId" uuid',
+      'ALTER TABLE "tender_mail_deliveries" ADD "recipientId" uuid',
+      'ALTER TABLE "tender_mail_deliveries" ADD CONSTRAINT "UQ_tender_mail_delivery_dispatch_recipient" UNIQUE ("dailyDispatchId", "recipientId")',
+      'ALTER TABLE "tender_mail_deliveries" ADD CONSTRAINT "FK_tender_mail_delivery_daily_dispatch" FOREIGN KEY ("dailyDispatchId") REFERENCES "tender_daily_dispatches"("id") ON DELETE SET NULL ON UPDATE NO ACTION',
+      'ALTER TABLE "tender_mail_deliveries" ADD CONSTRAINT "FK_tender_mail_delivery_recipient" FOREIGN KEY ("recipientId") REFERENCES "tender_recipients"("id") ON DELETE SET NULL ON UPDATE NO ACTION',
     ]);
   });
 

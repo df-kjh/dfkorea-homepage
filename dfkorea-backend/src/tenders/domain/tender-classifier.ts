@@ -68,7 +68,7 @@ const CLASSIFICATION_RULES = [...DIRECT_RULES, ...POTENTIAL_RULES];
 // These are deliberately full product phrases rather than broad terms such as
 // "전광판". A generic exclusion could hide a genuine lighting tender that also
 // mentions a signboard, while these phrases identify LED display products.
-const EXCLUSION_PHRASES = ["LED 전광판", "LED 디스플레이"];
+const DISPLAY_PHRASE_PATTERNS = [/led\s*전광판/gi, /led\s*디스플레이/gi];
 
 @Injectable()
 export class TenderClassifier {
@@ -80,7 +80,7 @@ export class TenderClassifier {
       hasExcludedPhrase
         ? searchableFields.map(([field, value]) => [
             field,
-            this.removeExcludedPhrases(value),
+            this.removeDisplayEvidence(value),
           ])
         : searchableFields,
     );
@@ -128,25 +128,22 @@ export class TenderClassifier {
     searchableFields: readonly [TenderClassificationField, string][],
   ): boolean {
     return searchableFields.some(([, value]) =>
-      EXCLUSION_PHRASES.some((phrase) => this.includes(value, phrase)),
+      DISPLAY_PHRASE_PATTERNS.some((pattern) => {
+        pattern.lastIndex = 0;
+        return pattern.test(value);
+      }),
     );
   }
 
-  private removeExcludedPhrases(value: string): string {
-    return EXCLUSION_PHRASES.reduce(
-      (result, phrase) =>
-        result.replace(
-          new RegExp(
-            this.normalizeWhitespace(phrase)
-              .split(" ")
-              .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-              .join("\\s+"),
-            "gi",
-          ),
-          " ",
-        ),
+  private removeDisplayEvidence(value: string): string {
+    const withoutPhrases = DISPLAY_PHRASE_PATTERNS.reduce(
+      (result, pattern) => result.replace(pattern, " "),
       value,
     );
+    // Once a notice contains an LED display phrase, a bare LED in any field is
+    // not independent lighting evidence. Specific words such as 가로등/조명
+    // remain searchable and can still classify a genuinely mixed notice.
+    return withoutPhrases.replace(/led/gi, " ");
   }
 
   private includes(value: string, keyword: string): boolean {

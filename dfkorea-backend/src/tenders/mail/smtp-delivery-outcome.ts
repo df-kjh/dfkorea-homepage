@@ -4,9 +4,8 @@ export enum SmtpDeliveryOutcome {
 }
 
 interface NodemailerTransportError {
-  code?: unknown;
-  command?: unknown;
   responseCode?: unknown;
+  rejected?: unknown;
 }
 
 const isTransportError = (error: unknown): error is NodemailerTransportError =>
@@ -20,25 +19,18 @@ export const classifySmtpTransportError = (
   const responseCode =
     typeof error.responseCode === "number" ? error.responseCode : undefined;
   if (responseCode && responseCode >= 400 && responseCode <= 599) {
-    // An explicit SMTP negative response proves the server did not accept DATA.
+    // A 4xx/5xx SMTP response proves that this attempt was rejected. The
+    // command may be "AUTH PLAIN"/"AUTH LOGIN" rather than exactly "AUTH".
     return SmtpDeliveryOutcome.CONFIRMED_FAILURE;
   }
 
-  const command =
-    typeof error.command === "string" ? error.command.toUpperCase() : "";
-  const code = typeof error.code === "string" ? error.code.toUpperCase() : "";
-  const preDataCommand = ["CONN", "AUTH", "MAIL FROM", "RCPT TO"].includes(
-    command,
-  );
-  const preDataFailure = [
-    "EAUTH",
-    "ECONNECTION",
-    "ETIMEDOUT",
-    "ECONNRESET",
-    "EENVELOPE",
-  ].includes(code);
+  if (Array.isArray(error.rejected) && error.rejected.length > 0) {
+    return SmtpDeliveryOutcome.CONFIRMED_FAILURE;
+  }
 
-  return preDataCommand && preDataFailure
-    ? SmtpDeliveryOutcome.CONFIRMED_FAILURE
-    : SmtpDeliveryOutcome.DELIVERY_UNCERTAIN;
+  // Nodemailer does not expose a phase-proof acceptance boundary for socket
+  // errors. In particular, command=CONN is still observed for connection
+  // timeouts after transport setup, so code/command alone must never trigger a
+  // resend. This deliberately prefers a rare missed mail over a duplicate.
+  return SmtpDeliveryOutcome.DELIVERY_UNCERTAIN;
 };
