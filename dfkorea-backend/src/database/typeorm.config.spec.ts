@@ -43,6 +43,7 @@ describe("TypeORM production database configuration", () => {
         DB_USERNAME: "application",
         DB_PASSWORD: "secret-value",
         DB_NAME: "dfkorea_production",
+        JWT_SECRET: "Production-JWT-secret-with-32+Chars!2026",
         PGHOST: "must-not-win",
       }),
     ).toEqual({

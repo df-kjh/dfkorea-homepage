@@ -1,0 +1,28 @@
+import {
+  classifySmtpTransportError,
+  SmtpDeliveryOutcome,
+} from "./smtp-delivery-outcome";
+
+describe("SMTP transport outcome classifier", () => {
+  it.each([
+    { code: "ECONNECTION", command: "CONN" },
+    { code: "EAUTH", command: "AUTH" },
+    { code: "EENVELOPE", command: "RCPT TO" },
+    { responseCode: 550, command: "DATA" },
+  ])("retries only a confirmed pre-acceptance failure %#", (error) => {
+    expect(classifySmtpTransportError(error)).toBe(
+      SmtpDeliveryOutcome.CONFIRMED_FAILURE,
+    );
+  });
+
+  it.each([
+    { code: "ETIMEDOUT", command: "DATA" },
+    { code: "ECONNRESET", command: "DATA" },
+    { code: "ETIMEDOUT" },
+    new Error("unknown transport failure"),
+  ])("conservatively marks ambiguous acceptance %#", (error) => {
+    expect(classifySmtpTransportError(error)).toBe(
+      SmtpDeliveryOutcome.DELIVERY_UNCERTAIN,
+    );
+  });
+});

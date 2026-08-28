@@ -92,6 +92,46 @@ describe("TenderClassifier", () => {
     },
   );
 
+  it.each([
+    {
+      title: "LED 전광판 및 가로등 교체",
+      description: "",
+      attachmentNames: [],
+      keyword: "가로등",
+    },
+    {
+      title: "LED 디스플레이 구매",
+      description: "실내 조명 개선 포함",
+      attachmentNames: [],
+      keyword: "조명",
+    },
+    {
+      title: "LED 전광판 설치",
+      description: "",
+      attachmentNames: ["보안등_설치도면.pdf"],
+      keyword: "보안등",
+    },
+  ])(
+    "keeps independent lighting evidence '$keyword' in mixed display notices",
+    ({ title, description, attachmentNames, keyword }) => {
+      expect(
+        classifier.classify({
+          title,
+          itemName: "",
+          description,
+          attachmentNames,
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          relevance: TenderRelevance.DIRECT,
+          reasons: expect.arrayContaining([
+            expect.objectContaining({ keyword, score: 100 }),
+          ]),
+        }),
+      );
+    },
+  );
+
   it("normalizes repeated whitespace in searchable text and attachment names", () => {
     expect(
       classifier.classify({

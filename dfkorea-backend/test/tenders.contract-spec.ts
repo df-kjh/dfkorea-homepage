@@ -417,7 +417,11 @@ describe("Tender collection and delivery service contracts", () => {
           ([call]) => call.to === failedRecipient.email,
         ).length;
         if (message.to === failedRecipient.email && failedAttempts === 1) {
-          throw new Error("simulated SMTP failure");
+          throw {
+            code: "EENVELOPE",
+            command: "RCPT TO",
+            responseCode: 550,
+          };
         }
         return { messageId: `smtp-${message.to}` };
       }),

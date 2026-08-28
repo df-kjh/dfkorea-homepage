@@ -16,7 +16,7 @@ describe("shared production environment", () => {
     DB_USERNAME: "ambient-user",
     DB_PASSWORD: "ambient-password",
     DB_NAME: "ambient-database",
-    JWT_SECRET: "ambient-jwt",
+    JWT_SECRET: "Ambient-JWT-secret-with-32+Chars!2026",
     GEMINI_API_KEY: "ambient-gemini",
   };
 
@@ -32,6 +32,7 @@ describe("shared production environment", () => {
         "DB_USERNAME=file-user",
         'DB_PASSWORD="file#password"',
         "DB_NAME=file-database",
+        "JWT_SECRET=File-JWT-secret-with-32+Chars!2026",
         "CORS_ORIGIN=https://file.example.com",
       ].join("\n"),
     );
@@ -81,7 +82,7 @@ describe("shared production environment", () => {
           password: "file#password",
           database: "file-database",
         },
-        jwt: "ambient-jwt",
+        jwt: "File-JWT-secret-with-32+Chars!2026",
         gemini: "ambient-gemini",
         cors: "https://file.example.com",
       });
@@ -131,6 +132,7 @@ describe("shared production environment", () => {
           "DB_PORT=5432",
           "DB_USERNAME=file-user",
           "DB_PASSWORD=file-password",
+          "JWT_SECRET=File-JWT-secret-with-32+Chars!2026",
         ].join("\n"),
       );
       expect(() =>
@@ -169,5 +171,27 @@ describe("shared production environment", () => {
     expect(getProductionEnvPath("/srv/dfkorea-backend")).toBe(
       "/srv/dfkorea-backend/.env.production",
     );
+  });
+
+  it.each([
+    [undefined, "missing"],
+    ["   ", "blank"],
+    ["your-secret-key-change-this", "placeholder"],
+    ["short-secret", "short"],
+    ["abcdefghijklmnopqrstuvwxyz123456", "low-complexity"],
+  ])("rejects a %s production JWT secret without exposing it", (secret) => {
+    const environment = {
+      ...completeAmbientEnvironment,
+      JWT_SECRET: secret,
+    };
+
+    expect(() => validateProductionEnvironment(environment)).toThrow(
+      /JWT_SECRET/,
+    );
+    try {
+      validateProductionEnvironment(environment);
+    } catch (error) {
+      if (secret) expect(String(error)).not.toContain(secret);
+    }
   });
 });

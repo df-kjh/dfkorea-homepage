@@ -7,6 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "admin:provision:prod": "node dist/scripts/run-production-process.js ambient admin:provision",
+    "admin:provision:prod:env": "node dist/scripts/run-production-process.js file admin:provision",
     "clean:dist": "node test/clean-dist.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

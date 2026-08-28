@@ -11,6 +11,35 @@ const requiredProductionDatabaseVariables = [
   "DB_NAME",
 ] as const;
 
+const DEVELOPMENT_JWT_SECRET =
+  "dfkorea-dev-test-only-JWT-secret-never-use-in-production!";
+const REJECTED_JWT_SECRETS = new Set(["your-secret-key-change-this"]);
+
+export const JWT_SECRET_RULE =
+  "JWT_SECRET must be at least 32 characters and contain at least three of lowercase, uppercase, number, and symbol";
+
+const hasStrongJwtSecret = (value: string): boolean => {
+  const characterClasses = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(
+    (pattern) => pattern.test(value),
+  ).length;
+  return (
+    value.length >= 32 &&
+    characterClasses >= 3 &&
+    !REJECTED_JWT_SECRETS.has(value)
+  );
+};
+
+export const resolveJwtSecret = (environment: NodeJS.ProcessEnv): string => {
+  const secret = environment.JWT_SECRET?.trim();
+  if (environment.NODE_ENV === "production") {
+    if (!secret || !hasStrongJwtSecret(secret)) {
+      throw new Error(`Production JWT_SECRET is invalid. ${JWT_SECRET_RULE}`);
+    }
+    return secret;
+  }
+  return secret || DEVELOPMENT_JWT_SECRET;
+};
+
 export const getProductionEnvPath = (workingDirectory: string): string =>
   join(workingDirectory, ".env.production");
 
@@ -27,6 +56,7 @@ export const validateProductionEnvironment = (
   if (missing.length > 0) {
     throw new Error(`Production environment is incomplete: ${missing.join(", ")}`);
   }
+  resolveJwtSecret(environment);
 };
 
 export const prepareProductionEnvironment = (

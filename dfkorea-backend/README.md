@@ -35,7 +35,7 @@ $ npm install
 ## Compile and run the project
 
 운영 환경 변수, 백업, 검증 및 롤백은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 단일 기준으로 사용합니다. 운영 서버는 PostgreSQL compiled migration이 성공한 뒤에만 시작합니다.
-수동 운영 서버에서는 하나의 production runner의 `file` mode인 `migration:run:prod:env`, `migration:revert:prod:env`, `start:prod:env` script를 사용합니다. 세 script는 모두 `.env.production`의 값을 ambient 값보다 우선하며, DB identity는 반드시 파일 자체에 있어야 합니다. Railway/container용 `migration:run:prod`, `migration:revert:prod`, `start:prod`는 파일을 읽지 않는 `ambient` mode입니다. 두 mode 모두 `NODE_ENV=production`과 모든 `DB_*`가 필수이며, 누락 시 datasource가 기본 DB로 fallback하지 않습니다.
+수동 운영 서버에서는 production runner의 `file` mode인 `migration:run:prod:env`, `migration:revert:prod:env`, `admin:provision:prod:env`, `start:prod:env`를 사용합니다. Railway/container의 suffix 없는 script는 파일을 읽지 않는 `ambient` mode입니다. 두 mode 모두 `NODE_ENV=production`, 모든 `DB_*`, 32자 이상·3개 문자군 이상의 `JWT_SECRET`이 필수입니다. fresh DB는 migration 뒤 임시 `ADMIN_USERNAME`/강한 `ADMIN_PASSWORD`로 one-off provisioning을 실행하고 입력을 제거해야 하며, production은 관리자 0명일 때 자동 생성 없이 시작을 거부합니다. 전체 운영·회전 절차는 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 따릅니다.
 
 backend의 기본 CI 진입점은 `npm run test:ci`입니다. lint, unit, contract, typecheck를 실행한 뒤 기존 `dist`를 지우고 새로 build하여 compiled file/ambient wrapper의 Nest bootstrap DB identity와 TypeORM entity/migration discovery를 실제 DB/network 없이 검증합니다. 운영 rollback artifact 의미와 순서는 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)를 따릅니다.
 

@@ -21,7 +21,7 @@ type SpawnProcess = (
 
 type InjectableProductionRunner = (
   mode: "file" | "ambient",
-  action: "start" | "migration:run" | "migration:revert",
+  action: "start" | "admin:provision" | "migration:run" | "migration:revert",
   workingDirectory: string,
   dependencies: {
     environment: NodeJS.ProcessEnv;
@@ -41,6 +41,7 @@ const completeAmbientEnvironment = (): NodeJS.ProcessEnv => ({
   DB_USERNAME: "ambient-user",
   DB_PASSWORD: "ambient-password",
   DB_NAME: "ambient-database",
+  JWT_SECRET: "Ambient-JWT-secret-with-32+Chars!2026",
 });
 
 const createChild = (): ChildProcess => {
@@ -57,6 +58,8 @@ describe("production process runner", () => {
     ["ambient", "migration:run"],
     ["file", "migration:revert"],
     ["ambient", "migration:revert"],
+    ["ambient", "admin:provision"],
+    ["file", "admin:provision"],
   ] as const)("accepts explicit %s mode for %s", (mode, action) => {
     expect(parseProductionProcessArguments([mode, action])).toEqual({
       mode,
@@ -102,6 +105,16 @@ describe("production process runner", () => {
     });
   });
 
+  it("runs admin provisioning only through the compiled out-of-band CLI", () => {
+    expect(
+      getProductionProcessCommand("admin:provision", "/srv/backend"),
+    ).toEqual({
+      kind: "child",
+      executable: process.execPath,
+      arguments: ["/srv/backend/dist/scripts/provision-admin.js"],
+    });
+  });
+
   it("rejects implicit modes and unknown actions", () => {
     expect(() => parseProductionProcessArguments(["start"])).toThrow(
       "Production process requires an explicit file or ambient mode",
@@ -122,11 +135,12 @@ describe("production process runner", () => {
         "DB_USERNAME=file-user",
         "DB_PASSWORD=file-password",
         "DB_NAME=file-database",
+        "JWT_SECRET=File-JWT-secret-with-32+Chars!2026",
       ].join("\n"),
     );
     const environment: NodeJS.ProcessEnv = {
       ...completeAmbientEnvironment(),
-      JWT_SECRET: "ambient-jwt-preserved",
+      JWT_SECRET: "Ambient-JWT-secret-with-32+Chars!2026",
     };
     const loadModule = jest.fn();
     const spawnProcess = jest.fn<ReturnType<SpawnProcess>, Parameters<SpawnProcess>>();
@@ -146,7 +160,7 @@ describe("production process runner", () => {
         DB_USERNAME: "file-user",
         DB_PASSWORD: "file-password",
         DB_NAME: "file-database",
-        JWT_SECRET: "ambient-jwt-preserved",
+        JWT_SECRET: "File-JWT-secret-with-32+Chars!2026",
       });
       expect(loadModule).toHaveBeenCalledWith(join(directory, "dist", "main.js"));
       expect(spawnProcess).not.toHaveBeenCalled();

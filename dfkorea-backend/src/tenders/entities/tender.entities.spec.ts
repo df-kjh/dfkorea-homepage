@@ -46,6 +46,16 @@ describe("tender entity metadata", () => {
     expect(unique?.columns).toEqual(["businessDate"]);
   });
 
+  it("indexes the daily dispatch lease for stale-claim recovery", () => {
+    const index = getMetadataArgsStorage().indices.find(
+      (item) =>
+        item.target === TenderDailyDispatch &&
+        item.name === "IDX_tender_daily_dispatch_status_lease",
+    );
+
+    expect(index?.columns).toEqual(["status", "leaseExpiresAt"]);
+  });
+
   it("indexes active recipients within the shared subscription", () => {
     const index = getMetadataArgsStorage().indices.find(
       (item) =>

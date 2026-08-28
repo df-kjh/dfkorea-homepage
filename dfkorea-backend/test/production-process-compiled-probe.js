@@ -58,6 +58,7 @@ const completeAmbient = {
   DB_USERNAME: "ambient-user",
   DB_PASSWORD: "ambient-password",
   DB_NAME: "ambient-database",
+  JWT_SECRET: "Ambient-JWT-secret-with-32+Chars!2026",
 };
 const fileEnvironment = [
   "NODE_ENV=production",
@@ -66,7 +67,38 @@ const fileEnvironment = [
   "DB_USERNAME=file-user",
   "DB_PASSWORD=file-password",
   "DB_NAME=file-database",
+  "JWT_SECRET=File-JWT-secret-with-32+Chars!2026",
 ].join("\n");
+
+const runRejectedStart = (name, environment, expectedError, secret) => {
+  const result = spawnSync(
+    process.execPath,
+    [compiledRunner, "ambient", "start"],
+    {
+      cwd: createSandbox(name, fileEnvironment),
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, ...environment },
+    },
+  );
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, expectedError);
+  if (secret) assert.doesNotMatch(result.stderr, new RegExp(secret));
+};
+
+const runRejectedFileStart = (name, envFile, expectedError, secret) => {
+  const result = spawnSync(
+    process.execPath,
+    [compiledRunner, "file", "start"],
+    {
+      cwd: createSandbox(name, envFile),
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, ...completeAmbient },
+    },
+  );
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, expectedError);
+  if (secret) assert.doesNotMatch(result.stderr, new RegExp(secret));
+};
 
 const runSuccessfulStart = (mode, sandbox, expected) => {
   const outputPath = join(sandbox, `${mode}-output.json`);
@@ -149,6 +181,75 @@ try {
   assert.strictEqual(conflictingNonProduction.username, "db-user");
   assert.strictEqual(conflictingNonProduction.password, "db-password");
   assert.strictEqual(conflictingNonProduction.database, "db-database");
+
+  const { createJwtModuleOptions, createJwtStrategyOptions } = require(
+    join(backendRoot, "dist", "auth", "jwt-configuration.js"),
+  );
+  const { JwtService } = require("@nestjs/jwt");
+  const jwtEnvironment = {
+    NODE_ENV: "production",
+    JWT_SECRET: completeAmbient.JWT_SECRET,
+  };
+  const token = new JwtService(createJwtModuleOptions(jwtEnvironment)).sign({
+    username: "compiled-probe-admin",
+  });
+  assert.strictEqual(
+    new JwtService({
+      secret: createJwtStrategyOptions(jwtEnvironment).secretOrKey,
+    }).verify(token).username,
+    "compiled-probe-admin",
+  );
+
+  const fullDatabaseEnvironment = { ...completeAmbient };
+  delete fullDatabaseEnvironment.JWT_SECRET;
+  runRejectedStart(
+    "missing-jwt",
+    fullDatabaseEnvironment,
+    /Production JWT_SECRET is invalid/,
+  );
+  runRejectedStart(
+    "placeholder-jwt",
+    { ...completeAmbient, JWT_SECRET: "your-secret-key-change-this" },
+    /Production JWT_SECRET is invalid/,
+    "your-secret-key-change-this",
+  );
+  runRejectedFileStart(
+    "missing-file-jwt",
+    fileEnvironment
+      .split("\n")
+      .filter((line) => !line.startsWith("JWT_SECRET="))
+      .join("\n"),
+    /Production JWT_SECRET is invalid/,
+  );
+  runRejectedFileStart(
+    "placeholder-file-jwt",
+    fileEnvironment.replace(
+      /JWT_SECRET=.*/,
+      "JWT_SECRET=your-secret-key-change-this",
+    ),
+    /Production JWT_SECRET is invalid/,
+    "your-secret-key-change-this",
+  );
+
+  const missingAdminInput = spawnSync(
+    process.execPath,
+    [compiledRunner, "ambient", "admin:provision"],
+    {
+      cwd: createSandbox("missing-admin-input", fileEnvironment),
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        ...completeAmbient,
+        DB_PASSWORD: "admin-probe-db-secret-must-not-print",
+      },
+    },
+  );
+  assert.strictEqual(missingAdminInput.status, 1);
+  assert.match(missingAdminInput.stderr, /ADMIN_USERNAME/);
+  assert.doesNotMatch(
+    missingAdminInput.stderr,
+    /admin-probe-db-secret-must-not-print/,
+  );
 
   const missingFile = spawnSync(
     process.execPath,

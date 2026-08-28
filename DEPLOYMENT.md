@@ -38,7 +38,8 @@ VITE_APP_TITLE=LED 조명 - 미래를 밝히는 빛
 ```env
 NODE_ENV=production
 PORT=3000
-JWT_SECRET=your-super-secret-jwt-key-change-this
+# secret store only: >=32 chars and 3+ of lower/upper/number/symbol
+JWT_SECRET=
 JWT_EXPIRES_IN=7d
 CORS_ORIGIN=https://yourdomain.com
 MAX_FILE_SIZE=10485760
@@ -52,6 +53,8 @@ TYPEORM_SYNCHRONIZE=false
 ```
 
 ### 2. Docker Compose로 빌드 및 실행
+
+기존 관리자가 있는 일반 배포는 아래 명령을 사용한다. fresh DB 또는 insecure default-admin cleanup으로 관리자가 0명이 된 배포는 backend ingress/replica를 열기 전에 이미지를 build하고 migration을 실행한 뒤, compose secret store에 임시 `ADMIN_USERNAME`/`ADMIN_PASSWORD`를 주입하여 `npm run admin:provision:prod` one-off container를 정확히 한 번 실행한다. 성공 뒤 두 입력을 제거하고 아래 일반 시작을 수행한다. backend는 관리자 0명 상태에서 자동 계정을 만들지 않고 시작에 실패한다.
 
 ```bash
 # 프로젝트 루트 디렉토리에서
@@ -203,7 +206,7 @@ sudo cp -r dist/* /var/www/led-lighting/
 | --------------------- | ------------------- | ------------------------- |
 | `NODE_ENV`            | 환경 모드           | `production`              |
 | `PORT`                | 서버 포트           | `3000`                    |
-| `JWT_SECRET`          | JWT 비밀키          | `your-secret-key`         |
+| `JWT_SECRET`          | JWT 서명키          | secret store에서 32자 이상 무작위 값 주입 |
 | `JWT_EXPIRES_IN`      | JWT 만료 시간       | `7d`                      |
 | `CORS_ORIGIN`         | CORS 허용 도메인    | `https://yourdomain.com`  |
 | `MAX_FILE_SIZE`       | 최대 업로드 크기    | `10485760` (10MB)         |
@@ -254,7 +257,7 @@ sudo tail -f /var/log/nginx/access.log
 
 ### 4. 보안 체크리스트
 
-- [ ] JWT_SECRET을 강력한 값으로 변경
+- [ ] JWT_SECRET이 32자 이상이고 소문자·대문자·숫자·기호 중 3종 이상이며 placeholder가 아닌지 확인
 - [ ] CORS_ORIGIN을 실제 도메인으로 설정
 - [ ] HTTPS 인증서 설치 (Let's Encrypt 권장)
 - [ ] 방화벽 설정 확인
@@ -334,16 +337,21 @@ sudo kill -9 <PID>
 
 ### PostgreSQL 마이그레이션과 배포 순서
 
-입찰 기능은 PostgreSQL과 TypeORM migration을 사용한다. `TYPEORM_SYNCHRONIZE=false`를 유지하고, 배포 전 DB 백업을 만든다. 아래 단계 중 하나라도 실패하면 이후 단계를 실행하지 않는다. 수동 서버의 `:env` 명령은 하나의 production runner를 `file` mode로 실행한다. 이 mode는 backend 디렉터리의 `.env.production`을 격리해서 읽고, 파일에 적힌 모든 값으로 같은 이름의 ambient 값을 덮어쓴다. 파일에 없는 PATH 같은 process 값과 JWT/Gemini 등의 별도 주입값은 유지하지만, 다섯 DB 값은 반드시 파일 자체에 있어야 한다. migration, revert, app start가 모두 이 동일한 precedence를 사용한다. 파일 또는 `NODE_ENV=production`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` 중 하나라도 없으면 DB에 접속하기 전에 실패하고 값은 오류에 출력하지 않는다.
+입찰 기능은 PostgreSQL과 TypeORM migration을 사용한다. `TYPEORM_SYNCHRONIZE=false`를 유지하고, 배포 전 DB 백업을 만든다. 아래 단계 중 하나라도 실패하면 이후 단계를 실행하지 않는다. 수동 서버의 `:env` 명령은 하나의 production runner를 `file` mode로 실행한다. 이 mode는 backend 디렉터리의 `.env.production`을 격리해서 읽고, 파일에 적힌 모든 값으로 같은 이름의 ambient 값을 덮어쓴다. 파일에 없는 PATH 같은 process 값은 유지하지만, 다섯 DB 값과 `JWT_SECRET`은 반드시 파일 자체에 있어야 한다. migration, revert, admin provisioning, app start가 모두 이 동일한 precedence를 사용한다. 파일 또는 `NODE_ENV=production`, 다섯 `DB_*`, 강한 `JWT_SECRET` 중 하나라도 유효하지 않으면 DB 접속이나 Nest listen 전에 실패하고 값은 오류에 출력하지 않는다.
 
 ```bash
 cd dfkorea-backend
 npm ci
 npm run build
+npm run migration:run:prod:env
+# 최초 배포 또는 insecure default-admin cleanup 뒤 admin이 0명일 때만:
+# secret store/.env.production에 ADMIN_USERNAME과 ADMIN_PASSWORD를 임시 주입
+npm run admin:provision:prod:env
+# provisioning 입력을 즉시 제거한 뒤 정상 실행
 npm run migration:run:prod:env && npm run start:prod:env
 ```
 
-Railway처럼 환경 변수를 플랫폼이 직접 주입하는 경로의 `migration:run:prod`, `migration:revert:prod`, `start:prod`는 같은 runner의 명시적 `ambient` mode다. 이 mode는 어떤 env 파일도 읽지 않는다. 플랫폼은 `NODE_ENV=production`과 다섯 `DB_*`를 모두 주입해야 하며, 누락 값을 localhost나 기본 DB로 대체하지 않고 실패한다. pre-deploy 명령은 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로, Start 명령은 `cd dfkorea-backend && npm run migration:run:prod && npm run start:prod`로 설정한다. `&&`를 사용하므로 schema 적용 실패가 숨겨진 채 새 서버가 시작되지 않는다.
+Railway처럼 환경 변수를 플랫폼이 직접 주입하는 경로의 `migration:run:prod`, `migration:revert:prod`, `admin:provision:prod`, `start:prod`는 같은 runner의 명시적 `ambient` mode다. 이 mode는 어떤 env 파일도 읽지 않는다. 플랫폼은 `NODE_ENV=production`, 다섯 `DB_*`, 규칙을 만족하는 `JWT_SECRET`을 모두 주입해야 한다. pre-deploy 명령은 `cd dfkorea-backend && npm ci && npm run build && npm run migration:run:prod`로 둔다. 최초 관리자만 별도 one-off job에서 임시 `ADMIN_USERNAME`/`ADMIN_PASSWORD`와 `npm run admin:provision:prod`로 만든 뒤 두 입력을 삭제한다. Start 명령은 `cd dfkorea-backend && npm run migration:run:prod && npm run start:prod`다. 관리자가 0명이면 start는 자동 계정을 만들지 않고 nonsecret 안내 오류로 중단한다.
 
 Dockerfile과 `railway.json`도 `npm run migration:run:prod && npm run start:prod`를 사용한다. migration 실패를 `|| true` 등으로 무시하지 않는다.
 
@@ -357,6 +365,20 @@ npm run test:ci
 `test:ci`는 lint, unit, contract, TypeScript 검사를 통과한 뒤 backend의 정확한 `dist` 디렉터리를 지우고 새로 build한다. 따라서 오래된 산출물로 compiled 검사가 통과할 수 없다. 이어서 실제 compiled runner를 `file`/`ambient` start mode로 spawn하여 `dist/main.js`에 진입하고 TypeORM entity/migration discovery도 검사한다. 별도 preload hook이 main module load 직전에만 `NODE_ENV=test`로 전환해 test-only sanitized config probe에서 종료하므로 DB/network 연결을 만들지 않는다. 이 test-only probe는 `NODE_ENV=production`에서는 비활성화되며 password를 기록하지 않는다. 또한 missing file/변수의 사전 종료와 dev/test에서 PG alias를 무시하는 기존 Nest DB 옵션을 검증한다.
 
 백엔드의 `PUBLIC_SITE_URL`, `PUBLIC_API_URL`, `CORS_ORIGIN`에는 실제 HTTPS URL을 넣고, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`에는 PostgreSQL 접속 값을 넣는다. 상세 변수는 `dfkorea-backend/.env.example`을 기준으로 한다.
+
+### JWT 키 생성과 회전
+
+- production `JWT_SECRET`은 trim 후 최소 32자이며 소문자·대문자·숫자·기호 중 최소 3종을 포함해야 한다. `your-secret-key-change-this`, 빈 값, 짧거나 단일 패턴인 값은 file/ambient mode 모두 거부한다.
+- 암호학적으로 안전한 생성기로 만든 값을 secret store에만 보관하고 로그, shell history, 저장소에 쓰지 않는다. signing과 verification은 동일한 shared validator 결과만 사용한다.
+- 회전 시 change window를 선언하고 새 키를 모든 replica의 동일 secret revision에 설정한 뒤 replica를 순차 재시작한다. 기존 token은 즉시 무효화되므로 관리자 재로그인과 보호 API를 확인하고 이전 키를 폐기·감사한다.
+- 과거 fallback 또는 알려진 placeholder로 운영한 적이 있다면 해당 키로 만든 모든 token을 침해된 것으로 보고 즉시 회전하며 access log와 관리자 변경 이력을 감사한다.
+
+### 최초 관리자와 기존 기본 자격 증명 정리
+
+- fresh migration은 관리자를 만들지 않는다. `1787819900000-RemoveInsecureDefaultAdmin`은 username이 정확히 `admin`이고 저장 hash가 `admin123`과 일치하는 행만 id+username+password 조건으로 삭제한다. 다른 관리자와 이미 회전된 `admin`은 삭제하지 않는다.
+- 관리자가 0명인 production은 자동 생성하지 않고 시작을 거부한다. 승인된 운영자가 migration 후 별도 one-off compiled `admin:provision:prod` 또는 `admin:provision:prod:env`를 한 번만 실행한다.
+- `ADMIN_USERNAME`은 3–64자의 영문·숫자·점·밑줄·하이픈, `ADMIN_PASSWORD`는 16자 이상이며 소문자·대문자·숫자·기호를 모두 포함해야 한다. CLI는 serializable transaction과 transaction advisory lock 아래 기존 관리자 0명을 다시 확인하고 bcrypt cost 12 hash만 저장한다. 값/hash는 출력하지 않는다.
+- 기존 `admin/admin123` 사용 이력이 있으면 migration 여부와 무관하게 관련 자격 증명을 폐기하고 관리자·로그인 이력을 감사한다. provisioning 입력은 성공 직후 secret store와 `.env.production`에서 제거한다.
 
 ### 공식 데이터 키
 
@@ -379,7 +401,8 @@ API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣�
 
 - 공고 수집은 `Asia/Seoul` 기준 매일 `00:00`, `12:00`에만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
 - 일일 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches.businessDate` 고유키를 먼저 claim한다. 설정 변경과 여러 replica가 있어도 KST 영업일별 한 번만 실행된다.
-- 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. SMTP 요청 뒤 결과를 DB에 확정하기 전에 프로세스가 종료된 stale claim은 `DELIVERY_UNCERTAIN`으로 종결하고 다시 보내지 않는다. SMTP 승인과 DB commit은 원자화할 수 없으므로, 이 정책은 드문 메일 손실 가능성을 감수해 이미 승인된 주소의 중복 발송을 우선 방지한다.
+- 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. `responseCode` 4xx/5xx의 명시적 거절, 또는 `command=CONN|AUTH|MAIL FROM|RCPT TO` 단계의 입증 가능한 연결·인증·envelope 실패만 confirmed failure다. `DATA` 중 timeout/reset, command 없는 `ETIMEDOUT`/`ECONNRESET`, 알 수 없는 오류는 즉시 terminal `DELIVERY_UNCERTAIN`으로 delivery/item을 함께 종결하며 재시도하지 않는다. Nodemailer 원본 오류는 메모리 내 typed classifier에만 전달하고 server response나 recipient 상세는 DB 오류 문자열에 저장하지 않는다.
+- 일일 dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST business date를 reclaim하여 durable delivery/no-work 상태가 없는 recipient만 처리한다. fresh lease와 `COMPLETED`는 건너뛴다.
 - 수집, 일일 메일, 재시도는 각각 PostgreSQL advisory lock을 같은 연결 세션에서 획득하므로 Railway/PM2 replica가 여러 개여도 한 인스턴스만 작업한다.
 - `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
 

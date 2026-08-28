@@ -1,5 +1,4 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 
 export class InitialSchema1706200000000 implements MigrationInterface {
   name = 'InitialSchema1706200000000';
@@ -55,12 +54,6 @@ export class InitialSchema1706200000000 implements MigrationInterface {
       )
     `);
 
-    // Insert default admin account
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-    await queryRunner.query(
-      `INSERT INTO "admins" ("username", "password") VALUES ($1, $2)`,
-      ['admin', hashedPassword],
-    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

@@ -80,7 +80,7 @@
 - 메일 재시도: 특정 주소의 1차 발송 실패 10분 뒤 해당 주소만 1회
 - 재시도 실패: 추가 자동 재시도 없이 실패 기록. 다음 날 해당 주소의 메일에 미발송 공고 재포함
 
-수집, 일일 메일, 재시도는 각각 전용 PostgreSQL advisory lock을 QueryRunner의 같은 연결 세션에서 획득·해제한다. 일일 메일은 추가로 `tender_daily_dispatches.businessDate` 고유 제약을 최종 idempotency 경계로 사용하므로 replica 중복 실행과 당일 발송 시각 변경에도 하루 한 번만 claim된다. 설정 PUT은 process-local cron을 재예약하지 않으며 다음 minute tick부터 모든 replica에 보인다. 수집 조회 시작은 출처별 마지막 정상 수집 시각의 1시간 전으로 잡고 DB 고유 키로 중복을 제거한다. 최초 수집은 실행 시각 이전 24시간을 조회한다.
+수집, 일일 메일, 재시도는 각각 전용 PostgreSQL advisory lock을 QueryRunner의 같은 연결 세션에서 획득·해제한다. 일일 메일은 추가로 `tender_daily_dispatches.businessDate` 고유 제약과 15분 `leaseExpiresAt`을 사용한다. fresh claim은 다른 replica가 건너뛰고, recipient durable state 생성 전 crash/DB 오류로 남은 `CLAIMED` 행은 lease 만료 뒤 같은 날짜로 reclaim한다. 재개 실행은 기존 terminal/retry/in-flight delivery 또는 durable `SKIPPED`가 없는 주소만 처리하고, 하나라도 durable state 전 claim이 실패하면 dispatch를 완료하지 않는다. 설정 PUT은 다음 minute tick부터 모든 replica에 보인다.
 
 ## 6. 관련도 분류
 
@@ -96,6 +96,7 @@
 
 - 규칙별 가중치를 합산하고 직접 관련 임계값을 우선 적용한다.
 - 직접 키워드와 잠재 키워드가 함께 있으면 직접 관련으로 분류한다.
+- `LED 전광판`과 `LED 디스플레이` phrase 안의 일반 `LED` 근거는 제거한다. display-only 공고는 제외하지만 같은 공고의 다른 필드나 phrase 밖 `가로등`, `조명`, `등기구`, `보안등` 등 독립 직접 근거는 `DIRECT`로 유지한다.
 - 판정에 사용된 필드, 키워드, 점수를 `relevanceReasons`에 저장한다.
 - 어떤 관련 키워드도 없는 공고는 저장하지 않고 수집 실행의 제외 건수에만 반영한다.
 - 분류 규칙은 코드와 테스트에 명시적으로 관리하며 UI에서 편집하는 기능은 초기 범위에 넣지 않는다.
@@ -156,7 +157,8 @@
 
 - KST `businessDate` 고유 제약: 여러 replica와 당일 발송 시각 변경을 통틀어 하나의 일일 실행 identity
 - claim 시 관측한 공용 `deliveryTime`
-- `CLAIMED | COMPLETED` 상태와 claim·완료·생성·수정 시각
+- `CLAIMED | COMPLETED` 상태, claim·15분 lease 만료·완료 시각, non-sensitive `lastError`
+- recipient delivery claim 전 오류는 `CLAIMED`로 남아 stale lease에서 재개되고, 모든 활성 주소에 durable state가 있을 때만 완료
 - advisory lock과 별도로 DB unique insert가 최종 중복 방지 경계
 
 DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를 새로 만들고 테이블, 관계, 고유 제약, 인덱스를 최신 상태로 기록한다.
@@ -257,7 +259,8 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 ### 10.4 실패 처리
 
 - 주소별 SMTP 결과를 기록한다.
-- 확인된 1차 SMTP 실패 주소만 10분 뒤 한 번 재시도한다.
+- Nodemailer `responseCode` 4xx/5xx 명시 거절과 `CONN`, `AUTH`, `MAIL FROM`, `RCPT TO` 단계의 입증 가능한 실패만 확인된 실패로 보고 10분 뒤 한 번 재시도한다.
+- `DATA` 중 timeout/reset, command 없는 network 오류, 알 수 없는 transport 오류는 이미 승인됐을 가능성을 배제할 수 없어 즉시 terminal `DELIVERY_UNCERTAIN`으로 처리한다. 원본 오류는 typed classifier에만 전달하고 SMTP response 상세는 저장하지 않는다.
 - SMTP 성공 응답 뒤에만 해당 주소와 공고 조합을 성공 발송으로 확정한다.
 - 재시도 실패 공고는 다음 날 해당 주소의 대상 선정에 다시 포함한다.
 - SMTP 승인과 그 뒤 DB commit은 원자화할 수 없다. in-flight claim이 stale이면 SMTP가 이미 승인했을 수 있으므로 delivery와 item을 terminal `DELIVERY_UNCERTAIN`으로 표시하고 재전송하지 않는다. 이는 이미 승인된 주소의 중복을 우선 방지하며, 극히 드문 메일 누락 가능성을 명시적으로 감수하는 절충이다.
@@ -271,6 +274,8 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - API 키, 네이버웍스 계정, 외부 앱 비밀번호는 백엔드 환경 변수에서만 읽는다.
 - 이메일 형식, 중복 주소, 최대 수신자 20개, `HH:mm` 시각을 DTO에서 검증한다.
 - 어드민 조회·설정 API는 모두 JWT 인증을 요구한다.
+- production JWT signing/verification은 같은 validator를 사용한다. 키는 32자 이상이고 소문자·대문자·숫자·기호 중 3종 이상이어야 하며 알려진 placeholder/blank를 거부한다.
+- fresh DB는 default admin을 seed하지 않는다. production 관리자 0명은 startup을 중단하며, compiled one-off CLI가 serializable transaction/advisory lock 아래 strong-password bcrypt hash로 최초 관리자만 생성한다.
 - 달력·목록 API 실패 시 기존 데이터를 성공 응답처럼 보이지 않고 오류 상태와 재시도 동작을 표시한다.
 
 ## 12. 테스트 전략
@@ -311,7 +316,7 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 
 ## 13. 운영 및 문서화
 
-- 환경 변수 예제와 배포 문서에 공공데이터 API 키, 한전 API 키, SMTP 호스트·포트·계정·외부 앱 비밀번호, 시간대를 추가한다.
+- 환경 변수 예제와 배포 문서에 JWT 생성·회전, 최초 관리자 one-off provisioning, 공공데이터 API 키, 한전 API 키, SMTP 설정과 시간대를 기록한다.
 - `database-schema.md`를 생성하고 DB 변경 때마다 갱신한다.
 - 신규 어드민 메뉴 기능 현황 문서 `docs/menus/tenders.md`를 만들고 `구현 완료`, `미구현`, `부족하거나 개선이 필요한 기능`, `관련 파일`, `갱신 규칙` 구성을 유지한다.
 - 실제 API 승인 전 또는 mock 응답만 연결된 단계는 완료로만 표시하지 않고 운영 한계를 함께 기록한다.
@@ -326,8 +331,8 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 캘린더 필터가 이메일 대상에 영향을 주지 않는다.
 - 여러 주소와 공통 발송 시각을 저장할 수 있다.
 - 모든 신규 관련 공고가 주소별로 하루 한 번만 발송된다.
-- 특정 주소 실패 시 10분 뒤 한 번만 재시도하며 다른 주소의 성공 상태는 유지된다.
+- 확인된 pre-acceptance 주소 실패만 10분 뒤 한 번 재시도하며 ambiguous SMTP 오류는 재시도하지 않고 다른 주소의 성공 상태는 유지된다.
 - 재시도 실패 공고가 다음 날 해당 주소 발송 대상에서 누락되지 않는다.
 - SMTP 결과가 불확실한 stale claim은 `DELIVERY_UNCERTAIN`으로 종결되어 중복 재전송되지 않는다.
-- 여러 replica와 설정 시각 변경에서도 KST 영업일별 일일 dispatch claim은 하나뿐이다.
+- 여러 replica와 설정 시각 변경에서도 KST 영업일별 identity는 하나이고, crash가 남긴 stale lease는 중복 recipient 발송 없이 재개된다.
 - 인증, 분류, 중복 제거, 집계, 발송 재시도 핵심 테스트가 통과한다.

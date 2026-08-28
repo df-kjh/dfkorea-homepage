@@ -14,6 +14,8 @@
 - 나라장터는 공사·물품·용역 operation에 `type=json`과 KST `YYYYMMDDHHmm` 등록 범위를 사용하며, 응답의 실제 첨부파일명도 분류 입력에 포함한다.
 - 수신 주소를 제거하면 비활성화하고, 다시 추가하면 같은 ID와 발송 이력을 복원한다. 설정 모달은 열 때마다 새 세대로 최신값을 조회하고, 늦게 도착한 이전 요청은 상태를 덮어쓰지 못한다. 최신 조회 실패 상태에서는 저장할 수 없으며 모달 안의 `다시 시도`로 새 요청을 실행한다.
 - 수집은 `Asia/Seoul` 기준 `00:00`, `12:00`에만 예약된다. 메일은 매분 공용 설정을 다시 읽고 KST 영업일 고유 claim과 PostgreSQL advisory lock으로 여러 인스턴스·시각 변경에서도 하루 한 번만 실행한다.
+- display-only `LED 전광판`/`LED 디스플레이` 안의 일반 LED 근거는 제외하지만, 같은 공고의 독립적인 `가로등`·`조명`·`등기구`·`보안등` 근거는 직접 관련으로 유지한다.
+- 일일 claim은 15분 lease를 사용한다. recipient delivery를 만들기 전 DB 오류가 나면 완료하지 않고 stale lease 회수 시 durable 상태가 없는 주소만 재처리한다.
 
 ## 미구현
 
@@ -26,7 +28,7 @@
 - 나라장터·K-apt는 공식 응답 fixture와 어댑터 계약 테스트만 통과했다. 공공데이터포털에서 승인된 실운영 키로 실제 응답을 받은 검증은 아직 하지 않았다.
 - 한전은 LINK API의 승인 계정·실제 OpenAPI 매뉴얼이 없어 기록 계약 fixture만 사용한다. `KEPCO_TENDER_ENABLED=false`가 기본이며, 실제 base URL·인증 파라미터·필드 매핑 검증 전에는 활성화하면 안 된다.
 - 네이버웍스 SMTP는 외부 앱 비밀번호가 없는 상태에서 전송기 이중(mock)과 영속 재시도 계약만 검증했다. 스테이징에서 실제 발신 권한, TLS 465 연결, 성공 주소 비중복, 실패 주소 10분 후 1회 재시도를 확인해야 한다.
-- SMTP가 수신 서버에서 메일을 승인한 직후 DB 확정 전에 프로세스가 종료되면 결과를 원자적으로 판별할 수 없다. stale claim은 `DELIVERY_UNCERTAIN`으로 종결하고 재전송하지 않아 중복을 방지한다. 따라서 극히 드문 장애에서는 해당 메일이 누락될 수 있으며, 운영에서는 uncertain 이력을 점검해야 한다.
+- 명시적 SMTP 4xx/5xx 거절과 DATA 이전 연결·인증·envelope 실패만 10분 재시도한다. DATA 중 timeout/reset 또는 단계 불명 네트워크 오류는 즉시 `DELIVERY_UNCERTAIN`으로 종결하고 재전송하지 않아 중복을 방지한다. SMTP 승인 직후 DB 확정 전 종료도 stale uncertainty로 처리하므로 극히 드문 장애에서는 메일이 누락될 수 있으며 운영에서는 uncertain 이력을 점검해야 한다.
 - 빠른 HTTP·서비스 계약 테스트와 화면 테스트는 안전한 이중(mock)을 사용한다. 별도 `test:tender:integration` 실행기는 실제 AppModule, JWT, TypeORM, migration을 검증하도록 준비했지만, 현재 disposable PostgreSQL이 없어 실행하지 못했다. 이 파괴적 러너는 로컬/명시 Docker 테스트 DB만 허용하며 원격 스테이징 DB에는 실행할 수 없다. KST SQL 집계, 다중 연결 lock/unique claim, 권한 만료, 대량 데이터, 모바일 실기기 시각 검증은 배포 전 추가 확인이 필요하다.
 
 ## 관련 파일

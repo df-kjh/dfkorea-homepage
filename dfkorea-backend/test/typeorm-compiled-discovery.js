@@ -28,6 +28,9 @@ for (const relativePath of [
   "dist/tenders/entities/tender-daily-dispatch.entity.js",
   "dist/migrations/1787819500000-CreateTenderTables.js",
   "dist/migrations/1787819800000-HardenTenderMailDelivery.js",
+  "dist/migrations/1787819900000-RemoveInsecureDefaultAdmin.js",
+  "dist/migrations/1787820000000-AddDailyDispatchLease.js",
+  "dist/scripts/provision-admin.js",
 ]) {
   assert.ok(
     existsSync(join(backendRoot, relativePath)),

@@ -75,13 +75,21 @@ export class TenderClassifier {
   classify(tender: TenderClassificationInput): TenderClassification | null {
     const searchableFields = this.getSearchableFields(tender);
 
-    if (this.hasExcludedPhrase(searchableFields)) {
-      return null;
-    }
+    const hasExcludedPhrase = this.hasExcludedPhrase(searchableFields);
+    const reasons = this.collectReasons(
+      hasExcludedPhrase
+        ? searchableFields.map(([field, value]) => [
+            field,
+            this.removeExcludedPhrases(value),
+          ])
+        : searchableFields,
+    );
 
-    const reasons = this.collectReasons(searchableFields);
-
-    if (reasons.length === 0) {
+    if (
+      reasons.length === 0 ||
+      (hasExcludedPhrase &&
+        !reasons.some((reason) => reason.score === DIRECT_SCORE))
+    ) {
       return null;
     }
 
@@ -121,6 +129,23 @@ export class TenderClassifier {
   ): boolean {
     return searchableFields.some(([, value]) =>
       EXCLUSION_PHRASES.some((phrase) => this.includes(value, phrase)),
+    );
+  }
+
+  private removeExcludedPhrases(value: string): string {
+    return EXCLUSION_PHRASES.reduce(
+      (result, phrase) =>
+        result.replace(
+          new RegExp(
+            this.normalizeWhitespace(phrase)
+              .split(" ")
+              .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+              .join("\\s+"),
+            "gi",
+          ),
+          " ",
+        ),
+      value,
     );
   }
 

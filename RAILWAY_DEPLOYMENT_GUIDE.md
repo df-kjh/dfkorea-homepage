@@ -17,7 +17,7 @@ DB_USERNAME=${{Postgres.PGUSER}}
 DB_PASSWORD=${{Postgres.PGPASSWORD}}
 DB_NAME=${{Postgres.PGDATABASE}}
 TYPEORM_SYNCHRONIZE=false
-JWT_SECRET=<secret-store-value>
+JWT_SECRET=<32-plus-random-secret-with-3-character-classes>
 JWT_EXPIRES_IN=24h
 CORS_ORIGIN=https://your-frontend.example.com
 ```

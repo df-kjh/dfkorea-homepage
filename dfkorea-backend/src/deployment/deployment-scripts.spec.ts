@@ -313,6 +313,12 @@ describe("deployment migration commands", () => {
     expect(packageJson.scripts["migration:revert:prod:env"]).toBe(
       "node dist/scripts/run-production-process.js file migration:revert",
     );
+    expect(packageJson.scripts["admin:provision:prod"]).toBe(
+      "node dist/scripts/run-production-process.js ambient admin:provision",
+    );
+    expect(packageJson.scripts["admin:provision:prod:env"]).toBe(
+      "node dist/scripts/run-production-process.js file admin:provision",
+    );
     expect(packageJson.scripts["test:production-process:compiled"]).toBe(
       "node test/production-process-compiled-probe.js",
     );

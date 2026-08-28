@@ -1,4 +1,5 @@
 import {
+  DailyDispatchStatus,
   MailDeliveryStatus,
   MailItemStatus,
   ProcurementType,
@@ -84,6 +85,7 @@ describe("TenderMailService", () => {
     });
     dailyDispatchRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(dispatchBuilder),
+      findOne: jest.fn().mockResolvedValue(null),
       update: jest.fn(),
     };
     transport = {
@@ -229,9 +231,12 @@ describe("TenderMailService", () => {
   });
 
   it("schedules exactly one durable retry ten minutes after a first SMTP failure", async () => {
-    transport.sendMail.mockRejectedValueOnce(
-      new Error("temporary SMTP failure"),
-    );
+    transport.sendMail.mockRejectedValueOnce({
+      code: "EENVELOPE",
+      command: "RCPT TO",
+      responseCode: 550,
+      message: "mailbox rejected",
+    });
 
     await service.sendDailyDigest(NOW);
 
@@ -248,6 +253,97 @@ describe("TenderMailService", () => {
       }),
     );
     expect(mailItemRepository.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { code: "ETIMEDOUT", command: "DATA" },
+    { code: "ECONNRESET", command: "DATA" },
+    { code: "ETIMEDOUT" },
+  ])(
+    "marks ambiguous SMTP error $code/$command terminal without retry",
+    async (smtpError) => {
+      transport.sendMail.mockRejectedValueOnce(smtpError);
+
+      await service.sendDailyDigest(NOW);
+
+      expect(deliveryRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "delivery-1" }),
+        expect.objectContaining({
+          status: MailDeliveryStatus.DELIVERY_UNCERTAIN,
+          nextRetryAt: null,
+          uncertainAt: NOW,
+        }),
+      );
+      expect(mailItemRepository.update).toHaveBeenCalledWith(
+        { lastDeliveryId: "delivery-1", status: MailItemStatus.PENDING },
+        { status: MailItemStatus.DELIVERY_UNCERTAIN, uncertainAt: NOW },
+      );
+    },
+  );
+
+  it("keeps a claimed dispatch resumable when recipient DB work fails before a durable delivery", async () => {
+    let transactionCall = 0;
+    dataSource.transaction.mockImplementation(async (callback) => {
+      transactionCall += 1;
+      if (transactionCall === 2) throw new Error("claim write failed");
+      return callback({
+        getRepository: jest.fn((entity) =>
+          entity === TenderDailyDispatch
+            ? dailyDispatchRepository
+            : entity === Tender
+              ? tenderRepository
+              : entity === TenderMailDelivery
+                ? deliveryRepository
+                : mailItemRepository,
+        ),
+      });
+    });
+    dailyDispatchRepository.update.mockRejectedValueOnce(
+      new Error("lastError audit write failed"),
+    );
+
+    await expect(service.sendDailyDigest(NOW)).rejects.toThrow(
+      "claim write failed",
+    );
+    expect(dailyDispatchRepository.update).toHaveBeenCalledWith(
+      "dispatch-1",
+      expect.objectContaining({
+        status: DailyDispatchStatus.CLAIMED,
+        lastError: "Recipient delivery claim failed before durable state",
+      }),
+    );
+    expect(dailyDispatchRepository.update).not.toHaveBeenCalledWith(
+      "dispatch-1",
+      expect.objectContaining({ status: DailyDispatchStatus.COMPLETED }),
+    );
+  });
+
+  it("reclaims a stale daily dispatch lease but skips a fresh replica claim", async () => {
+    const builder = dailyDispatchRepository.createQueryBuilder();
+    builder.execute.mockResolvedValue({ raw: [] });
+    dailyDispatchRepository.findOne = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: "stale-dispatch",
+        status: DailyDispatchStatus.CLAIMED,
+        leaseExpiresAt: new Date(NOW.getTime() - 1),
+      })
+      .mockResolvedValueOnce({
+        id: "fresh-dispatch",
+        status: DailyDispatchStatus.CLAIMED,
+        leaseExpiresAt: new Date(NOW.getTime() + 60_000),
+      });
+    dailyDispatchRepository.update.mockResolvedValue({ affected: 1 });
+    const claimDailyDispatch = (
+      service as unknown as {
+        claimDailyDispatch(now: Date, time: string): Promise<string | null>;
+      }
+    ).claimDailyDispatch.bind(service);
+
+    await expect(claimDailyDispatch(NOW, "09:00")).resolves.toBe(
+      "stale-dispatch",
+    );
+    await expect(claimDailyDispatch(NOW, "09:00")).resolves.toBeNull();
   });
 
   it("does not revive a stale delivery-uncertain claim when a late known SMTP failure arrives", async () => {
@@ -298,7 +394,11 @@ describe("TenderMailService", () => {
     }));
     transport.sendMail.mockImplementation(({ to }) =>
       to === failedRecipient.email
-        ? Promise.reject(new Error("one mailbox unavailable"))
+        ? Promise.reject({
+            code: "EENVELOPE",
+            command: "RCPT TO",
+            responseCode: 550,
+          })
         : Promise.resolve({ messageId: "smtp-success" }),
     );
 
@@ -337,7 +437,11 @@ describe("TenderMailService", () => {
     mailItemRepository.find.mockResolvedValue([
       { id: "item-1", tender: TENDER, lastDeliveryId: delivery.id },
     ]);
-    transport.sendMail.mockRejectedValueOnce(new Error("still unavailable"));
+    transport.sendMail.mockRejectedValueOnce({
+      code: "EENVELOPE",
+      command: "RCPT TO",
+      responseCode: 550,
+    });
 
     await service.retryDue(NOW);
 

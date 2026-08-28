@@ -11,6 +11,7 @@ import { Product } from "../entities/product.entity";
 import { Post } from "../entities/post.entity";
 import { Admin } from "../entities/admin.entity";
 import { Certificate } from "../entities/certificate.entity";
+import { createJwtModuleOptions } from "./jwt-configuration";
 
 @Module({
   imports: [
@@ -18,14 +19,11 @@ import { Certificate } from "../entities/certificate.entity";
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret:
-          configService.get<string>("JWT_SECRET") ||
-          "your-secret-key-change-this",
-        signOptions: {
-          expiresIn: configService.get<string>("JWT_EXPIRES_IN") || "24h",
-        } as any,
-      }),
+      useFactory: (configService: ConfigService) =>
+        createJwtModuleOptions(
+          process.env,
+          configService.get<string>("JWT_EXPIRES_IN") || "24h",
+        ),
       inject: [ConfigService],
     }),
   ],

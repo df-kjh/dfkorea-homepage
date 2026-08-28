@@ -17,12 +17,17 @@ import { TenderRecipient } from "../entities/tender-recipient.entity";
 import { TenderSubscription } from "../entities/tender-subscription.entity";
 import { TenderDailyDispatch } from "../entities/tender-daily-dispatch.entity";
 import { TenderMailRenderer } from "../mail/tender-mail-renderer";
+import {
+  classifySmtpTransportError,
+  SmtpDeliveryOutcome,
+} from "../mail/smtp-delivery-outcome";
 
 export const TENDER_MAIL_TRANSPORT = "TENDER_MAIL_TRANSPORT";
 const DAILY_MAIL_LOCK_ID = 824002;
 const RETRY_MAIL_LOCK_ID = 824003;
 const RETRY_DELAY_MS = 10 * 60 * 1000;
 const DELIVERY_LEASE_MS = 15 * 60 * 1000;
+const DAILY_DISPATCH_LEASE_MS = 15 * 60 * 1000;
 
 interface MailTransport {
   sendMail(message: {
@@ -70,15 +75,37 @@ export class TenderMailService {
         subscription.deliveryTime,
       );
       if (!dispatchId) return;
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         (subscription.recipients ?? []).map(async (recipient) => {
           const claim = await this.claimInitialDelivery(recipient, now);
-          if (claim) await this.deliver(claim.delivery, claim.tenders, now);
+          if (!claim) return;
+          try {
+            await this.deliver(claim.delivery, claim.tenders, now);
+          } catch {
+            // A durable PENDING delivery already exists. Its lease recovery will
+            // conservatively resolve an unknown post-claim persistence outcome.
+          }
         }),
       );
+      const rejected = results.find(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+      if (rejected) {
+        try {
+          await this.dailyDispatchRepository.update(dispatchId, {
+            status: DailyDispatchStatus.CLAIMED,
+            lastError: "Recipient delivery claim failed before durable state",
+          });
+        } catch {
+          // The claim row is already durable and remains CLAIMED. Preserve the
+          // primary recipient-claim error even if its audit update also fails.
+        }
+        throw rejected.reason;
+      }
       await this.dailyDispatchRepository.update(dispatchId, {
         status: DailyDispatchStatus.COMPLETED,
         completedAt: now,
+        lastError: null,
       });
     });
   }
@@ -159,13 +186,41 @@ export class TenderMailService {
           deliveryTime,
           status: DailyDispatchStatus.CLAIMED,
           claimedAt: now,
+          leaseExpiresAt: new Date(now.getTime() + DAILY_DISPATCH_LEASE_MS),
+          lastError: null,
           completedAt: null,
         })
         .orIgnore()
         .returning("id")
         .execute();
       const row = Array.isArray(result.raw) ? result.raw[0] : undefined;
-      return typeof row?.id === "string" ? row.id : null;
+      if (typeof row?.id === "string") return row.id;
+
+      const existing = await repository.findOne({
+        where: { businessDate: this.toKstDate(now) },
+      });
+      if (
+        !existing ||
+        existing.status !== DailyDispatchStatus.CLAIMED ||
+        existing.leaseExpiresAt > now
+      ) {
+        return null;
+      }
+      const reclaimed = await repository.update(
+        {
+          id: existing.id,
+          status: DailyDispatchStatus.CLAIMED,
+          leaseExpiresAt: LessThanOrEqual(now),
+        },
+        {
+          deliveryTime,
+          claimedAt: now,
+          leaseExpiresAt: new Date(now.getTime() + DAILY_DISPATCH_LEASE_MS),
+          lastError: null,
+          completedAt: null,
+        },
+      );
+      return reclaimed.affected === 1 ? existing.id : null;
     });
   }
 
@@ -363,17 +418,38 @@ export class TenderMailService {
     tenders: Tender[],
     now: Date,
   ): Promise<void> {
-    let result: { messageId?: string };
+    let message: {
+      from: string;
+      to: string;
+      subject: string;
+      html: string;
+      text: string;
+    };
     try {
       const configuration = this.getConfiguration();
       const rendered = this.renderer.render(now, tenders);
-      result = await this.transport.sendMail({
+      message = {
         from: `"${configuration.fromName.replace(/["\\]/g, "")}" <${configuration.user}>`,
         to: delivery.recipientEmail,
         ...rendered,
-      });
+      };
     } catch {
       await this.persistFailure(delivery, now);
+      return;
+    }
+
+    let result: { messageId?: string };
+    try {
+      result = await this.transport.sendMail(message);
+    } catch (error: unknown) {
+      if (
+        classifySmtpTransportError(error) ===
+        SmtpDeliveryOutcome.CONFIRMED_FAILURE
+      ) {
+        await this.persistFailure(delivery, now);
+      } else {
+        await this.persistUncertain(delivery, now);
+      }
       return;
     }
 
@@ -442,6 +518,42 @@ export class TenderMailService {
         uncertainAt: null,
         errorMessage: "SMTP delivery failed",
       });
+    });
+  }
+
+  private async persistUncertain(
+    delivery: TenderMailDelivery,
+    now: Date,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const deliveryRepository = manager.getRepository(TenderMailDelivery);
+      const mailItemRepository = manager.getRepository(TenderMailItem);
+      const transitioned = await deliveryRepository.update(
+        {
+          id: delivery.id,
+          status: MailDeliveryStatus.PENDING,
+          claimedAt: delivery.claimedAt,
+        },
+        {
+          status: MailDeliveryStatus.DELIVERY_UNCERTAIN,
+          nextRetryAt: null,
+          claimedAt: null,
+          failedAt: null,
+          uncertainAt: now,
+          errorMessage: "SMTP delivery outcome is uncertain",
+        },
+      );
+      if (transitioned.affected !== 1) return;
+      await mailItemRepository.update(
+        {
+          lastDeliveryId: delivery.id,
+          status: MailItemStatus.PENDING,
+        },
+        {
+          status: MailItemStatus.DELIVERY_UNCERTAIN,
+          uncertainAt: now,
+        },
+      );
     });
   }
 

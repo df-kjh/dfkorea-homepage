@@ -1,5 +1,15 @@
 # Database Schema
 
+## `admins`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | serial | Primary key |
+| `username` | varchar | Unique administrator identity |
+| `password` | varchar | bcrypt hash only; no plaintext/default credential |
+
+Fresh databases contain no administrator row. Production startup refuses an empty admin table; the compiled one-off provisioning CLI creates the first row under a serializable transaction plus PostgreSQL transaction advisory lock. `1787819900000-RemoveInsecureDefaultAdmin` removes only the exact `admin` row whose stored bcrypt hash verifies the historical `admin123` value, with id, username, and original hash in the delete predicate.
+
 ## Tender notification tables
 
 ```mermaid
@@ -102,10 +112,11 @@ Unique constraint: `UQ_tender_mail_item_recipient_tender` on (`recipientId`, `te
 | `businessDate`           | date        | KST execution identity, unique through `UQ_tender_daily_dispatch_business_date` |
 | `deliveryTime`           | varchar(5)  | Shared `HH:mm` value observed when the date was claimed               |
 | `status`                 | varchar     | `CLAIMED` or `COMPLETED`                                              |
-| `claimedAt`, `completedAt` | timestamptz | Durable claim and nullable completion timestamps                    |
+| `claimedAt`, `leaseExpiresAt`, `completedAt` | timestamptz | Durable claim, 15-minute reclaim boundary, and nullable completion timestamp |
+| `lastError`               | text        | Nullable non-sensitive recipient-claim failure summary              |
 | `createdAt`, `updatedAt` | timestamptz | Audit timestamps                                                      |
 
-Index: `IDX_tender_daily_dispatch_status`. The unique KST business date is the final replica/time-change idempotency boundary in addition to advisory lock `824002`.
+Index: `IDX_tender_daily_dispatch_status_lease` on (`status`, `leaseExpiresAt`). The unique KST business date is the final replica/time-change idempotency boundary in addition to advisory lock `824002`. A fresh `CLAIMED` lease is skipped; a stale claim can be atomically reclaimed and processes only recipients without an existing durable terminal/retry/in-flight/no-work state.
 
 ## Update rule
 
@@ -117,5 +128,7 @@ Whenever a migration changes this schema, update this root `database-schema.md` 
 - `1787819600000-AddTenderSubscriptionSingletonKey` adds the required shared subscription key and `UQ_tender_subscription_singleton_key`.
 - `1787819700000-AddTenderMailDeliveryClaimedAt` adds the durable delivery lease timestamp and `IDX_tender_mail_delivery_status_claimed_at`.
 - `1787819800000-HardenTenderMailDelivery` adds recipient soft activation, ambiguous SMTP audit timestamps, and the KST business-date daily dispatch table with its unique constraint and indexes.
+- `1787819900000-RemoveInsecureDefaultAdmin` removes only the exact historical `admin/admin123` bcrypt identity and never recreates it on rollback; fresh baseline migration no longer seeds credentials.
+- `1787820000000-AddDailyDispatchLease` adds `leaseExpiresAt`, safe `lastError`, and replaces the status-only daily index with `IDX_tender_daily_dispatch_status_lease`.
 
 The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.

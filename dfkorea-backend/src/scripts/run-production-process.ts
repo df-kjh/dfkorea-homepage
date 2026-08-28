@@ -7,6 +7,7 @@ import {
 
 export type ProductionProcessAction =
   | "start"
+  | "admin:provision"
   | "migration:run"
   | "migration:revert";
 
@@ -41,6 +42,7 @@ export const parseProductionProcessArguments = (
   }
   if (
     action !== "start" &&
+    action !== "admin:provision" &&
     action !== "migration:run" &&
     action !== "migration:revert"
   ) {
@@ -60,6 +62,14 @@ export const getProductionProcessCommand = (
     return {
       kind: "module",
       modulePath: join(workingDirectory, "dist", "main.js"),
+    };
+  }
+
+  if (action === "admin:provision") {
+    return {
+      kind: "child",
+      executable: process.execPath,
+      arguments: [join(workingDirectory, "dist", "scripts", "provision-admin.js")],
     };
   }
 

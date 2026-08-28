@@ -11,7 +11,7 @@ import { DailyDispatchStatus } from "../domain/tender.enums";
 
 @Entity("tender_daily_dispatches")
 @Unique("UQ_tender_daily_dispatch_business_date", ["businessDate"])
-@Index("IDX_tender_daily_dispatch_status", ["status"])
+@Index("IDX_tender_daily_dispatch_status_lease", ["status", "leaseExpiresAt"])
 export class TenderDailyDispatch {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -27,6 +27,12 @@ export class TenderDailyDispatch {
 
   @Column({ type: "timestamptz" })
   claimedAt: Date;
+
+  @Column({ type: "timestamptz" })
+  leaseExpiresAt: Date;
+
+  @Column({ type: "text", nullable: true })
+  lastError: string | null;
 
   @Column({ type: "timestamptz", nullable: true })
   completedAt: Date | null;

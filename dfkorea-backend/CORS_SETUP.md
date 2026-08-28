@@ -152,7 +152,8 @@ VITE_API_BASE_URL=https://dfkorea-backend.railway.app
 CORS_ORIGIN=https://dfkorea-frontend.vercel.app,https://dfkorea.com
 PORT=3000
 NODE_ENV=production
-JWT_SECRET=your-secret-key
+# production: 32+ chars, 3+ of lower/upper/number/symbol; secret store only
+JWT_SECRET=
 ```
 
 ## 재배포
