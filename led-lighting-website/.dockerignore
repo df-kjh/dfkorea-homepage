@@ -1,0 +1,14 @@
+node_modules
+.nuxt
+.output
+dist
+coverage
+.git
+.gitignore
+.DS_Store
+.vscode
+.idea
+*.log
+.eslintcache
+.env*
+!.env.example

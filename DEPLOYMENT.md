@@ -16,9 +16,7 @@
 
 - 백엔드: Node.js 20.x 이상
 - 프론트엔드: Node.js 22.18.0 이상 (Node 22 계열), npm 11.17.0
-- npm 또는 yarn
 - Docker & Docker Compose (Docker 배포 시)
-- Nginx (수동 배포 시)
 - PostgreSQL (모든 백엔드 배포에서 필수)
 
 ---
@@ -130,65 +128,16 @@ npm ci
 npm run build
 ```
 
-#### 2. Nginx 설정
+#### 2. Nuxt 프로덕션 서버 실행
 
-`/etc/nginx/sites-available/led-lighting` 파일 생성:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-    root /var/www/led-lighting/dist;
-    index index.html;
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json application/javascript;
-
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # SPA fallback
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API proxy
-    location /api {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-#### 3. Nginx 활성화
+Nuxt 4의 기본 Node 서버 preset은 `.output`에 SSR 서버와 정적 자산을 함께 생성합니다. 빌드 결과를 `dist`에 복사하거나 Nginx의 SPA fallback으로 제공하지 말고, 다음처럼 Nitro 서버를 실행합니다.
 
 ```bash
-# 심볼릭 링크 생성
-sudo ln -s /etc/nginx/sites-available/led-lighting /etc/nginx/sites-enabled/
-
-# Nginx 설정 테스트
-sudo nginx -t
-
-# Nginx 재시작
-sudo systemctl restart nginx
+NODE_ENV=production HOST=0.0.0.0 PORT=3000 \
+  node .output/server/index.mjs
 ```
 
-#### 4. 빌드 파일 복사
-
-```bash
-sudo mkdir -p /var/www/led-lighting
-sudo cp -r dist/* /var/www/led-lighting/
-```
+운영에서는 PM2 또는 systemd로 위 프로세스를 관리하고, 외부 80/443 포트가 필요하면 별도 reverse proxy에서 내부 `localhost:3000`으로 전달합니다. Docker Compose를 사용하면 프론트엔드 컨테이너의 `3000` 포트가 호스트 80 포트에 매핑됩니다.
 
 ---
 
@@ -229,11 +178,8 @@ sudo cp -r dist/* /var/www/led-lighting/
 # Docker
 docker-compose ps
 
-# PM2
+# 프론트엔드 Nitro 서버 (수동 배포 시)
 pm2 status
-
-# Nginx
-sudo systemctl status nginx
 ```
 
 ### 2. 접속 테스트
@@ -250,10 +196,9 @@ docker-compose logs -f frontend
 
 # PM2
 pm2 logs led-backend
+pm2 logs led-frontend
 
-# Nginx
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/access.log
+# reverse proxy를 별도로 사용하는 경우에만 해당 proxy 로그 확인
 ```
 
 ### 4. 보안 체크리스트
@@ -293,7 +238,7 @@ cd ../led-lighting-website
 git pull
 npm ci
 npm run build
-sudo cp -r dist/* /var/www/led-lighting/
+# PM2/systemd 등으로 관리 중인 프론트엔드 프로세스 재시작
 ```
 
 ---
@@ -315,7 +260,7 @@ sudo kill -9 <PID>
 
 - `uploads` 디렉토리 권한 확인
 - `MAX_FILE_SIZE` 설정 확인
-- Nginx `client_max_body_size` 설정 확인
+- 별도 reverse proxy를 사용하는 경우 해당 proxy의 요청 본문 크기 설정 확인
 
 ### CORS 에러
 

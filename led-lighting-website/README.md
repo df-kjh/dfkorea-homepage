@@ -46,8 +46,10 @@ Vue 3 + TypeScript + Tailwind CSS로 제작된 모던한 LED 조명 회사 웹�
 ### 설치
 
 ```sh
-npm install
+npm ci
 ```
+
+`npm ci`는 고정된 lockfile을 설치하고 `postinstall` 단계에서 Nuxt 타입 파일을 준비합니다. 프로젝트의 npm 기준 버전은 `11.17.0`입니다.
 
 ### 개발 서버 실행
 

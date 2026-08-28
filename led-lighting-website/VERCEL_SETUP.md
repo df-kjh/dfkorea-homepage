@@ -12,6 +12,16 @@ Nuxt 4 프론트엔드는 Node.js `22.18.0` 이상인 Node 22 계열을 지원 �
 
 Vercel 프로젝트의 **Settings → General → Node.js Version**에서 `22.x`를 선택하세요. 최소 `22.18.0`을 사용해야 하며, `package.json`의 `engines.node`와 `packageManager`가 로컬, Vercel, Docker 빌드 환경의 Node/npm 기준을 고정합니다.
 
+## 설치 및 빌드 명령
+
+프로젝트의 `vercel.json`은 다음 설치 명령으로 lockfile을 재현하고 npm 버전을 고정합니다.
+
+```sh
+npx --yes npm@11.17.0 ci
+```
+
+이 명령은 `postinstall`의 `nuxt prepare`를 실행한 뒤 Vercel의 `npm run build`로 이어집니다. Nuxt의 Node 서버 산출물은 Vercel이 자동으로 처리하므로 별도의 `dist` 출력 설정은 사용하지 않습니다.
+
 ## 환경 변수 설정
 
 Vercel에 배포하기 전에 다음 환경 변수를 설정해야 합니다.

@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "framework": "nuxtjs",
-  "installCommand": "npm install",
+  "installCommand": "npx --yes npm@11.17.0 ci",
   "rewrites": [
     {
       "source": "/sitemap.xml",
