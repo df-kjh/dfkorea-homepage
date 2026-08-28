@@ -1,11 +1,7 @@
 import axios from 'axios'
+import { getApiBaseUrl } from '../utils/api-base'
 
 // 환경 변수에서 API URL 가져오기
-const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL
-  return envUrl || 'http://localhost:3000'
-}
-
 const apiClient = axios.create({
   baseURL: getApiBaseUrl(),
   headers: {

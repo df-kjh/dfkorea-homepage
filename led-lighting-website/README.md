@@ -53,10 +53,10 @@ npm ci
 
 ### 운영 API URL
 
-운영 빌드에는 브라우저에서 접근 가능한 백엔드 public `/api` URL을 사용합니다. Docker Compose는 저장소 루트 `.env`의 `FRONTEND_API_BASE_URL`을 필수 build arg로 전달합니다.
+운영 빌드에는 브라우저에서 접근 가능한 백엔드 public base URL을 사용합니다. 백엔드는 `/products`, `/tenders`처럼 루트 경로를 사용하므로 URL 끝에 `/api`를 붙이지 않습니다. Docker Compose는 저장소 루트 `.env`의 `FRONTEND_API_BASE_URL`을 필수 build arg로 전달합니다.
 
 ```env
-FRONTEND_API_BASE_URL=https://api.yourdomain.com/api
+FRONTEND_API_BASE_URL=https://api.yourdomain.com
 ```
 
 `.env.production`을 Docker 이미지에 복사하지 않도록 모든 `.env*` 파일은 Docker context에서 제외됩니다. API URL을 변경하면 다시 빌드해야 합니다. Vercel은 [Vercel 배포 설정](./VERCEL_SETUP.md)에 따라 대시보드의 `VITE_API_BASE_URL`을 빌드 전에 설정하세요.

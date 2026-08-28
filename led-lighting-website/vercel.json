@@ -13,9 +13,7 @@
     }
   ],
   "env": {
-    "NUXT_PUBLIC_API_BASE_URL": "https://dfkorea-production.up.railway.app",
     "NUXT_PUBLIC_SITE_URL": "https://www.dfkorealed.com",
-    "VITE_API_BASE_URL": "https://dfkorea-production.up.railway.app",
     "VITE_APP_TITLE": "LED 조명 - 미래를 밝히는 빛"
   }
 }

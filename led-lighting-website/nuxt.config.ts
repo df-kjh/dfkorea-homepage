@@ -1,5 +1,13 @@
 import { fileURLToPath, URL } from "node:url";
 
+const configuredApiBaseUrl = process.env.VITE_API_BASE_URL?.trim();
+const isProductionBuild =
+  process.env.NODE_ENV === "production" &&
+  process.argv.some((argument) => argument === "build" || argument === "generate");
+if (isProductionBuild && !configuredApiBaseUrl) {
+  throw new Error("VITE_API_BASE_URL is required for production builds");
+}
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-06-11",
   srcDir: "src/",
@@ -8,8 +16,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBaseUrl:
-        process.env.NUXT_PUBLIC_API_BASE_URL ||
-        process.env.VITE_API_BASE_URL ||
+        configuredApiBaseUrl ||
         "http://localhost:3000",
       siteUrl:
         process.env.NUXT_PUBLIC_SITE_URL ||

@@ -14,6 +14,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "build-only": "nuxt build",
+    "verify:production-api": "node scripts/verify-production-api-bundle.mjs",
     "type-check": "nuxt typecheck",
     "test": "vitest run",
     "test:watch": "vitest",

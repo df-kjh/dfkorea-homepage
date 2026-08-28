@@ -25,7 +25,7 @@ services:
       context: ./led-lighting-website
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: "${FRONTEND_API_BASE_URL:?set FRONTEND_API_BASE_URL in the root .env to a public https://.../api URL}"
+        VITE_API_BASE_URL: "${FRONTEND_API_BASE_URL:?set FRONTEND_API_BASE_URL in the root .env to a public https://... URL}"
     container_name: led-frontend
     ports:
       - "80:3000"

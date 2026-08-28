@@ -37,22 +37,22 @@ Vercel에 배포하기 전에 다음 환경 변수를 설정해야 합니다.
 
 | 변수명              | 설명           | 예시 값                        | 환경                             |
 | ------------------- | -------------- | ------------------------------ | -------------------------------- |
-| `VITE_API_BASE_URL` | 브라우저에서 접근할 백엔드 public API URL | `https://your-backend-api.com/api` | Production, Preview, Development |
+| `VITE_API_BASE_URL` | 브라우저에서 접근할 백엔드 public API URL | `https://your-backend-api.com` | Production, Preview, Development |
 | `VITE_APP_TITLE`    | 앱 타이틀      | `LED 조명 - 미래를 밝히는 빛`  | Production, Preview, Development |
 
 ### 백엔드 API URL 설정
 
 백엔드가 배포된 URL을 `VITE_API_BASE_URL`에 설정해야 합니다:
 
-- **Railway/Render/Heroku 등에 배포한 경우**: 해당 서비스에서 제공하는 public URL 뒤에 `/api`를 붙여 사용
+- **Railway/Render/Heroku 등에 배포한 경우**: 해당 서비스에서 제공하는 public base URL을 그대로 사용
 - **자체 서버에 배포한 경우**: 도메인 또는 IP 주소 사용
 - **로컬 테스트**: `http://localhost:3000` (개발 환경에서만)
 
 예시:
 
 ```
-VITE_API_BASE_URL=https://dfkorea-backend.railway.app/api
-VITE_API_BASE_URL=https://api.dfkorea.com/api
+VITE_API_BASE_URL=https://dfkorea-backend.railway.app
+VITE_API_BASE_URL=https://api.dfkorea.com
 ```
 
 ### 주의사항
@@ -60,14 +60,14 @@ VITE_API_BASE_URL=https://api.dfkorea.com/api
 ⚠️ **중요**:
 
 - Vercel은 저장소의 `.env.production` 파일을 사용하지 않습니다
-- 반드시 Vercel 대시보드의 `VITE_API_BASE_URL`에 브라우저에서 접근 가능한 public `/api` URL을 설정해야 합니다
+- 반드시 Vercel 대시보드의 `VITE_API_BASE_URL`에 브라우저에서 접근 가능한 public base URL을 설정해야 합니다. 백엔드는 `/products`, `/tenders`처럼 루트 경로를 사용하므로 URL 끝에 `/api`를 붙이지 않습니다
 - 이 값은 빌드 시 번들에 포함되므로 변경 후에는 반드시 다시 빌드하여 재배포해야 합니다
 
 ### 확인 방법
 
 배포 후 브라우저 개발자 도구(F12)의 Network 탭에서 API 요청 URL을 확인하세요:
 
-- ✅ 올바른 경우: `https://your-backend-api.com/api/products`
+- ✅ 올바른 경우: `https://your-backend-api.com/products`
 - ❌ 잘못된 경우: `http://localhost:3000/products`
 
 ## CLI로 환경 변수 설정 (선택사항)

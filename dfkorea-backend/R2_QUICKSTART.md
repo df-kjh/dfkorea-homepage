@@ -105,7 +105,7 @@ compiled migrations completed
 ```bash
 TOKEN="your-jwt-token"
 
-curl -X POST https://dfkorea-production.up.railway.app/api/upload/image \
+curl -X POST https://dfkorea-production.up.railway.app/upload/image \
   -H "Authorization: Bearer $TOKEN" \
   -F "image=@test.jpg"
 ```

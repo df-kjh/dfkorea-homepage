@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from './api-base'
+
 /**
  * 이미지 URL을 절대 경로로 변환하는 유틸리티 함수
  * 상대 경로인 경우 API 베이스 URL을 추가
@@ -13,10 +15,7 @@ export const getImageUrl = (imagePath: string | undefined): string => {
   }
 
   // 상대 경로인 경우 API 베이스 URL 추가
-  const apiBaseUrl =
-    import.meta.env.NUXT_PUBLIC_API_BASE_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    'http://localhost:3000'
+  const apiBaseUrl = getApiBaseUrl()
 
   // 슬래시로 시작하는 경우
   if (imagePath.startsWith('/')) {
