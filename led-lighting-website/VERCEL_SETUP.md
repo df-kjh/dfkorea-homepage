@@ -8,9 +8,9 @@ npm run migration:run:prod && npm run start:prod
 
 ## Node.js 버전
 
-Nuxt 4 프론트엔드는 Node.js `22.12.0` 이상을 지원 기준으로 사용합니다.
+Nuxt 4 프론트엔드는 Node.js `22.18.0` 이상인 Node 22 계열을 지원 기준으로 사용합니다.
 
-Vercel 프로젝트의 **Settings → General → Node.js Version**에서 `22.x`를 선택하세요. `package.json`의 `engines.node`도 동일한 최소 버전을 선언하므로 로컬, Vercel, Docker 빌드 환경이 같은 기준을 사용합니다.
+Vercel 프로젝트의 **Settings → General → Node.js Version**에서 `22.x`를 선택하세요. 최소 `22.18.0`을 사용해야 하며, `package.json`의 `engines.node`와 `packageManager`가 로컬, Vercel, Docker 빌드 환경의 Node/npm 기준을 고정합니다.
 
 ## 환경 변수 설정
 
