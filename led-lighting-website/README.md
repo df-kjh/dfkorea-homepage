@@ -51,6 +51,16 @@ npm ci
 
 `npm ci`는 고정된 lockfile을 설치하고 `postinstall` 단계에서 Nuxt 타입 파일을 준비합니다. 프로젝트의 npm 기준 버전은 `11.17.0`입니다.
 
+### 운영 API URL
+
+운영 빌드에는 브라우저에서 접근 가능한 백엔드 public `/api` URL을 사용합니다. Docker Compose는 저장소 루트 `.env`의 `FRONTEND_API_BASE_URL`을 필수 build arg로 전달합니다.
+
+```env
+FRONTEND_API_BASE_URL=https://api.yourdomain.com/api
+```
+
+`.env.production`을 Docker 이미지에 복사하지 않도록 모든 `.env*` 파일은 Docker context에서 제외됩니다. API URL을 변경하면 다시 빌드해야 합니다. Vercel은 [Vercel 배포 설정](./VERCEL_SETUP.md)에 따라 대시보드의 `VITE_API_BASE_URL`을 빌드 전에 설정하세요.
+
 ### 개발 서버 실행
 
 ```sh

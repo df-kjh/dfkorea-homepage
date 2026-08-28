@@ -25,12 +25,13 @@
 
 ### 1. 환경 변수 설정
 
-**프론트엔드** (`led-lighting-website/.env.production`):
+**프론트엔드 Docker 빌드** (저장소 루트 `.env`, 커밋하지 않음):
 
 ```env
-VITE_API_BASE_URL=https://api.yourdomain.com
-VITE_APP_TITLE=LED 조명 - 미래를 밝히는 빛
+FRONTEND_API_BASE_URL=https://api.yourdomain.com/api
 ```
+
+`FRONTEND_API_BASE_URL`은 브라우저에서 접근 가능한 운영 백엔드의 전체 public `/api` URL이어야 합니다. `docker-compose.yml`이 이 값을 `VITE_API_BASE_URL` build arg로 전달하며, 값이 없거나 localhost이면 빌드가 명확한 오류와 함께 중단됩니다. 프론트엔드의 `.env*` 파일은 Docker context에서 의도적으로 제외하므로 `.env.production`을 이미지에 복사하지 않습니다.
 
 **백엔드** (`dfkorea-backend/.env.production`):
 
@@ -125,6 +126,7 @@ npm run migration:run:prod:env && npm run start:prod:env
 ```bash
 cd led-lighting-website
 npm ci
+export VITE_API_BASE_URL=https://api.yourdomain.com/api
 npm run build
 ```
 
@@ -147,7 +149,7 @@ NODE_ENV=production HOST=0.0.0.0 PORT=3000 \
 
 | 변수명              | 설명           | 예시                         |
 | ------------------- | -------------- | ---------------------------- |
-| `VITE_API_BASE_URL` | 백엔드 API URL | `https://api.yourdomain.com` |
+| `VITE_API_BASE_URL` | 브라우저에서 접근할 백엔드 public API URL | `https://api.yourdomain.com/api` |
 | `VITE_APP_TITLE`    | 앱 타이틀      | `LED 조명`                   |
 
 ### 백엔드 환경 변수
