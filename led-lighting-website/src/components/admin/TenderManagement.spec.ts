@@ -75,6 +75,8 @@ const cleanupMountedWrappers = () => {
 
 describe('TenderManagement', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-27T12:00:00.000Z'))
     vi.clearAllMocks()
     api.getCalendar.mockResolvedValue({ data: [{ date: '2026-08-27', total: 1, direct: 1, potential: 0 }] })
     api.getAll.mockResolvedValue({ data: listResponse })
@@ -90,6 +92,7 @@ describe('TenderManagement', () => {
     cleanupMountedWrappers()
     document.body.innerHTML = ''
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it('applies and resets calendar filters without showing a collection status control', async () => {
