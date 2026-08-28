@@ -40,7 +40,7 @@ Vue 3 + TypeScript + Tailwind CSS로 제작된 모던한 LED 조명 회사 웹�
 
 ### 필수 요구사항
 
-- Node.js 20.11.0 이상
+- Node.js 22.12.0 이상
 - npm 또는 yarn
 
 ### 설치

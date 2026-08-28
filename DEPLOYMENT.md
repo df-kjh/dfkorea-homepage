@@ -14,7 +14,8 @@
 
 ### 필수 요구사항
 
-- Node.js 20.x 이상
+- 백엔드: Node.js 20.x 이상
+- 프론트엔드: Node.js 22.12.0 이상
 - npm 또는 yarn
 - Docker & Docker Compose (Docker 배포 시)
 - Nginx (수동 배포 시)
