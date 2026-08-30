@@ -33,6 +33,36 @@ describe("production admin provisioning", () => {
     },
   );
 
+  it("accepts an eight-character password with every required character group", () => {
+    expect(
+      validateAdminProvisioningInput({
+        ...validEnvironment,
+        ADMIN_PASSWORD: "Ab1!xyZ9",
+      }),
+    ).toEqual({
+      username: "operations-admin",
+      password: "Ab1!xyZ9",
+    });
+  });
+
+  it("rejects a seven-character password even with every required character group", () => {
+    expect(() =>
+      validateAdminProvisioningInput({
+        ...validEnvironment,
+        ADMIN_PASSWORD: "Aa1!xyz",
+      }),
+    ).toThrow(/at least 8 characters/);
+  });
+
+  it("counts emoji as one visible character for the minimum length", () => {
+    expect(() =>
+      validateAdminProvisioningInput({
+        ...validEnvironment,
+        ADMIN_PASSWORD: "Aa1!💡💡",
+      }),
+    ).toThrow(/at least 8 characters/);
+  });
+
   it("serializes first-admin creation and stores only a bcrypt hash", async () => {
     const repository = {
       count: jest.fn().mockResolvedValue(0),
