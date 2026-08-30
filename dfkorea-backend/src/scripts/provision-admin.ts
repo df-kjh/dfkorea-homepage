@@ -7,7 +7,7 @@ import { Admin } from "../entities/admin.entity";
 const ADMIN_PROVISION_LOCK_ID = 824004;
 const ADMIN_PASSWORD_MIN_LENGTH = 8;
 export const ADMIN_PASSWORD_RULE =
-  `ADMIN_PASSWORD must be at least ${ADMIN_PASSWORD_MIN_LENGTH} characters and contain lowercase, uppercase, number, and symbol`;
+  `ADMIN_PASSWORD must be at least ${ADMIN_PASSWORD_MIN_LENGTH} characters and contain at least three of lowercase, uppercase, number, and symbol`;
 
 const countVisibleCharacters = (value: string): number =>
   Array.from(
@@ -19,6 +19,9 @@ export const validateAdminProvisioningInput = (
 ): { username: string; password: string } => {
   const username = environment.ADMIN_USERNAME?.trim();
   const password = environment.ADMIN_PASSWORD ?? "";
+  const characterClasses = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(
+    (pattern) => pattern.test(password),
+  ).length;
   if (!username || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) {
     throw new Error(
       "ADMIN_USERNAME must contain 3-64 letters, numbers, dot, underscore, or hyphen characters",
@@ -26,10 +29,7 @@ export const validateAdminProvisioningInput = (
   }
   if (
     countVisibleCharacters(password) < ADMIN_PASSWORD_MIN_LENGTH ||
-    !/[a-z]/.test(password) ||
-    !/[A-Z]/.test(password) ||
-    !/[0-9]/.test(password) ||
-    !/[^A-Za-z0-9]/.test(password)
+    characterClasses < 3
   ) {
     throw new Error(`ADMIN_PASSWORD is invalid. ${ADMIN_PASSWORD_RULE}`);
   }

@@ -45,6 +45,27 @@ describe("production admin provisioning", () => {
     });
   });
 
+  it("accepts eight or more characters with three character groups", () => {
+    expect(
+      validateAdminProvisioningInput({
+        ...validEnvironment,
+        ADMIN_PASSWORD: "lowercase1!",
+      }),
+    ).toEqual({
+      username: "operations-admin",
+      password: "lowercase1!",
+    });
+  });
+
+  it("rejects a password containing only two character groups", () => {
+    expect(() =>
+      validateAdminProvisioningInput({
+        ...validEnvironment,
+        ADMIN_PASSWORD: "lowercase123",
+      }),
+    ).toThrow(/at least three/);
+  });
+
   it("rejects a seven-character password even with every required character group", () => {
     expect(() =>
       validateAdminProvisioningInput({
