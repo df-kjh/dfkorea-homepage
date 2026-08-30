@@ -325,7 +325,7 @@ npm run test:ci
 
 - fresh migration은 관리자를 만들지 않는다. `1787819900000-RemoveInsecureDefaultAdmin`은 username이 정확히 `admin`이고 저장 hash가 `admin123`과 일치하는 행만 id+username+password 조건으로 삭제한다. 다른 관리자와 이미 회전된 `admin`은 삭제하지 않는다.
 - 관리자가 0명인 production은 자동 생성하지 않고 시작을 거부한다. 승인된 운영자가 migration 후 별도 one-off compiled `admin:provision:prod` 또는 `admin:provision:prod:env`를 한 번만 실행한다.
-- `ADMIN_USERNAME`은 3–64자의 영문·숫자·점·밑줄·하이픈, `ADMIN_PASSWORD`는 8자 이상이며 소문자·대문자·숫자·기호를 모두 포함해야 한다. CLI는 serializable transaction과 transaction advisory lock 아래 기존 관리자 0명을 다시 확인하고 bcrypt cost 12 hash만 저장한다. 값/hash는 출력하지 않는다.
+- `ADMIN_USERNAME`은 3–64자의 영문·숫자·점·밑줄·하이픈, `ADMIN_PASSWORD`는 8자 이상이며 소문자·대문자·숫자·기호를 모두 포함해야 한다. CLI는 serializable transaction과 transaction advisory lock 아래 기존 관리자 0명을 다시 확인하고 bcrypt cost 12 hash만 저장한다. 이미 관리자가 있으면 기존 username/password를 수정하지 않고 성공 종료하므로 재배포에도 안전하다. 값/hash는 출력하지 않는다.
 - 기존 `admin/admin123` 사용 이력이 있으면 migration 여부와 무관하게 관련 자격 증명을 폐기하고 관리자·로그인 이력을 감사한다. provisioning 입력은 성공 직후 secret store와 `.env.production`에서 제거한다.
 
 ### 공식 데이터 키

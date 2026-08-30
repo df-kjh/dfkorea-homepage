@@ -143,7 +143,7 @@ describe("production admin provisioning", () => {
     }
   });
 
-  it("refuses to create another admin after the serialized count check", async () => {
+  it("leaves an existing admin unchanged without requiring bootstrap credentials", async () => {
     const repository = {
       count: jest.fn().mockResolvedValue(1),
       create: jest.fn(),
@@ -159,8 +159,9 @@ describe("production admin provisioning", () => {
     };
 
     await expect(
-      provisionFirstAdmin(dataSource as never, validEnvironment),
-    ).rejects.toThrow("Production admin already exists");
+      provisionFirstAdmin(dataSource as never, { NODE_ENV: "production" }),
+    ).resolves.toBe("unchanged");
+    expect(repository.create).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
   });
 

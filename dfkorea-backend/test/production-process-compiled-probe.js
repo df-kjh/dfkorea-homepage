@@ -231,7 +231,7 @@ try {
     "your-secret-key-change-this",
   );
 
-  const missingAdminInput = spawnSync(
+  const unavailableAdminDatabase = spawnSync(
     process.execPath,
     [compiledRunner, "ambient", "admin:provision"],
     {
@@ -244,10 +244,13 @@ try {
       },
     },
   );
-  assert.strictEqual(missingAdminInput.status, 1);
-  assert.match(missingAdminInput.stderr, /ADMIN_USERNAME/);
+  assert.strictEqual(unavailableAdminDatabase.status, 1);
+  assert.match(
+    unavailableAdminDatabase.stderr,
+    /Admin provisioning failed; inspect secure database diagnostics/,
+  );
   assert.doesNotMatch(
-    missingAdminInput.stderr,
+    unavailableAdminDatabase.stderr,
     /admin-probe-db-secret-must-not-print/,
   );
 

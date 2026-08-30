@@ -65,26 +65,29 @@ export const assertProvisioningQueryLoggingDisabled = (
 export const provisionFirstAdmin = async (
   targetDataSource: Pick<DataSource, "transaction">,
   environment: NodeJS.ProcessEnv,
-): Promise<void> => {
-  const input = validateAdminProvisioningInput(environment);
-  await targetDataSource.transaction("SERIALIZABLE", async (manager) => {
+): Promise<"created" | "unchanged"> =>
+  targetDataSource.transaction("SERIALIZABLE", async (manager) => {
     await manager.query("SELECT pg_advisory_xact_lock($1)", [
       ADMIN_PROVISION_LOCK_ID,
     ]);
     const repository = manager.getRepository(Admin);
+
+    // 재배포 시 기존 관리자 계정과 비밀번호는 절대 변경하지 않는다.
+    // Bootstrap 변수 검증도 최초 관리자가 실제로 필요한 경우에만 수행한다.
     if ((await repository.count()) !== 0) {
-      throw new Error("Production admin already exists; provisioning refused");
+      return "unchanged";
     }
+
+    const input = validateAdminProvisioningInput(environment);
     const password = await bcrypt.hash(input.password, 12);
     await repository.save(
       repository.create({ username: input.username, password }),
     );
+    return "created";
   });
-};
 
 const run = async (): Promise<void> => {
   validateProductionEnvironment(process.env);
-  validateAdminProvisioningInput(process.env);
   assertProvisioningQueryLoggingDisabled(dataSource);
   let initializedHere = false;
   try {
@@ -92,8 +95,12 @@ const run = async (): Promise<void> => {
       await dataSource.initialize();
       initializedHere = true;
     }
-    await provisionFirstAdmin(dataSource, process.env);
-    process.stdout.write("Production admin provisioned successfully\n");
+    const result = await provisionFirstAdmin(dataSource, process.env);
+    process.stdout.write(
+      result === "created"
+        ? "Production admin provisioned successfully\n"
+        : "Production admin already exists; no changes made\n",
+    );
   } finally {
     if (initializedHere && dataSource.isInitialized) await dataSource.destroy();
   }
