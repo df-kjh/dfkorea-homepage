@@ -10,6 +10,20 @@
 
 Fresh databases contain no administrator row. Production startup refuses an empty admin table; the compiled one-off provisioning CLI creates the first row under a serializable transaction plus PostgreSQL transaction advisory lock. `1787819900000-RemoveInsecureDefaultAdmin` removes only the exact `admin` row whose stored bcrypt hash verifies the historical `admin123` value, with id, username, and original hash in the delete predicate.
 
+## `certificates`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid | Primary key; defaults to `uuid_generate_v4()` |
+| `name` | varchar | Certificate name |
+| `issuingOrganization` | varchar | Issuing organization |
+| `category` | varchar | Nullable category |
+| `markImage` | varchar | Nullable certification-mark image URL |
+| `certificatePdf` | varchar | Nullable certificate PDF URL; canonical replacement for the retired `certificateImage` column |
+| `createdAt`, `updatedAt` | timestamp | Creation and update timestamps |
+
+The certificate migrations reconcile both fresh databases and databases that were historically created through TypeORM synchronization. If only `certificateImage` exists, it is renamed without rewriting data. If both PDF columns exist, a non-null `certificatePdf` value wins, otherwise the legacy value is copied before `certificateImage` is dropped. The final schema never retains the legacy column. Both historical certificate migrations are intentionally forward-only because either may baseline a pre-existing production table that is not owned by the migration ledger; rollback never renames the canonical column or drops the table.
+
 ## Tender notification tables
 
 ```mermaid
@@ -126,7 +140,9 @@ Index: `IDX_tender_daily_dispatch_status_lease` on (`status`, `leaseExpiresAt`).
 
 Whenever a migration changes this schema, update this root `database-schema.md` in the same change with affected tables, relationships, foreign-key deletion behavior, unique constraints, and indexes.
 
-## Tender migration sequence
+## Migration sequence
+
+Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1771481900000-CreateCertificatesTable` converge legacy and fresh certificate databases on the current `certificates` entity schema. Both migrations are safe when the table or canonical columns already exist.
 
 - `1706200000000-InitialSchema` enables `uuid-ossp` before the baseline UUID tables. `1787819500000-CreateTenderTables` repeats the idempotent extension guard and creates the six tender tables, baseline foreign keys, unique constraints, and query indexes.
 - `1787819600000-AddTenderSubscriptionSingletonKey` adds the required shared subscription key and `UQ_tender_subscription_singleton_key`.

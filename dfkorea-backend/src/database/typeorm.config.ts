@@ -17,7 +17,9 @@ export const getTypeOrmPaths = (runtimeExtension: ".ts" | ".js") => {
       `${root}/entities/*.entity${runtimeExtension}`,
       `${root}/tenders/entities/*.entity${runtimeExtension}`,
     ],
-    migrations: [`${root}/migrations/*${runtimeExtension}`],
+    // Only timestamp-prefixed production migrations are discoverable. This
+    // keeps Jest specs and support modules out of source-mode TypeORM runs.
+    migrations: [`${root}/migrations/[0-9]*${runtimeExtension}`],
   };
 };
 

@@ -14,7 +14,7 @@ const discoveryPaths = [...paths.entities, ...paths.migrations];
 for (const expectedGlob of [
   "dist/entities/*.entity.js",
   "dist/tenders/entities/*.entity.js",
-  "dist/migrations/*.js",
+  "dist/migrations/[0-9]*.js",
 ]) {
   assert.ok(
     discoveryPaths.includes(expectedGlob),
@@ -26,6 +26,9 @@ for (const relativePath of [
   "dist/tenders/entities/tender-recipient.entity.js",
   "dist/tenders/entities/tender-mail-delivery.entity.js",
   "dist/tenders/entities/tender-daily-dispatch.entity.js",
+  "dist/migrations/1740100000000-RenameCertificateImageToPdf.js",
+  "dist/migrations/1771481900000-CreateCertificatesTable.js",
+  "dist/migrations/support/normalize-certificate-schema.js",
   "dist/migrations/1787819500000-CreateTenderTables.js",
   "dist/migrations/1787819800000-HardenTenderMailDelivery.js",
   "dist/migrations/1787819900000-RemoveInsecureDefaultAdmin.js",

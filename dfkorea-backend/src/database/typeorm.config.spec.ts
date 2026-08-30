@@ -13,7 +13,7 @@ describe("TypeORM migration discovery paths", () => {
         "src/entities/*.entity.ts",
         "src/tenders/entities/*.entity.ts",
       ],
-      migrations: ["src/migrations/*.ts"],
+      migrations: ["src/migrations/[0-9]*.ts"],
     },
     {
       runtimeExtension: ".js" as const,
@@ -21,7 +21,7 @@ describe("TypeORM migration discovery paths", () => {
         "dist/entities/*.entity.js",
         "dist/tenders/entities/*.entity.js",
       ],
-      migrations: ["dist/migrations/*.js"],
+      migrations: ["dist/migrations/[0-9]*.js"],
     },
   ])(
     "discovers existing and tender artifacts when the runtime uses $runtimeExtension",
