@@ -14,14 +14,19 @@ describe("TendersController", () => {
     getOrCreate: jest.fn(),
     update: jest.fn(),
   };
+  const ingestion = {
+    collectAll: jest.fn(),
+  };
   const controller = new TendersController(
     query as never,
     subscription as never,
+    ingestion as never,
   );
 
   beforeEach(() => {
     Object.values(query).forEach((method) => method.mockReset());
     Object.values(subscription).forEach((method) => method.mockReset());
+    Object.values(ingestion).forEach((method) => method.mockReset());
   });
 
   it("protects every tender endpoint with the JWT guard", () => {
@@ -30,7 +35,7 @@ describe("TendersController", () => {
     );
   });
 
-  it("declares the calendar and subscription static routes before the ID route", () => {
+  it("declares the calendar, subscription, and collection static routes before the ID route", () => {
     expect(
       Reflect.getMetadata(PATH_METADATA, TendersController.prototype.calendar),
     ).toBe("calendar");
@@ -47,8 +52,36 @@ describe("TendersController", () => {
       ),
     ).toBe("subscription");
     expect(
+      Reflect.getMetadata(PATH_METADATA, TendersController.prototype.collect),
+    ).toBe("collect");
+    expect(
       Reflect.getMetadata(PATH_METADATA, TendersController.prototype.findOne),
     ).toBe(":id");
+  });
+
+  it("returns the ingestion summary for a manual collection, including an unavailable lock", async () => {
+    const summary = {
+      lockAcquired: false,
+      collectedAt: new Date("2026-08-31T00:00:00.000Z"),
+      sources: [],
+      failedSources: [],
+    };
+    ingestion.collectAll.mockResolvedValue(summary);
+
+    await expect(controller.collect()).resolves.toBe(summary);
+    expect(ingestion.collectAll).toHaveBeenCalledWith(expect.any(Date));
+  });
+
+  it("returns partial-source failures from the ingestion summary without throwing", async () => {
+    const summary = {
+      lockAcquired: true,
+      collectedAt: new Date("2026-08-31T00:00:00.000Z"),
+      sources: [],
+      failedSources: [TenderSource.G2B],
+    };
+    ingestion.collectAll.mockResolvedValue(summary);
+
+    await expect(controller.collect()).resolves.toBe(summary);
   });
 
   it("returns and replaces only the shared subscription settings", async () => {

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Post,
   Put,
   Query,
   UseGuards,
@@ -18,6 +19,7 @@ import { TenderQueryService } from "./services/tender-query.service";
 import { UpdateTenderSubscriptionDto } from "./dto/update-tender-subscription.dto";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
 import { TenderSubscriptionQueryDto } from "./dto/tender-subscription-query.dto";
+import { TenderIngestionService } from "./services/tender-ingestion.service";
 
 @Controller("tenders")
 @UseGuards(JwtAuthGuard)
@@ -25,6 +27,7 @@ export class TendersController {
   constructor(
     private readonly tenderQueryService: TenderQueryService,
     private readonly tenderSubscriptionService: TenderSubscriptionService,
+    private readonly tenderIngestionService: TenderIngestionService,
   ) {}
 
   @Get("calendar")
@@ -49,6 +52,11 @@ export class TendersController {
   @Get()
   findAll(@Query() query: TenderListQueryDto) {
     return this.tenderQueryService.getTenders(query);
+  }
+
+  @Post("collect")
+  collect() {
+    return this.tenderIngestionService.collectAll(new Date());
   }
 
   @Get(":id")

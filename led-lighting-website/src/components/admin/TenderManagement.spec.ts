@@ -5,6 +5,7 @@ const api = vi.hoisted(() => ({
   getCalendar: vi.fn(),
   getAll: vi.fn(),
   getOne: vi.fn(),
+  collect: vi.fn(),
   getSubscription: vi.fn(),
   updateSubscription: vi.fn(),
 }))
@@ -77,9 +78,17 @@ describe('TenderManagement', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-08-27T12:00:00.000Z'))
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     api.getCalendar.mockResolvedValue({ data: [{ date: '2026-08-27', total: 1, direct: 1, potential: 0 }] })
     api.getAll.mockResolvedValue({ data: listResponse })
+    api.collect.mockResolvedValue({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-08-27T12:00:00.000Z',
+        sources: [],
+        failedSources: [],
+      },
+    })
     api.getSubscription.mockResolvedValue({
       data: { enabled: true, deliveryTime: '09:00', recipients: ['sales@dfkorea.co.kr'] },
     })
@@ -95,7 +104,7 @@ describe('TenderManagement', () => {
     vi.useRealTimers()
   })
 
-  it('applies and resets calendar filters without showing a collection status control', async () => {
+  it('applies and resets calendar filters', async () => {
     const wrapper = mountTenderManagement()
     await flushPromises()
 
@@ -108,14 +117,121 @@ describe('TenderManagement', () => {
     expect(api.getAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ registeredDate: '2026-08-27', keyword: '서울', page: 1 }),
     )
-    expect(wrapper.text()).not.toContain('수집 현황')
-
     await wrapper.get('[data-test="reset-filter"]').trigger('click')
     await flushPromises()
     expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: undefined }))
     expect(api.getAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ registeredDate: '2026-08-27', keyword: undefined, page: 1 }),
     )
+  })
+
+  it('prevents a second immediate collection while the first request is loading and reports a held lock without refreshing', async () => {
+    const collection = deferred<{ data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] } }>()
+    api.collect.mockImplementationOnce(() => collection.promise)
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    const collectButton = wrapper.get<HTMLButtonElement>('[data-test="collect-tenders"]')
+    expect(collectButton.attributes('aria-label')).toBe('공고 즉시 수집')
+    expect(collectButton.attributes('aria-busy')).toBe('false')
+
+    await collectButton.trigger('click')
+    await collectButton.trigger('click')
+
+    expect(api.collect).toHaveBeenCalledTimes(1)
+    expect(collectButton.element.disabled).toBe(true)
+    expect(collectButton.attributes('aria-label')).toBe('공고 즉시 수집')
+    expect(collectButton.attributes('aria-busy')).toBe('true')
+
+    collection.resolve({
+      data: {
+        lockAcquired: false,
+        collectedAt: '2026-08-27T12:00:00.000Z',
+        sources: [],
+        failedSources: [],
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toContain('이미 수집이 진행 중입니다.')
+    expect(api.getCalendar).toHaveBeenCalledTimes(1)
+    expect(api.getAll).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves a page change made during collection for the post-collection refresh', async () => {
+    const collection = deferred<{ data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] } }>()
+    const pageChange = deferred<{ data: typeof listResponse }>()
+    const refresh = deferred<{ data: typeof listResponse }>()
+    api.getAll
+      .mockResolvedValueOnce({ data: { ...listResponse, totalPages: 2 } })
+      .mockImplementationOnce(() => pageChange.promise)
+      .mockImplementationOnce(() => refresh.promise)
+    api.collect.mockImplementationOnce(() => collection.promise)
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await wrapper.get('[aria-label="다음 페이지"]').trigger('click')
+    expect(api.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+
+    collection.resolve({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-08-27T12:00:00.000Z',
+        sources: [],
+        failedSources: [],
+      },
+    })
+    await flushPromises()
+
+    expect(api.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+    refresh.resolve({ data: { ...listResponse, page: 2, totalPages: 2 } })
+    pageChange.resolve({ data: { ...listResponse, page: 2, totalPages: 2 } })
+    await flushPromises()
+  })
+
+  it('refreshes the current filtered calendar and list page after a partial collection', async () => {
+    api.getAll.mockResolvedValue({ data: { ...listResponse, totalPages: 2 } })
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-08-27T12:00:00.000Z',
+        sources: [],
+        failedSources: ['KAPT'],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-filter"]').trigger('click')
+    await wrapper.get('[data-test="filter-keyword"]').setValue('서울')
+    await wrapper.get('[data-test="apply-filter"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('일부 출처 수집에 실패했습니다.')
+    expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: '서울' }))
+    expect(api.getAll).toHaveBeenLastCalledWith(expect.objectContaining({
+      registeredDate: '2026-08-27',
+      keyword: '서울',
+      page: 1,
+      pageSize: 20,
+    }))
+  })
+
+  it('keeps existing calendar and list data visible when immediate collection fails', async () => {
+    api.collect.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('공고 수집을 시작하지 못했습니다.')
+    expect(wrapper.text()).toContain('서울 LED 조명 교체')
+    expect(api.getCalendar).toHaveBeenCalledTimes(1)
+    expect(api.getAll).toHaveBeenCalledTimes(1)
   })
 
   it('never copies calendar filters into the recipient settings payload', async () => {

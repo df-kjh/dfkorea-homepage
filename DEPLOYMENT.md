@@ -347,7 +347,7 @@ API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣�
 
 ### 예약 작업과 여러 서버 인스턴스
 
-- 공고 수집은 `Asia/Seoul` 기준 매일 `00:00`, `12:00`에만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
+- 공고 수집은 `Asia/Seoul` 기준 매시 정각에 실행한다. 관리자의 `즉시 수집`도 같은 ingestion 경계를 사용하며, 정기·수동 실행이 겹치면 PostgreSQL advisory lock으로 하나만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
 - 일일 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches.businessDate` 고유키를 먼저 claim한다. 설정 변경과 여러 replica가 있어도 KST 영업일별 한 번만 실행된다.
 - 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. confirmed failure는 `responseCode` 4xx/5xx의 명시적 SMTP 거절(`535`의 `AUTH PLAIN`/`AUTH LOGIN`, `550`의 `RCPT TO` 포함) 또는 non-empty recipient `rejected`뿐이다. negative SMTP 응답이 없는 `ETIMEDOUT`, `ECONNECTION`, `ECONNRESET`, `ESOCKET` 등은 Nodemailer의 `command=CONN`이어도 pre-DATA를 입증하지 못하므로 즉시 terminal `DELIVERY_UNCERTAIN`으로 delivery/item을 함께 종결하며 재시도하지 않는다. 보수적 분류는 중복 방지를 우선해 드문 누락 가능성을 감수한다. 원본 오류는 메모리 내 typed classifier에만 전달하고 server response나 recipient 상세는 DB 오류 문자열에 저장하지 않는다.
 - 일일 dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST business date를 reclaim한다. `(dailyDispatchId, recipientId)` 고유 제약과 조회가 기존 `SENT`, `RETRY_SCHEDULED`, `PENDING`, `DELIVERY_UNCERTAIN`, `CANCELLED`, `FAILED`, `SKIPPED` outcome을 모두 재사용하므로 durable outcome이 전혀 없는 recipient만 처리한다. fresh lease와 `COMPLETED`는 건너뛴다.
@@ -377,7 +377,7 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
 
 1. 전용 DB를 백업하고 migration을 실행한 뒤 일곱 tender 테이블과 singleton/claim/recipient-activation migration이 적용됐는지 확인한다.
 2. 나라장터·K-apt 키를 주입해 실제 응답을 한 번 수집하고, 공고 ID·차수 중복이 없으며 키가 로그·응답에 없는지 확인한다. 한전은 승인된 매뉴얼 검증 전까지 비활성화한다.
-3. 다음 `00:00` 또는 `12:00` KST 실행 뒤 `tender_sync_runs`가 출처별 성공/실패를 분리하고, 캘린더의 등록일 기준 직접/잠재 건수가 DB 집계와 같은지 확인한다.
+3. 다음 매시 정각 KST 실행 또는 관리자 `즉시 수집` 완료 뒤 `tender_sync_runs`가 출처별 성공/실패를 분리하고, 캘린더의 등록일 기준 직접/잠재 건수가 DB 집계와 같은지 확인한다.
 4. 관리자 JWT로 calendar, list, detail을 확인한다. 캘린더는 42칸이고, 화면 필터가 메일 수신 대상에 영향을 주지 않아야 한다.
 5. 스테이징 수신 주소와 다음 발송 시각을 저장해 digest 한 번을 확인한다. 한 주소를 고의 실패시켜 그 주소만 10분 뒤 한 번 재시도되고, 성공 주소에는 중복 메일이 없는지 확인한다. SMTP 승인 직후 강제 종료 시험은 별도 승인된 테스트 계정에서만 수행하고, stale claim이 `DELIVERY_UNCERTAIN`으로 종결되어 재전송되지 않는지 확인한다.
 

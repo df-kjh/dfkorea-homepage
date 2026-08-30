@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { get, put } = vi.hoisted(() => ({
+const { get, post, put } = vi.hoisted(() => ({
   get: vi.fn(),
+  post: vi.fn(),
   put: vi.fn(),
 }))
 
 vi.mock('./client', () => ({
-  default: { get, put },
+  default: { get, post, put },
 }))
 
 import { tendersAPI } from './tenders'
@@ -14,7 +15,14 @@ import { tendersAPI } from './tenders'
 describe('tendersAPI', () => {
   beforeEach(() => {
     get.mockReset()
+    post.mockReset()
     put.mockReset()
+  })
+
+  it('requests an immediate collection without a request body', () => {
+    tendersAPI.collect()
+
+    expect(post).toHaveBeenCalledWith('/tenders/collect')
   })
 
   it('sends the backend list query names including pageSize', () => {

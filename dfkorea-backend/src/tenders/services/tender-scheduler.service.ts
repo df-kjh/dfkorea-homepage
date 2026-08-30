@@ -3,7 +3,7 @@ import { schedule, ScheduledTask } from "node-cron";
 import { TenderIngestionService } from "./tender-ingestion.service";
 import { TenderMailService } from "./tender-mail.service";
 
-export const TENDER_COLLECTION_CRON = "0 0 0,12 * * *";
+export const TENDER_COLLECTION_CRON = "0 0 * * * *";
 export const TENDER_COLLECTION_TIMEZONE = "Asia/Seoul";
 
 @Injectable()

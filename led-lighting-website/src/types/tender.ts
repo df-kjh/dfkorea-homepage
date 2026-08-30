@@ -1,5 +1,24 @@
 export type TenderSource = 'G2B' | 'KAPT' | 'KEPCO'
 
+export type TenderCollectionSourceStatus = 'SUCCEEDED' | 'FAILED'
+
+export interface TenderCollectionSourceResult {
+  source: TenderSource
+  status: TenderCollectionSourceStatus
+  fetchedCount: number
+  createdCount: number
+  updatedCount: number
+  excludedCount: number
+  errorCode: string | null
+}
+
+export interface TenderCollectionResponse {
+  lockAcquired: boolean
+  collectedAt: string
+  sources: TenderCollectionSourceResult[]
+  failedSources: TenderSource[]
+}
+
 export type TenderProcurementType = 'GOODS' | 'CONSTRUCTION' | 'SERVICE' | 'OTHER'
 
 export type TenderRelevance = 'DIRECT' | 'POTENTIAL'

@@ -17,6 +17,7 @@ import {
   MailItemStatus,
   TenderRelevance,
   TenderSource,
+  SyncRunStatus,
 } from "../src/tenders/domain/tender.enums";
 import { NormalizedTender } from "../src/tenders/domain/normalized-tender";
 import { TenderSourceAdapter } from "../src/tenders/domain/tender-source.adapter";
@@ -32,7 +33,7 @@ const ADMIN_TOKEN = "test-admin-token";
 const TENDER_ID = "00000000-0000-4000-8000-000000000001";
 
 describe("Tender admin HTTP contract", () => {
-  let app: INestApplication;
+  let app: INestApplication | undefined;
   const query = {
     getCalendar: jest.fn(),
     getTenders: jest.fn(),
@@ -41,6 +42,9 @@ describe("Tender admin HTTP contract", () => {
   const subscription = {
     getOrCreate: jest.fn(),
     update: jest.fn(),
+  };
+  const ingestion = {
+    collectAll: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -70,12 +74,38 @@ describe("Tender admin HTTP contract", () => {
       deliveryTime: "12:30",
       recipients: ["sales@dfkorea.co.kr"],
     });
+    ingestion.collectAll.mockResolvedValue({
+      lockAcquired: true,
+      collectedAt: new Date("2026-08-31T00:00:00.000Z"),
+      sources: [
+        {
+          source: TenderSource.G2B,
+          status: SyncRunStatus.SUCCEEDED,
+          fetchedCount: 2,
+          createdCount: 1,
+          updatedCount: 1,
+          excludedCount: 0,
+          errorCode: null,
+        },
+        {
+          source: TenderSource.KEPCO,
+          status: SyncRunStatus.FAILED,
+          fetchedCount: 0,
+          createdCount: 0,
+          updatedCount: 0,
+          excludedCount: 0,
+          errorCode: "SOURCE_UNAVAILABLE",
+        },
+      ],
+      failedSources: [TenderSource.KEPCO],
+    });
 
     const module = await Test.createTestingModule({
       controllers: [TendersController],
       providers: [
         { provide: TenderQueryService, useValue: query },
         { provide: TenderSubscriptionService, useValue: subscription },
+        { provide: TenderIngestionService, useValue: ingestion },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -105,17 +135,59 @@ describe("Tender admin HTTP contract", () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+      app = undefined;
+    }
   });
 
   it("rejects an unauthenticated calendar request", async () => {
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .get("/tenders/calendar?month=2026-08")
       .expect(401);
   });
 
+  it("rejects an unauthenticated manual collection request", async () => {
+    await request(app!.getHttpServer()).post("/tenders/collect").expect(401);
+  });
+
+  it("returns the authenticated manual collection summary", async () => {
+    await request(app!.getHttpServer())
+      .post("/tenders/collect")
+      .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          lockAcquired: true,
+          collectedAt: "2026-08-31T00:00:00.000Z",
+          sources: [
+            {
+              source: "G2B",
+              status: "SUCCEEDED",
+              fetchedCount: 2,
+              createdCount: 1,
+              updatedCount: 1,
+              excludedCount: 0,
+              errorCode: null,
+            },
+            {
+              source: "KEPCO",
+              status: "FAILED",
+              fetchedCount: 0,
+              createdCount: 0,
+              updatedCount: 0,
+              excludedCount: 0,
+              errorCode: "SOURCE_UNAVAILABLE",
+            },
+          ],
+          failedSources: ["KEPCO"],
+        });
+      });
+    expect(ingestion.collectAll).toHaveBeenCalledWith(expect.any(Date));
+  });
+
   it("serves the authenticated calendar, list, and safe detail contracts", async () => {
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .get("/tenders/calendar?month=2026-08&source=G2B")
       .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
       .expect(200)
@@ -132,7 +204,7 @@ describe("Tender admin HTTP contract", () => {
       expect.objectContaining({ source: "G2B" }),
     );
 
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .get("/tenders?registeredDate=2026-08-27&relevance=DIRECT")
       .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
       .expect(200)
@@ -144,7 +216,7 @@ describe("Tender admin HTTP contract", () => {
       }),
     );
 
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .get(`/tenders/${TENDER_ID}`)
       .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
       .expect(200)
@@ -162,7 +234,7 @@ describe("Tender admin HTTP contract", () => {
       deliveryTime: "12:30",
       recipients: ["sales@dfkorea.co.kr"],
     };
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .put("/tenders/subscription")
       .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
       .send(payload)
@@ -170,7 +242,7 @@ describe("Tender admin HTTP contract", () => {
       .expect(({ body }) => expect(body).toEqual(payload));
     expect(subscription.update).toHaveBeenCalledWith(payload);
 
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .put("/tenders/subscription")
       .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
       .send({ ...payload, keyword: "LED" })
@@ -178,7 +250,7 @@ describe("Tender admin HTTP contract", () => {
   });
 
   it("rejects display-filter query parameters on the subscription endpoint", async () => {
-    await request(app.getHttpServer())
+    await request(app!.getHttpServer())
       .get("/tenders/subscription?keyword=LED")
       .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
       .expect(400);

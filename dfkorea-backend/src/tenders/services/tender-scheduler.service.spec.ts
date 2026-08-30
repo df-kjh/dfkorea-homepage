@@ -8,7 +8,7 @@ describe("TenderSchedulerService", () => {
     (schedule as jest.Mock).mockReset();
   });
 
-  it("registers only midnight and noon collection in Korea Standard Time", () => {
+  it("registers hourly collection in Korea Standard Time", () => {
     const ingestion = { collectAll: jest.fn() };
     const mail = { sendDailyDigest: jest.fn(), retryDue: jest.fn() };
     const task = { stop: jest.fn(), destroy: jest.fn() };
@@ -16,18 +16,17 @@ describe("TenderSchedulerService", () => {
       .mockReturnValueOnce(task)
       .mockReturnValueOnce({ stop: jest.fn(), destroy: jest.fn() })
       .mockReturnValueOnce({ stop: jest.fn(), destroy: jest.fn() });
-    const service = new TenderSchedulerService(ingestion as never, mail as never);
+    const service = new TenderSchedulerService(
+      ingestion as never,
+      mail as never,
+    );
 
     service.onModuleInit();
 
-    expect(schedule).toHaveBeenCalledWith(
-      "0 0 0,12 * * *",
-      expect.any(Function),
-      {
-        timezone: "Asia/Seoul",
-        noOverlap: true,
-      },
-    );
+    expect(schedule).toHaveBeenCalledWith("0 0 * * * *", expect.any(Function), {
+      timezone: "Asia/Seoul",
+      noOverlap: true,
+    });
   });
 
   it("runs collection through the ingestion boundary and releases its cron task", async () => {
@@ -38,7 +37,10 @@ describe("TenderSchedulerService", () => {
       .mockReturnValueOnce(task)
       .mockReturnValueOnce({ stop: jest.fn(), destroy: jest.fn() })
       .mockReturnValueOnce({ stop: jest.fn(), destroy: jest.fn() });
-    const service = new TenderSchedulerService(ingestion as never, mail as never);
+    const service = new TenderSchedulerService(
+      ingestion as never,
+      mail as never,
+    );
 
     await service.onModuleInit();
     const callback = (schedule as jest.Mock).mock.calls[0][1];
@@ -56,16 +58,29 @@ describe("TenderSchedulerService", () => {
     const collectionTask = { stop: jest.fn(), destroy: jest.fn() };
     const dailyTask = { stop: jest.fn(), destroy: jest.fn() };
     const retryTask = { stop: jest.fn(), destroy: jest.fn() };
-    (schedule as jest.Mock).mockReturnValueOnce(collectionTask).mockReturnValueOnce(retryTask).mockReturnValueOnce(dailyTask);
-    const service = new TenderSchedulerService(ingestion as never, mail as never);
+    (schedule as jest.Mock)
+      .mockReturnValueOnce(collectionTask)
+      .mockReturnValueOnce(retryTask)
+      .mockReturnValueOnce(dailyTask);
+    const service = new TenderSchedulerService(
+      ingestion as never,
+      mail as never,
+    );
 
     await service.onModuleInit();
     const dailyCallback = (schedule as jest.Mock).mock.calls[1][1];
     await dailyCallback();
 
-    expect(schedule).toHaveBeenCalledWith("0 * * * * *", expect.any(Function), { timezone: "Asia/Seoul", noOverlap: true });
+    expect(schedule).toHaveBeenCalledWith("0 * * * * *", expect.any(Function), {
+      timezone: "Asia/Seoul",
+      noOverlap: true,
+    });
     expect(schedule).toHaveBeenCalledTimes(3);
-    expect(schedule).not.toHaveBeenCalledWith(expect.stringMatching(/45 13/), expect.anything(), expect.anything());
+    expect(schedule).not.toHaveBeenCalledWith(
+      expect.stringMatching(/45 13/),
+      expect.anything(),
+      expect.anything(),
+    );
     expect(mail.sendDailyDigest).toHaveBeenCalledWith(expect.any(Date));
     service.onModuleDestroy();
     expect(dailyTask.stop).toHaveBeenCalledTimes(1);

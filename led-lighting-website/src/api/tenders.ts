@@ -4,6 +4,7 @@ import type {
   Tender,
   TenderCalendarDay,
   TenderCalendarQuery,
+  TenderCollectionResponse,
   TenderQuery,
   TenderSubscription,
   UpdateTenderSubscription,
@@ -13,6 +14,7 @@ const withoutUndefined = <T extends object>(query: T): Partial<T> =>
   Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined)) as Partial<T>
 
 export const tendersAPI = {
+  collect: () => apiClient.post<TenderCollectionResponse>('/tenders/collect'),
   getCalendar: (month: string, query: TenderCalendarQuery = {}) =>
     apiClient.get<TenderCalendarDay[]>('/tenders/calendar', {
       params: withoutUndefined({ month, ...query }),
