@@ -5,9 +5,6 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "preDeployCommand": [
-      "npm run migration:run:prod && npm run admin:provision:prod"
-    ],
     "startCommand": "sh -c 'npm run migration:run:prod && exec npm run start:prod'",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,

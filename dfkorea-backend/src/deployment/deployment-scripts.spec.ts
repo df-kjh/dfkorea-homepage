@@ -485,13 +485,6 @@ describe("deployment migration commands", () => {
     expect(railwayConfig.deploy.startCommand).not.toMatch(
       /migration:run:prod\s*\|\|/,
     );
-
-    // 초기 운영 관리자 생성이 필요한 배포에서만 허용하는 1회성 명령이다.
-    // 서버 시작 뒤에는 어떤 명령도 실행될 수 없으므로 Pre-deploy 단계로 분리한다.
-    if (railwayConfig.deploy.preDeployCommand !== undefined) {
-      expect(railwayConfig.deploy.preDeployCommand).toEqual([
-        "npm run migration:run:prod && npm run admin:provision:prod",
-      ]);
-    }
+    expect(railwayConfig.deploy.preDeployCommand).toBeUndefined();
   });
 });
