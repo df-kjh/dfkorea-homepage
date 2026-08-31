@@ -1,4 +1,4 @@
-import { TenderRelevance, TenderSource, ProcurementType } from "../domain/tender.enums";
+import { TenderOpportunityType, TenderRelevance, TenderSource, ProcurementType } from "../domain/tender.enums";
 import { TenderQueryService } from "./tender-query.service";
 
 const createQueryBuilder = () => {
@@ -55,6 +55,15 @@ describe("TenderQueryService", () => {
     );
     expect(builder.groupBy).toHaveBeenCalledWith(
       "(tender.registeredAt AT TIME ZONE 'Asia/Seoul')::date",
+    );
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "tender.opportunityType IN (:...eligibleOpportunityTypes)",
+      {
+        eligibleOpportunityTypes: [
+          TenderOpportunityType.GOODS_SUPPLY,
+          TenderOpportunityType.MAS,
+        ],
+      },
     );
   });
 
@@ -143,6 +152,8 @@ describe("TenderQueryService", () => {
       relevance: TenderRelevance.DIRECT,
       relevanceScore: 100,
       relevanceReasons: [],
+      opportunityType: TenderOpportunityType.GOODS_SUPPLY,
+      opportunityReasons: ["물품 업무구분"],
       rawData: { secret: "must-not-leak" },
       firstCollectedAt: new Date("2026-08-10T04:00:00.000Z"),
       lastUpdatedAt: new Date("2026-08-10T04:00:00.000Z"),
@@ -176,6 +187,12 @@ describe("TenderQueryService", () => {
     expect(builder.addOrderBy).toHaveBeenCalledWith("tender.id", "ASC");
     expect(builder.skip).toHaveBeenCalledWith(5);
     expect(builder.take).toHaveBeenCalledWith(5);
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        opportunityType: TenderOpportunityType.GOODS_SUPPLY,
+        opportunityReasons: ["물품 업무구분"],
+      }),
+    );
   });
 
   it("returns a safe detail response without provider raw data", async () => {
@@ -200,6 +217,8 @@ describe("TenderQueryService", () => {
       relevance: TenderRelevance.POTENTIAL,
       relevanceScore: 40,
       relevanceReasons: [{ field: "title", keyword: "전기시설", score: 40 }],
+      opportunityType: TenderOpportunityType.MAS,
+      opportunityReasons: ["MAS 표현: 제목"],
       rawData: { apiKey: "must-not-leak" },
       firstCollectedAt: new Date("2026-08-01T00:00:00.000Z"),
       lastUpdatedAt: new Date("2026-08-01T00:00:00.000Z"),
@@ -211,6 +230,8 @@ describe("TenderQueryService", () => {
     expect(detail).toEqual(expect.objectContaining({
       title: "전기시설 개선",
       relevanceReasons: [{ field: "title", keyword: "전기시설", score: 40 }],
+      opportunityType: TenderOpportunityType.MAS,
+      opportunityReasons: ["MAS 표현: 제목"],
     }));
     expect(detail).not.toHaveProperty("rawData");
   });

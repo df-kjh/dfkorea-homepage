@@ -11,6 +11,7 @@ import { TenderQueryService } from "../src/tenders/services/tender-query.service
 import { TenderSubscriptionService } from "../src/tenders/services/tender-subscription.service";
 import { TendersController } from "../src/tenders/tenders.controller";
 import { TenderClassifier } from "../src/tenders/domain/tender-classifier";
+import { TenderOpportunityClassifier } from "../src/tenders/domain/tender-opportunity-classifier";
 import {
   ProcurementType,
   MailDeliveryStatus,
@@ -18,6 +19,7 @@ import {
   TenderRelevance,
   TenderSource,
   SyncRunStatus,
+  TenderOpportunityType,
 } from "../src/tenders/domain/tender.enums";
 import { NormalizedTender } from "../src/tenders/domain/normalized-tender";
 import { TenderSourceAdapter } from "../src/tenders/domain/tender-source.adapter";
@@ -343,6 +345,7 @@ describe("Tender collection and delivery service contracts", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
+      new TenderOpportunityClassifier(),
       [g2b, kapt, kepco],
     );
 
@@ -406,6 +409,8 @@ describe("Tender collection and delivery service contracts", () => {
       relevance: TenderRelevance.DIRECT,
       relevanceScore: 100,
       relevanceReasons: [],
+      opportunityType: TenderOpportunityType.GOODS_SUPPLY,
+      opportunityReasons: ["물품 업무구분"],
       firstCollectedAt: now,
       lastUpdatedAt: now,
     } as Tender;

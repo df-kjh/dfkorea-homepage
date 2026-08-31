@@ -7,6 +7,10 @@ import {
   MailItemStatus,
   TenderRelevance,
 } from "../domain/tender.enums";
+import {
+  ELIGIBLE_TENDER_OPPORTUNITY_TYPES,
+  isEligibleTenderOpportunityType,
+} from "../domain/tender-opportunity-eligibility";
 import { Tender } from "../entities/tender.entity";
 import { TenderMailDelivery } from "../entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "../entities/tender-mail-item.entity";
@@ -269,6 +273,7 @@ export class TenderMailService {
         const tenders = await tenderRepository.find({
           where: {
             relevance: In([TenderRelevance.DIRECT, TenderRelevance.POTENTIAL]),
+            opportunityType: In(ELIGIBLE_TENDER_OPPORTUNITY_TYPES),
           },
         });
         const missing = tenders
@@ -289,11 +294,12 @@ export class TenderMailService {
           ...(inserted as TenderMailItem[]),
         ].filter(
           (item) =>
-            item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
-            (item.status === MailItemStatus.PENDING &&
+            isEligibleTenderOpportunityType(item.tender.opportunityType) &&
+            (item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
+              (item.status === MailItemStatus.PENDING &&
               (!item.lastDelivery ||
                 item.lastDelivery.status === MailDeliveryStatus.FAILED ||
-                item.lastDelivery.status === MailDeliveryStatus.CANCELLED)),
+                item.lastDelivery.status === MailDeliveryStatus.CANCELLED))),
         );
         const targetDate = this.toKstDate(now);
         if (eligible.length === 0) {
@@ -372,13 +378,16 @@ export class TenderMailService {
       where: { lastDeliveryId: delivery.id, status: MailItemStatus.PENDING },
       relations: { tender: true },
     });
-    if (items.length === 0)
+    const eligibleItems = items.filter((item) =>
+      isEligibleTenderOpportunityType(item.tender.opportunityType),
+    );
+    if (eligibleItems.length === 0)
       return this.cancelRetry(
         delivery,
         now,
         "Delivery cancelled because no pending mail items remain",
       );
-    if (!(await this.isCurrentEnabledRecipient(delivery, items[0]))) {
+    if (!(await this.isCurrentEnabledRecipient(delivery, eligibleItems[0]))) {
       return this.cancelRetry(
         delivery,
         now,
@@ -387,7 +396,7 @@ export class TenderMailService {
     }
     await this.deliver(
       delivery,
-      items.map((item) => item.tender),
+      eligibleItems.map((item) => item.tender),
       now,
     );
   }

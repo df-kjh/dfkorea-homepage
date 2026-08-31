@@ -11,6 +11,7 @@ import {
   ProcurementType,
   TenderRelevance,
   TenderSource,
+  TenderOpportunityType,
 } from '../domain/tender.enums';
 import type { TenderClassificationReason } from '../domain/tender-classifier';
 
@@ -25,6 +26,7 @@ import type { TenderClassificationReason } from '../domain/tender-classifier';
 @Index('IDX_tender_relevance', ['relevance'])
 @Index('IDX_tender_region', ['region'])
 @Index('IDX_tender_procurement_type', ['procurementType'])
+@Index('IDX_tender_opportunity_type', ['opportunityType'])
 export class Tender {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -83,6 +85,16 @@ export class Tender {
 
   @Column({ type: 'jsonb' })
   relevanceReasons: TenderClassificationReason[];
+
+  @Column({
+    type: 'varchar',
+    nullable: false,
+    default: TenderOpportunityType.EXCLUDED_NON_SUPPLY,
+  })
+  opportunityType: TenderOpportunityType;
+
+  @Column({ type: 'jsonb', nullable: false, default: () => "'[]'::jsonb" })
+  opportunityReasons: string[];
 
   @Column({ type: 'jsonb' })
   rawData: Record<string, unknown>;

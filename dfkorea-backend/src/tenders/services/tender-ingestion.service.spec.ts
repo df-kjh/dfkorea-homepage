@@ -4,11 +4,13 @@ import { TenderSourceAdapter } from "../domain/tender-source.adapter";
 import {
   ProcurementType,
   SyncRunStatus,
+  TenderOpportunityType,
   TenderRelevance,
   TenderSource,
 } from "../domain/tender.enums";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { TenderIngestionService } from "./tender-ingestion.service";
+import { TenderOpportunityClassifier } from "../domain/tender-opportunity-classifier";
 
 const NOW = new Date("2026-08-27T03:00:00.000Z");
 
@@ -109,6 +111,7 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
+      new TenderOpportunityClassifier(),
       [g2b, kapt, kepco],
     );
   });
@@ -158,6 +161,8 @@ describe("TenderIngestionService", () => {
           relevanceReasons: expect.arrayContaining([
             expect.objectContaining({ keyword: "LED" }),
           ]),
+          opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
+          opportunityReasons: ["공사 업무구분"],
           rawData: { bidNtceNo: "G2B-1" },
         }),
       ],
@@ -183,7 +188,13 @@ describe("TenderIngestionService", () => {
         revision: "0",
       },
     ]);
-    g2b.fetchNotices.mockResolvedValue([directNotice]);
+    g2b.fetchNotices.mockResolvedValue([
+      {
+        ...directNotice,
+        title: "MAS LED 조명",
+        procurementType: ProcurementType.GOODS,
+      },
+    ]);
     kapt.fetchNotices.mockResolvedValue([]);
     kepco.fetchNotices.mockResolvedValue([]);
 
@@ -197,7 +208,13 @@ describe("TenderIngestionService", () => {
       }),
     );
     expect(tenderRepository.upsert).toHaveBeenCalledWith(
-      [expect.objectContaining({ title: "LED 가로등 교체공사" })],
+      [
+        expect.objectContaining({
+          title: "MAS LED 조명",
+          opportunityType: TenderOpportunityType.MAS,
+          opportunityReasons: ["MAS 표현: 제목"],
+        }),
+      ],
       expect.objectContaining({
         conflictPaths: ["source", "sourceNoticeId", "revision"],
       }),
@@ -298,6 +315,7 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
+      new TenderOpportunityClassifier(),
       throwingAdapters,
     );
 
@@ -323,6 +341,7 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
+      new TenderOpportunityClassifier(),
       new Proxy([] as TenderSourceAdapter[], {
         get(target, property, receiver) {
           if (property === "map") {
@@ -389,6 +408,7 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
+      new TenderOpportunityClassifier(),
       createBodyThrowingAdapters(undefined),
     );
 
@@ -406,6 +426,7 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
+      new TenderOpportunityClassifier(),
       createBodyThrowingAdapters(null),
     );
 

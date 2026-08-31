@@ -4,6 +4,7 @@ import { DataSource, In, QueryRunner, Repository } from "typeorm";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
+import { TenderOpportunityClassifier } from "../domain/tender-opportunity-classifier";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
@@ -43,6 +44,7 @@ export class TenderIngestionService {
     @InjectRepository(TenderSyncRun)
     private readonly syncRunRepository: Repository<TenderSyncRun>,
     private readonly classifier: TenderClassifier,
+    private readonly opportunityClassifier: TenderOpportunityClassifier,
     @Inject(TENDER_SOURCE_ADAPTERS)
     private readonly adapters: readonly TenderSourceAdapter[],
   ) {}
@@ -311,6 +313,14 @@ export class TenderIngestionService {
     notice: NormalizedTender,
     classification: NonNullable<ReturnType<TenderClassifier["classify"]>>,
   ): TenderUpsert {
+    const opportunity = this.opportunityClassifier.classify({
+      procurementType: notice.procurementType,
+      title: notice.title,
+      description: notice.description,
+      attachmentNames: notice.attachmentNames,
+      contractMethod: notice.contractMethod,
+      licenseLimits: notice.licenseLimits,
+    });
     return {
       source: notice.source,
       sourceNoticeId: notice.sourceNoticeId,
@@ -330,6 +340,8 @@ export class TenderIngestionService {
       relevance: classification.relevance,
       relevanceScore: classification.score,
       relevanceReasons: classification.reasons,
+      opportunityType: opportunity.type,
+      opportunityReasons: opportunity.reasons,
       // Adapters keep only provider response fields in rawData; request URLs
       // and configuration never cross this boundary, preventing key storage.
       rawData: notice.rawData,

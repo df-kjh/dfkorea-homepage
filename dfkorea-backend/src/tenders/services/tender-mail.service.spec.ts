@@ -3,6 +3,7 @@ import {
   MailDeliveryStatus,
   MailItemStatus,
   ProcurementType,
+  TenderOpportunityType,
   TenderRelevance,
   TenderSource,
 } from "../domain/tender.enums";
@@ -36,13 +37,15 @@ const TENDER = {
   bidEndedAt: null,
   openedAt: null,
   region: null,
-  procurementType: ProcurementType.CONSTRUCTION,
+  procurementType: ProcurementType.GOODS,
   contractMethod: null,
   estimatedAmount: null,
   sourceUrl: "https://example.com",
   relevance: TenderRelevance.DIRECT,
   relevanceScore: 100,
   relevanceReasons: [{ field: "title", keyword: "LED", score: 100 }],
+  opportunityType: TenderOpportunityType.GOODS_SUPPLY,
+  opportunityReasons: ["물품 업무구분"],
   rawData: {},
   firstCollectedAt: NOW,
   lastUpdatedAt: NOW,
@@ -155,6 +158,39 @@ describe("TenderMailService", () => {
       }),
     );
     expect(dataSource.transaction).toHaveBeenCalledTimes(3);
+    expect(tenderRepository.find).toHaveBeenCalledWith({
+      where: {
+        relevance: expect.anything(),
+        opportunityType: expect.anything(),
+      },
+    });
+  });
+
+  it("does not deliver an already queued pending item when its tender is no longer eligible", async () => {
+    const excludedTender = {
+      ...TENDER,
+      id: "excluded-tender",
+      opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
+      opportunityReasons: ["공사 업무구분"],
+    } as Tender;
+    tenderRepository.find.mockResolvedValue([]);
+    mailItemRepository.find.mockResolvedValue([
+      {
+        id: "queued-item",
+        recipientId: RECIPIENT.id,
+        tenderId: excludedTender.id,
+        tender: excludedTender,
+        status: MailItemStatus.PENDING,
+        lastDelivery: null,
+      },
+    ]);
+
+    await service.sendDailyDigest(NOW);
+
+    expect(transport.sendMail).not.toHaveBeenCalled();
+    expect(deliveryRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.SKIPPED }),
+    );
   });
 
   it.each([
@@ -680,6 +716,42 @@ describe("TenderMailService", () => {
     expect(mailItemRepository.update).toHaveBeenCalledWith(
       { lastDeliveryId: delivery.id },
       { lastDeliveryId: null },
+    );
+  });
+
+  it("cancels a due retry when its queued tender is no longer eligible", async () => {
+    const delivery = {
+      id: "delivery-excluded-tender",
+      recipientEmail: RECIPIENT.email,
+      status: MailDeliveryStatus.RETRY_SCHEDULED,
+      attemptCount: 1,
+      nextRetryAt: new Date(NOW.getTime() - 1),
+      targetDate: "2026-08-27",
+    } as TenderMailDelivery;
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
+    mailItemRepository.find.mockResolvedValue([
+      {
+        id: "queued-excluded-item",
+        recipientId: RECIPIENT.id,
+        tenderId: "excluded-tender",
+        tender: {
+          ...TENDER,
+          id: "excluded-tender",
+          opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
+          opportunityReasons: ["공사 업무구분"],
+        },
+        status: MailItemStatus.PENDING,
+        lastDeliveryId: delivery.id,
+      },
+    ]);
+
+    await service.retryDue(NOW);
+
+    expect(transport.sendMail).not.toHaveBeenCalled();
+    expect(deliveryRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.CANCELLED }),
     );
   });
 
