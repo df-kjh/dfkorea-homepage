@@ -381,6 +381,9 @@ export class TenderMailService {
     const eligibleItems = items.filter((item) =>
       isEligibleTenderOpportunityType(item.tender.opportunityType),
     );
+    const excludedMailItemIds = items
+      .filter((item) => !isEligibleTenderOpportunityType(item.tender.opportunityType))
+      .map((item) => item.id);
     if (eligibleItems.length === 0)
       return this.cancelRetry(
         delivery,
@@ -398,6 +401,8 @@ export class TenderMailService {
       delivery,
       eligibleItems.map((item) => item.tender),
       now,
+      eligibleItems.map((item) => item.id),
+      excludedMailItemIds,
     );
   }
 
@@ -488,6 +493,8 @@ export class TenderMailService {
     delivery: TenderMailDelivery,
     tenders: Tender[],
     now: Date,
+    deliveredMailItemIds?: string[],
+    excludedMailItemIds?: string[],
   ): Promise<void> {
     let message: {
       to: string;
@@ -525,21 +532,40 @@ export class TenderMailService {
     // however, item and delivery success state must commit or roll back as one
     // unit; a failed commit leaves the durable lease to become terminal
     // DELIVERY_UNCERTAIN, deliberately preferring possible loss to duplication.
-    await this.persistSuccess(delivery, result, now);
+    await this.persistSuccess(
+      delivery,
+      result,
+      now,
+      deliveredMailItemIds,
+      excludedMailItemIds,
+    );
   }
 
   private async persistSuccess(
     delivery: TenderMailDelivery,
     result: { providerMessageId?: string | null },
     now: Date,
+    deliveredMailItemIds?: string[],
+    excludedMailItemIds?: string[],
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const mailItemRepository = manager.getRepository(TenderMailItem);
       const deliveryRepository = manager.getRepository(TenderMailDelivery);
       await mailItemRepository.update(
-        { lastDeliveryId: delivery.id },
+        deliveredMailItemIds
+          ? { id: In(deliveredMailItemIds), lastDeliveryId: delivery.id }
+          : { lastDeliveryId: delivery.id },
         { status: MailItemStatus.SENT, sentAt: now, uncertainAt: null },
       );
+      if (excludedMailItemIds && excludedMailItemIds.length > 0) {
+        // These items were intentionally omitted from the acknowledged
+        // provider payload. Clear the completed delivery link so a later
+        // eligible reclassification can create a fresh, recoverable delivery.
+        await mailItemRepository.update(
+          { id: In(excludedMailItemIds), lastDeliveryId: delivery.id },
+          { lastDeliveryId: null },
+        );
+      }
       await deliveryRepository.save({
         ...delivery,
         status: MailDeliveryStatus.SENT,

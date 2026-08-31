@@ -33,6 +33,24 @@ describe("AddTenderOpportunityType1788135000000", () => {
     expect(statements.some((sql) => /\b(DELETE|TRUNCATE|DROP TABLE)\b/i.test(sql))).toBe(false);
   });
 
+  it("keeps a historical G2B goods row excluded until recollection verifies its license limits", async () => {
+    const runner = {
+      hasTable: jest.fn().mockResolvedValue(true),
+      query: jest.fn().mockResolvedValue([]),
+    };
+
+    await loadMigration().up(runner as never);
+
+    const backfill = compactSql(runner.query.mock.calls[2][0]);
+    const g2bGoods =
+      'WHEN "source" = \'G2B\' AND "procurementType" = \'GOODS\' THEN \'EXCLUDED_NON_SUPPLY\'';
+    expect(backfill).toContain(g2bGoods);
+    expect(backfill).toContain('기존 G2B 물품은 면허제한 재검증 필요');
+    expect(backfill.indexOf(g2bGoods)).toBeLessThan(
+      backfill.indexOf("THEN 'GOODS_SUPPLY'"),
+    );
+  });
+
   it("removes only the opportunity index and columns on rollback", async () => {
     const runner = {
       hasTable: jest.fn().mockResolvedValue(true),

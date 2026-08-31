@@ -59,7 +59,7 @@ erDiagram
 
 Indexes: `IDX_tender_registered_at`, `IDX_tender_source`, `IDX_tender_relevance`, `IDX_tender_region`, `IDX_tender_procurement_type`, and `IDX_tender_opportunity_type`.
 
-`1788135000000-AddTenderOpportunityType` expands `tenders` in place, backfills each existing notice from its procurement type and K-apt `rawData.codeClassifyType2`, and detects existing MAS wording in normalized and raw fields. It then sets non-null defaults before indexing eligibility. This migration never deletes or rewrites tender, mail-item, delivery, or dispatch-history rows; its rollback removes only the added index and two tender columns.
+`1788135000000-AddTenderOpportunityType` expands `tenders` in place, backfills the two new columns from each existing notice's procurement type and K-apt `rawData.codeClassifyType2`, and detects existing MAS wording in normalized and raw fields. Historical G2B goods remain excluded until recollection verifies their separately fetched license restrictions. It then sets non-null defaults before indexing eligibility. This migration deletes no rows and does not modify pre-existing tender columns, mail-item rows, delivery rows, or dispatch-history rows; its rollback removes only the added index and two tender columns.
 
 ### `tender_subscriptions`
 

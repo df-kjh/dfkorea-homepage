@@ -23,6 +23,8 @@ export class AddTenderOpportunityType1788135000000
           WHEN "procurementType" = 'CONSTRUCTION'
             OR ("source" = 'KAPT' AND "rawData"->>'codeClassifyType2' = '02')
             THEN 'EXCLUDED_CONSTRUCTION'
+          WHEN "source" = 'G2B' AND "procurementType" = 'GOODS'
+            THEN 'EXCLUDED_NON_SUPPLY'
           WHEN (
             "procurementType" = 'GOODS'
             OR ("source" = 'KAPT' AND "rawData"->>'codeClassifyType2' = '04')
@@ -40,6 +42,8 @@ export class AddTenderOpportunityType1788135000000
           WHEN "procurementType" = 'CONSTRUCTION'
             OR ("source" = 'KAPT' AND "rawData"->>'codeClassifyType2' = '02')
             THEN '["기존 공사 업무구분"]'::jsonb
+          WHEN "source" = 'G2B' AND "procurementType" = 'GOODS'
+            THEN '["기존 G2B 물품은 면허제한 재검증 필요"]'::jsonb
           WHEN (
             "procurementType" = 'GOODS'
             OR ("source" = 'KAPT' AND "rawData"->>'codeClassifyType2' = '04')

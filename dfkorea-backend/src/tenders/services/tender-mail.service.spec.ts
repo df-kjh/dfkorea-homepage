@@ -755,6 +755,66 @@ describe("TenderMailService", () => {
     );
   });
 
+  it("marks only the eligible retry item sent when a queued delivery now contains excluded work", async () => {
+    const delivery = {
+      id: "delivery-mixed-eligibility",
+      recipientEmail: RECIPIENT.email,
+      status: MailDeliveryStatus.RETRY_SCHEDULED,
+      attemptCount: 1,
+      nextRetryAt: new Date(NOW.getTime() - 1),
+      targetDate: "2026-08-27",
+    } as TenderMailDelivery;
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
+    mailItemRepository.find.mockResolvedValue([
+      {
+        id: "eligible-item",
+        recipientId: RECIPIENT.id,
+        tenderId: TENDER.id,
+        tender: TENDER,
+        status: MailItemStatus.PENDING,
+        lastDeliveryId: delivery.id,
+      },
+      {
+        id: "excluded-item",
+        recipientId: RECIPIENT.id,
+        tenderId: "excluded-tender",
+        tender: {
+          ...TENDER,
+          id: "excluded-tender",
+          opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
+          opportunityReasons: ["공사 업무구분"],
+        },
+        status: MailItemStatus.PENDING,
+        lastDeliveryId: delivery.id,
+      },
+    ]);
+
+    await service.retryDue(NOW);
+
+    expect(mailItemRepository.update).toHaveBeenCalledWith(
+      {
+        id: expect.objectContaining({
+          _type: "in",
+          _value: ["eligible-item"],
+        }),
+        lastDeliveryId: delivery.id,
+      },
+      { status: MailItemStatus.SENT, sentAt: NOW, uncertainAt: null },
+    );
+    expect(mailItemRepository.update).toHaveBeenCalledWith(
+      {
+        id: expect.objectContaining({
+          _type: "in",
+          _value: ["excluded-item"],
+        }),
+        lastDeliveryId: delivery.id,
+      },
+      { lastDeliveryId: null },
+    );
+  });
+
   it("cancels a due retry without calling the provider when its recipient was removed", async () => {
     const delivery = {
       id: "delivery-removed",

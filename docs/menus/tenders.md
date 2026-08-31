@@ -34,7 +34,7 @@
 - NAVER WORKS Mail API는 전송기 이중(mock)과 OAuth 암호화·갱신 및 영속 재시도 계약까지 검증했다. 스테이징에서 실제 Developer Console 앱의 `mail` scope, callback, 발신 계정 승인, `202` 성공, 주소 비중복, `429`/토큰 endpoint 일시 실패의 10분 후 1회 재시도를 확인해야 한다.
 - Mail API의 `429`처럼 수신이 명시적으로 거절된 일시 오류만 같은 슬롯에서 10분 뒤 한 번 재시도한다. `401`은 access token을 한 번 갱신하며, 그 밖의 `4xx`는 영구 실패다. Mail API는 idempotency key를 제공하지 않으므로 발송 요청의 network/timeout 오류와 `5xx`는 제공자가 이미 승인했을 가능성을 배제할 수 없어 해당 슬롯에서는 `DELIVERY_UNCERTAIN`으로 종결한다. 이후 관리자가 같은 날 발송 시각을 변경하거나 다음 날짜 슬롯이 열리면 이 공고는 다시 발송될 수 있으므로 드문 경우 중복 메일 가능성이 있다.
 - 빠른 HTTP·서비스 계약 테스트와 화면 테스트는 안전한 이중(mock)을 사용한다. 별도 `test:tender:integration` 실행기는 실제 AppModule, JWT, TypeORM, migration을 검증하도록 준비했지만, 현재 disposable PostgreSQL이 없어 실행하지 못했다. 이 파괴적 러너는 로컬/명시 Docker 테스트 DB만 허용하며 원격 스테이징 DB에는 실행할 수 없다. KST SQL 집계, 다중 연결 lock/unique claim, 권한 만료, 대량 데이터, 모바일 실기기 시각 검증은 배포 전 추가 확인이 필요하다.
-- 기존 행의 기회 판정 backfill은 이미 저장된 업무구분, K-apt `codeClassifyType2`, 제목·계약방법·원본 응답의 MAS 표현으로 수행한다. 과거 나라장터 전기공사업 면허제한 응답은 별도 정규화 열로 보존하지 않았으므로, 이력 행은 다음 수집 때 최신 판정 근거로 갱신된다.
+- 기존 행의 기회 판정 backfill은 이미 저장된 업무구분, K-apt `codeClassifyType2`, 제목·계약방법·원본 응답의 MAS 표현으로 수행한다. 과거 나라장터 물품은 전기공사업 면허제한 응답을 별도 정규화 열로 보존하지 않았으므로, 재수집에서 면허 제한을 검증할 때까지 보수적으로 제외한다.
 
 ## 관련 파일
 
