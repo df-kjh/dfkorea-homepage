@@ -5,6 +5,8 @@ import type {
   TenderCalendarDay,
   TenderCalendarQuery,
   TenderCollectionResponse,
+  TenderMailOAuthAuthorization,
+  TenderMailOAuthStatus,
   TenderQuery,
   TenderSubscription,
   UpdateTenderSubscription,
@@ -27,4 +29,8 @@ export const tendersAPI = {
   getSubscription: () => apiClient.get<TenderSubscription>('/tenders/subscription'),
   updateSubscription: (subscription: UpdateTenderSubscription) =>
     apiClient.put<TenderSubscription>('/tenders/subscription', subscription),
+  getMailOAuthStatus: () =>
+    apiClient.get<TenderMailOAuthStatus>('/tenders/mail/oauth/status'),
+  authorizeMailOAuth: () =>
+    apiClient.post<TenderMailOAuthAuthorization>('/tenders/mail/oauth/authorize'),
 }

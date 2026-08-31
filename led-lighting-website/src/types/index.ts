@@ -219,6 +219,8 @@ export type {
   TenderRelevanceReason,
   TenderSource,
   TenderSubscription,
+  TenderMailOAuthAuthorization,
+  TenderMailOAuthStatus,
   UpdateTenderSubscription,
 } from './tender'
 

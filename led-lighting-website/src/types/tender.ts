@@ -93,3 +93,13 @@ export interface TenderSubscription {
 }
 
 export type UpdateTenderSubscription = TenderSubscription
+
+export interface TenderMailOAuthStatus {
+  connected: boolean
+  connectedAt: string | null
+  accessTokenExpiresAt: string | null
+}
+
+export interface TenderMailOAuthAuthorization {
+  authorizationUrl: string
+}

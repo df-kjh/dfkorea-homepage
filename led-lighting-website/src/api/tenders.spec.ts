@@ -76,4 +76,12 @@ describe('tendersAPI', () => {
     expect(get).toHaveBeenNthCalledWith(2, '/tenders/a4d643b6-6448-4cad-9096-a82ba8cd2d60')
     expect(get).toHaveBeenNthCalledWith(3, '/tenders/subscription')
   })
+
+  it('uses the protected NAVER WORKS OAuth status and authorization routes', () => {
+    tendersAPI.getMailOAuthStatus()
+    tendersAPI.authorizeMailOAuth()
+
+    expect(get).toHaveBeenCalledWith('/tenders/mail/oauth/status')
+    expect(post).toHaveBeenCalledWith('/tenders/mail/oauth/authorize')
+  })
 })

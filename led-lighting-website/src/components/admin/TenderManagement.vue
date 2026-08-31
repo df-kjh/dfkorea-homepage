@@ -12,6 +12,7 @@ import type {
   PaginatedTenderResponse,
   Tender,
   TenderCalendarDay,
+  TenderMailOAuthStatus,
   TenderQuery,
   TenderSubscription,
 } from '@/types'
@@ -50,9 +51,14 @@ const subscriptionLoading = ref(false)
 const subscriptionLoaded = ref(false)
 const subscriptionError = ref<string | null>(null)
 const subscription = ref<TenderSubscription>({ enabled: false, deliveryTime: '09:00', recipients: [] })
+const mailOAuthStatus = ref<TenderMailOAuthStatus | null>(null)
+const mailOAuthLoading = ref(false)
+const mailOAuthError = ref<string | null>(null)
+const mailOAuthFeedback = ref<string | null>(null)
 let calendarRequest = 0
 let listRequest = 0
 let subscriptionRequest = 0
+let mailOAuthRequest = 0
 
 const summary = computed(() => calendarDays.value.reduce(
   (total, day) => ({ total: total.total + day.total, direct: total.direct + day.direct, potential: total.potential + day.potential }),
@@ -138,19 +144,64 @@ const fetchSubscription = async () => {
   }
 }
 
+const fetchMailOAuthStatus = async () => {
+  const request = ++mailOAuthRequest
+  mailOAuthLoading.value = true
+  mailOAuthError.value = null
+  try {
+    const { data } = await tendersAPI.getMailOAuthStatus()
+    if (request === mailOAuthRequest) mailOAuthStatus.value = data
+  } catch {
+    if (request === mailOAuthRequest) {
+      mailOAuthError.value = 'NAVER WORKS 연결 상태를 확인하지 못했습니다. 다시 시도해 주세요.'
+    }
+  } finally {
+    if (request === mailOAuthRequest) mailOAuthLoading.value = false
+  }
+}
+
+const authorizeMailOAuth = async () => {
+  if (mailOAuthLoading.value) return
+  mailOAuthLoading.value = true
+  mailOAuthError.value = null
+  try {
+    const { data } = await tendersAPI.authorizeMailOAuth()
+    const authorizationUrl = new URL(data.authorizationUrl)
+    if (authorizationUrl.protocol !== 'https:' || authorizationUrl.hostname !== 'auth.worksmobile.com') {
+      throw new Error('Untrusted NAVER WORKS authorization URL')
+    }
+    window.location.assign(authorizationUrl.toString())
+  } catch {
+    mailOAuthError.value = 'NAVER WORKS 메일 연결을 시작하지 못했습니다. 다시 시도해 주세요.'
+    mailOAuthLoading.value = false
+  }
+}
+
+const handleMailOAuthCallback = () => {
+  const currentUrl = new URL(window.location.href)
+  if (currentUrl.searchParams.get('mailOAuth') !== 'connected') return
+  mailOAuthFeedback.value = 'NAVER WORKS 메일 연결이 완료되었습니다.'
+  currentUrl.searchParams.delete('mailOAuth')
+  window.history.replaceState(window.history.state, '', currentUrl.toString())
+  void fetchMailOAuthStatus()
+}
+
 const selectDate = (date: string) => { selectedDate.value = date; fetchList(1) }
 const changeMonth = (nextMonth: string) => { month.value = nextMonth; selectedDate.value = `${nextMonth}-01`; fetchCalendar(); fetchList(1) }
 const goToday = () => { const today = currentDateLabel(); month.value = today.slice(0, 7); selectedDate.value = today; fetchCalendar(); fetchList(1) }
 const applyFilters = (filters: CalendarFilters) => { Object.assign(appliedFilters, filters); fetchCalendar(); fetchList(1) }
 const resetFilters = () => { Object.assign(appliedFilters, { keyword: undefined, source: undefined, region: undefined, procurementType: undefined, relevance: undefined }); fetchCalendar(); fetchList(1) }
 const openDetail = (tender: Tender) => { selectedTender.value = tender; detailOpen.value = true }
-const openSubscription = () => { subscriptionOpen.value = true; void fetchSubscription() }
+const openSubscription = () => { subscriptionOpen.value = true; void fetchSubscription(); void fetchMailOAuthStatus() }
 const closeSubscription = () => {
   ++subscriptionRequest
+  ++mailOAuthRequest
   subscriptionOpen.value = false
   subscriptionLoaded.value = false
   subscriptionLoading.value = false
   subscriptionError.value = null
+  mailOAuthLoading.value = false
+  mailOAuthError.value = null
 }
 const setSubscriptionOpen = (open: boolean) => { if (open) openSubscription(); else closeSubscription() }
 const saveSubscription = async (next: TenderSubscription) => {
@@ -173,7 +224,7 @@ const saveSubscription = async (next: TenderSubscription) => {
   }
 }
 
-onMounted(() => { fetchCalendar(); fetchList() })
+onMounted(() => { fetchCalendar(); fetchList(); handleMailOAuthCallback() })
 </script>
 
 <template>
@@ -185,6 +236,7 @@ onMounted(() => { fetchCalendar(); fetchList() })
 
     <TenderFilterPanel v-if="filterVisible" :filters="appliedFilters" class="mt-4" @apply="applyFilters" @reset="resetFilters" />
     <p v-if="collectionFeedback" class="tender-management__feedback" :role="collectionFeedback.role">{{ collectionFeedback.message }}</p>
+    <p v-if="mailOAuthFeedback" data-test="mail-oauth-feedback" class="tender-management__feedback" role="status">{{ mailOAuthFeedback }}</p>
     <p v-if="calendarError" class="tender-management__error" role="alert">{{ calendarError }}</p>
 
     <div class="tender-management__summary" aria-label="월간 공고 요약">
@@ -196,7 +248,7 @@ onMounted(() => { fetchCalendar(); fetchList() })
     <BaseCard :hoverable="false" custom-class="tender-calendar-card"><div class="tender-management__calendar-scroll"><TenderCalendar :month="month" :selected-date="selectedDate" :days="calendarDays" :loading="calendarLoading" @change-month="changeMonth" @select-date="selectDate" @today="goToday" /></div></BaseCard>
     <TenderList :response="listResponse" :loading="listLoading" :error="listError" :selected-date="selectedDate" @select="openDetail" @retry="fetchList(currentListPage)" @page-change="fetchList" />
     <TenderDetailModal v-model="detailOpen" :tender="selectedTender" />
-    <TenderSubscriptionModal :model-value="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :loaded="subscriptionLoaded" :error="subscriptionError" @update:model-value="setSubscriptionOpen" @retry="fetchSubscription" @save="saveSubscription" />
+    <TenderSubscriptionModal :model-value="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :loaded="subscriptionLoaded" :error="subscriptionError" :mail-o-auth-status="mailOAuthStatus" :mail-o-auth-loading="mailOAuthLoading" :mail-o-auth-error="mailOAuthError" @update:model-value="setSubscriptionOpen" @retry="fetchSubscription" @retry-mail-o-auth="fetchMailOAuthStatus" @authorize-mail-o-auth="authorizeMailOAuth" @save="saveSubscription" />
   </section>
 </template>
 

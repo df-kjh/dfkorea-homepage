@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   collect: vi.fn(),
   getSubscription: vi.fn(),
   updateSubscription: vi.fn(),
+  getMailOAuthStatus: vi.fn(),
+  authorizeMailOAuth: vi.fn(),
 }))
 
 vi.mock('@/api/tenders', () => ({ tendersAPI: api }))
@@ -76,6 +78,7 @@ const cleanupMountedWrappers = () => {
 
 describe('TenderManagement', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/admin')
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-08-27T12:00:00.000Z'))
     vi.resetAllMocks()
@@ -94,6 +97,16 @@ describe('TenderManagement', () => {
     })
     api.updateSubscription.mockResolvedValue({
       data: { enabled: true, deliveryTime: '09:00', recipients: ['sales@dfkorea.co.kr'] },
+    })
+    api.getMailOAuthStatus.mockResolvedValue({
+      data: {
+        connected: false,
+        connectedAt: null,
+        accessTokenExpiresAt: null,
+      },
+    })
+    api.authorizeMailOAuth.mockResolvedValue({
+      data: { authorizationUrl: 'https://auth.worksmobile.com/oauth2/v2.0/authorize?state=safe' },
     })
   })
 
@@ -253,6 +266,78 @@ describe('TenderManagement', () => {
       deliveryTime: '09:00',
       recipients: ['sales@dfkorea.co.kr'],
     })
+  })
+
+  it('loads NAVER WORKS connection status when opening reception settings', async () => {
+    api.getMailOAuthStatus.mockResolvedValueOnce({
+      data: {
+        connected: true,
+        connectedAt: '2026-08-31T00:00:00.000Z',
+        accessTokenExpiresAt: '2026-08-31T01:00:00.000Z',
+      },
+    })
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+
+    expect(api.getMailOAuthStatus).toHaveBeenCalledTimes(1)
+    expect(document.body.querySelector('[data-test="mail-oauth-status"]')?.textContent).toContain('연결됨')
+    expect(document.body.querySelector('[data-test="authorize-mail-oauth"]')?.textContent).toContain('다시 연결')
+  })
+
+  it('shows a safe error instead of navigating to an untrusted authorization URL', async () => {
+    api.authorizeMailOAuth.mockResolvedValueOnce({
+      data: { authorizationUrl: 'https://evil.example/oauth/authorize' },
+    })
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+    const button = document.body.querySelector<HTMLButtonElement>('[data-test="authorize-mail-oauth"]')
+    if (!button) throw new Error('Expected NAVER WORKS authorization button')
+    button.click()
+    await flushPromises()
+
+    expect(document.body.querySelector('[data-test="mail-oauth-error"]')?.textContent).toContain('연결을 시작하지 못했습니다')
+    expect(window.location.hostname).not.toBe('evil.example')
+  })
+
+  it('navigates to the trusted NAVER WORKS authorization URL returned by the backend', async () => {
+    const authorizationUrl = 'https://auth.worksmobile.com/oauth2/v2.0/authorize?state=safe'
+    api.authorizeMailOAuth.mockResolvedValueOnce({ data: { authorizationUrl } })
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-subscription"]').trigger('click')
+    await flushPromises()
+    const button = document.body.querySelector<HTMLButtonElement>('[data-test="authorize-mail-oauth"]')
+    if (!button) throw new Error('Expected NAVER WORKS authorization button')
+    button.click()
+    await flushPromises()
+
+    expect(window.location.href).toBe(authorizationUrl)
+  })
+
+  it('refreshes OAuth status and reports success after the callback query', async () => {
+    window.history.replaceState({}, '', '/admin?tab=tenders&mailOAuth=connected')
+    api.getMailOAuthStatus.mockResolvedValueOnce({
+      data: {
+        connected: true,
+        connectedAt: '2026-08-31T00:00:00.000Z',
+        accessTokenExpiresAt: '2026-08-31T01:00:00.000Z',
+      },
+    })
+
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    expect(api.getMailOAuthStatus).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="mail-oauth-feedback"]').text()).toContain('NAVER WORKS 메일 연결이 완료되었습니다')
+    expect(new URL(window.location.href).searchParams.has('mailOAuth')).toBe(false)
+    expect(new URL(window.location.href).searchParams.get('tab')).toBe('tenders')
   })
 
   it('refetches settings on every modal open and disables save after a failed refresh without overwriting loaded settings', async () => {
