@@ -84,6 +84,30 @@ describe("TendersController", () => {
     await expect(controller.collect()).resolves.toBe(summary);
   });
 
+  it("returns a non-sensitive PARTIAL result when G2B license enrichment is unavailable", async () => {
+    const summary = {
+      lockAcquired: true,
+      collectedAt: new Date("2026-08-31T00:00:00.000Z"),
+      sources: [
+        {
+          source: TenderSource.G2B,
+          status: "PARTIAL",
+          fetchedCount: 3,
+          createdCount: 3,
+          updatedCount: 0,
+          excludedCount: 0,
+          errorCode: "LICENSE_LIMIT_UNAVAILABLE",
+        },
+      ],
+      failedSources: [],
+    };
+    ingestion.collectAll.mockResolvedValue(summary);
+
+    await expect(controller.collect()).resolves.toEqual(summary);
+    expect(JSON.stringify(summary)).not.toContain("serviceKey");
+    expect(JSON.stringify(summary)).not.toContain("http");
+  });
+
   it("returns and replaces only the shared subscription settings", async () => {
     subscription.getOrCreate.mockResolvedValue({
       enabled: false,

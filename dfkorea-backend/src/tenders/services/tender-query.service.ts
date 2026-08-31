@@ -10,6 +10,7 @@ import {
   TenderSummaryDto,
 } from "../dto/tender-query.dto";
 import { Tender } from "../entities/tender.entity";
+import { ELIGIBLE_TENDER_OPPORTUNITY_TYPES } from "../domain/tender-opportunity-eligibility";
 
 const KST_OFFSET_HOURS = -9;
 const LIKE_ESCAPE_CHARACTER = "!";
@@ -38,6 +39,7 @@ export class TenderQueryService {
       });
 
     this.applyFilters(builder, filters);
+    this.applyOpportunityEligibility(builder);
     const rows = await builder
       .groupBy(localRegisteredDate)
       .addGroupBy("tender.relevance")
@@ -83,6 +85,7 @@ export class TenderQueryService {
       );
     }
     this.applyFilters(builder, query);
+    this.applyOpportunityEligibility(builder);
 
     const [tenders, total] = await builder
       .orderBy("tender.registeredAt", "DESC")
@@ -103,10 +106,11 @@ export class TenderQueryService {
   }
 
   async getTender(id: string): Promise<TenderDetailDto | null> {
-    const tender = await this.tenderRepository
+    const builder = this.tenderRepository
       .createQueryBuilder("tender")
-      .where("tender.id = :id", { id })
-      .getOne();
+      .where("tender.id = :id", { id });
+    this.applyOpportunityEligibility(builder);
+    const tender = await builder.getOne();
     return tender ? this.toSafeDto(tender) : null;
   }
 
@@ -134,7 +138,16 @@ export class TenderQueryService {
       relevance: tender.relevance,
       relevanceScore: tender.relevanceScore,
       relevanceReasons: tender.relevanceReasons,
+      opportunityType: tender.opportunityType,
+      opportunityReasons: tender.opportunityReasons,
     };
+  }
+
+  private applyOpportunityEligibility(builder: SelectQueryBuilder<Tender>): void {
+    builder.andWhere(
+      "tender.opportunityType IN (:...eligibleOpportunityTypes)",
+      { eligibleOpportunityTypes: ELIGIBLE_TENDER_OPPORTUNITY_TYPES },
+    );
   }
 
   /** Applies only admin display filters; subscription delivery never reads this DTO. */

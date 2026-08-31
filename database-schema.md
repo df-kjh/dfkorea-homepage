@@ -53,10 +53,13 @@ erDiagram
 | `estimatedAmount`                                        | bigint                  | Nullable; mapped to a string in TypeORM to preserve precision               |
 | `sourceUrl`                                              | varchar                 | Official source link                                                        |
 | `relevance`, `relevanceScore`, `relevanceReasons`        | varchar, integer, jsonb | Relevance is `DIRECT` or `POTENTIAL` and reasons retain classifier evidence |
+| `opportunityType`, `opportunityReasons`                  | varchar, jsonb          | Non-null supply-delivery eligibility (`GOODS_SUPPLY`, `MAS`, or excluded type) and its classifier/backfill evidence |
 | `rawData`                                                | jsonb                   | Original source response                                                    |
 | `firstCollectedAt`, `lastUpdatedAt`                      | timestamptz             | Collection audit timestamps                                                 |
 
-Indexes: `IDX_tender_registered_at`, `IDX_tender_source`, `IDX_tender_relevance`, `IDX_tender_region`, and `IDX_tender_procurement_type`.
+Indexes: `IDX_tender_registered_at`, `IDX_tender_source`, `IDX_tender_relevance`, `IDX_tender_region`, `IDX_tender_procurement_type`, and `IDX_tender_opportunity_type`.
+
+`1788135000000-AddTenderOpportunityType` expands `tenders` in place, backfills the two new columns from each existing notice's procurement type and K-apt `rawData.codeClassifyType2`, and detects existing MAS wording in normalized and raw fields. Historical G2B goods remain excluded until recollection verifies their separately fetched license restrictions. It then sets non-null defaults before indexing eligibility. This migration deletes no rows and does not modify pre-existing tender columns, mail-item rows, delivery rows, or dispatch-history rows; its rollback removes only the added index and two tender columns.
 
 ### `tender_subscriptions`
 
@@ -87,7 +90,7 @@ Index: `IDX_tender_recipient_subscription_active` on (`subscriptionId`, `isActiv
 | `id`                                                            | UUID          | Primary key                                      |
 | `source`                                                        | varchar       | `G2B`, `KAPT`, or `KEPCO`                        |
 | `scheduledAt`, `startedAt`, `finishedAt`                        | timestamptz   | Start/end timestamps are nullable until recorded |
-| `status`                                                        | varchar       | `RUNNING`, `SUCCEEDED`, or `FAILED`              |
+| `status`                                                        | varchar       | `RUNNING`, `SUCCEEDED`, `PARTIAL`, or `FAILED`   |
 | `fetchedCount`, `createdCount`, `updatedCount`, `excludedCount` | integer       | Per-run totals, default `0`                      |
 | `errorCode`, `errorMessage`                                     | varchar, text | Safe failure diagnostics, both nullable          |
 | `createdAt`                                                     | timestamptz   | Creation timestamp                               |
@@ -175,5 +178,6 @@ Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1
 - `1787820200000-UseNaverWorksMailApi` is the expand phase for a rolling deployment. It creates the singleton encrypted OAuth credential table, adds `providerMessageId`, copies existing `smtpMessageId` audit values, and temporarily keeps both columns synchronized with a trigger while old and new containers can coexist. Its rollback copies canonical values back before removing the new column. A separately deployed contract migration removes the synchronization trigger and `smtpMessageId` only after the new application version is healthy; the final schema retains only `providerMessageId`.
 - `1787820300000-DropLegacyTenderSmtpMessageId` is that contract phase. It performs a final null-only backfill, removes the compatibility trigger/function, and drops `smtpMessageId`. Its rollback recreates the legacy column from `providerMessageId` and restores bidirectional synchronization.
 - `1787820400000-AllowMultipleDailyDispatchTimes` replaces the date-only dispatch unique constraint with `UQ_tender_daily_dispatch_business_date_delivery_time`. It preserves every existing dispatch and allows a changed shared time to create another same-day slot. Rollback refuses to collapse multiple same-day audit rows instead of deleting history.
+- `1788135000000-AddTenderOpportunityType` adds indexed non-null tender opportunity eligibility and classifier evidence. It backfills procurement type, K-apt `codeClassifyType2`, and existing MAS wording without deleting tender or notification history; rollback removes only those new tender columns and their index.
 
 The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.

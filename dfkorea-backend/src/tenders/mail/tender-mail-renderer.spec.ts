@@ -2,6 +2,7 @@ import {
   ProcurementType,
   TenderRelevance,
   TenderSource,
+  TenderOpportunityType,
 } from "../domain/tender.enums";
 import { Tender } from "../entities/tender.entity";
 import { TenderMailRenderer } from "./tender-mail-renderer";
@@ -27,6 +28,8 @@ const tender = (overrides: Partial<Tender> = {}): Tender =>
     relevance: TenderRelevance.DIRECT,
     relevanceScore: 100,
     relevanceReasons: [{ field: "title", keyword: "<LED>", score: 100 }],
+    opportunityType: TenderOpportunityType.GOODS_SUPPLY,
+    opportunityReasons: ["물품 업무구분"],
     rawData: {},
     firstCollectedAt: new Date(),
     lastUpdatedAt: new Date(),
@@ -72,5 +75,28 @@ describe("TenderMailRenderer", () => {
     expect(rendered.html).not.toContain("javascript:");
     expect(rendered.html).not.toContain("공식 원문 보기");
     expect(rendered.text).not.toContain("javascript:");
+  });
+
+  it("renders supply and MAS opportunity labels with their reasons without raw source data", () => {
+    const rendered = new TenderMailRenderer().render(
+      new Date("2026-08-27T01:00:00.000Z"),
+      [
+        tender(),
+        tender({
+          id: "00000000-0000-4000-8000-000000000003",
+          opportunityType: TenderOpportunityType.MAS,
+          opportunityReasons: ["MAS 표현: 제목"],
+          rawData: { internalOnly: "do-not-show" },
+        }),
+      ],
+    );
+
+    for (const content of [rendered.html, rendered.text]) {
+      expect(content).toContain("📦 물품 납품");
+      expect(content).toContain("🧾 MAS");
+      expect(content).toContain("기회 판정 근거: 물품 업무구분");
+      expect(content).toContain("기회 판정 근거: MAS 표현: 제목");
+      expect(content).not.toContain("do-not-show");
+    }
   });
 });

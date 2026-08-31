@@ -2,8 +2,13 @@ import { NormalizedTender } from "../domain/normalized-tender";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
+  TenderSourceFetchResult,
 } from "../domain/tender-source.adapter";
-import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import {
+  ProcurementType,
+  SyncRunStatus,
+  TenderSource,
+} from "../domain/tender.enums";
 import {
   formatKstDate,
   parseKstDate,
@@ -31,9 +36,15 @@ export class KepcoTenderAdapter implements TenderSourceAdapter {
     }
   }
 
-  async fetchNotices(window: TenderFetchWindow): Promise<NormalizedTender[]> {
+  async fetchNotices(
+    window: TenderFetchWindow,
+  ): Promise<TenderSourceFetchResult> {
     if (!this.config.enabled) {
-      return [];
+      return {
+        notices: [],
+        status: SyncRunStatus.SUCCEEDED,
+        errorCode: null,
+      };
     }
 
     const rows = await this.client.getAllPages({
@@ -47,10 +58,14 @@ export class KepcoTenderAdapter implements TenderSourceAdapter {
       },
     });
 
-    return rows.flatMap((row) => {
-      const normalized = this.normalize(row);
-      return normalized ? [normalized] : [];
-    });
+    return {
+      notices: rows.flatMap((row) => {
+        const normalized = this.normalize(row);
+        return normalized ? [normalized] : [];
+      }),
+      status: SyncRunStatus.SUCCEEDED,
+      errorCode: null,
+    };
   }
 
   private normalize(row: Record<string, unknown>): NormalizedTender | null {
@@ -88,6 +103,9 @@ export class KepcoTenderAdapter implements TenderSourceAdapter {
       itemName: toNullableText(row.itemName) ?? "",
       description: toNullableText(row.description) ?? "",
       attachmentNames: [],
+      licenseLimits: [],
+      // KEPCO has no separate G2B license-limit enrichment requirement.
+      licenseLimitsVerified: true,
       rawData: row,
     };
   }

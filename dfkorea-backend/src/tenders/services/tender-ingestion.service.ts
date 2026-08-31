@@ -4,6 +4,7 @@ import { DataSource, In, QueryRunner, Repository } from "typeorm";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
+import { TenderOpportunityClassifier } from "../domain/tender-opportunity-classifier";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
@@ -19,7 +20,10 @@ const COLLECTION_OVERLAP_MS = 60 * 60 * 1000;
 
 export interface SourceCollectionSummary {
   source: TenderSource;
-  status: SyncRunStatus.SUCCEEDED | SyncRunStatus.FAILED;
+  status:
+    | SyncRunStatus.SUCCEEDED
+    | SyncRunStatus.PARTIAL
+    | SyncRunStatus.FAILED;
   fetchedCount: number;
   createdCount: number;
   updatedCount: number;
@@ -43,6 +47,7 @@ export class TenderIngestionService {
     @InjectRepository(TenderSyncRun)
     private readonly syncRunRepository: Repository<TenderSyncRun>,
     private readonly classifier: TenderClassifier,
+    private readonly opportunityClassifier: TenderOpportunityClassifier,
     @Inject(TENDER_SOURCE_ADAPTERS)
     private readonly adapters: readonly TenderSourceAdapter[],
   ) {}
@@ -178,7 +183,8 @@ export class TenderIngestionService {
         errorCode: null,
         errorMessage: null,
       });
-      const notices = await adapter.fetchNotices(window);
+      const fetchResult = await adapter.fetchNotices(window);
+      const { notices } = fetchResult;
       const { relevant, excludedCount } = this.classifyNotices(notices);
       const { createdCount, updatedCount } = await this.upsertRelevantTenders(
         relevant,
@@ -186,22 +192,22 @@ export class TenderIngestionService {
       await this.syncRunRepository.save({
         ...run,
         finishedAt: new Date(),
-        status: SyncRunStatus.SUCCEEDED,
+        status: fetchResult.status,
         fetchedCount: notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: null,
+        errorCode: fetchResult.errorCode,
         errorMessage: null,
       });
       return {
         source: adapter.source,
-        status: SyncRunStatus.SUCCEEDED,
+        status: fetchResult.status,
         fetchedCount: notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: null,
+        errorCode: fetchResult.errorCode,
       };
     } catch (error) {
       const { errorCode, errorMessage } = this.sanitizeError(error);
@@ -311,6 +317,15 @@ export class TenderIngestionService {
     notice: NormalizedTender,
     classification: NonNullable<ReturnType<TenderClassifier["classify"]>>,
   ): TenderUpsert {
+    const opportunity = this.opportunityClassifier.classify({
+      procurementType: notice.procurementType,
+      title: notice.title,
+      description: notice.description,
+      attachmentNames: notice.attachmentNames,
+      contractMethod: notice.contractMethod,
+      licenseLimits: notice.licenseLimits,
+      licenseLimitsVerified: notice.licenseLimitsVerified,
+    });
     return {
       source: notice.source,
       sourceNoticeId: notice.sourceNoticeId,
@@ -330,6 +345,8 @@ export class TenderIngestionService {
       relevance: classification.relevance,
       relevanceScore: classification.score,
       relevanceReasons: classification.reasons,
+      opportunityType: opportunity.type,
+      opportunityReasons: opportunity.reasons,
       // Adapters keep only provider response fields in rawData; request URLs
       // and configuration never cross this boundary, preventing key storage.
       rawData: notice.rawData,
