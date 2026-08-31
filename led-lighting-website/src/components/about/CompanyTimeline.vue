@@ -24,6 +24,12 @@ withDefaults(defineProps<Props>(), {
       title: '디에프코리아는 LED 조명 분야에서 지속적인 성장을 이어가고 있습니다',
       isCurrent: true,
     },
+        {
+      year: '2026',
+      month: '08',
+      title: '배선일체형 몰드바 출시',
+      isCurrent: false,
+    },
     {
       year: '2025',
       month: '12',
