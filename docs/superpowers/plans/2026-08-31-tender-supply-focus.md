@@ -100,31 +100,31 @@ Commit message: `feat: classify supply tender opportunities`
 - Produces: `Tender.opportunityType`, `Tender.opportunityReasons`, and matching fields in `TenderSummaryDto`.
 - Produces: shared `MAIL_ELIGIBLE_OPPORTUNITY_TYPES` or an equivalent single domain helper used by both query and mail selection.
 
-- [ ] **Step 1: Write failing persistence and ingestion tests**
+- [x] **Step 1: Write failing persistence and ingestion tests**
 
 Assert TypeORM metadata contains indexed non-null `opportunityType` and non-null JSONB `opportunityReasons`. Assert ingestion persists classifier output on create and updates both fields when an existing revision is recollected.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run entity and ingestion spec files; expect missing fields/classifier integration failures.
 
-- [ ] **Step 3: Implement entity, migration, ingestion, and run GREEN**
+- [x] **Step 3: Implement entity, migration, ingestion, and run GREEN**
 
 The migration adds both columns without dropping data, backfills existing rows using procurement type plus K-apt `rawData->>'codeClassifyType2'`, detects MAS text for existing goods, then sets non-null defaults and creates `IDX_tender_opportunity_type`. Down migration removes only the new index and columns. Register the classifier provider and persist its result on every create/update.
 
-- [ ] **Step 4: Write failing query and mail tests**
+- [x] **Step 4: Write failing query and mail tests**
 
 Assert calendar/list builders add `opportunityType IN (:...eligibleOpportunityTypes)` and safe DTOs expose both new fields. Assert mail creates items only for eligible tenders and excludes previously queued pending items whose related tender is now excluded.
 
-- [ ] **Step 5: Run focused tests and verify RED**
+- [x] **Step 5: Run focused tests and verify RED**
 
 Run query and mail service specs; expect absent filters and response fields.
 
-- [ ] **Step 6: Implement shared eligibility enforcement and run GREEN**
+- [x] **Step 6: Implement shared eligibility enforcement and run GREEN**
 
 Use exactly `GOODS_SUPPLY` and `MAS` as eligible types. Apply the predicate to calendar, list, and mail selection, including existing mail items. Do not change recipient, dispatch-slot, retry, or sent-history semantics.
 
-- [ ] **Step 7: Update schema documentation and commit Task 2**
+- [x] **Step 7: Update schema documentation and commit Task 2**
 
 Document the columns, index, backfill, and preservation behavior in `database-schema.md`.
 
