@@ -174,7 +174,7 @@
 - 생성·수정 일시
 - token 암호화 key는 DB에 저장하지 않고 배포 secret store에서만 주입
 
-`1787820200000-UseNaverWorksMailApi` migration은 무중단 전환의 expand 단계다. `providerMessageId`를 추가하고 기존 `smtpMessageId` 값을 복사한 뒤, 구·신 컨테이너가 공존하는 동안 trigger로 두 컬럼을 동기화한다. 새 버전의 정상 동작을 확인한 다음 별도 contract migration을 배포해 trigger와 `smtpMessageId`를 제거한다. rollback 시에는 canonical 값을 legacy 컬럼에 다시 복사하므로 audit data가 보존된다.
+`1787820200000-UseNaverWorksMailApi` migration은 무중단 전환의 expand 단계다. `providerMessageId`를 추가하고 기존 `smtpMessageId` 값을 복사한 뒤, 구·신 컨테이너가 공존하는 동안 trigger로 두 컬럼을 동기화한다. 새 버전의 정상 동작을 확인한 다음 `1787820300000-DropLegacyTenderSmtpMessageId` contract migration을 별도 배포해 trigger와 `smtpMessageId`를 제거한다. rollback 시에는 canonical 값을 legacy 컬럼에 다시 복사하므로 audit data가 보존된다.
 
 DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를 새로 만들고 테이블, 관계, 고유 제약, 인덱스를 최신 상태로 기록한다.
 

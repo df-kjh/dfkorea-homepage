@@ -1,4 +1,5 @@
 import { UseNaverWorksMailApi1787820200000 } from "./1787820200000-UseNaverWorksMailApi";
+import { DropLegacyTenderSmtpMessageId1787820300000 } from "./1787820300000-DropLegacyTenderSmtpMessageId";
 
 const compactSql = (sql: string) => sql.replace(/\s+/g, " ").trim();
 
@@ -9,6 +10,38 @@ const createRunner = (tables: Record<string, string[]>) => ({
       tables[tableName]?.includes(columnName) ?? false,
   ),
   query: jest.fn().mockResolvedValue([]),
+});
+
+describe("DropLegacyTenderSmtpMessageId1787820300000", () => {
+  it("backfills canonical audit values before removing the synchronized legacy column", async () => {
+    const runner = createRunner({
+      tender_mail_deliveries: ["smtpMessageId", "providerMessageId"],
+    });
+
+    await new DropLegacyTenderSmtpMessageId1787820300000().up(runner as never);
+
+    const statements = runner.query.mock.calls.map(([sql]) => compactSql(sql));
+    expect(statements).toContain(
+      'UPDATE "tender_mail_deliveries" SET "providerMessageId" = COALESCE("providerMessageId", "smtpMessageId") WHERE "providerMessageId" IS NULL',
+    );
+    expect(statements).toContain(
+      'ALTER TABLE "tender_mail_deliveries" DROP COLUMN "smtpMessageId"',
+    );
+  });
+
+  it("restores and synchronizes the legacy column on rollback", async () => {
+    const runner = createRunner({
+      tender_mail_deliveries: ["providerMessageId"],
+    });
+
+    await new DropLegacyTenderSmtpMessageId1787820300000().down(runner as never);
+
+    const statements = runner.query.mock.calls.map(([sql]) => compactSql(sql));
+    expect(statements).toContain(
+      'ALTER TABLE "tender_mail_deliveries" ADD COLUMN "smtpMessageId" varchar',
+    );
+    expect(statements.some((sql) => sql.includes("CREATE TRIGGER"))).toBe(true);
+  });
 });
 
 describe("UseNaverWorksMailApi1787820200000", () => {
