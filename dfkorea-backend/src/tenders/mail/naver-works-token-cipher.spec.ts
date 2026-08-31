@@ -21,7 +21,9 @@ describe("NaverWorksTokenCipher", () => {
       new ConfigService({ NAVER_WORKS_TOKEN_ENCRYPTION_KEY: key }),
     );
     const encrypted = cipher.encrypt("refresh-secret");
-    const modified = `${encrypted.slice(0, -1)}${encrypted.endsWith("A") ? "B" : "A"}`;
+    const parts = encrypted.split(":");
+    parts[3] = `${parts[3].startsWith("A") ? "B" : "A"}${parts[3].slice(1)}`;
+    const modified = parts.join(":");
 
     expect(() => cipher.decrypt(modified)).toThrow(
       "NAVER WORKS credential could not be decrypted",

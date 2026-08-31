@@ -76,7 +76,7 @@ describe("Tender mail OAuth HTTP contract", () => {
       .expect(302)
       .expect(
         "Location",
-        "https://www.dfkorealed.com/admin?tab=tenders&mailOAuth=connected",
+        "https://www.dfkorealed.com/admin/dashboard?tab=tenders&mailOAuth=connected",
       );
     expect(oauth.completeAuthorization).toHaveBeenCalledWith(
       "code-value",
