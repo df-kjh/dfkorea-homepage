@@ -61,4 +61,3 @@
 - 분류 변경은 실패 테스트를 먼저 작성하고 확인한 뒤 구현한다.
 - DB 변경과 함께 `database-schema.md`를 갱신한다.
 - 입찰 메뉴 변경과 함께 `docs/menus/tenders.md`를 갱신한다.
-
