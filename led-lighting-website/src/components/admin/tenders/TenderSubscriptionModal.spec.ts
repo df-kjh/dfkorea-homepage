@@ -54,6 +54,51 @@ describe('TenderSubscriptionModal', () => {
     ])
   })
 
+  it('starts reception when saving one or more recipient addresses', async () => {
+    const wrapper = mount(TenderSubscriptionModal, {
+      props: {
+        modelValue: true,
+        subscription: {
+          enabled: false,
+          deliveryTime: '09:30',
+          recipients: ['owner@dfkorealed.com'],
+        },
+      },
+      attachTo: document.body,
+    })
+
+    await click('[data-test="save-subscription"]')
+
+    expect(wrapper.emitted('save')).toEqual([
+      [
+        {
+          enabled: true,
+          deliveryTime: '09:30',
+          recipients: ['owner@dfkorealed.com'],
+        },
+      ],
+    ])
+  })
+
+  it('stops reception only through the explicit stop action', async () => {
+    const wrapper = mount(TenderSubscriptionModal, {
+      props: { modelValue: true, subscription },
+      attachTo: document.body,
+    })
+
+    await click('[data-test="disable-subscription"]')
+
+    expect(wrapper.emitted('save')).toEqual([
+      [
+        {
+          enabled: false,
+          deliveryTime: '09:00',
+          recipients: ['sales@dfkorea.co.kr'],
+        },
+      ],
+    ])
+  })
+
   it('rejects duplicate and invalid email addresses without adding them', async () => {
     mount(TenderSubscriptionModal, {
       props: { modelValue: true, subscription },
