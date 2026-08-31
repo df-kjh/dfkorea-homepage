@@ -150,23 +150,23 @@ Commit message: `feat: enforce supply-focused tender delivery`
 - Consumes: API `opportunityType` and `opportunityReasons` from Task 2.
 - Produces: `TenderOpportunityBadge` rendering `📦 물품 납품` or `🧾 MAS`.
 
-- [ ] **Step 1: Write failing component and renderer tests**
+- [x] **Step 1: Write failing component and renderer tests**
 
 Assert the common badge labels both eligible types, list and detail render the badge, and HTML/text mail output contains the same label plus opportunity reasons without exposing `rawData`.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run the new badge/list/detail Vitest files and backend mail-renderer Jest file; expect failures for missing fields/component/content.
 
-- [ ] **Step 3: Implement the common badge and integrations**
+- [x] **Step 3: Implement the common badge and integrations**
 
 Use the existing common visual language: teal package badge for goods and indigo document badge for MAS. Keep `TenderRelevanceBadge` alongside it. Add accessible text, render reasons in the detail and mail, and avoid duplicating label maps across list/detail by keeping label logic in the common badge.
 
-- [ ] **Step 4: Run focused tests and GREEN**
+- [x] **Step 4: Run focused tests and GREEN**
 
 Run the focused frontend and backend renderer tests and expect PASS.
 
-- [ ] **Step 5: Update menu documentation and commit Task 3**
+- [x] **Step 5: Update menu documentation and commit Task 3**
 
 Update `docs/menus/tenders.md` with completed supply-focused behavior, MAS boundary, K-apt mapping, and the operational need to confirm the current OpenAPI license-limit response.
 
