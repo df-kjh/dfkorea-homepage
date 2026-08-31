@@ -27,6 +27,10 @@ import { TenderRecipient } from "../src/tenders/entities/tender-recipient.entity
 import { TenderIngestionService } from "../src/tenders/services/tender-ingestion.service";
 import { TenderMailService } from "../src/tenders/services/tender-mail.service";
 import { TenderMailRenderer } from "../src/tenders/mail/tender-mail-renderer";
+import {
+  MailDeliveryError,
+  MailDeliveryOutcome,
+} from "../src/tenders/mail/mail-delivery-outcome";
 import { TenderDailyDispatch } from "../src/tenders/entities/tender-daily-dispatch.entity";
 
 const ADMIN_TOKEN = "test-admin-token";
@@ -499,13 +503,11 @@ describe("Tender collection and delivery service contracts", () => {
           ([call]) => call.to === failedRecipient.email,
         ).length;
         if (message.to === failedRecipient.email && failedAttempts === 1) {
-          throw {
-            code: "EENVELOPE",
-            command: "RCPT TO",
-            responseCode: 550,
-          };
+          throw new MailDeliveryError(
+            MailDeliveryOutcome.RETRYABLE_REJECTION,
+          );
         }
-        return { messageId: `smtp-${message.to}` };
+        return { providerMessageId: `provider-${message.to}` };
       }),
     };
     const dataSource = {
@@ -534,17 +536,6 @@ describe("Tender collection and delivery service contracts", () => {
       deliveryRepository as never,
       mailItemRepository as never,
       dailyDispatchRepository as never,
-      {
-        get: jest.fn(
-          (key: string) =>
-            ({
-              SMTP_HOST: "smtp.worksmobile.com",
-              SMTP_USER: "sender@dfkorea.co.kr",
-              SMTP_APP_PASSWORD: "test-only-password",
-              SMTP_FROM_NAME: "DF KOREA 입찰정보",
-            })[key],
-        ),
-      } as never,
       new TenderMailRenderer(),
       transport as never,
     );

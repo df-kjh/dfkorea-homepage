@@ -70,12 +70,14 @@
 - `TenderIngestionService`: 정규화, 분류, 중복 확인, 신규 저장 및 변경 갱신
 - `TenderQueryService`: 월별 집계, 일자별 목록, 상세 조회
 - `TenderSubscriptionService`: 수신 사용 여부, 주소 목록, 발송 시각 관리
-- `TenderMailService`: 이메일 HTML 생성과 네이버웍스 SMTP 발송
-- `TenderSchedulerService`: 2회 수집, 일일 메일, 실패 재시도 예약
+- `TenderMailService`: 이메일 HTML 생성, provider-neutral 발송 상태, NAVER WORKS Mail API 결과 영속화
+- `NaverWorksOAuthService`: 관리자 승인 URL·callback state 검증, 암호화 token 저장과 access token 자동 갱신
+- `NaverWorksMailTransport`: HTTPS Mail API 호출, `401` 갱신, provider 응답의 안전한 결과 분류
+- `TenderSchedulerService`: 매시 수집, 일일 메일, 실패 재시도 예약
 
 ### 5.2 스케줄
 
-- 공고 수집: 매일 `00:00`, `12:00`, `Asia/Seoul`
+- 공고 수집: 매시 정각, `Asia/Seoul`
 - 메일 발송: 매분 공용 설정의 enabled·발송 시각·활성 수신자를 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 KST 영업일 고유 claim을 획득한 한 replica만 실행
 - 메일 재시도: 특정 주소의 1차 발송 실패 10분 뒤 해당 주소만 1회
 - 재시도 실패: 추가 자동 재시도 없이 실패 기록. 다음 날 해당 주소의 메일에 미발송 공고 재포함
@@ -144,8 +146,8 @@
 - 대상 수신 주소, 대상 기간, 시도 횟수 `1 | 2`
 - nullable 일일 dispatch/recipient 외래 키와 `(dailyDispatchId, recipientId)` 고유 제약. 기존 migration 이전 audit row는 nullable 유지
 - `PENDING | SENT | FAILED | RETRY_SCHEDULED | SKIPPED | CANCELLED | DELIVERY_UNCERTAIN` 상태
-- SMTP 메시지 ID, durable `claimedAt`, 성공·실패·불확실 시각, 안전하게 정리된 오류
-- stale in-flight SMTP 결과는 terminal `DELIVERY_UNCERTAIN`이며 재시도하지 않음
+- nullable provider-neutral 메시지 ID, durable `claimedAt`, 성공·실패·불확실 시각, 안전하게 정리된 오류
+- stale in-flight mail-provider 결과는 terminal `DELIVERY_UNCERTAIN`이며 재시도하지 않음
 
 ### 7.6 `tender_mail_items`
 
@@ -162,17 +164,32 @@
 - recipient delivery claim 전 오류는 `CLAIMED`로 남아 stale lease에서 재개되고, 모든 활성 주소에 해당 dispatch의 durable state가 있을 때만 완료
 - advisory lock과 별도로 DB unique insert가 최종 중복 방지 경계
 
+### 7.8 `tender_mail_oauth_credentials`
+
+- `singletonKey=naver-works` 고유 제약으로 공용 발신 계정 한 건만 유지
+- provider 식별자 `NAVER_WORKS`
+- AES-256-GCM으로 암호화한 access/refresh token과 access token 만료 시각
+- 허용 scope, 연결 완료 시각
+- OAuth state 원문 대신 SHA-256 hash와 10분 만료 시각 저장
+- 생성·수정 일시
+- token 암호화 key는 DB에 저장하지 않고 배포 secret store에서만 주입
+
+`1787820200000-UseNaverWorksMailApi` migration은 무중단 전환의 expand 단계다. `providerMessageId`를 추가하고 기존 `smtpMessageId` 값을 복사한 뒤, 구·신 컨테이너가 공존하는 동안 trigger로 두 컬럼을 동기화한다. 새 버전의 정상 동작을 확인한 다음 별도 contract migration을 배포해 trigger와 `smtpMessageId`를 제거한다. rollback 시에는 canonical 값을 legacy 컬럼에 다시 복사하므로 audit data가 보존된다.
+
 DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를 새로 만들고 테이블, 관계, 고유 제약, 인덱스를 최신 상태로 기록한다.
 
 ## 8. API 설계
 
-모든 엔드포인트는 기존 `JwtAuthGuard`로 보호한다.
+공고·설정·OAuth 시작·상태 엔드포인트는 기존 `JwtAuthGuard`로 보호한다. OAuth provider가 호출하는 callback만 공개하되 저장된 state hash, constant-time 비교, 10분 만료로 요청을 검증한다.
 
 - `GET /tenders/calendar?month=YYYY-MM&keyword&source&region&procurementType&relevance`: 월의 날짜별 전체·직접·잠재 건수. 목록과 같은 조회 전용 필터를 적용하며, 이메일 수신 대상에는 영향을 주지 않는다.
 - `GET /tenders`: `registeredDate`, `keyword`, `source`, `region`, `procurementType`, `relevance`, `page`, `pageSize`로 목록 조회
 - `GET /tenders/:id`: 상세 공고와 판정 근거 조회
 - `GET /tenders/subscription`: 수신 사용 여부, 이메일 목록, 발송 시각 조회
 - `PUT /tenders/subscription`: 전체 수신 설정 원자적 저장
+- `POST /tenders/mail/oauth/authorize`: 관리자 전용 NAVER WORKS 승인 URL 생성
+- `GET /tenders/mail/oauth/status`: 관리자 전용 연결 여부·연결/만료 시각 조회
+- `GET /tenders/mail/oauth/callback?code&state`: 검증된 authorization code 교환 뒤 입찰 탭으로 redirect
 
 조회 API는 등록일을 기준으로 캘린더와 목록을 일치시킨다. 목록 기본 정렬은 등록일시 내림차순이다.
 
@@ -234,13 +251,13 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 
 ### 10.1 발송 방식
 
-- SMTP 호스트: `smtp.worksmobile.com`
-- 포트: `465` SSL
-- 사용자 ID: 도메인을 포함한 네이버웍스 이메일 주소
-- 비밀번호: 네이버웍스 외부 앱 비밀번호
+- API: `POST https://www.worksapis.com/v1.0/users/{senderUserId}/mail`
+- 인증: NAVER WORKS OAuth 2.0 authorization-code 및 refresh-token 흐름, `mail` scope
+- 발신자 ID: 도메인을 포함한 네이버웍스 구성원 이메일 주소
+- 성공 경계: provider의 `202 Accepted`
 - 각 수신 주소에 개별 발송해 주소 상호 노출 방지
 
-네이버웍스 관리자가 SMTP 사용을 허용해야 하며, 발신 계정의 외부 앱 비밀번호를 별도로 발급한다. 자격 증명은 환경 변수에만 저장한다.
+Developer Console의 client ID/secret과 정확한 HTTPS callback URL을 환경 변수로 설정한다. 관리자 JWT로 승인 URL을 만든 뒤 발신 구성원 계정이 권한을 승인한다. access/refresh token은 배포 secret의 32-byte base64 key로 AES-256-GCM 암호화해 singleton DB row에 저장하고 access token은 만료 전에 자동 갱신한다. `401`은 token을 강제 갱신한 뒤 Mail API 요청을 한 번만 다시 호출한다. Railway Hobby에서도 TCP SMTP가 아닌 outbound HTTPS만 사용한다.
 
 ### 10.2 발송 대상
 
@@ -259,20 +276,21 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 
 ### 10.4 실패 처리
 
-- 주소별 SMTP 결과를 기록한다.
-- Nodemailer `responseCode` 4xx/5xx 명시 거절과 `CONN`, `AUTH`, `MAIL FROM`, `RCPT TO` 단계의 입증 가능한 실패만 확인된 실패로 보고 10분 뒤 한 번 재시도한다.
-- 명시적 4xx/5xx `responseCode` 또는 non-empty recipient `rejected`만 confirmed failure로 재시도한다. negative SMTP 응답이 없는 `ETIMEDOUT`, `ECONNECTION`, `ECONNRESET`, `ESOCKET`과 알 수 없는 transport 오류는 `command=CONN`이어도 승인 경계를 증명하지 못해 즉시 terminal `DELIVERY_UNCERTAIN`으로 처리한다. 원본 오류는 typed classifier에만 전달하고 SMTP response 상세는 저장하지 않는다.
-- SMTP 성공 응답 뒤에만 해당 주소와 공고 조합을 성공 발송으로 확정한다.
+- 주소별 Mail API 결과를 기록한다.
+- `202 Accepted`만 해당 주소와 공고 조합의 성공 발송으로 확정한다.
+- Mail API `429`와 OAuth token endpoint의 network/timeout·`429`·`5xx`만 확인된 일시 실패로 보고 10분 뒤 한 번 재시도한다. Mail API `401`은 token 강제 갱신 뒤 한 번 재호출하고, 이후 `4xx`와 token endpoint의 그 밖의 `4xx`는 영구 실패다.
+- NAVER WORKS Mail API는 idempotency key를 문서화하지 않는다. 본문 요청의 network/timeout, Mail API `5xx`, 예상하지 않은 응답은 provider가 이미 승인했을 가능성을 배제할 수 없으므로 즉시 terminal `DELIVERY_UNCERTAIN`으로 처리한다. 원본 오류는 typed classifier에만 전달하고 Authorization header, token, response body는 저장하지 않는다.
 - 재시도 실패 공고는 다음 날 해당 주소의 대상 선정에 다시 포함한다.
-- SMTP 승인과 그 뒤 DB commit은 원자화할 수 없다. in-flight claim이 stale이면 SMTP가 이미 승인했을 수 있으므로 delivery와 item을 terminal `DELIVERY_UNCERTAIN`으로 표시하고 재전송하지 않는다. 이는 이미 승인된 주소의 중복을 우선 방지하며, 극히 드문 메일 누락 가능성을 명시적으로 감수하는 절충이다.
-- stale 전이와 늦게 도착한 확인된 실패는 조건부 lease update로 경합하므로 `DELIVERY_UNCERTAIN`이 retry 상태로 되살아나지 않는다. 늦은 SMTP 성공은 실제 승인을 `SENT`로 확정할 수 있다.
+- provider 승인과 그 뒤 DB commit은 원자화할 수 없다. in-flight claim이 stale이면 provider가 이미 승인했을 수 있으므로 delivery와 item을 terminal `DELIVERY_UNCERTAIN`으로 표시하고 재전송하지 않는다. 이는 이미 승인된 주소의 중복을 우선 방지하며, 극히 드문 메일 누락 가능성을 명시적으로 감수하는 절충이다.
+- stale 전이와 늦게 도착한 확인된 실패는 조건부 lease update로 경합하므로 `DELIVERY_UNCERTAIN`이 retry 상태로 되살아나지 않는다. 늦은 `202`는 실제 승인을 `SENT`로 확정할 수 있다.
 
 ## 11. 오류 및 보안
 
 - 출처 하나가 실패해도 다른 출처의 수집은 계속한다.
-- 수집 실패 출처는 다음 `00:00` 또는 `12:00` 실행에서 겹치는 기간으로 재조회한다.
+- 수집 실패 출처는 다음 매시 실행에서 겹치는 기간으로 재조회한다.
 - 외부 API 원본 오류 응답과 인증키는 사용자 응답이나 일반 로그에 노출하지 않는다.
-- API 키, 네이버웍스 계정, 외부 앱 비밀번호는 백엔드 환경 변수에서만 읽는다.
+- API 키, NAVER WORKS client secret, sender ID, token 암호화 key는 백엔드 환경 변수에서만 읽는다. OAuth access/refresh token은 AES-256-GCM 암호문으로만 DB에 저장한다.
+- OAuth callback은 raw state를 저장하지 않고 SHA-256 hash와 10분 만료를 constant-time 비교하며, 성공한 state는 token 저장과 함께 제거한다.
 - 이메일 형식, 중복 주소, 최대 수신자 20개, `HH:mm` 시각을 DTO에서 검증한다.
 - 어드민 조회·설정 API는 모두 JWT 인증을 요구한다.
 - production JWT signing/verification은 같은 validator를 사용한다. 키는 32자 이상이고 소문자·대문자·숫자·기호 중 3종 이상이어야 하며 알려진 placeholder/blank를 거부한다.
@@ -293,7 +311,9 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 - 수신 주소별 미발송 공고 선정
 - 1차 실패 후 10분 재시도와 최대 2회 제한
 - 성공 주소 제외 및 실패 주소 다음 날 재포함
-- stale SMTP claim의 terminal uncertainty, 늦은 성공·실패 경합, 재선정 금지
+- stale Mail API claim의 terminal uncertainty, 늦은 성공·실패 경합, 재선정 금지
+- OAuth state 만료·불일치, token AES-256-GCM round trip, access token refresh single-flight
+- Mail API `202`, `401` refresh, `429`, permanent `4xx`, ambiguous network/timeout·`5xx` 분류
 - minute due check의 이전/새 발송 시각과 두 replica의 KST business-date 단일 claim
 
 ### 12.2 백엔드 통합 테스트
@@ -317,24 +337,24 @@ DB 변경 구현과 같은 작업에서 레포 루트의 `database-schema.md`를
 
 ## 13. 운영 및 문서화
 
-- 환경 변수 예제와 배포 문서에 JWT 생성·회전, 최초 관리자 one-off provisioning, 공공데이터 API 키, 한전 API 키, SMTP 설정과 시간대를 기록한다.
+- 환경 변수 예제와 배포 문서에 JWT 생성·회전, 최초 관리자 one-off provisioning, 공공데이터 API 키, 한전 API 키, NAVER WORKS OAuth/Mail API 설정·token 암호화 key 회전과 시간대를 기록한다.
 - `database-schema.md`를 생성하고 DB 변경 때마다 갱신한다.
 - 신규 어드민 메뉴 기능 현황 문서 `docs/menus/tenders.md`를 만들고 `구현 완료`, `미구현`, `부족하거나 개선이 필요한 기능`, `관련 파일`, `갱신 규칙` 구성을 유지한다.
 - 실제 API 승인 전 또는 mock 응답만 연결된 단계는 완료로만 표시하지 않고 운영 한계를 함께 기록한다.
-- 수집 실행과 메일 발송 로그에 비밀번호, API 키, 전체 SMTP 응답 원문을 남기지 않는다.
+- 수집 실행과 메일 발송 로그에 비밀번호, API 키, OAuth code/token/state, Authorization header, Mail API 응답 원문을 남기지 않는다.
 - production TypeORM logging은 application, migration/revert, admin provisioning에서 항상 `false`이며 환경 변수로 활성화하지 않는다.
 
 ## 14. 완료 기준
 
-- 세 초기 출처의 공식 API에서 관련 공고가 `00:00`, `12:00` KST에 수집된다.
+- 활성화된 공식 API 출처의 관련 공고가 매시 정각 KST에 수집된다.
 - 동일 공고와 차수가 중복 저장되지 않는다.
 - 직접·잠재 관련 배지와 판정 근거가 캘린더, 목록, 메일에서 일치한다.
 - 등록일 기준 월 전체 캘린더와 날짜별 목록이 동작한다.
 - 캘린더 필터가 이메일 대상에 영향을 주지 않는다.
 - 여러 주소와 공통 발송 시각을 저장할 수 있다.
 - 모든 신규 관련 공고가 주소별로 하루 한 번만 발송된다.
-- 명시적 SMTP 4xx/5xx/recipient rejection만 10분 뒤 한 번 재시도하며 network/socket ambiguous SMTP 오류는 command와 무관하게 재시도하지 않고 다른 주소의 성공 상태는 유지된다.
+- Mail API `429`와 token endpoint의 확인된 일시 실패만 10분 뒤 한 번 재시도하며, Mail API network/timeout·`5xx`의 불확실한 결과는 재시도하지 않고 다른 주소의 성공 상태는 유지된다.
 - 재시도 실패 공고가 다음 날 해당 주소 발송 대상에서 누락되지 않는다.
-- SMTP 결과가 불확실한 stale claim은 `DELIVERY_UNCERTAIN`으로 종결되어 중복 재전송되지 않는다.
+- Mail API 결과가 불확실한 stale claim은 `DELIVERY_UNCERTAIN`으로 종결되어 중복 재전송되지 않는다.
 - 여러 replica와 설정 시각 변경에서도 KST 영업일별 identity는 하나이고, crash가 남긴 stale lease는 중복 recipient 발송 없이 재개된다.
 - 인증, 분류, 중복 제거, 집계, 발송 재시도 핵심 테스트가 통과한다.

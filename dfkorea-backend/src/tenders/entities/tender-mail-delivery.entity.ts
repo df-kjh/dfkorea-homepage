@@ -54,13 +54,13 @@ export class TenderMailDelivery {
   @Column({ type: "timestamptz", nullable: true })
   nextRetryAt: Date | null;
 
-  // A claim is durable before SMTP starts. If a worker crashes before it can
+  // A claim is durable before provider delivery starts. If a worker crashes before it can
   // record the result, the retry scanner can recover this lease explicitly.
   @Column({ type: "timestamptz", nullable: true })
   claimedAt: Date | null;
 
   @Column({ type: "varchar", nullable: true })
-  smtpMessageId: string | null;
+  providerMessageId: string | null;
 
   @Column({ type: "timestamptz", nullable: true })
   sentAt: Date | null;

@@ -11,6 +11,10 @@ import { TenderMailDelivery } from "../entities/tender-mail-delivery.entity";
 import { TenderRecipient } from "../entities/tender-recipient.entity";
 import { TenderDailyDispatch } from "../entities/tender-daily-dispatch.entity";
 import { TenderMailRenderer } from "../mail/tender-mail-renderer";
+import {
+  MailDeliveryError,
+  MailDeliveryOutcome,
+} from "../mail/mail-delivery-outcome";
 import { TenderMailService } from "./tender-mail.service";
 
 const NOW = new Date("2026-08-27T01:00:00.000Z");
@@ -93,7 +97,7 @@ describe("TenderMailService", () => {
       update: jest.fn(),
     };
     transport = {
-      sendMail: jest.fn().mockResolvedValue({ messageId: "smtp-1" }),
+      sendMail: jest.fn().mockResolvedValue({ providerMessageId: null }),
     };
     dataSource = {
       transaction: jest.fn((callback) =>
@@ -123,19 +127,6 @@ describe("TenderMailService", () => {
       deliveryRepository,
       mailItemRepository,
       dailyDispatchRepository,
-      {
-        get: jest.fn(
-          (key: string) =>
-            ({
-              SMTP_HOST: "smtp.worksmobile.com",
-              SMTP_PORT: "465",
-              SMTP_SECURE: "true",
-              SMTP_USER: "sender@dfkorea.co.kr",
-              SMTP_APP_PASSWORD: "secret",
-              SMTP_FROM_NAME: "DF KOREA 입찰정보",
-            })[key],
-        ),
-      } as never,
       new TenderMailRenderer(),
       transport as never,
     );
@@ -272,17 +263,6 @@ describe("TenderMailService", () => {
       deliveryRepository,
       mailItemRepository,
       dailyDispatchRepository,
-      {
-        get: jest.fn(
-          (key: string) =>
-            ({
-              SMTP_HOST: "smtp.worksmobile.com",
-              SMTP_USER: "sender@dfkorea.co.kr",
-              SMTP_APP_PASSWORD: "secret",
-              SMTP_FROM_NAME: "DF KOREA",
-            })[key],
-        ),
-      } as never,
       new TenderMailRenderer(),
       transport as never,
     );
@@ -327,7 +307,7 @@ describe("TenderMailService", () => {
     expect(transport.sendMail).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves a successful SMTP delivery leased when its atomic success persistence fails", async () => {
+  it("leaves a successful provider delivery leased when its atomic success persistence fails", async () => {
     mailItemRepository.update.mockRejectedValueOnce(
       new Error("simulated item-write failure"),
     );
@@ -349,13 +329,10 @@ describe("TenderMailService", () => {
     );
   });
 
-  it("schedules exactly one durable retry ten minutes after a first SMTP failure", async () => {
-    transport.sendMail.mockRejectedValueOnce({
-      code: "EENVELOPE",
-      command: "RCPT TO",
-      responseCode: 550,
-      message: "mailbox rejected",
-    });
+  it("schedules exactly one durable retry ten minutes after a retryable provider rejection", async () => {
+    transport.sendMail.mockRejectedValueOnce(
+      new MailDeliveryError(MailDeliveryOutcome.RETRYABLE_REJECTION),
+    );
 
     await service.sendDailyDigest(NOW);
 
@@ -374,16 +351,10 @@ describe("TenderMailService", () => {
     expect(mailItemRepository.update).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { code: "ETIMEDOUT", command: "CONN" },
-    { code: "ECONNECTION", command: "CONN" },
-    { code: "ETIMEDOUT", command: "DATA" },
-    { code: "ECONNRESET", command: "DATA" },
-    { code: "ETIMEDOUT" },
-  ])(
-    "marks ambiguous SMTP error $code/$command terminal without retry",
-    async (smtpError) => {
-      transport.sendMail.mockRejectedValueOnce(smtpError);
+  it("marks an unknown provider acceptance outcome terminal without retry", async () => {
+      transport.sendMail.mockRejectedValueOnce(
+        new MailDeliveryError(MailDeliveryOutcome.UNKNOWN_ACCEPTANCE),
+      );
 
       await service.sendDailyDigest(NOW);
 
@@ -399,8 +370,24 @@ describe("TenderMailService", () => {
         { lastDeliveryId: "delivery-1", status: MailItemStatus.PENDING },
         { status: MailItemStatus.DELIVERY_UNCERTAIN, uncertainAt: NOW },
       );
-    },
-  );
+  });
+
+  it("marks a permanent provider rejection failed without scheduling a retry", async () => {
+    transport.sendMail.mockRejectedValueOnce(
+      new MailDeliveryError(MailDeliveryOutcome.PERMANENT_REJECTION),
+    );
+
+    await service.sendDailyDigest(NOW);
+
+    expect(deliveryRepository.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "delivery-1" }),
+      expect.objectContaining({
+        status: MailDeliveryStatus.FAILED,
+        nextRetryAt: null,
+        errorMessage: "Mail provider permanently rejected delivery",
+      }),
+    );
+  });
 
   it("keeps a claimed dispatch resumable when recipient DB work fails before a durable delivery", async () => {
     let transactionCall = 0;
@@ -467,7 +454,7 @@ describe("TenderMailService", () => {
     await expect(claimDailyDispatch(NOW, "09:00")).resolves.toBeNull();
   });
 
-  it("does not revive a stale delivery-uncertain claim when a late known SMTP failure arrives", async () => {
+  it("does not revive a stale delivery-uncertain claim when a late known provider failure arrives", async () => {
     deliveryRepository.update.mockResolvedValueOnce({ affected: 0 });
     const staleClaim = {
       id: "stale-delivery",
@@ -496,7 +483,7 @@ describe("TenderMailService", () => {
     expect(deliveryRepository.save).not.toHaveBeenCalled();
   });
 
-  it("keeps a successful recipient sent when a different recipient's SMTP delivery fails", async () => {
+  it("keeps a successful recipient sent when a different recipient's provider delivery fails", async () => {
     const failedRecipient = {
       id: "recipient-failed",
       email: "failed@dfkorea.co.kr",
@@ -517,12 +504,10 @@ describe("TenderMailService", () => {
     }));
     transport.sendMail.mockImplementation(({ to }) =>
       to === failedRecipient.email
-        ? Promise.reject({
-            code: "EENVELOPE",
-            command: "RCPT TO",
-            responseCode: 550,
-          })
-        : Promise.resolve({ messageId: "smtp-success" }),
+        ? Promise.reject(
+            new MailDeliveryError(MailDeliveryOutcome.RETRYABLE_REJECTION),
+          )
+        : Promise.resolve({ providerMessageId: null }),
     );
 
     await service.sendDailyDigest(NOW);
@@ -560,11 +545,9 @@ describe("TenderMailService", () => {
     mailItemRepository.find.mockResolvedValue([
       { id: "item-1", tender: TENDER, lastDeliveryId: delivery.id },
     ]);
-    transport.sendMail.mockRejectedValueOnce({
-      code: "EENVELOPE",
-      command: "RCPT TO",
-      responseCode: 550,
-    });
+    transport.sendMail.mockRejectedValueOnce(
+      new MailDeliveryError(MailDeliveryOutcome.RETRYABLE_REJECTION),
+    );
 
     await service.retryDue(NOW);
 
@@ -593,7 +576,7 @@ describe("TenderMailService", () => {
     expect(mailItemRepository.update).not.toHaveBeenCalled();
   });
 
-  it("cancels a due retry without SMTP when the shared subscription is disabled", async () => {
+  it("cancels a due retry without calling the provider when the shared subscription is disabled", async () => {
     const delivery = {
       id: "delivery-1",
       recipientEmail: RECIPIENT.email,
@@ -631,7 +614,7 @@ describe("TenderMailService", () => {
     );
   });
 
-  it("cancels a due retry without SMTP when its recipient was removed", async () => {
+  it("cancels a due retry without calling the provider when its recipient was removed", async () => {
     const delivery = {
       id: "delivery-removed",
       recipientEmail: RECIPIENT.email,
@@ -682,7 +665,7 @@ describe("TenderMailService", () => {
     expect(mailItemRepository.find).not.toHaveBeenCalled();
   });
 
-  it("marks a stale SMTP claim and its items delivery-uncertain without retrying", async () => {
+  it("marks a stale provider claim and its items delivery-uncertain without retrying", async () => {
     const stale = {
       id: "stale-1",
       recipientEmail: RECIPIENT.email,
@@ -749,73 +732,36 @@ describe("TenderMailService", () => {
     expect(transport.sendMail).not.toHaveBeenCalled();
   });
 
-  it("rejects header injection in SMTP identity without exposing configuration in the delivery error", async () => {
-    service = new TenderMailService(
-      dataSource,
-      subscriptionRepository,
-      recipientRepository,
-      tenderRepository,
-      deliveryRepository,
-      mailItemRepository,
-      dailyDispatchRepository,
-      {
-        get: jest.fn(
-          (key: string) =>
-            ({
-              SMTP_HOST: "smtp.worksmobile.com",
-              SMTP_USER: "sender@dfkorea.co.kr",
-              SMTP_APP_PASSWORD: "not-for-logs",
-              SMTP_FROM_NAME: "DF\r\nBcc: victim@example.com",
-            })[key],
-        ),
-      } as never,
-      new TenderMailRenderer(),
-      transport as never,
-    );
+  it("limits provider concurrency below the NAVER WORKS connection limit", async () => {
+    const recipients = Array.from({ length: 6 }, (_, index) => ({
+      ...RECIPIENT,
+      id: `recipient-${index}`,
+      email: `recipient-${index}@example.com`,
+    }));
+    subscriptionRepository.findOne.mockResolvedValue({
+      enabled: true,
+      deliveryTime: "09:00",
+      recipients,
+    });
+    let deliveryNumber = 0;
+    deliveryRepository.save.mockImplementation(async (value) => ({
+      id: `delivery-${++deliveryNumber}`,
+      ...value,
+    }));
+    let active = 0;
+    let maximumActive = 0;
+    transport.sendMail.mockImplementation(async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return { providerMessageId: null };
+    });
 
     await service.sendDailyDigest(NOW);
 
-    expect(transport.sendMail).not.toHaveBeenCalled();
-    expect(deliveryRepository.update).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: MailDeliveryStatus.PENDING }),
-      expect.objectContaining({
-        status: MailDeliveryStatus.RETRY_SCHEDULED,
-        errorMessage: "SMTP delivery failed",
-      }),
-    );
-  });
-
-  it("requires SMTP_USER to be one email address before attempting delivery", async () => {
-    service = new TenderMailService(
-      dataSource,
-      subscriptionRepository,
-      recipientRepository,
-      tenderRepository,
-      deliveryRepository,
-      mailItemRepository,
-      dailyDispatchRepository,
-      {
-        get: jest.fn(
-          (key: string) =>
-            ({
-              SMTP_HOST: "smtp.worksmobile.com",
-              SMTP_USER: "sender@dfkorea.co.kr, other@dfkorea.co.kr",
-              SMTP_APP_PASSWORD: "not-for-logs",
-              SMTP_FROM_NAME: "DF KOREA",
-            })[key],
-        ),
-      } as never,
-      new TenderMailRenderer(),
-      transport as never,
-    );
-
-    await service.sendDailyDigest(NOW);
-
-    expect(transport.sendMail).not.toHaveBeenCalled();
-    expect(deliveryRepository.update).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: MailDeliveryStatus.PENDING }),
-      expect.objectContaining({ errorMessage: "SMTP delivery failed" }),
-    );
+    expect(transport.sendMail).toHaveBeenCalledTimes(6);
+    expect(maximumActive).toBeLessThanOrEqual(4);
   });
 
   it("records a skipped delivery when an address has no pending notices", async () => {

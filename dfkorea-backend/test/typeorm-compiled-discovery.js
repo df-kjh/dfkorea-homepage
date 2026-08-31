@@ -26,6 +26,7 @@ for (const relativePath of [
   "dist/tenders/entities/tender-recipient.entity.js",
   "dist/tenders/entities/tender-mail-delivery.entity.js",
   "dist/tenders/entities/tender-daily-dispatch.entity.js",
+  "dist/tenders/entities/tender-mail-oauth-credential.entity.js",
   "dist/migrations/1740100000000-RenameCertificateImageToPdf.js",
   "dist/migrations/1771481900000-CreateCertificatesTable.js",
   "dist/migrations/support/normalize-certificate-schema.js",
@@ -33,6 +34,7 @@ for (const relativePath of [
   "dist/migrations/1787819800000-HardenTenderMailDelivery.js",
   "dist/migrations/1787819900000-RemoveInsecureDefaultAdmin.js",
   "dist/migrations/1787820000000-AddDailyDispatchLease.js",
+  "dist/migrations/1787820200000-UseNaverWorksMailApi.js",
   "dist/scripts/provision-admin.js",
 ]) {
   assert.ok(

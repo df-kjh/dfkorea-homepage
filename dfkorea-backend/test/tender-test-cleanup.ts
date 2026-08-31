@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 // This deliberate child-to-parent order is the complete destructive scope of
 // the disposable integration suite. Never add application or migration tables.
 export const TENDER_INTEGRATION_TABLES = [
+  '"tender_mail_oauth_credentials"',
   '"tender_daily_dispatches"',
   '"tender_mail_items"',
   '"tender_mail_deliveries"',

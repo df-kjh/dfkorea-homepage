@@ -19,6 +19,10 @@ import {
 } from "../src/tenders/domain/tender.enums";
 import { Tender } from "../src/tenders/entities/tender.entity";
 import { TenderMailDelivery } from "../src/tenders/entities/tender-mail-delivery.entity";
+import {
+  MailDeliveryError,
+  MailDeliveryOutcome,
+} from "../src/tenders/mail/mail-delivery-outcome";
 import { Admin } from "../src/entities/admin.entity";
 import { TenderIngestionService } from "../src/tenders/services/tender-ingestion.service";
 import {
@@ -81,11 +85,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
       if (migrationDataSource.isInitialized) await migrationDataSource.destroy();
     }
 
-    // The transport itself is overridden below, but the real mail service
-    // validates this config before calling that boundary.
-    process.env.SMTP_HOST = "smtp.worksmobile.com";
-    process.env.SMTP_USER = "tender-test@example.com";
-    process.env.SMTP_APP_PASSWORD = "test-only-password";
+    process.env.NAVER_WORKS_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 3).toString(
+      "base64",
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -207,7 +209,7 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .expect(400);
   });
 
-  it("keeps recipients isolated and makes exactly one due SMTP retry", async () => {
+  it("keeps recipients isolated and makes exactly one due provider retry", async () => {
     g2b.fetchNotices.mockResolvedValue([NOTICE]);
     kapt.fetchNotices.mockResolvedValue([]);
     kepco.fetchNotices.mockResolvedValue([]);
@@ -229,9 +231,11 @@ describe("Tender AppModule PostgreSQL integration", () => {
         ([message]) => message.to === to,
       ).length;
       if (to === "failed@example.com" && attempts === 1) {
-        throw new Error("test SMTP failure");
+        throw new MailDeliveryError(
+          MailDeliveryOutcome.RETRYABLE_REJECTION,
+        );
       }
-      return { messageId: `test-${to}` };
+      return { providerMessageId: `test-${to}` };
     });
     const service = app.get(TenderMailService);
     const firstAttempt = new Date("2026-08-27T03:30:00.000Z");

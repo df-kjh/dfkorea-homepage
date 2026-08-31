@@ -1,6 +1,6 @@
 # Railway 백엔드 배포 체크리스트
 
-이 파일은 백엔드 디렉터리에서 찾기 쉬운 요약이다. 전체 환경 변수, 백업, 입찰 스케줄·SMTP, 스테이징 검증과 롤백의 단일 기준은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)다.
+이 파일은 백엔드 디렉터리에서 찾기 쉬운 요약이다. 전체 환경 변수, 백업, 입찰 스케줄·NAVER WORKS Mail API, 스테이징 검증과 롤백의 단일 기준은 루트 [DEPLOYMENT.md](../DEPLOYMENT.md)다.
 
 ## 1. 서비스 준비
 
@@ -24,7 +24,7 @@ JWT_EXPIRES_IN=24h
 CORS_ORIGIN=https://your-frontend.example.com
 ```
 
-공식 입찰 API와 NAVER WORKS SMTP를 사용하는 환경은 루트 `DEPLOYMENT.md`의 필수 변수를 추가한다. 운영 비밀값을 저장소나 deploy log에 출력하지 않는다.
+공식 입찰 API와 NAVER WORKS Mail API(HTTPS/OAuth)를 사용하는 환경은 루트 `DEPLOYMENT.md`의 필수 변수를 추가한다. Railway Hobby에서도 SMTP 포트 없이 outbound HTTPS로 동작한다. client secret, token 암호화 key, OAuth code/token을 저장소나 deploy log에 출력하지 않는다.
 
 ## 3. migration-first 명령
 

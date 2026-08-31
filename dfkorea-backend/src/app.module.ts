@@ -23,6 +23,7 @@ import { TenderSyncRun } from "./tenders/entities/tender-sync-run.entity";
 import { TenderMailDelivery } from "./tenders/entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
 import { TenderDailyDispatch } from "./tenders/entities/tender-daily-dispatch.entity";
+import { TenderMailOAuthCredential } from "./tenders/entities/tender-mail-oauth-credential.entity";
 import { TendersModule } from "./tenders/tenders.module";
 import { resolveDatabaseConnectionOptions } from "./config/production-environment";
 
@@ -43,6 +44,7 @@ export const createApplicationDatabaseOptions = (
     TenderMailDelivery,
     TenderMailItem,
     TenderDailyDispatch,
+    TenderMailOAuthCredential,
   ],
   // Shared and production databases are migration-only. Keep this false there;
   // synchronize remains available only for explicitly isolated local work.

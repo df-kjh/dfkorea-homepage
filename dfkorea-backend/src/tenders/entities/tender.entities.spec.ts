@@ -4,6 +4,7 @@ import { TenderMailItem } from "./tender-mail-item.entity";
 import { TenderMailDelivery } from "./tender-mail-delivery.entity";
 import { TenderRecipient } from "./tender-recipient.entity";
 import { TenderDailyDispatch } from "./tender-daily-dispatch.entity";
+import { TenderMailOAuthCredential } from "./tender-mail-oauth-credential.entity";
 
 describe("tender entity metadata", () => {
   it("deduplicates source notice revisions", () => {
@@ -74,5 +75,15 @@ describe("tender entity metadata", () => {
     );
 
     expect(index?.columns).toEqual(["subscriptionId", "isActive"]);
+  });
+
+  it("stores only one NAVER WORKS OAuth credential set", () => {
+    const unique = getMetadataArgsStorage().uniques.find(
+      (item) =>
+        item.target === TenderMailOAuthCredential &&
+        item.name === "UQ_tender_mail_oauth_credential_singleton_key",
+    );
+
+    expect(unique?.columns).toEqual(["singletonKey"]);
   });
 });

@@ -336,23 +336,40 @@ npm run test:ci
 
 API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣지 않는다.
 
-### NAVER WORKS SMTP
+### NAVER WORKS Mail API (OAuth/HTTPS)
 
-1. NAVER WORKS 관리자 콘솔에서 발신 계정의 SMTP 사용을 허용한다.
-2. 발신 계정의 외부 앱 비밀번호를 만들고, 일반 로그인 비밀번호 대신 `SMTP_APP_PASSWORD`에만 저장한다.
-3. `SMTP_HOST=smtp.worksmobile.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=도메인_포함_발신_이메일`, `SMTP_FROM_NAME`을 설정한다.
-4. 앱 비밀번호 노출 또는 발신 계정 변경 시 기존 비밀번호를 폐기하고, 새 값을 배포 플랫폼에 주입한 뒤 스테이징 메일함으로 다시 검증한다.
+Railway Hobby 환경에서는 SMTP TCP 연결을 사용하지 않는다. 메일은 `https://www.worksapis.com/v1.0`의 NAVER WORKS Mail API로 전송한다.
 
-수신 주소에는 개별 메일을 전송하므로 서로의 주소가 노출되지 않는다. SMTP 자격 증명은 구독 설정 API 또는 DB에 저장되지 않는다.
+1. NAVER WORKS Developer Console에서 OAuth 앱을 만들고 `mail` scope를 허용한다.
+2. callback URL을 운영 backend의 `https://<backend-host>/tenders/mail/oauth/callback`과 정확히 같게 등록한다. 쿼리 문자열이나 frontend URL을 등록하지 않는다.
+3. Railway backend Variables에 아래 값을 설정하고 재배포한다. `NAVER_WORKS_API_BASE_URL`은 테스트에서 임의 host로 바꿀 수 없도록 공식 HTTPS host만 허용한다.
+
+```bash
+NAVER_WORKS_API_BASE_URL=https://www.worksapis.com/v1.0
+NAVER_WORKS_CLIENT_ID=<developer-console-client-id>
+NAVER_WORKS_CLIENT_SECRET=<secret-store-only>
+NAVER_WORKS_OAUTH_REDIRECT_URI=https://<backend-host>/tenders/mail/oauth/callback
+NAVER_WORKS_SENDER_USER_ID=<domain-qualified-sender-email>
+NAVER_WORKS_FROM_NAME=DF KOREA 입찰정보
+NAVER_WORKS_TOKEN_ENCRYPTION_KEY=<32-byte-base64-secret>
+NAVER_WORKS_HTTP_TIMEOUT_MS=10000
+```
+
+`NAVER_WORKS_TOKEN_ENCRYPTION_KEY`는 `openssl rand -base64 32` 같은 암호학적 생성기로 만들고 secret store에만 둔다. 애플리케이션은 정확히 32-byte로 decode되는 canonical base64 값만 허용하며 OAuth access/refresh token을 AES-256-GCM envelope로 암호화해 `tender_mail_oauth_credentials`에 저장한다. client secret, 암호화 key, 평문 token은 DB·로그·문서에 저장하지 않는다.
+
+4. 관리자 JWT로 `POST /tenders/mail/oauth/authorize`를 호출하고 반환된 `authorizationUrl`을 브라우저에서 연다. 발신 NAVER WORKS 구성원 계정으로 로그인해 권한을 승인한다. 공개 callback은 10분 유효한 single-use state의 SHA-256 hash가 DB 값과 일치할 때만 authorization code를 교환하고, 성공하면 `PUBLIC_SITE_URL/admin?tab=tenders&mailOAuth=connected`로 이동한다.
+5. 관리자 JWT로 `GET /tenders/mail/oauth/status`를 호출해 `connected=true`와 연결 시각을 확인한 뒤 스테이징 주소에 한 번 발송한다. access token은 만료 1분 전부터 refresh token으로 자동 갱신되며, Mail API `401`은 token을 강제 갱신한 뒤 동일 요청을 한 번만 다시 호출한다.
+
+수신 주소에는 개별 HTTPS 요청을 보내므로 서로의 주소가 노출되지 않는다. `202 Accepted`만 발송 성공으로 기록하고 보낸메일함·수신 추적 저장 옵션을 사용한다. client secret이나 token 암호화 key가 노출되면 즉시 폐기·교체하고 OAuth를 다시 승인한다. 암호화 key를 교체하면 기존 token을 복호화할 수 없으므로 변경 창에서 새 key 배포와 재승인을 함께 수행하며, 이전 key는 검증 완료 후 폐기한다.
 
 ### 예약 작업과 여러 서버 인스턴스
 
 - 공고 수집은 `Asia/Seoul` 기준 매시 정각에 실행한다. 관리자의 `즉시 수집`도 같은 ingestion 경계를 사용하며, 정기·수동 실행이 겹치면 PostgreSQL advisory lock으로 하나만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
 - 일일 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches.businessDate` 고유키를 먼저 claim한다. 설정 변경과 여러 replica가 있어도 KST 영업일별 한 번만 실행된다.
-- 주소별 확인된 첫 SMTP 실패만 10분 뒤 한 번 재시도한다. confirmed failure는 `responseCode` 4xx/5xx의 명시적 SMTP 거절(`535`의 `AUTH PLAIN`/`AUTH LOGIN`, `550`의 `RCPT TO` 포함) 또는 non-empty recipient `rejected`뿐이다. negative SMTP 응답이 없는 `ETIMEDOUT`, `ECONNECTION`, `ECONNRESET`, `ESOCKET` 등은 Nodemailer의 `command=CONN`이어도 pre-DATA를 입증하지 못하므로 즉시 terminal `DELIVERY_UNCERTAIN`으로 delivery/item을 함께 종결하며 재시도하지 않는다. 보수적 분류는 중복 방지를 우선해 드문 누락 가능성을 감수한다. 원본 오류는 메모리 내 typed classifier에만 전달하고 server response나 recipient 상세는 DB 오류 문자열에 저장하지 않는다.
+- 주소별 첫 confirmed transient failure만 10분 뒤 한 번 재시도한다. Mail API `429`와 OAuth token endpoint의 network/timeout·`429`·`5xx`는 제공자가 메일 본문을 아직 받기 전의 일시 실패로 분류한다. Mail API `401`은 token을 한 번 강제 갱신하고, 이후 `4xx` 또는 token endpoint의 다른 `4xx`는 즉시 영구 실패로 기록한다. Mail API는 idempotency key를 문서화하지 않으므로 본문 전송 중 network/timeout과 Mail API `5xx`·예상하지 않은 응답은 이미 승인됐을 가능성을 배제할 수 없다. 이 경우 delivery/item을 즉시 terminal `DELIVERY_UNCERTAIN`으로 종결하고 재시도하지 않는다. 원본 OAuth token, Authorization header, provider response body, recipient 상세는 DB 오류 문자열이나 로그에 저장하지 않는다.
 - 일일 dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST business date를 reclaim한다. `(dailyDispatchId, recipientId)` 고유 제약과 조회가 기존 `SENT`, `RETRY_SCHEDULED`, `PENDING`, `DELIVERY_UNCERTAIN`, `CANCELLED`, `FAILED`, `SKIPPED` outcome을 모두 재사용하므로 durable outcome이 전혀 없는 recipient만 처리한다. fresh lease와 `COMPLETED`는 건너뛴다.
 - 수집, 일일 메일, 재시도는 각각 PostgreSQL advisory lock을 같은 연결 세션에서 획득하므로 Railway/PM2 replica가 여러 개여도 한 인스턴스만 작업한다.
-- production TypeORM query/parameter logging은 app, migration, revert, 최초 관리자 provisioning 경로 모두 코드에서 `false`로 고정한다. 운영 환경 변수로 이를 켤 수 없으며 비밀번호·bcrypt hash·SMTP 응답을 stdout/stderr에 기록하지 않는다.
+- production TypeORM query/parameter logging은 app, migration, revert, 최초 관리자 provisioning 경로 모두 코드에서 `false`로 고정한다. 운영 환경 변수로 이를 켤 수 없으며 비밀번호·bcrypt hash·OAuth code/token/state·Authorization header·Mail API 응답 본문을 stdout/stderr에 기록하지 않는다.
 - `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
 
 관리자에는 수집 현황 버튼이 없다. 실패는 `tender_sync_runs`에 출처별로 남고 다음 정규 수집이 겹치는 시간 범위를 회수한다.
@@ -369,17 +386,17 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
   npm run test:tender:integration
 ```
 
-또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 **로컬** `localhost`, `127.0.0.1`, `::1` 또는 명시된 Docker 서비스 `postgres`/`db`만 허용한다. DB 이름에는 `test` 또는 `e2e`가 있어야 하고 URL·host·DB 이름 어디에도 `prod`, `production`, `live`, `staging`이 있으면 AppModule을 시작하기 전에 실패한다. URL 안전성 검사는 최대 4회 percent decode하며 malformed 또는 그 이후에도 남은 어떤 `%`도 거부한다. 원격 스테이징 DB는 이 파괴적 통합 러너의 대상이 아니다. migration을 적용하고 명시된 tender 테이블 일곱 개만 트랜잭션으로 truncate하며, 종료 시에도 같은 범위만 정리한 뒤 앱을 닫는다. 실제 API 어댑터와 SMTP 전송기만 이중으로 교체하며 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
+또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 **로컬** `localhost`, `127.0.0.1`, `::1` 또는 명시된 Docker 서비스 `postgres`/`db`만 허용한다. DB 이름에는 `test` 또는 `e2e`가 있어야 하고 URL·host·DB 이름 어디에도 `prod`, `production`, `live`, `staging`이 있으면 AppModule을 시작하기 전에 실패한다. URL 안전성 검사는 최대 4회 percent decode하며 malformed 또는 그 이후에도 남은 어떤 `%`도 거부한다. 원격 스테이징 DB는 이 파괴적 통합 러너의 대상이 아니다. migration을 적용하고 명시된 tender 테이블 여덟 개만 트랜잭션으로 truncate하며, 종료 시에도 같은 범위만 정리한 뒤 앱을 닫는다. 실제 입찰 API 어댑터와 NAVER WORKS OAuth/Mail HTTP client만 이중으로 교체하며 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
 
 ### 스테이징 라이브 스모크 체크리스트
 
-실제 API·SMTP 자격 증명 없이 이 저장소에서 외부 호출을 수행하지 않는다. 별도 스테이징에서 다음을 확인한다.
+실제 입찰 API·NAVER WORKS OAuth 자격 증명 없이 이 저장소에서 외부 호출을 수행하지 않는다. 별도 스테이징에서 다음을 확인한다.
 
-1. 전용 DB를 백업하고 migration을 실행한 뒤 일곱 tender 테이블과 singleton/claim/recipient-activation migration이 적용됐는지 확인한다.
+1. 전용 DB를 백업하고 expand migration을 먼저 배포한다. 여덟 tender 테이블, OAuth credential singleton, `providerMessageId` 및 기존 `smtpMessageId` 값의 동기화가 정상인지 확인한다. 새 애플리케이션이 정상 동작한 뒤 contract migration을 별도 배포하고, 마지막에 `smtpMessageId`가 제거됐는지 확인한다.
 2. 나라장터·K-apt 키를 주입해 실제 응답을 한 번 수집하고, 공고 ID·차수 중복이 없으며 키가 로그·응답에 없는지 확인한다. 한전은 승인된 매뉴얼 검증 전까지 비활성화한다.
 3. 다음 매시 정각 KST 실행 또는 관리자 `즉시 수집` 완료 뒤 `tender_sync_runs`가 출처별 성공/실패를 분리하고, 캘린더의 등록일 기준 직접/잠재 건수가 DB 집계와 같은지 확인한다.
 4. 관리자 JWT로 calendar, list, detail을 확인한다. 캘린더는 42칸이고, 화면 필터가 메일 수신 대상에 영향을 주지 않아야 한다.
-5. 스테이징 수신 주소와 다음 발송 시각을 저장해 digest 한 번을 확인한다. 한 주소를 고의 실패시켜 그 주소만 10분 뒤 한 번 재시도되고, 성공 주소에는 중복 메일이 없는지 확인한다. SMTP 승인 직후 강제 종료 시험은 별도 승인된 테스트 계정에서만 수행하고, stale claim이 `DELIVERY_UNCERTAIN`으로 종결되어 재전송되지 않는지 확인한다.
+5. OAuth authorize/callback/status를 완료한 뒤 스테이징 수신 주소와 다음 발송 시각을 저장해 `202` digest 한 번을 확인한다. `401` token refresh와 `429`를 이중으로 검증해 실패 주소만 10분 뒤 한 번 재시도되고 성공 주소에는 중복 메일이 없는지 확인한다. Mail API 본문 전송 중 timeout/`5xx`와 provider 승인 직후 강제 종료 시험은 별도 승인된 테스트 계정에서만 수행하고, stale claim이 `DELIVERY_UNCERTAIN`으로 종결되어 재전송되지 않는지 확인한다.
 
 ### 롤백
 

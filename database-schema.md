@@ -32,6 +32,9 @@ erDiagram
   TENDER_RECIPIENTS ||--o{ TENDER_MAIL_ITEMS : receives
   TENDERS ||--o{ TENDER_MAIL_ITEMS : tracks
   TENDER_MAIL_DELIVERIES ||--o{ TENDER_MAIL_ITEMS : last_attempt
+  TENDER_MAIL_OAUTH_CREDENTIALS {
+    varchar singletonKey UK
+  }
   TENDER_DAILY_DISPATCHES {
     date businessDate UK
   }
@@ -100,7 +103,7 @@ Indexes: `IDX_tender_sync_run_source` and `IDX_tender_sync_run_status`.
 | `recipientEmail`, `targetDate`                                                    | varchar, date                                                     | Recipient snapshot and digest date                                        |
 | `attemptCount`                                                                    | integer                                                           | Starts at `0`; attempts are recorded as `1` and `2`                       |
 | `status`                                                                          | varchar                                                           | `PENDING`, `SENT`, `FAILED`, `RETRY_SCHEDULED`, `SKIPPED`, `CANCELLED`, or terminal `DELIVERY_UNCERTAIN` |
-| `nextRetryAt`, `claimedAt`, `smtpMessageId`, `sentAt`, `failedAt`, `uncertainAt`, `errorMessage` | timestamptz, timestamptz, varchar, timestamptz, timestamptz, timestamptz, text | Nullable retry, durable lease, known result, and ambiguous-result audit fields |
+| `nextRetryAt`, `claimedAt`, `providerMessageId`, `sentAt`, `failedAt`, `uncertainAt`, `errorMessage` | timestamptz, timestamptz, varchar, timestamptz, timestamptz, timestamptz, text | Nullable retry, durable lease, provider-neutral acknowledgement, known result, and ambiguous-result audit fields |
 | `createdAt`, `updatedAt`                                                          | timestamptz                                                       | Audit timestamps                                                          |
 
 Indexes: `IDX_tender_mail_delivery_status_next_retry_at`, `IDX_tender_mail_delivery_status_claimed_at`, and `IDX_tender_mail_delivery_recipient_target_date`.
@@ -117,10 +120,27 @@ Unique constraint: `UQ_tender_mail_delivery_dispatch_recipient` on (`dailyDispat
 | `status`                 | varchar     | `PENDING`, `SENT`, or terminal `DELIVERY_UNCERTAIN`                      |
 | `lastDeliveryId`         | UUID        | Nullable foreign key to `tender_mail_deliveries.id`, `ON DELETE CASCADE` |
 | `sentAt`                 | timestamptz | Nullable successful-send timestamp                                       |
-| `uncertainAt`            | timestamptz | Nullable time when a stale in-flight SMTP outcome became terminal         |
+| `uncertainAt`            | timestamptz | Nullable time when a stale in-flight mail-provider outcome became terminal |
 | `createdAt`, `updatedAt` | timestamptz | Audit timestamps                                                         |
 
 Unique constraint: `UQ_tender_mail_item_recipient_tender` on (`recipientId`, `tenderId`).
+
+### `tender_mail_oauth_credentials`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `singletonKey` | varchar(32) | Always `naver-works`; unique through `UQ_tender_mail_oauth_credential_singleton_key` |
+| `provider` | varchar(32) | Mail provider identifier; defaults to `NAVER_WORKS` |
+| `accessTokenEncrypted`, `refreshTokenEncrypted` | text | Nullable AES-256-GCM encrypted OAuth tokens; plaintext tokens are never stored |
+| `accessTokenExpiresAt` | timestamptz | Nullable access-token expiry with refresh skew already applied |
+| `scope` | varchar | Nullable granted OAuth scope |
+| `oauthStateHash` | varchar(64) | Nullable SHA-256 hash of the single-use authorization state; the raw state is never stored |
+| `oauthStateExpiresAt` | timestamptz | Nullable authorization-state expiry |
+| `connectedAt` | timestamptz | Nullable time when an authorization code was successfully exchanged |
+| `createdAt`, `updatedAt` | timestamptz | Audit timestamps |
+
+Unique constraint: `UQ_tender_mail_oauth_credential_singleton_key` on (`singletonKey`). This table has no recipient or subscription foreign key because one authorized NAVER WORKS sender is shared by the common subscription. `NAVER_WORKS_TOKEN_ENCRYPTION_KEY` remains in the deployment secret store and is never persisted in PostgreSQL.
 
 ### `tender_daily_dispatches`
 
@@ -147,9 +167,10 @@ Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1
 - `1706200000000-InitialSchema` enables `uuid-ossp` before the baseline UUID tables. `1787819500000-CreateTenderTables` repeats the idempotent extension guard and creates the six tender tables, baseline foreign keys, unique constraints, and query indexes.
 - `1787819600000-AddTenderSubscriptionSingletonKey` adds the required shared subscription key and `UQ_tender_subscription_singleton_key`.
 - `1787819700000-AddTenderMailDeliveryClaimedAt` adds the durable delivery lease timestamp and `IDX_tender_mail_delivery_status_claimed_at`.
-- `1787819800000-HardenTenderMailDelivery` adds recipient soft activation, ambiguous SMTP audit timestamps, and the KST business-date daily dispatch table with its unique constraint and indexes.
+- `1787819800000-HardenTenderMailDelivery` adds recipient soft activation, ambiguous mail-delivery audit timestamps, and the KST business-date daily dispatch table with its unique constraint and indexes.
 - `1787819900000-RemoveInsecureDefaultAdmin` removes only the exact historical `admin/admin123` bcrypt identity and never recreates it on rollback; fresh baseline migration no longer seeds credentials.
 - `1787820000000-AddDailyDispatchLease` adds `leaseExpiresAt`, safe `lastError`, and replaces the status-only daily index with `IDX_tender_daily_dispatch_status_lease`.
 - `1787820100000-LinkDailyDispatchDeliveries` adds nullable dispatch/recipient foreign keys to delivery history and `UQ_tender_mail_delivery_dispatch_recipient`, so a reclaimed daily dispatch resumes only recipients with no durable outcome.
+- `1787820200000-UseNaverWorksMailApi` is the expand phase for a rolling deployment. It creates the singleton encrypted OAuth credential table, adds `providerMessageId`, copies existing `smtpMessageId` audit values, and temporarily keeps both columns synchronized with a trigger while old and new containers can coexist. Its rollback copies canonical values back before removing the new column. A separately deployed contract migration removes the synchronization trigger and `smtpMessageId` only after the new application version is healthy; the final schema retains only `providerMessageId`.
 
 The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.

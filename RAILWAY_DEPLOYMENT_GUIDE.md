@@ -22,7 +22,7 @@ JWT_EXPIRES_IN=24h
 CORS_ORIGIN=https://your-frontend.example.com
 ```
 
-입찰 기능을 운영하면 `DEPLOYMENT.md`에 정의된 공식 API와 NAVER WORKS SMTP 환경 변수도 비밀 저장소에서 주입한다. 비밀값은 문서, 로그, 이미지 또는 저장소에 기록하지 않는다.
+입찰 기능을 운영하면 `DEPLOYMENT.md`에 정의된 공식 입찰 API와 NAVER WORKS Mail API(HTTPS/OAuth) 환경 변수도 비밀 저장소에서 주입한다. Railway Hobby에서도 outbound HTTPS를 사용하며 SMTP 포트는 필요하지 않다. client secret, token 암호화 key, OAuth code/token은 문서, 로그, 이미지 또는 저장소에 기록하지 않는다.
 
 ## 빌드와 시작
 

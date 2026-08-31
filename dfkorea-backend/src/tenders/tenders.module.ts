@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import * as nodemailer from "nodemailer";
 import {
   G2B_TENDER_ADAPTER,
   KAPT_TENDER_ADAPTER,
@@ -20,6 +19,7 @@ import { TenderDailyDispatch } from "./entities/tender-daily-dispatch.entity";
 import { TenderRecipient } from "./entities/tender-recipient.entity";
 import { TenderSubscription } from "./entities/tender-subscription.entity";
 import { TenderSyncRun } from "./entities/tender-sync-run.entity";
+import { TenderMailOAuthCredential } from "./entities/tender-mail-oauth-credential.entity";
 import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
@@ -27,6 +27,10 @@ import { TenderSubscriptionService } from "./services/tender-subscription.servic
 import { TenderMailRenderer } from "./mail/tender-mail-renderer";
 import { TENDER_MAIL_TRANSPORT, TenderMailService } from "./services/tender-mail.service";
 import { TendersController } from "./tenders.controller";
+import { TenderMailOAuthController } from "./tender-mail-oauth.controller";
+import { NaverWorksOAuthService } from "./mail/naver-works-oauth.service";
+import { NaverWorksTokenCipher } from "./mail/naver-works-token-cipher";
+import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
 
 @Module({
   imports: [
@@ -38,9 +42,10 @@ import { TendersController } from "./tenders.controller";
       TenderMailDelivery,
       TenderMailItem,
       TenderDailyDispatch,
+      TenderMailOAuthCredential,
     ]),
   ],
-  controllers: [TendersController],
+  controllers: [TendersController, TenderMailOAuthController],
   providers: [
     TenderClassifier,
     {
@@ -78,18 +83,15 @@ import { TendersController } from "./tenders.controller";
     },
     TenderIngestionService,
     TenderMailRenderer,
+    NaverWorksTokenCipher,
+    NaverWorksOAuthService,
     {
       provide: TENDER_MAIL_TRANSPORT,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => nodemailer.createTransport({
-        host: config.get<string>("SMTP_HOST") ?? "smtp.worksmobile.com",
-        port: Number(config.get<string>("SMTP_PORT") ?? "465"),
-        secure: (config.get<string>("SMTP_SECURE") ?? "true") !== "false",
-        auth: {
-          user: config.get<string>("SMTP_USER") ?? "",
-          pass: config.get<string>("SMTP_APP_PASSWORD") ?? "",
-        },
-      }),
+      inject: [ConfigService, NaverWorksOAuthService],
+      useFactory: (
+        config: ConfigService,
+        oauth: NaverWorksOAuthService,
+      ) => new NaverWorksMailTransport(config, oauth),
     },
     TenderMailService,
     TenderSchedulerService,
