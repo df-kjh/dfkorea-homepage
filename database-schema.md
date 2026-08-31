@@ -90,7 +90,7 @@ Index: `IDX_tender_recipient_subscription_active` on (`subscriptionId`, `isActiv
 | `id`                                                            | UUID          | Primary key                                      |
 | `source`                                                        | varchar       | `G2B`, `KAPT`, or `KEPCO`                        |
 | `scheduledAt`, `startedAt`, `finishedAt`                        | timestamptz   | Start/end timestamps are nullable until recorded |
-| `status`                                                        | varchar       | `RUNNING`, `SUCCEEDED`, or `FAILED`              |
+| `status`                                                        | varchar       | `RUNNING`, `SUCCEEDED`, `PARTIAL`, or `FAILED`   |
 | `fetchedCount`, `createdCount`, `updatedCount`, `excludedCount` | integer       | Per-run totals, default `0`                      |
 | `errorCode`, `errorMessage`                                     | varchar, text | Safe failure diagnostics, both nullable          |
 | `createdAt`                                                     | timestamptz   | Creation timestamp                               |

@@ -3,10 +3,16 @@ import {
   TenderLicenseLimit,
 } from "../domain/normalized-tender";
 import {
+  LICENSE_LIMIT_UNAVAILABLE_ERROR_CODE,
   TenderFetchWindow,
   TenderSourceAdapter,
+  TenderSourceFetchResult,
 } from "../domain/tender-source.adapter";
-import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import {
+  ProcurementType,
+  SyncRunStatus,
+  TenderSource,
+} from "../domain/tender.enums";
 import {
   formatKstDateTimeMinute,
   parseKstDate,
@@ -34,7 +40,9 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
     private readonly config: G2bTenderAdapterConfig,
   ) {}
 
-  async fetchNotices(window: TenderFetchWindow): Promise<NormalizedTender[]> {
+  async fetchNotices(
+    window: TenderFetchWindow,
+  ): Promise<TenderSourceFetchResult> {
     const query = {
       serviceKey: this.config.serviceKey,
       type: "json",
@@ -42,7 +50,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
       inqryBgnDt: formatKstDateTimeMinute(window.from),
       inqryEndDt: formatKstDateTimeMinute(window.to),
     };
-    const [collections, licenseLimitRows] = await Promise.all([
+    const [collections, licenseLimitResult] = await Promise.all([
       Promise.all(
         G2B_OPERATIONS.map(async ([operation, procurementType]) => {
           const rows = await this.client.getAllPages({
@@ -58,22 +66,42 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
           });
         }),
       ),
-      this.client.getAllPages({
-        source: this.source,
-        baseUrl: this.config.baseUrl,
-        operation: LICENSE_LIMIT_OPERATION,
-        query,
-      }),
+      this.client
+        .getAllPages({
+          source: this.source,
+          baseUrl: this.config.baseUrl,
+          operation: LICENSE_LIMIT_OPERATION,
+          query,
+        })
+        .then((rows) => ({
+          rows,
+          status: SyncRunStatus.SUCCEEDED as const,
+          errorCode: null,
+        }))
+        .catch(() => ({
+          rows: [] as Record<string, unknown>[],
+          status: SyncRunStatus.PARTIAL as const,
+          errorCode: LICENSE_LIMIT_UNAVAILABLE_ERROR_CODE,
+        })),
     ]);
-    const licenseLimitsByNotice = this.groupLicenseLimits(licenseLimitRows);
+    const licenseLimitsByNotice = this.groupLicenseLimits(
+      licenseLimitResult.rows,
+    );
+    const licenseLimitsVerified =
+      licenseLimitResult.status === SyncRunStatus.SUCCEEDED;
 
-    return collections.flat().map((notice) => ({
-      ...notice,
-      licenseLimits:
-        licenseLimitsByNotice.get(
-          this.toNoticeKey(notice.sourceNoticeId, notice.revision),
-        ) ?? [],
-    }));
+    return {
+      notices: collections.flat().map((notice) => ({
+        ...notice,
+        licenseLimits:
+          licenseLimitsByNotice.get(
+            this.toNoticeKey(notice.sourceNoticeId, notice.revision),
+          ) ?? [],
+        licenseLimitsVerified,
+      })),
+      status: licenseLimitResult.status,
+      errorCode: licenseLimitResult.errorCode,
+    };
   }
 
   private groupLicenseLimits(
@@ -146,6 +174,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
         toNullableText(row[`ntceSpecDocNm${index + 1}`]),
       ).filter((name): name is string => name !== null),
       licenseLimits: [],
+      licenseLimitsVerified: false,
       rawData: row,
     };
   }

@@ -9,6 +9,7 @@ export interface TenderOpportunityClassificationInput {
   attachmentNames: string[];
   contractMethod: string | null;
   licenseLimits: TenderLicenseLimit[];
+  licenseLimitsVerified: boolean;
 }
 
 export interface TenderOpportunityClassification {
@@ -33,6 +34,13 @@ export class TenderOpportunityClassifier {
     }
 
     if (input.procurementType === ProcurementType.GOODS) {
+      if (!input.licenseLimitsVerified) {
+        return {
+          type: TenderOpportunityType.EXCLUDED_NON_SUPPLY,
+          reasons: ["면허제한 정보 확인 불가"],
+        };
+      }
+
       const electricalLicenseLimit = input.licenseLimits.find((licenseLimit) =>
         ELECTRICAL_CONSTRUCTION_PATTERN.test(
           `${licenseLimit.name} ${licenseLimit.permittedIndustries}`,

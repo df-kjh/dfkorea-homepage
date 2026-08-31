@@ -397,13 +397,34 @@ export class TenderMailService {
         "Delivery cancelled because its recipient is no longer active",
       );
     }
+    await this.detachExcludedRetryItems(delivery.id, excludedMailItemIds);
     await this.deliver(
       delivery,
       eligibleItems.map((item) => item.tender),
       now,
       eligibleItems.map((item) => item.id),
-      excludedMailItemIds,
     );
+  }
+
+  private async detachExcludedRetryItems(
+    deliveryId: string,
+    excludedMailItemIds: string[],
+  ): Promise<void> {
+    if (excludedMailItemIds.length === 0) return;
+
+    await this.dataSource.transaction(async (manager) => {
+      const result = await manager.getRepository(TenderMailItem).update(
+        {
+          id: In(excludedMailItemIds),
+          lastDeliveryId: deliveryId,
+          status: MailItemStatus.PENDING,
+        },
+        { lastDeliveryId: null },
+      );
+      if (result.affected !== excludedMailItemIds.length) {
+        throw new Error("Retry delivery item detach was incomplete");
+      }
+    });
   }
 
   private async isCurrentEnabledRecipient(
@@ -494,7 +515,6 @@ export class TenderMailService {
     tenders: Tender[],
     now: Date,
     deliveredMailItemIds?: string[],
-    excludedMailItemIds?: string[],
   ): Promise<void> {
     let message: {
       to: string;
@@ -523,7 +543,7 @@ export class TenderMailService {
       } else if (outcome === MailDeliveryOutcome.PERMANENT_REJECTION) {
         await this.persistPermanentFailure(delivery, now);
       } else {
-        await this.persistUncertain(delivery, now);
+        await this.persistUncertain(delivery, now, deliveredMailItemIds);
       }
       return;
     }
@@ -537,7 +557,6 @@ export class TenderMailService {
       result,
       now,
       deliveredMailItemIds,
-      excludedMailItemIds,
     );
   }
 
@@ -546,7 +565,6 @@ export class TenderMailService {
     result: { providerMessageId?: string | null },
     now: Date,
     deliveredMailItemIds?: string[],
-    excludedMailItemIds?: string[],
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const mailItemRepository = manager.getRepository(TenderMailItem);
@@ -557,15 +575,6 @@ export class TenderMailService {
           : { lastDeliveryId: delivery.id },
         { status: MailItemStatus.SENT, sentAt: now, uncertainAt: null },
       );
-      if (excludedMailItemIds && excludedMailItemIds.length > 0) {
-        // These items were intentionally omitted from the acknowledged
-        // provider payload. Clear the completed delivery link so a later
-        // eligible reclassification can create a fresh, recoverable delivery.
-        await mailItemRepository.update(
-          { id: In(excludedMailItemIds), lastDeliveryId: delivery.id },
-          { lastDeliveryId: null },
-        );
-      }
       await deliveryRepository.save({
         ...delivery,
         status: MailDeliveryStatus.SENT,
@@ -639,6 +648,7 @@ export class TenderMailService {
   private async persistUncertain(
     delivery: TenderMailDelivery,
     now: Date,
+    deliveredMailItemIds?: string[],
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const deliveryRepository = manager.getRepository(TenderMailDelivery);
@@ -660,10 +670,16 @@ export class TenderMailService {
       );
       if (transitioned.affected !== 1) return;
       await mailItemRepository.update(
-        {
-          lastDeliveryId: delivery.id,
-          status: MailItemStatus.PENDING,
-        },
+        deliveredMailItemIds
+          ? {
+              id: In(deliveredMailItemIds),
+              lastDeliveryId: delivery.id,
+              status: MailItemStatus.PENDING,
+            }
+          : {
+              lastDeliveryId: delivery.id,
+              status: MailItemStatus.PENDING,
+            },
         {
           status: MailItemStatus.DELIVERY_UNCERTAIN,
           uncertainAt: now,

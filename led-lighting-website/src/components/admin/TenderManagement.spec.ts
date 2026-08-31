@@ -235,6 +235,38 @@ describe('TenderManagement', () => {
     }))
   })
 
+  it('warns when G2B collection is partial even when no source fully failed', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-08-27T12:00:00.000Z',
+        sources: [
+          {
+            source: 'G2B',
+            status: 'PARTIAL',
+            fetchedCount: 3,
+            createdCount: 3,
+            updatedCount: 0,
+            excludedCount: 0,
+            errorCode: 'LICENSE_LIMIT_UNAVAILABLE',
+          },
+        ],
+        failedSources: [],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      '나라장터 면허제한 정보를 확인하지 못해 검증되지 않은 물품 공고는 제외했습니다.',
+    )
+    expect(api.getCalendar).toHaveBeenCalledTimes(2)
+    expect(api.getAll).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps existing calendar and list data visible when immediate collection fails', async () => {
     api.collect.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mountTenderManagement()

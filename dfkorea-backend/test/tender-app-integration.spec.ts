@@ -10,10 +10,14 @@ import {
   KEPCO_TENDER_ADAPTER,
 } from "../src/tenders/adapters/public-api-client";
 import { NormalizedTender } from "../src/tenders/domain/normalized-tender";
-import { TenderSourceAdapter } from "../src/tenders/domain/tender-source.adapter";
+import {
+  TenderSourceAdapter,
+  TenderSourceFetchResult,
+} from "../src/tenders/domain/tender-source.adapter";
 import {
   MailDeliveryStatus,
   ProcurementType,
+  SyncRunStatus,
   TenderRelevance,
   TenderSource,
 } from "../src/tenders/domain/tender.enums";
@@ -55,8 +59,17 @@ const NOTICE: NormalizedTender = {
   description: "통합 테스트 fixture",
   attachmentNames: [],
   licenseLimits: [],
+  licenseLimitsVerified: true,
   rawData: { fixture: true },
 };
+
+const successfulFetch = (
+  notices: NormalizedTender[] = [],
+): TenderSourceFetchResult => ({
+  notices,
+  status: SyncRunStatus.SUCCEEDED,
+  errorCode: null,
+});
 
 describe("Tender AppModule PostgreSQL integration", () => {
   let app: INestApplication;
@@ -143,9 +156,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
   });
 
   it("uses real TypeORM storage for mocked-adapter ingestion and authenticated queries", async () => {
-    g2b.fetchNotices.mockResolvedValue([NOTICE]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successfulFetch([NOTICE]));
+    kapt.fetchNotices.mockResolvedValue(successfulFetch());
+    kepco.fetchNotices.mockResolvedValue(successfulFetch());
 
     await app
       .get(TenderIngestionService)
@@ -211,9 +224,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
   });
 
   it("keeps recipients isolated and makes exactly one due provider retry", async () => {
-    g2b.fetchNotices.mockResolvedValue([NOTICE]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successfulFetch([NOTICE]));
+    kapt.fetchNotices.mockResolvedValue(successfulFetch());
+    kepco.fetchNotices.mockResolvedValue(successfulFetch());
     await app
       .get(TenderIngestionService)
       .collectAll(new Date("2026-08-27T03:00:00.000Z"));

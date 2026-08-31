@@ -243,4 +243,24 @@ describe("TenderQueryService", () => {
 
     await expect(service.getTender("00000000-0000-4000-8000-000000000001")).resolves.toBeNull();
   });
+
+  it("applies the eligible-opportunity predicate to detail lookup so excluded IDs are absent", async () => {
+    const builder = createQueryBuilder();
+    builder.getOne.mockResolvedValue(null);
+    repository.createQueryBuilder.mockReturnValue(builder);
+
+    await expect(
+      service.getTender("00000000-0000-4000-8000-000000000001"),
+    ).resolves.toBeNull();
+
+    expect(builder.andWhere).toHaveBeenCalledWith(
+      "tender.opportunityType IN (:...eligibleOpportunityTypes)",
+      {
+        eligibleOpportunityTypes: [
+          TenderOpportunityType.GOODS_SUPPLY,
+          TenderOpportunityType.MAS,
+        ],
+      },
+    );
+  });
 });

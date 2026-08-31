@@ -29,5 +29,6 @@ export interface NormalizedTender {
   description: string;
   attachmentNames: string[];
   licenseLimits: TenderLicenseLimit[];
+  licenseLimitsVerified: boolean;
   rawData: Record<string, unknown>;
 }

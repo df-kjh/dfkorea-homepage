@@ -20,7 +20,10 @@ const COLLECTION_OVERLAP_MS = 60 * 60 * 1000;
 
 export interface SourceCollectionSummary {
   source: TenderSource;
-  status: SyncRunStatus.SUCCEEDED | SyncRunStatus.FAILED;
+  status:
+    | SyncRunStatus.SUCCEEDED
+    | SyncRunStatus.PARTIAL
+    | SyncRunStatus.FAILED;
   fetchedCount: number;
   createdCount: number;
   updatedCount: number;
@@ -180,7 +183,8 @@ export class TenderIngestionService {
         errorCode: null,
         errorMessage: null,
       });
-      const notices = await adapter.fetchNotices(window);
+      const fetchResult = await adapter.fetchNotices(window);
+      const { notices } = fetchResult;
       const { relevant, excludedCount } = this.classifyNotices(notices);
       const { createdCount, updatedCount } = await this.upsertRelevantTenders(
         relevant,
@@ -188,22 +192,22 @@ export class TenderIngestionService {
       await this.syncRunRepository.save({
         ...run,
         finishedAt: new Date(),
-        status: SyncRunStatus.SUCCEEDED,
+        status: fetchResult.status,
         fetchedCount: notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: null,
+        errorCode: fetchResult.errorCode,
         errorMessage: null,
       });
       return {
         source: adapter.source,
-        status: SyncRunStatus.SUCCEEDED,
+        status: fetchResult.status,
         fetchedCount: notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: null,
+        errorCode: fetchResult.errorCode,
       };
     } catch (error) {
       const { errorCode, errorMessage } = this.sanitizeError(error);
@@ -320,6 +324,7 @@ export class TenderIngestionService {
       attachmentNames: notice.attachmentNames,
       contractMethod: notice.contractMethod,
       licenseLimits: notice.licenseLimits,
+      licenseLimitsVerified: notice.licenseLimitsVerified,
     });
     return {
       source: notice.source,

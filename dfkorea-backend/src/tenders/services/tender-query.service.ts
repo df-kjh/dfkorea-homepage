@@ -106,10 +106,11 @@ export class TenderQueryService {
   }
 
   async getTender(id: string): Promise<TenderDetailDto | null> {
-    const tender = await this.tenderRepository
+    const builder = this.tenderRepository
       .createQueryBuilder("tender")
-      .where("tender.id = :id", { id })
-      .getOne();
+      .where("tender.id = :id", { id });
+    this.applyOpportunityEligibility(builder);
+    const tender = await builder.getOne();
     return tender ? this.toSafeDto(tender) : null;
   }
 

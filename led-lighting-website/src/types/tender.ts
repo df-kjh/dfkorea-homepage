@@ -1,6 +1,6 @@
 export type TenderSource = 'G2B' | 'KAPT' | 'KEPCO'
 
-export type TenderCollectionSourceStatus = 'SUCCEEDED' | 'FAILED'
+export type TenderCollectionSourceStatus = 'SUCCEEDED' | 'PARTIAL' | 'FAILED'
 
 export interface TenderCollectionSourceResult {
   source: TenderSource

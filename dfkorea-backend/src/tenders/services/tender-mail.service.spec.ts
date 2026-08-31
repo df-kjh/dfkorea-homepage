@@ -51,6 +51,42 @@ const TENDER = {
   lastUpdatedAt: NOW,
 } as Tender;
 
+const createMixedRetry = () => {
+  const delivery = {
+    id: "delivery-mixed-eligibility",
+    recipientEmail: RECIPIENT.email,
+    status: MailDeliveryStatus.RETRY_SCHEDULED,
+    attemptCount: 1,
+    nextRetryAt: new Date(NOW.getTime() - 1),
+    targetDate: "2026-08-27",
+  } as TenderMailDelivery;
+  const eligibleItem = {
+    id: "eligible-item",
+    recipientId: RECIPIENT.id,
+    tenderId: TENDER.id,
+    tender: TENDER,
+    status: MailItemStatus.PENDING,
+    lastDeliveryId: delivery.id,
+    uncertainAt: null,
+  };
+  const excludedItem = {
+    id: "excluded-item",
+    recipientId: RECIPIENT.id,
+    tenderId: "excluded-tender",
+    tender: {
+      ...TENDER,
+      id: "excluded-tender",
+      opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
+      opportunityReasons: ["공사 업무구분"],
+    },
+    status: MailItemStatus.PENDING,
+    lastDeliveryId: delivery.id,
+    uncertainAt: null,
+  };
+
+  return { delivery, eligibleItem, excludedItem };
+};
+
 describe("TenderMailService", () => {
   let subscriptionRepository: any;
   let recipientRepository: any;
@@ -81,7 +117,7 @@ describe("TenderMailService", () => {
     mailItemRepository = {
       find: jest.fn().mockResolvedValue([]),
       save: jest.fn(async (value) => (Array.isArray(value) ? value : value)),
-      update: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     const dispatchBuilder = {
       insert: jest.fn(),
@@ -810,9 +846,117 @@ describe("TenderMailService", () => {
           _value: ["excluded-item"],
         }),
         lastDeliveryId: delivery.id,
+        status: MailItemStatus.PENDING,
       },
       { lastDeliveryId: null },
     );
+  });
+
+  it("marks only the eligible item uncertain when a mixed retry has an unknown provider outcome", async () => {
+    const { delivery, eligibleItem, excludedItem } = createMixedRetry();
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
+    mailItemRepository.find.mockResolvedValue([eligibleItem, excludedItem]);
+    mailItemRepository.update.mockImplementation(async (where, update) => {
+      const ids = (where.id as { _value?: string[] } | undefined)?._value;
+      for (const item of [eligibleItem, excludedItem]) {
+        if (ids && !ids.includes(item.id)) continue;
+        if (where.lastDeliveryId && item.lastDeliveryId !== where.lastDeliveryId)
+          continue;
+        if (where.status && item.status !== where.status) continue;
+        Object.assign(item, update);
+      }
+      return { affected: 1 };
+    });
+    transport.sendMail.mockRejectedValueOnce(
+      new MailDeliveryError(MailDeliveryOutcome.UNKNOWN_ACCEPTANCE),
+    );
+
+    await service.retryDue(NOW);
+
+    expect(eligibleItem).toEqual(
+      expect.objectContaining({
+        status: MailItemStatus.DELIVERY_UNCERTAIN,
+        uncertainAt: NOW,
+        lastDeliveryId: delivery.id,
+      }),
+    );
+    expect(excludedItem).toEqual(
+      expect.objectContaining({
+        status: MailItemStatus.PENDING,
+        uncertainAt: null,
+        lastDeliveryId: null,
+      }),
+    );
+  });
+
+  it("leaves only the eligible mixed-retry item linked for uncertain recovery after provider acknowledgement persistence fails", async () => {
+    const { delivery, eligibleItem, excludedItem } = createMixedRetry();
+    const staleDelivery = {
+      ...delivery,
+      status: MailDeliveryStatus.PENDING,
+      attemptCount: 2,
+      claimedAt: NOW,
+      nextRetryAt: null,
+    } as TenderMailDelivery;
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery])
+      .mockResolvedValueOnce([staleDelivery])
+      .mockResolvedValueOnce([]);
+    mailItemRepository.find.mockResolvedValue([eligibleItem, excludedItem]);
+    mailItemRepository.update.mockImplementation(async (where, update) => {
+      if (update.status === MailItemStatus.SENT) {
+        throw new Error("simulated post-ack persistence failure");
+      }
+      const ids = (where.id as { _value?: string[] } | undefined)?._value;
+      for (const item of [eligibleItem, excludedItem]) {
+        if (ids && !ids.includes(item.id)) continue;
+        if (where.lastDeliveryId && item.lastDeliveryId !== where.lastDeliveryId)
+          continue;
+        if (where.status && item.status !== where.status) continue;
+        Object.assign(item, update);
+      }
+      return { affected: 1 };
+    });
+
+    await expect(service.retryDue(NOW)).rejects.toThrow(
+      "simulated post-ack persistence failure",
+    );
+    await service.retryDue(new Date(NOW.getTime() + 16 * 60_000));
+
+    expect(transport.sendMail).toHaveBeenCalledTimes(1);
+    expect(eligibleItem).toEqual(
+      expect.objectContaining({
+        status: MailItemStatus.DELIVERY_UNCERTAIN,
+        lastDeliveryId: delivery.id,
+      }),
+    );
+    expect(excludedItem).toEqual(
+      expect.objectContaining({
+        status: MailItemStatus.PENDING,
+        uncertainAt: null,
+        lastDeliveryId: null,
+      }),
+    );
+  });
+
+  it("does not call the provider when detaching an excluded retry item fails", async () => {
+    const { delivery, eligibleItem, excludedItem } = createMixedRetry();
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
+    mailItemRepository.find.mockResolvedValue([eligibleItem, excludedItem]);
+    mailItemRepository.update.mockRejectedValueOnce(
+      new Error("simulated detach failure"),
+    );
+
+    await expect(service.retryDue(NOW)).rejects.toThrow(
+      "simulated detach failure",
+    );
+
+    expect(transport.sendMail).not.toHaveBeenCalled();
   });
 
   it("cancels a due retry without calling the provider when its recipient was removed", async () => {

@@ -2,8 +2,13 @@ import { NormalizedTender } from "../domain/normalized-tender";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
+  TenderSourceFetchResult,
 } from "../domain/tender-source.adapter";
-import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import {
+  ProcurementType,
+  SyncRunStatus,
+  TenderSource,
+} from "../domain/tender.enums";
 import {
   formatKstDate,
   parseKstDate,
@@ -24,7 +29,9 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
     private readonly config: KaptTenderAdapterConfig,
   ) {}
 
-  async fetchNotices(window: TenderFetchWindow): Promise<NormalizedTender[]> {
+  async fetchNotices(
+    window: TenderFetchWindow,
+  ): Promise<TenderSourceFetchResult> {
     const rows = await this.client.getAllPages({
       source: this.source,
       baseUrl: this.config.baseUrl,
@@ -37,10 +44,14 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
       },
     });
 
-    return rows.flatMap((row) => {
-      const normalized = this.normalize(row);
-      return normalized ? [normalized] : [];
-    });
+    return {
+      notices: rows.flatMap((row) => {
+        const normalized = this.normalize(row);
+        return normalized ? [normalized] : [];
+      }),
+      status: SyncRunStatus.SUCCEEDED,
+      errorCode: null,
+    };
   }
 
   private normalize(row: Record<string, unknown>): NormalizedTender | null {
@@ -73,6 +84,8 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
       description: toNullableText(row.bidContent) ?? "",
       attachmentNames: [],
       licenseLimits: [],
+      // K-apt has no separate G2B license-limit enrichment requirement.
+      licenseLimitsVerified: true,
       rawData: row,
     };
   }
