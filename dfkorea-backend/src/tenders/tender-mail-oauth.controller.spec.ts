@@ -43,7 +43,7 @@ describe("TenderMailOAuthController", () => {
       "state-value",
     );
     expect(response.redirect).toHaveBeenCalledWith(
-      "https://www.dfkorealed.com/admin?tab=tenders&mailOAuth=connected",
+      "https://www.dfkorealed.com/admin/dashboard?tab=tenders&mailOAuth=connected",
     );
   });
 

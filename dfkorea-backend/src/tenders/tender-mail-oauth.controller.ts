@@ -43,7 +43,7 @@ export class TenderMailOAuthController {
     const publicSiteUrl = this.config.get<string>("PUBLIC_SITE_URL")?.trim();
     let redirect: URL;
     try {
-      redirect = new URL("/admin", publicSiteUrl);
+      redirect = new URL("/admin/dashboard", publicSiteUrl);
     } catch {
       throw new Error("PUBLIC_SITE_URL is invalid");
     }
