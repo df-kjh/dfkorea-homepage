@@ -54,6 +54,7 @@ const NOTICE: NormalizedTender = {
   itemName: "LED 등기구",
   description: "통합 테스트 fixture",
   attachmentNames: [],
+  licenseLimits: [],
   rawData: { fixture: true },
 };
 

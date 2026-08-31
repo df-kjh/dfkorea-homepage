@@ -283,6 +283,7 @@ describe("Tender collection and delivery service contracts", () => {
     itemName: "LED 등기구",
     description: "",
     attachmentNames: [],
+    licenseLimits: [],
     rawData: { notice: "sanitized fixture" },
     ...overrides,
   });

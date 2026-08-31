@@ -31,6 +31,7 @@ const directNotice: NormalizedTender = {
   itemName: "LED 등기구",
   description: "공용부 조명 교체",
   attachmentNames: ["spec.pdf"],
+  licenseLimits: [],
   rawData: { bidNtceNo: "G2B-1" },
 };
 

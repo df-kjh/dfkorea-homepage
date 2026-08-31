@@ -11,6 +11,13 @@ export enum ProcurementType {
   OTHER = "OTHER",
 }
 
+export enum TenderOpportunityType {
+  GOODS_SUPPLY = "GOODS_SUPPLY",
+  MAS = "MAS",
+  EXCLUDED_CONSTRUCTION = "EXCLUDED_CONSTRUCTION",
+  EXCLUDED_NON_SUPPLY = "EXCLUDED_NON_SUPPLY",
+}
+
 export enum TenderRelevance {
   DIRECT = "DIRECT",
   POTENTIAL = "POTENTIAL",

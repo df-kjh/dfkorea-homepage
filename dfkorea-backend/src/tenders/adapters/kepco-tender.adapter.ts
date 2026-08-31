@@ -88,6 +88,7 @@ export class KepcoTenderAdapter implements TenderSourceAdapter {
       itemName: toNullableText(row.itemName) ?? "",
       description: toNullableText(row.description) ?? "",
       attachmentNames: [],
+      licenseLimits: [],
       rawData: row,
     };
   }

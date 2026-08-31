@@ -65,16 +65,28 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
       bidEndedAt: parseKstDate(row.bidDeadline),
       openedAt: null,
       region: toNullableText(row.bidArea),
-      // The V3 list fields expose a status, not a procurement category. Do not
-      // infer a type from the title or status; classification is a later step.
-      procurementType: ProcurementType.OTHER,
+      procurementType: this.mapProcurementType(row.codeClassifyType2),
       contractMethod: null,
       estimatedAmount: null,
       sourceUrl: `https://www.k-apt.go.kr/web/bid/bidDetail.do?bidNum=${encodeURIComponent(sourceNoticeId)}`,
       itemName: "",
       description: toNullableText(row.bidContent) ?? "",
       attachmentNames: [],
+      licenseLimits: [],
       rawData: row,
     };
+  }
+
+  private mapProcurementType(value: unknown): ProcurementType {
+    switch (toNullableText(value)) {
+      case "02":
+        return ProcurementType.CONSTRUCTION;
+      case "03":
+        return ProcurementType.SERVICE;
+      case "04":
+        return ProcurementType.GOODS;
+      default:
+        return ProcurementType.OTHER;
+    }
   }
 }

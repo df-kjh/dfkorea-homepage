@@ -1,4 +1,7 @@
-import { NormalizedTender } from "../domain/normalized-tender";
+import {
+  NormalizedTender,
+  TenderLicenseLimit,
+} from "../domain/normalized-tender";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
@@ -21,6 +24,7 @@ const G2B_OPERATIONS: ReadonlyArray<[string, ProcurementType]> = [
   ["getBidPblancListInfoThng", ProcurementType.GOODS],
   ["getBidPblancListInfoServc", ProcurementType.SERVICE],
 ];
+const LICENSE_LIMIT_OPERATION = "getBidPblancListInfoLicenseLimit";
 
 export class G2bTenderAdapter implements TenderSourceAdapter {
   readonly source = TenderSource.G2B;
@@ -31,29 +35,78 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
   ) {}
 
   async fetchNotices(window: TenderFetchWindow): Promise<NormalizedTender[]> {
-    const collections = await Promise.all(
-      G2B_OPERATIONS.map(async ([operation, procurementType]) => {
-        const rows = await this.client.getAllPages({
-          source: this.source,
-          baseUrl: this.config.baseUrl,
-          operation,
-          query: {
-            serviceKey: this.config.serviceKey,
-            type: "json",
-            inqryDiv: "1",
-            inqryBgnDt: formatKstDateTimeMinute(window.from),
-            inqryEndDt: formatKstDateTimeMinute(window.to),
-          },
-        });
+    const query = {
+      serviceKey: this.config.serviceKey,
+      type: "json",
+      inqryDiv: "1",
+      inqryBgnDt: formatKstDateTimeMinute(window.from),
+      inqryEndDt: formatKstDateTimeMinute(window.to),
+    };
+    const [collections, licenseLimitRows] = await Promise.all([
+      Promise.all(
+        G2B_OPERATIONS.map(async ([operation, procurementType]) => {
+          const rows = await this.client.getAllPages({
+            source: this.source,
+            baseUrl: this.config.baseUrl,
+            operation,
+            query,
+          });
 
-        return rows.flatMap((row) => {
-          const normalized = this.normalize(row, procurementType);
-          return normalized ? [normalized] : [];
-        });
+          return rows.flatMap((row) => {
+            const normalized = this.normalize(row, procurementType);
+            return normalized ? [normalized] : [];
+          });
+        }),
+      ),
+      this.client.getAllPages({
+        source: this.source,
+        baseUrl: this.config.baseUrl,
+        operation: LICENSE_LIMIT_OPERATION,
+        query,
       }),
-    );
+    ]);
+    const licenseLimitsByNotice = this.groupLicenseLimits(licenseLimitRows);
 
-    return collections.flat();
+    return collections.flat().map((notice) => ({
+      ...notice,
+      licenseLimits:
+        licenseLimitsByNotice.get(
+          this.toNoticeKey(notice.sourceNoticeId, notice.revision),
+        ) ?? [],
+    }));
+  }
+
+  private groupLicenseLimits(
+    rows: Record<string, unknown>[],
+  ): Map<string, TenderLicenseLimit[]> {
+    const licenseLimitsByNotice = new Map<string, TenderLicenseLimit[]>();
+
+    for (const row of rows) {
+      const sourceNoticeId = toNullableText(row.bidNtceNo);
+      if (!sourceNoticeId) {
+        continue;
+      }
+
+      const name = toNullableText(row.lcnsLmtNm) ?? "";
+      const permittedIndustries = toNullableText(row.permsnIndstrytyList) ?? "";
+      if (!name && !permittedIndustries) {
+        continue;
+      }
+
+      const key = this.toNoticeKey(
+        sourceNoticeId,
+        toNullableText(row.bidNtceOrd) ?? "0",
+      );
+      const licenseLimits = licenseLimitsByNotice.get(key) ?? [];
+      licenseLimits.push({ name, permittedIndustries });
+      licenseLimitsByNotice.set(key, licenseLimits);
+    }
+
+    return licenseLimitsByNotice;
+  }
+
+  private toNoticeKey(sourceNoticeId: string, revision: string): string {
+    return `${sourceNoticeId}:${revision}`;
   }
 
   private normalize(
@@ -92,6 +145,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
       attachmentNames: Array.from({ length: 10 }, (_, index) =>
         toNullableText(row[`ntceSpecDocNm${index + 1}`]),
       ).filter((name): name is string => name !== null),
+      licenseLimits: [],
       rawData: row,
     };
   }

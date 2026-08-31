@@ -51,8 +51,44 @@ describe("official tender adapters", () => {
         rawData: g2bFixture.response.body.items[0],
       }),
     );
-    expect(client.getAllPages).toHaveBeenCalledTimes(3);
+    expect(client.getAllPages).toHaveBeenCalledTimes(4);
     expect(notice?.attachmentNames).toEqual(["LED 등기구 시방서.pdf"]);
+    expect(notice?.licenseLimits).toEqual([]);
+  });
+
+  it("enriches G2B notices with matching official license limits", async () => {
+    const client = createClient();
+    client.getAllPages
+      .mockResolvedValueOnce([g2bFixture.response.body.items[0]])
+      .mockResolvedValueOnce([g2bFixture.response.body.items[1]])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(g2bFixture.licenseLimitItems);
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const notices = await adapter.fetchNotices(window);
+
+    expect(client.getAllPages).toHaveBeenCalledWith({
+      source: TenderSource.G2B,
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      operation: "getBidPblancListInfoLicenseLimit",
+      query: {
+        serviceKey: "test-key",
+        type: "json",
+        inqryDiv: "1",
+        inqryBgnDt: "202608260900",
+        inqryEndDt: "202608270900",
+      },
+    });
+    expect(
+      notices.find(
+        (notice) =>
+          notice.sourceNoticeId === "R26BK00000002" &&
+          notice.revision === "001",
+      )?.licenseLimits,
+    ).toEqual([{ name: "조명기구 제조업", permittedIndustries: "0037" }]);
   });
 
   it("classifies a notice from a documented G2B attachment filename", async () => {
@@ -106,7 +142,7 @@ describe("official tender adapters", () => {
         demandOrganization: null,
         registeredAt: new Date("2026-08-26T06:30:00.000Z"),
         bidEndedAt: new Date("2026-09-02T01:00:00.000Z"),
-        procurementType: ProcurementType.OTHER,
+        procurementType: ProcurementType.CONSTRUCTION,
         region: "서울특별시 송파구",
         estimatedAmount: null,
         sourceUrl:
@@ -115,6 +151,15 @@ describe("official tender adapters", () => {
         rawData: kaptFixture.response.body.items[0],
       }),
     );
+    expect(
+      (await adapter.fetchNotices(window)).map((item) => item.procurementType),
+    ).toEqual([
+      ProcurementType.CONSTRUCTION,
+      ProcurementType.SERVICE,
+      ProcurementType.GOODS,
+      ProcurementType.OTHER,
+    ]);
+    expect(notice?.licenseLimits).toEqual([]);
   });
 
   it("maps the isolated KEPCO recorded contract and validates enabled configuration", async () => {
@@ -200,8 +245,9 @@ describe("PublicApiClient", () => {
       "getBidPblancListInfoCnstwk",
       "getBidPblancListInfoThng",
       "getBidPblancListInfoServc",
+      "getBidPblancListInfoLicenseLimit",
     ];
-    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(fetcher).toHaveBeenCalledTimes(8);
     for (const operation of operations) {
       for (const pageNo of ["1", "2"]) {
         const request = fetcher.mock.calls
