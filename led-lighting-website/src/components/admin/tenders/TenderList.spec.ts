@@ -6,6 +6,7 @@ const tender = {
   id: 'tender-1', source: 'G2B' as const, sourceNoticeId: 'R26BK0001', revision: '000', title: '서울 LED 조명 교체', orderingOrganization: '서울시', demandOrganization: null,
   registeredAt: '2026-08-27T09:00:00.000Z', bidStartedAt: null, bidEndedAt: '2026-09-02T09:00:00.000Z', openedAt: null, region: '서울', procurementType: 'GOODS' as const,
   contractMethod: null, estimatedAmount: '5000000', sourceUrl: 'https://example.go.kr/tenders/1', relevance: 'DIRECT' as const, relevanceScore: 100, relevanceReasons: [{ field: 'title', keyword: 'LED', score: 100 }],
+  opportunityType: 'GOODS_SUPPLY' as const, opportunityReasons: ['물품 업무구분'],
 }
 
 describe('TenderList', () => {
@@ -55,5 +56,14 @@ describe('TenderList', () => {
     expect(wrapper.text()).toContain('2026. 9. 1. 00:30')
     expect(wrapper.text()).toContain('2026. 9. 2. 00:30')
     expect(wrapper.text()).toContain('9,007,199,254,740,993,123,456,789원')
+  })
+
+  it('renders the common supply opportunity badge alongside the relevance badge', () => {
+    const wrapper = mount(TenderList, {
+      props: { response: { data: [tender], total: 1, page: 1, pageSize: 20, totalPages: 1 }, loading: false, error: null, selectedDate: '2026-08-27' },
+    })
+
+    expect(wrapper.get('.tender-opportunity-badge').attributes('aria-label')).toBe('📦 물품 납품')
+    expect(wrapper.get('.tender-relevance-badge').attributes('aria-label')).toBe('💡 직접 관련')
   })
 })

@@ -36,6 +36,8 @@ const tender = {
   relevance: 'DIRECT' as const,
   relevanceScore: 100,
   relevanceReasons: [{ field: 'title', keyword: 'LED', score: 100 }],
+  opportunityType: 'GOODS_SUPPLY' as const,
+  opportunityReasons: ['물품 업무구분'],
 }
 
 const listResponse = {
