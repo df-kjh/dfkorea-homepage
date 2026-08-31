@@ -42,37 +42,37 @@
 - Produces: `TenderOpportunityClassifier.classify(input): { type: TenderOpportunityType; reasons: string[] }`.
 - Produces: `NormalizedTender.licenseLimits: Array<{ name: string; permittedIndustries: string }>`; K-apt and KEPCO populate an empty array until their official APIs expose an equivalent field.
 
-- [ ] **Step 1: Write failing classifier tests**
+- [x] **Step 1: Write failing classifier tests**
 
 Add literal cases proving: construction is excluded; a goods title containing `공사 관급자재 구입` remains `GOODS_SUPPLY`; goods with `전기공사업/0037` in a license limit is excluded; `다수공급자계약 LED 조명기구` becomes `MAS`; and service becomes `EXCLUDED_NON_SUPPLY`.
 
-- [ ] **Step 2: Run the classifier test and verify RED**
+- [x] **Step 2: Run the classifier test and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand src/tenders/domain/tender-opportunity-classifier.spec.ts`
 
 Expected: FAIL because the enum and classifier do not exist.
 
-- [ ] **Step 3: Implement the minimal classifier and run GREEN**
+- [x] **Step 3: Implement the minimal classifier and run GREEN**
 
 Implement the priority in the spec. Match MAS using `다수\s*공급자\s*계약` or the independent ASCII word `MAS`; match an electrical-construction restriction across both license name and permitted industries using `전기공사업`.
 
 Run the focused classifier test and expect PASS.
 
-- [ ] **Step 4: Write failing adapter tests**
+- [x] **Step 4: Write failing adapter tests**
 
 For G2B, make the client return four operation results and assert `getBidPblancListInfoLicenseLimit` is called with the same `inqryDiv=1`, `inqryBgnDt`, `inqryEndDt`, `type=json` window and that matching `bidNtceNo`/`bidNtceOrd` rows populate `licenseLimits`. For K-apt, add literal rows proving `codeClassifyType2` values `02`, `03`, `04`, and an unknown code map to construction, service, goods, and other.
 
-- [ ] **Step 5: Run adapter tests and verify RED**
+- [x] **Step 5: Run adapter tests and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand src/tenders/adapters/tender-adapters.spec.ts`
 
 Expected: FAIL because G2B does not fetch license limits and K-apt always returns `OTHER`.
 
-- [ ] **Step 6: Implement adapter enrichment and run GREEN**
+- [x] **Step 6: Implement adapter enrichment and run GREEN**
 
 Fetch license limits once per collection window, group by `${bidNtceNo}:${bidNtceOrd}`, and attach sanitized `lcnsLmtNm`/`permsnIndstrytyList` values. Do not place request URLs or service keys in `rawData`. Implement the exact K-apt mapping from Global Constraints and run both focused suites.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 Commit message: `feat: classify supply tender opportunities`
 
