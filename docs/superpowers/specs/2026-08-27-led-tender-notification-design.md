@@ -2,7 +2,7 @@
 
 ## 1. 목적
 
-회사 홈페이지 어드민에서 LED 조명 관련 입찰 공고를 등록일 기준 월간 캘린더로 조회하고, 여러 회사 이메일 주소로 하루 한 번 신규 공고 요약 메일을 발송한다. 직접적인 조명 공고뿐 아니라 전기공사·시설개선처럼 조명이 포함될 가능성이 있는 공고도 수집하되, 관련도를 명확히 구분한다.
+회사 홈페이지 어드민에서 LED 조명 관련 입찰 공고를 등록일 기준 월간 캘린더로 조회하고, 여러 회사 이메일 주소로 설정 시각 슬롯마다 신규 공고 요약 메일을 발송한다. 같은 날 설정 시각을 변경하면 추가 슬롯을 실행할 수 있다. 직접적인 조명 공고뿐 아니라 전기공사·시설개선처럼 조명이 포함될 가능성이 있는 공고도 수집하되, 관련도를 명확히 구분한다.
 
 ## 2. 현재 프로젝트 기준
 
@@ -82,7 +82,7 @@
 - 메일 재시도: 특정 주소의 1차 발송 실패 10분 뒤 해당 주소만 1회
 - 재시도 실패: 추가 자동 재시도 없이 실패 기록. 다음 날 해당 주소의 메일에 미발송 공고 재포함
 
-수집, 일일 메일, 재시도는 각각 전용 PostgreSQL advisory lock을 QueryRunner의 같은 연결 세션에서 획득·해제한다. 일일 메일은 추가로 `tender_daily_dispatches.businessDate` 고유 제약과 15분 `leaseExpiresAt`을 사용한다. fresh claim은 다른 replica가 건너뛰고, recipient durable state 생성 전 crash/DB 오류로 남은 `CLAIMED` 행은 lease 만료 뒤 같은 날짜로 reclaim한다. 모든 새 delivery는 nullable FK `dailyDispatchId`와 `recipientId`를 기록하고 `(dailyDispatchId, recipientId)` 고유 제약을 사용한다. 재개 실행은 이 dispatch에 terminal/retry/in-flight delivery 또는 durable `SKIPPED`가 없는 주소만 처리하고, 하나라도 durable state 전 claim이 실패하면 dispatch를 완료하지 않는다. 설정 PUT은 다음 minute tick부터 모든 replica에 보인다.
+수집, 메일, 재시도는 각각 전용 PostgreSQL advisory lock을 QueryRunner의 같은 연결 세션에서 획득·해제한다. 메일은 추가로 `tender_daily_dispatches(businessDate, deliveryTime)` 고유 제약과 15분 `leaseExpiresAt`을 사용한다. fresh claim은 다른 replica가 건너뛰고, recipient durable state 생성 전 crash/DB 오류로 남은 `CLAIMED` 행은 lease 만료 뒤 같은 날짜·시각으로 reclaim한다. 모든 새 delivery는 nullable FK `dailyDispatchId`와 `recipientId`를 기록하고 `(dailyDispatchId, recipientId)` 고유 제약을 사용한다. 같은 날 설정 시각이 바뀌면 새 슬롯을 만들고 이미 `SENT`인 공고를 제외한 미발송·불확실 공고를 처리한다. 설정 PUT은 다음 minute tick부터 모든 replica에 보인다.
 
 ## 6. 관련도 분류
 
@@ -158,7 +158,7 @@
 
 ### 7.7 `tender_daily_dispatches`
 
-- KST `businessDate` 고유 제약: 여러 replica와 당일 발송 시각 변경을 통틀어 하나의 일일 실행 identity
+- KST (`businessDate`, `deliveryTime`) 고유 제약: 같은 설정 시각은 여러 replica에서 한 번만 실행하고 당일 시각 변경은 새 실행 identity 생성
 - claim 시 관측한 공용 `deliveryTime`
 - `CLAIMED | COMPLETED` 상태, claim·15분 lease 만료·완료 시각, non-sensitive `lastError`
 - recipient delivery claim 전 오류는 `CLAIMED`로 남아 stale lease에서 재개되고, 모든 활성 주소에 해당 dispatch의 durable state가 있을 때만 완료
@@ -281,7 +281,7 @@ Developer Console의 client ID/secret과 정확한 HTTPS callback URL을 환경 
 - Mail API `429`와 OAuth token endpoint의 network/timeout·`429`·`5xx`만 확인된 일시 실패로 보고 10분 뒤 한 번 재시도한다. Mail API `401`은 token 강제 갱신 뒤 한 번 재호출하고, 이후 `4xx`와 token endpoint의 그 밖의 `4xx`는 영구 실패다.
 - NAVER WORKS Mail API는 idempotency key를 문서화하지 않는다. 본문 요청의 network/timeout, Mail API `5xx`, 예상하지 않은 응답은 provider가 이미 승인했을 가능성을 배제할 수 없으므로 즉시 terminal `DELIVERY_UNCERTAIN`으로 처리한다. 원본 오류는 typed classifier에만 전달하고 Authorization header, token, response body는 저장하지 않는다.
 - 재시도 실패 공고는 다음 날 해당 주소의 대상 선정에 다시 포함한다.
-- provider 승인과 그 뒤 DB commit은 원자화할 수 없다. in-flight claim이 stale이면 provider가 이미 승인했을 수 있으므로 delivery와 item을 terminal `DELIVERY_UNCERTAIN`으로 표시하고 재전송하지 않는다. 이는 이미 승인된 주소의 중복을 우선 방지하며, 극히 드문 메일 누락 가능성을 명시적으로 감수하는 절충이다.
+- provider 승인과 그 뒤 DB commit은 원자화할 수 없다. in-flight claim이 stale이면 provider가 이미 승인했을 수 있으므로 delivery와 item을 해당 슬롯의 terminal `DELIVERY_UNCERTAIN`으로 표시한다. 같은 슬롯에서는 재전송하지 않지만, 다음 날짜 또는 변경된 시각 슬롯에서는 다시 선택할 수 있어 누락을 줄이는 대신 드문 중복 메일 가능성을 감수한다.
 - stale 전이와 늦게 도착한 확인된 실패는 조건부 lease update로 경합하므로 `DELIVERY_UNCERTAIN`이 retry 상태로 되살아나지 않는다. 늦은 `202`는 실제 승인을 `SENT`로 확정할 수 있다.
 
 ## 11. 오류 및 보안
@@ -352,9 +352,9 @@ Developer Console의 client ID/secret과 정확한 HTTPS callback URL을 환경 
 - 등록일 기준 월 전체 캘린더와 날짜별 목록이 동작한다.
 - 캘린더 필터가 이메일 대상에 영향을 주지 않는다.
 - 여러 주소와 공통 발송 시각을 저장할 수 있다.
-- 모든 신규 관련 공고가 주소별로 하루 한 번만 발송된다.
+- 모든 신규 관련 공고가 주소별 설정 시각 슬롯에 발송되며, 같은 날 설정 시각을 변경하면 추가 슬롯을 실행할 수 있다.
 - Mail API `429`와 token endpoint의 확인된 일시 실패만 10분 뒤 한 번 재시도하며, Mail API network/timeout·`5xx`의 불확실한 결과는 재시도하지 않고 다른 주소의 성공 상태는 유지된다.
 - 재시도 실패 공고가 다음 날 해당 주소 발송 대상에서 누락되지 않는다.
-- Mail API 결과가 불확실한 stale claim은 `DELIVERY_UNCERTAIN`으로 종결되어 중복 재전송되지 않는다.
-- 여러 replica와 설정 시각 변경에서도 KST 영업일별 identity는 하나이고, crash가 남긴 stale lease는 중복 recipient 발송 없이 재개된다.
+- Mail API 결과가 불확실한 stale claim은 해당 슬롯에서 `DELIVERY_UNCERTAIN`으로 종결되고, 다음 날짜 또는 변경된 시각 슬롯에서 다시 선택될 수 있다.
+- 여러 replica는 같은 KST 날짜·시각 identity를 한 번만 처리하고, crash가 남긴 stale lease는 중복 recipient 발송 없이 재개된다.
 - 인증, 분류, 중복 제거, 집계, 발송 재시도 핵심 테스트가 통과한다.

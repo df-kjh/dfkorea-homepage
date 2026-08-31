@@ -37,6 +37,7 @@ erDiagram
   }
   TENDER_DAILY_DISPATCHES {
     date businessDate UK
+    varchar deliveryTime UK
   }
 ```
 
@@ -147,14 +148,14 @@ Unique constraint: `UQ_tender_mail_oauth_credential_singleton_key` on (`singleto
 | Column                   | Type        | Notes                                                                 |
 | ------------------------ | ----------- | --------------------------------------------------------------------- |
 | `id`                     | UUID        | Primary key                                                           |
-| `businessDate`           | date        | KST execution identity, unique through `UQ_tender_daily_dispatch_business_date` |
-| `deliveryTime`           | varchar(5)  | Shared `HH:mm` value observed when the date was claimed               |
+| `businessDate`           | date        | KST date portion of the execution identity                            |
+| `deliveryTime`           | varchar(5)  | Shared `HH:mm` value; together with `businessDate`, unique through `UQ_tender_daily_dispatch_business_date_delivery_time` |
 | `status`                 | varchar     | `CLAIMED` or `COMPLETED`                                              |
 | `claimedAt`, `leaseExpiresAt`, `completedAt` | timestamptz | Durable claim, 15-minute reclaim boundary, and nullable completion timestamp |
 | `lastError`               | text        | Nullable non-sensitive recipient-claim failure summary              |
 | `createdAt`, `updatedAt` | timestamptz | Audit timestamps                                                      |
 
-Index: `IDX_tender_daily_dispatch_status_lease` on (`status`, `leaseExpiresAt`). The unique KST business date is the final replica/time-change idempotency boundary in addition to advisory lock `824002`. A fresh `CLAIMED` lease is skipped; a stale claim can be atomically reclaimed and processes only recipients without an existing durable terminal/retry/in-flight/no-work state.
+Index: `IDX_tender_daily_dispatch_status_lease` on (`status`, `leaseExpiresAt`). The unique KST (`businessDate`, `deliveryTime`) slot is the final replica idempotency boundary in addition to advisory lock `824002`. Changing the shared time on the same date creates another slot without deleting prior audit rows. A fresh `CLAIMED` lease is skipped; a stale claim can be atomically reclaimed and processes only recipients without an existing durable outcome for that slot.
 
 ## Update rule
 
@@ -173,5 +174,6 @@ Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1
 - `1787820100000-LinkDailyDispatchDeliveries` adds nullable dispatch/recipient foreign keys to delivery history and `UQ_tender_mail_delivery_dispatch_recipient`, so a reclaimed daily dispatch resumes only recipients with no durable outcome.
 - `1787820200000-UseNaverWorksMailApi` is the expand phase for a rolling deployment. It creates the singleton encrypted OAuth credential table, adds `providerMessageId`, copies existing `smtpMessageId` audit values, and temporarily keeps both columns synchronized with a trigger while old and new containers can coexist. Its rollback copies canonical values back before removing the new column. A separately deployed contract migration removes the synchronization trigger and `smtpMessageId` only after the new application version is healthy; the final schema retains only `providerMessageId`.
 - `1787820300000-DropLegacyTenderSmtpMessageId` is that contract phase. It performs a final null-only backfill, removes the compatibility trigger/function, and drops `smtpMessageId`. Its rollback recreates the legacy column from `providerMessageId` and restores bidirectional synchronization.
+- `1787820400000-AllowMultipleDailyDispatchTimes` replaces the date-only dispatch unique constraint with `UQ_tender_daily_dispatch_business_date_delivery_time`. It preserves every existing dispatch and allows a changed shared time to create another same-day slot. Rollback refuses to collapse multiple same-day audit rows instead of deleting history.
 
 The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.

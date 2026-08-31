@@ -365,9 +365,9 @@ NAVER_WORKS_HTTP_TIMEOUT_MS=10000
 ### 예약 작업과 여러 서버 인스턴스
 
 - 공고 수집은 `Asia/Seoul` 기준 매시 정각에 실행한다. 관리자의 `즉시 수집`도 같은 ingestion 경계를 사용하며, 정기·수동 실행이 겹치면 PostgreSQL advisory lock으로 하나만 실행한다. 최초 조회 범위는 직전 24시간이고, 이후에는 출처별 마지막 성공 시각의 1시간 전부터 다시 조회한다.
-- 일일 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches.businessDate` 고유키를 먼저 claim한다. 설정 변경과 여러 replica가 있어도 KST 영업일별 한 번만 실행된다.
+- 메일 작업은 매분 공용 설정을 DB에서 다시 읽고, 현재 KST 시각이 저장 시각 이상이면 `tender_daily_dispatches(businessDate, deliveryTime)` 고유 슬롯을 먼저 claim한다. 같은 설정 시각은 여러 replica에서도 한 번만 실행되고, 같은 날 공용 발송 시각을 변경하면 새 슬롯으로 다시 실행된다.
 - 주소별 첫 confirmed transient failure만 10분 뒤 한 번 재시도한다. Mail API `429`와 OAuth token endpoint의 network/timeout·`429`·`5xx`는 제공자가 메일 본문을 아직 받기 전의 일시 실패로 분류한다. Mail API `401`은 token을 한 번 강제 갱신하고, 이후 `4xx` 또는 token endpoint의 다른 `4xx`는 즉시 영구 실패로 기록한다. Mail API는 idempotency key를 문서화하지 않으므로 본문 전송 중 network/timeout과 Mail API `5xx`·예상하지 않은 응답은 이미 승인됐을 가능성을 배제할 수 없다. 이 경우 delivery/item을 즉시 terminal `DELIVERY_UNCERTAIN`으로 종결하고 재시도하지 않는다. 원본 OAuth token, Authorization header, provider response body, recipient 상세는 DB 오류 문자열이나 로그에 저장하지 않는다.
-- 일일 dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST business date를 reclaim한다. `(dailyDispatchId, recipientId)` 고유 제약과 조회가 기존 `SENT`, `RETRY_SCHEDULED`, `PENDING`, `DELIVERY_UNCERTAIN`, `CANCELLED`, `FAILED`, `SKIPPED` outcome을 모두 재사용하므로 durable outcome이 전혀 없는 recipient만 처리한다. fresh lease와 `COMPLETED`는 건너뛴다.
+- dispatch claim은 15분 `leaseExpiresAt`을 가진다. recipient claim 전 DB 오류가 나면 `CLAIMED`와 안전한 `lastError`를 유지하고 완료하지 않는다. 다음 replica는 lease 만료 뒤 같은 KST 날짜·시각 슬롯을 reclaim한다. `(dailyDispatchId, recipientId)` 고유 제약으로 같은 슬롯의 durable outcome을 재사용한다. 새 시각 슬롯은 이미 `SENT`인 공고를 제외하고 미발송·이전 `DELIVERY_UNCERTAIN` 공고를 다시 선택할 수 있다. fresh lease와 `COMPLETED`는 건너뛴다.
 - 수집, 일일 메일, 재시도는 각각 PostgreSQL advisory lock을 같은 연결 세션에서 획득하므로 Railway/PM2 replica가 여러 개여도 한 인스턴스만 작업한다.
 - production TypeORM query/parameter logging은 app, migration, revert, 최초 관리자 provisioning 경로 모두 코드에서 `false`로 고정한다. 운영 환경 변수로 이를 켤 수 없으며 비밀번호·bcrypt hash·OAuth code/token/state·Authorization header·Mail API 응답 본문을 stdout/stderr에 기록하지 않는다.
 - `node-cron`이 `Asia/Seoul`을 명시하므로 Node 프로세스·서버의 기본 시간대는 일정 의미를 바꾸지 않는다.
@@ -396,7 +396,7 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
 2. 나라장터·K-apt 키를 주입해 실제 응답을 한 번 수집하고, 공고 ID·차수 중복이 없으며 키가 로그·응답에 없는지 확인한다. 한전은 승인된 매뉴얼 검증 전까지 비활성화한다.
 3. 다음 매시 정각 KST 실행 또는 관리자 `즉시 수집` 완료 뒤 `tender_sync_runs`가 출처별 성공/실패를 분리하고, 캘린더의 등록일 기준 직접/잠재 건수가 DB 집계와 같은지 확인한다.
 4. 관리자 JWT로 calendar, list, detail을 확인한다. 캘린더는 42칸이고, 화면 필터가 메일 수신 대상에 영향을 주지 않아야 한다.
-5. OAuth authorize/callback/status를 완료한 뒤 스테이징 수신 주소와 다음 발송 시각을 저장해 `202` digest 한 번을 확인한다. `401` token refresh와 `429`를 이중으로 검증해 실패 주소만 10분 뒤 한 번 재시도되고 성공 주소에는 중복 메일이 없는지 확인한다. Mail API 본문 전송 중 timeout/`5xx`와 provider 승인 직후 강제 종료 시험은 별도 승인된 테스트 계정에서만 수행하고, stale claim이 `DELIVERY_UNCERTAIN`으로 종결되어 재전송되지 않는지 확인한다.
+5. OAuth authorize/callback/status를 완료한 뒤 스테이징 수신 주소와 다음 발송 시각을 저장해 `202` digest 한 번을 확인한다. `401` token refresh와 `429`를 이중으로 검증해 실패 주소만 같은 슬롯에서 10분 뒤 한 번 재시도되고 성공 주소에는 중복 메일이 없는지 확인한다. 같은 날 발송 시각을 변경했을 때 새 dispatch가 생성되고 기존 `SENT` 공고는 제외되는지 확인한다. Mail API 본문 전송 중 timeout/`5xx`와 provider 승인 직후 강제 종료 시험은 별도 승인된 테스트 계정에서만 수행하며, stale claim은 기존 슬롯에서 `DELIVERY_UNCERTAIN`으로 종결되고 변경된 시각 슬롯에서는 다시 선택되는지 확인한다.
 
 ### 롤백
 

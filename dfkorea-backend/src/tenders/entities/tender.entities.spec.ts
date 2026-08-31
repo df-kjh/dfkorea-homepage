@@ -47,16 +47,6 @@ describe("tender entity metadata", () => {
     expect(unique?.columns).toEqual(["dailyDispatchId", "recipientId"]);
   });
 
-  it("keeps one daily dispatch identity per KST business date", () => {
-    const unique = getMetadataArgsStorage().uniques.find(
-      (item) =>
-        item.target === TenderDailyDispatch &&
-        item.name === "UQ_tender_daily_dispatch_business_date",
-    );
-
-    expect(unique?.columns).toEqual(["businessDate"]);
-  });
-
   it("indexes the daily dispatch lease for stale-claim recovery", () => {
     const index = getMetadataArgsStorage().indices.find(
       (item) =>
@@ -75,6 +65,16 @@ describe("tender entity metadata", () => {
     );
 
     expect(index?.columns).toEqual(["subscriptionId", "isActive"]);
+  });
+
+  it("uses the KST date and configured time as the dispatch identity", () => {
+    const unique = getMetadataArgsStorage().uniques.find(
+      (item) =>
+        item.target === TenderDailyDispatch &&
+        item.name === "UQ_tender_daily_dispatch_business_date_delivery_time",
+    );
+
+    expect(unique?.columns).toEqual(["businessDate", "deliveryTime"]);
   });
 
   it("stores only one NAVER WORKS OAuth credential set", () => {

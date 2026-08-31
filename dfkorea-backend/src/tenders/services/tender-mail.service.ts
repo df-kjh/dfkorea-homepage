@@ -66,6 +66,11 @@ export class TenderMailService {
       const subscription = await this.getActiveSubscription();
       if (!subscription) return;
       if (!this.isDeliveryDue(now, subscription.deliveryTime)) return;
+      // A changed delivery-time slot may intentionally reselect a prior
+      // uncertain item. Resolve expired provider leases first so the new slot
+      // cannot become durably SKIPPED immediately before retry recovery marks
+      // that item uncertain.
+      await this.recoverStaleClaims(now);
       const dispatchId = await this.claimDailyDispatch(
         now,
         subscription.deliveryTime,
@@ -212,7 +217,10 @@ export class TenderMailService {
       if (typeof row?.id === "string") return row.id;
 
       const existing = await repository.findOne({
-        where: { businessDate: this.toKstDate(now) },
+        where: {
+          businessDate: this.toKstDate(now),
+          deliveryTime,
+        },
       });
       if (
         !existing ||
@@ -281,10 +289,11 @@ export class TenderMailService {
           ...(inserted as TenderMailItem[]),
         ].filter(
           (item) =>
-            item.status === MailItemStatus.PENDING &&
-            (!item.lastDelivery ||
-              item.lastDelivery.status === MailDeliveryStatus.FAILED ||
-              item.lastDelivery.status === MailDeliveryStatus.CANCELLED),
+            item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
+            (item.status === MailItemStatus.PENDING &&
+              (!item.lastDelivery ||
+                item.lastDelivery.status === MailDeliveryStatus.FAILED ||
+                item.lastDelivery.status === MailDeliveryStatus.CANCELLED)),
         );
         const targetDate = this.toKstDate(now);
         if (eligible.length === 0) {
@@ -307,7 +316,8 @@ export class TenderMailService {
         }
         // The delivery and every linked item commit before the provider request.
         // If its outcome cannot later be proven, the expired lease becomes
-        // terminal DELIVERY_UNCERTAIN rather than risking a duplicate resend.
+        // terminal for this slot. A later date or explicitly changed time slot
+        // may reselect it under the user-approved no-daily-limit policy.
         const delivery = await deliveryRepository.save({
           dailyDispatchId,
           recipientId: recipient.id,
@@ -324,7 +334,12 @@ export class TenderMailService {
           errorMessage: null,
         });
         await mailItemRepository.save(
-          eligible.map((item) => ({ ...item, lastDeliveryId: delivery.id })),
+          eligible.map((item) => ({
+            ...item,
+            status: MailItemStatus.PENDING,
+            uncertainAt: null,
+            lastDeliveryId: delivery.id,
+          })),
         );
         return { delivery, tenders: eligible.map((item) => item.tender) };
       });
