@@ -183,22 +183,22 @@ Commit message: `feat: display supply tender opportunity badges`
 - Consumes: completed Tasks 1-3.
 - Produces: verified build and regression evidence.
 
-- [ ] **Step 1: Run backend CI verification**
+- [x] **Step 1: Run backend CI verification**
 
 Run: `cd dfkorea-backend && npm run test:ci`
 
 Expected: lint, unit, contract, TypeScript, production-process, TypeORM discovery, and build checks all PASS.
 
-- [ ] **Step 2: Run frontend verification**
+- [x] **Step 2: Run frontend verification**
 
 Run: `cd led-lighting-website && npm test && npm run type-check && npm run build`
 
 Expected: Vitest, Nuxt typecheck, and production build all PASS.
 
-- [ ] **Step 3: Inspect migration safety and repository state**
+- [x] **Step 3: Inspect migration safety and repository state**
 
 Confirm the migration contains no `DROP TABLE`, no deletion/update of mail history, and only backfills the two new tender columns. Confirm `git diff --check` is clean.
 
-- [ ] **Step 4: Commit any verification-only correction**
+- [x] **Step 4: Commit any verification-only correction**
 
 If a correction was required, commit it as `fix: complete supply tender verification`; otherwise record the passing evidence without an empty commit.
