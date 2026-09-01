@@ -390,6 +390,93 @@ describe("official tender adapters", () => {
 });
 
 describe("PublicApiClient", () => {
+  it("accepts a canonical response body when the provider omits the result header", async () => {
+    const canonicalWithoutHeader = {
+      response: {
+        body: { items: [{ bidNtceNo: "1" }], totalCount: 1 },
+      },
+    };
+    const canonicalClient = new PublicApiClient(
+      jest
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify(canonicalWithoutHeader), { status: 200 }),
+        ),
+    );
+    const request = requestFor("notices");
+
+    await expect(canonicalClient.getAllPages(request)).resolves.toEqual([
+      { bidNtceNo: "1" },
+    ]);
+  });
+
+  it("classifies a gateway error without serializing provider details", async () => {
+    const gatewayError = {
+      OpenAPI_ServiceResponse: {
+        cmmMsgHeader: { errMsg: "SERVICE KEY IS NOT REGISTERED ERROR" },
+      },
+    };
+    const gatewayClient = new PublicApiClient(
+      jest
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify(gatewayError), { status: 200 }),
+        ),
+    );
+    const request = requestFor("notices");
+    const result = gatewayClient.getAllPages(request);
+
+    await expect(result).rejects.toMatchObject({
+      code: "PROVIDER_RESULT_ERROR",
+      status: 200,
+      providerResultCode: null,
+      responseShape: "GATEWAY_ERROR_SHAPE",
+    });
+
+    const error = await result.catch((reason) => reason);
+    const serialized = JSON.stringify(error);
+    expect(serialized).not.toContain("SERVICE KEY IS NOT REGISTERED ERROR");
+    expect(serialized).not.toContain("https://api.example.test/bids");
+    expect(serialized).not.toContain("serviceKey=secret-key");
+    expect(serialized).not.toContain("secret-key");
+    expect(serialized).not.toContain(JSON.stringify(gatewayError));
+  });
+
+  it.each([
+    [
+      "a body.data fallback",
+      { response: { body: { data: [{ bidNtceNo: "1" }], totalCount: 1 } } },
+    ],
+    [
+      "a root-level body",
+      { body: { items: [{ bidNtceNo: "1" }], totalCount: 1 } },
+    ],
+    [
+      "an inferred total count",
+      { response: { body: { items: [{ bidNtceNo: "1" }] } } },
+    ],
+    [
+      "an error record",
+      { response: { body: { items: [], totalCount: 0 }, error: {} } },
+    ],
+    [
+      "an errors record",
+      { response: { body: { items: [], totalCount: 0 }, errors: {} } },
+    ],
+  ])("rejects a missing-code response containing %s", async (_label, body) => {
+    const unknownClient = new PublicApiClient(
+      jest
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })),
+    );
+
+    await expect(
+      unknownClient.getAllPages(requestFor("notices")),
+    ).rejects.toMatchObject({
+      responseShape: "UNKNOWN_RESPONSE_SHAPE",
+    });
+  });
+
   it("retries provider code 23 twice and retains safe page diagnostics", async () => {
     jest.useFakeTimers();
     const fetcher = jest
