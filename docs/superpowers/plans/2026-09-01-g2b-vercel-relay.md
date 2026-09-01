@@ -498,15 +498,15 @@ G2B_RELAY_URL=https://dfkorealed.com/api/internal/g2b-relay
 G2B_RELAY_SHARED_SECRET=<same hidden value>
 ```
 
-- [ ] **Step 4: Push and wait for both deployments**
+- [x] **Step 4: Push and wait for both deployments**
 
 Push `main`, verify Vercel `dfkorea-frontend` reaches Ready and Railway `dfkorea` reaches Success, and require HTTP 200 from the existing public frontend/backend health paths before collection testing.
 
-- [ ] **Step 5: Send a signed production relay probe**
+- [x] **Step 5: Send a signed production relay probe**
 
 Create a current, narrow query window known to have notices; locally generate the exact signed JSON request using the already configured secret without printing headers/body, call `https://dfkorealed.com/api/internal/g2b-relay`, and inspect only safe shape/count fields. Require a canonical provider success response; do not print the response body.
 
-- [ ] **Step 6: Verify the authenticated production collection once**
+- [x] **Step 6: Verify the authenticated production collection once**
 
 Use the existing admin UI's `즉시 수집` action or an already-authorized session. Require:
 
@@ -521,10 +521,12 @@ Use the existing admin UI's `즉시 수집` action or an already-authorized sess
 
 Here `fetchedCount` is required to be greater than zero, not literally equal to one. Confirm no failed G2B operation log and confirm saved notices are returned by the existing tender query path.
 
-- [ ] **Step 7: Apply the production stop condition**
+- [x] **Step 7: Apply the production stop condition**
 
 If the signed relay probe itself receives a gateway/WAF or provider rejection, leave fail-closed parsing intact, disable `G2B_RELAY_ENABLED`, and report that a separate Korean-hosted collector with a permitted outbound address is required. Do not broaden success parsing or mark the task complete.
 
-- [ ] **Step 8: Record final evidence**
+Production evaluation completed without triggering this stop condition.
+
+- [x] **Step 8: Record final evidence**
 
 Record commit SHA, deployment identifiers/statuses, health status codes, safe relay response shape, and safe G2B collect counts in the final handoff. Never record secrets, request URLs with query strings, headers, provider bodies, or raw causes.
