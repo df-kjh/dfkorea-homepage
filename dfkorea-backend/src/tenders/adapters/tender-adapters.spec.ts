@@ -7,6 +7,7 @@ import { KepcoTenderAdapter } from "./kepco-tender.adapter";
 import {
   parseKstDate,
   PublicApiClient,
+  PublicApiRequest,
   TenderApiClient,
   TenderSourceError,
 } from "./public-api-client";
@@ -21,6 +22,40 @@ const window: TenderFetchWindow = {
 
 const createClient = (): jest.Mocked<TenderApiClient> => ({
   getAllPages: jest.fn(),
+});
+
+const providerResponse = (
+  resultCode: string,
+  items: Record<string, unknown>[] = [],
+  totalCount = items.length,
+  status = 200,
+) =>
+  new Response(
+    JSON.stringify({
+      response: { header: { resultCode }, body: { totalCount, items } },
+    }),
+    { status },
+  );
+
+const gatewayResponse = (returnReasonCode: string) =>
+  new Response(
+    JSON.stringify({
+      OpenAPI_ServiceResponse: {
+        cmmMsgHeader: {
+          returnReasonCode,
+          returnAuthMsg: "provider message serviceKey=secret-key",
+          errMsg: "raw provider response body",
+        },
+      },
+    }),
+    { status: 200 },
+  );
+
+const requestFor = (operation: string): PublicApiRequest => ({
+  source: TenderSource.G2B,
+  baseUrl: "https://api.example.test/bids",
+  operation,
+  query: { serviceKey: "secret-key" },
 });
 
 describe("official tender adapters", () => {
@@ -173,12 +208,266 @@ describe("official tender adapters", () => {
 });
 
 describe("PublicApiClient", () => {
+  it("retries provider code 23 twice and retains safe page diagnostics", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest
+      .fn()
+      .mockResolvedValueOnce(providerResponse("23"))
+      .mockResolvedValueOnce(providerResponse("23"))
+      .mockResolvedValueOnce(providerResponse("00", [], 0));
+    const onRetry = jest.fn();
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+      onRetry,
+    });
+
+    const result = client.getAllPages(requestFor("getBidPblancListInfoThng"));
+    await jest.advanceTimersByTimeAsync(4_000);
+
+    await expect(result).resolves.toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(onRetry).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        operation: "getBidPblancListInfoThng",
+        pageNo: 1,
+        providerResultCode: "23",
+        attempt: 1,
+      }),
+    );
+    expect(onRetry).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        operation: "getBidPblancListInfoThng",
+        pageNo: 1,
+        providerResultCode: "23",
+        attempt: 2,
+      }),
+    );
+    expect(JSON.stringify(onRetry.mock.calls)).not.toContain("secret-key");
+    jest.useRealTimers();
+  });
+
+  it.each([
+    ["provider", providerResponse("30")],
+    ["http", new Response("", { status: 401 })],
+  ])("does not retry permanent %s failures", async (_label, response) => {
+    const fetcher = jest.fn().mockResolvedValue(response);
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+    });
+
+    await expect(
+      client.getAllPages(requestFor("notices")),
+    ).rejects.toBeInstanceOf(TenderSourceError);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([429, 502, 503, 504])(
+    "retries transient HTTP %s responses up to the configured limit",
+    async (status) => {
+      jest.useFakeTimers();
+      const fetcher = jest
+        .fn()
+        .mockResolvedValueOnce(new Response("", { status }))
+        .mockResolvedValueOnce(new Response("", { status }))
+        .mockResolvedValueOnce(providerResponse("00", [], 0));
+      const onRetry = jest.fn();
+      const client = new PublicApiClient(fetcher, {
+        retryDelaysMs: [1_000, 3_000],
+        onRetry,
+      });
+
+      const result = client.getAllPages(requestFor("notices"));
+      await jest.advanceTimersByTimeAsync(4_000);
+
+      await expect(result).resolves.toEqual([]);
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      expect(onRetry).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          errorCode: "HTTP_ERROR",
+          httpStatus: status,
+          attempt: 2,
+        }),
+      );
+      jest.useRealTimers();
+    },
+  );
+
+  it("retries request timeouts and records only safe retry metadata", async () => {
+    jest.useFakeTimers();
+    const hangingResponse = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new Error("raw timeout serviceKey=secret-key")),
+        );
+      });
+    const fetcher = jest
+      .fn()
+      .mockImplementationOnce(hangingResponse)
+      .mockImplementationOnce(hangingResponse)
+      .mockResolvedValueOnce(providerResponse("00", [], 0));
+    const onRetry = jest.fn();
+    const client = new PublicApiClient(fetcher, {
+      timeoutMs: 10,
+      retryDelaysMs: [1_000, 3_000],
+      onRetry,
+    });
+
+    const result = client.getAllPages(requestFor("notices"));
+    await jest.advanceTimersByTimeAsync(4_020);
+
+    await expect(result).resolves.toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(onRetry.mock.calls.map(([event]) => event.errorCode)).toEqual([
+      "REQUEST_TIMEOUT",
+      "REQUEST_TIMEOUT",
+    ]);
+    expect(JSON.stringify(onRetry.mock.calls)).not.toContain("secret-key");
+    expect(jest.getTimerCount()).toBe(0);
+    jest.useRealTimers();
+  });
+
+  it("retries network errors without exposing their cause", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("network serviceKey=secret-key"))
+      .mockRejectedValueOnce(
+        new Error("https://api.example.test/bids?serviceKey=secret-key"),
+      )
+      .mockResolvedValueOnce(providerResponse("00", [], 0));
+    const onRetry = jest.fn();
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+      onRetry,
+    });
+
+    const result = client.getAllPages(requestFor("notices"));
+    await jest.advanceTimersByTimeAsync(4_000);
+
+    await expect(result).resolves.toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(onRetry.mock.calls.map(([event]) => event.errorCode)).toEqual([
+      "NETWORK_ERROR",
+      "NETWORK_ERROR",
+    ]);
+    expect(JSON.stringify(onRetry.mock.calls)).not.toContain("secret-key");
+    jest.useRealTimers();
+  });
+
+  it("parses gateway result codes without exposing provider messages", async () => {
+    const fetcher = jest.fn().mockResolvedValue(gatewayResponse("30"));
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+    });
+
+    try {
+      await client.getAllPages(requestFor("notices"));
+      fail("expected a provider result error");
+    } catch (error) {
+      expect(error).toMatchObject({
+        source: TenderSource.G2B,
+        code: "PROVIDER_RESULT_ERROR",
+        operation: "notices",
+        pageNo: 1,
+        providerResultCode: "30",
+        attempts: 1,
+      });
+      expect((error as Error).message).not.toContain("secret-key");
+      expect((error as Error).message).not.toContain("provider message");
+      expect((error as Error).message).not.toContain("raw provider response");
+      expect((error as Error).message).not.toContain("api.example.test");
+    }
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries gateway provider code 23", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest
+      .fn()
+      .mockResolvedValueOnce(gatewayResponse("23"))
+      .mockResolvedValueOnce(providerResponse("00", [], 0));
+    const onRetry = jest.fn();
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+      onRetry,
+    });
+
+    const result = client.getAllPages(requestFor("notices"));
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    await expect(result).resolves.toEqual([]);
+    expect(onRetry).toHaveBeenCalledWith(
+      expect.objectContaining({ providerResultCode: "23", attempt: 1 }),
+    );
+    const retryDiagnostics = JSON.stringify(onRetry.mock.calls);
+    expect(retryDiagnostics).not.toContain("secret-key");
+    expect(retryDiagnostics).not.toContain("provider message");
+    expect(retryDiagnostics).not.toContain("raw provider response");
+    expect(retryDiagnostics).not.toContain("api.example.test");
+    jest.useRealTimers();
+  });
+
+  it("retains safe diagnostics after exhausting retries", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest
+      .fn()
+      .mockImplementation(() => Promise.resolve(providerResponse("23")));
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+    });
+
+    const result = client.getAllPages(requestFor("notices"));
+    const outcome: Promise<TenderSourceError> = result.then(
+      () => fail("expected retries to be exhausted"),
+      (error: TenderSourceError) => error,
+    );
+    await jest.advanceTimersByTimeAsync(4_000);
+
+    await expect(outcome).resolves.toMatchObject({
+      source: TenderSource.G2B,
+      code: "PROVIDER_RESULT_ERROR",
+      operation: "notices",
+      pageNo: 1,
+      providerResultCode: "23",
+      attempts: 3,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    const error = await outcome;
+    expect(error.message).not.toContain("secret-key");
+    expect(error.message).not.toContain("api.example.test");
+    jest.useRealTimers();
+  });
+
+  it("paces concurrent callers through one shared request-start slot", async () => {
+    jest.useFakeTimers();
+    const starts: number[] = [];
+    const fetcher = jest.fn(async () => {
+      starts.push(Date.now());
+      return providerResponse("00", [], 0);
+    });
+    const client = new PublicApiClient(fetcher, {
+      minimumRequestIntervalMs: 1_100,
+    });
+    const requests = Promise.all([
+      client.getAllPages(requestFor("construction")),
+      client.getAllPages(requestFor("goods")),
+    ]);
+    await jest.runAllTimersAsync();
+    await requests;
+
+    expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1_100);
+    jest.useRealTimers();
+  });
+
   it("sends the exact official G2B minute-window and pagination parameters for every operation", async () => {
     const row = g2bFixture.response.body.items[0];
     const fetcher = jest.fn(async (urlText: string) => {
       const url = new URL(urlText);
       const pageNo = url.searchParams.get("pageNo");
-      const items = pageNo === "1" ? Array.from({ length: 100 }, () => row) : [row];
+      const items =
+        pageNo === "1" ? Array.from({ length: 100 }, () => row) : [row];
       return new Response(
         JSON.stringify({
           response: {

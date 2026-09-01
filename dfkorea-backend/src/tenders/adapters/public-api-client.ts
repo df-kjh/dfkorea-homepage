@@ -8,6 +8,7 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const SUCCESS_CODES = new Set(["00", "0", "0000", "NORMAL_SERVICE"]);
+const RETRYABLE_HTTP_STATUSES = new Set([429, 502, 503, 504]);
 
 export type TenderSourceErrorCode =
   | "CONFIGURATION_ERROR"
@@ -31,6 +32,10 @@ export class TenderSourceError extends Error {
     readonly code: TenderSourceErrorCode,
     readonly status: number | null = null,
     cause?: unknown,
+    readonly operation: string | null = null,
+    readonly pageNo: number | null = null,
+    readonly providerResultCode: string | null = null,
+    readonly attempts = 1,
   ) {
     super(`${source} tender source error: ${code}`);
     this.name = "TenderSourceError";
@@ -65,16 +70,43 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 export interface PublicApiClientOptions {
   /** Timeout per provider page request. Defaults to ten seconds. */
   timeoutMs?: number;
+  /** Minimum delay between request starts made through this client. */
+  minimumRequestIntervalMs?: number;
+  /** Delays before retries. At most the first two delays are used. */
+  retryDelaysMs?: readonly number[];
+  /** Receives only the safe diagnostic fields declared by this interface. */
+  onRetry?: (event: PublicApiRetryEvent) => void;
+}
+
+export interface PublicApiRetryEvent {
+  source: TenderSource;
+  operation: string;
+  pageNo: number;
+  errorCode: TenderSourceErrorCode;
+  providerResultCode: string | null;
+  httpStatus: number | null;
+  attempt: number;
 }
 
 export class PublicApiClient implements TenderApiClient {
   private readonly timeoutMs: number;
+  private readonly minimumRequestIntervalMs: number;
+  private readonly retryDelaysMs: readonly number[];
+  private readonly onRetry?: (event: PublicApiRetryEvent) => void;
+  private nextRequestAt = 0;
 
   constructor(
     private readonly fetcher: Fetcher = globalThis.fetch,
     options: PublicApiClientOptions = {},
   ) {
     this.timeoutMs = this.toTimeoutMs(options.timeoutMs);
+    this.minimumRequestIntervalMs = this.toNonNegativeMs(
+      options.minimumRequestIntervalMs,
+    );
+    this.retryDelaysMs = (options.retryDelaysMs ?? [])
+      .slice(0, 2)
+      .map((delay) => this.toNonNegativeMs(delay));
+    this.onRetry = options.onRetry;
   }
 
   async getAllPages<T extends Record<string, unknown>>(
@@ -84,8 +116,7 @@ export class PublicApiClient implements TenderApiClient {
     let totalCount: number | null = null;
 
     for (let pageNo = 1; pageNo <= MAX_PAGES; pageNo += 1) {
-      const body = await this.fetchPage(request, pageNo);
-      const page = this.readPage<T>(body, request.source);
+      const page = await this.fetchPageWithRetry<T>(request, pageNo);
       totalCount ??= page.totalCount;
       rows.push(...page.items);
 
@@ -94,15 +125,93 @@ export class PublicApiClient implements TenderApiClient {
       }
     }
 
-    throw new TenderSourceError(request.source, "PAGINATION_LIMIT", null);
+    throw new TenderSourceError(
+      request.source,
+      "PAGINATION_LIMIT",
+      null,
+      undefined,
+      request.operation,
+      MAX_PAGES,
+    );
+  }
+
+  private async fetchPageWithRetry<T extends Record<string, unknown>>(
+    request: PublicApiRequest,
+    pageNo: number,
+  ): Promise<{ items: T[]; totalCount: number }> {
+    const maximumAttempts = this.retryDelaysMs.length + 1;
+
+    for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+      if (attempt > 1) {
+        await this.wait(
+          this.retryDelaysMs[attempt - 2] ?? 0,
+          request,
+          pageNo,
+          attempt,
+        );
+      }
+
+      // Slot reservation mutates nextRequestAt before the first await, so
+      // concurrent callers cannot reserve the same request-start timestamp.
+      const slotWait = this.reserveRequestSlot(request, pageNo, attempt);
+      if (slotWait) {
+        await slotWait;
+      }
+
+      try {
+        const body = await this.fetchPage(request, pageNo, attempt);
+        return this.readPage<T>(body, request, pageNo, attempt);
+      } catch (error) {
+        const sourceError = this.withRequestMetadata(
+          error,
+          request,
+          pageNo,
+          attempt,
+        );
+        if (attempt >= maximumAttempts || !this.isRetryable(sourceError)) {
+          throw sourceError;
+        }
+
+        this.onRetry?.({
+          source: sourceError.source,
+          operation: request.operation,
+          pageNo,
+          errorCode: sourceError.code,
+          providerResultCode: sourceError.providerResultCode,
+          httpStatus: sourceError.status,
+          attempt,
+        });
+      }
+    }
+
+    throw new TenderSourceError(
+      request.source,
+      "INVALID_RESPONSE",
+      null,
+      undefined,
+      request.operation,
+      pageNo,
+      null,
+      maximumAttempts,
+    );
   }
 
   private async fetchPage(
     request: PublicApiRequest,
     pageNo: number,
+    attempt: number,
   ): Promise<unknown> {
     if (request.signal?.aborted) {
-      throw new TenderSourceError(request.source, "REQUEST_ABORTED", null);
+      throw new TenderSourceError(
+        request.source,
+        "REQUEST_ABORTED",
+        null,
+        undefined,
+        request.operation,
+        pageNo,
+        null,
+        attempt,
+      );
     }
 
     const url = this.createUrl(request, pageNo);
@@ -118,7 +227,16 @@ export class PublicApiClient implements TenderApiClient {
           abortListener = () => {
             controller.abort();
             reject(
-              new TenderSourceError(request.source, "REQUEST_ABORTED", null),
+              new TenderSourceError(
+                request.source,
+                "REQUEST_ABORTED",
+                null,
+                undefined,
+                request.operation,
+                pageNo,
+                null,
+                attempt,
+              ),
             );
           };
           request.signal!.addEventListener("abort", abortListener, {
@@ -139,13 +257,24 @@ export class PublicApiClient implements TenderApiClient {
         timeout = setTimeout(() => {
           controller.abort();
           reject(
-            new TenderSourceError(request.source, "REQUEST_TIMEOUT", null),
+            new TenderSourceError(
+              request.source,
+              "REQUEST_TIMEOUT",
+              null,
+              undefined,
+              request.operation,
+              pageNo,
+              null,
+              attempt,
+            ),
           );
         }, this.timeoutMs);
       });
       const requestPromise = this.fetchAndReadJson(
         url,
-        request.source,
+        request,
+        pageNo,
+        attempt,
         controller.signal,
       );
       pending.push(timeoutPromise, requestPromise);
@@ -156,12 +285,39 @@ export class PublicApiClient implements TenderApiClient {
         throw error;
       }
       if (request.signal?.aborted) {
-        throw new TenderSourceError(request.source, "REQUEST_ABORTED", null);
+        throw new TenderSourceError(
+          request.source,
+          "REQUEST_ABORTED",
+          null,
+          undefined,
+          request.operation,
+          pageNo,
+          null,
+          attempt,
+        );
       }
       if (controller.signal.aborted) {
-        throw new TenderSourceError(request.source, "REQUEST_TIMEOUT", null);
+        throw new TenderSourceError(
+          request.source,
+          "REQUEST_TIMEOUT",
+          null,
+          undefined,
+          request.operation,
+          pageNo,
+          null,
+          attempt,
+        );
       }
-      throw new TenderSourceError(request.source, "NETWORK_ERROR", null, error);
+      throw new TenderSourceError(
+        request.source,
+        "NETWORK_ERROR",
+        null,
+        error,
+        request.operation,
+        pageNo,
+        null,
+        attempt,
+      );
     } finally {
       if (timeout !== undefined) {
         clearTimeout(timeout);
@@ -174,12 +330,23 @@ export class PublicApiClient implements TenderApiClient {
 
   private async fetchAndReadJson(
     url: string,
-    source: TenderSource,
+    request: PublicApiRequest,
+    pageNo: number,
+    attempt: number,
     signal: AbortSignal,
   ): Promise<unknown> {
     const response = await this.fetcher(url, { signal });
     if (!response.ok) {
-      throw new TenderSourceError(source, "HTTP_ERROR", response.status);
+      throw new TenderSourceError(
+        request.source,
+        "HTTP_ERROR",
+        response.status,
+        undefined,
+        request.operation,
+        pageNo,
+        null,
+        attempt,
+      );
     }
 
     try {
@@ -188,7 +355,16 @@ export class PublicApiClient implements TenderApiClient {
       if (signal.aborted) {
         throw error;
       }
-      throw new TenderSourceError(source, "INVALID_RESPONSE", response.status);
+      throw new TenderSourceError(
+        request.source,
+        "INVALID_RESPONSE",
+        response.status,
+        undefined,
+        request.operation,
+        pageNo,
+        null,
+        attempt,
+      );
     }
   }
 
@@ -216,17 +392,34 @@ export class PublicApiClient implements TenderApiClient {
 
   private readPage<T extends Record<string, unknown>>(
     response: unknown,
-    source: TenderSource,
+    request: PublicApiRequest,
+    pageNo: number,
+    attempt: number,
   ): { items: T[]; totalCount: number } {
+    const source = request.source;
     const root = this.asRecord(response, source);
     const envelope = this.asRecord(root.response ?? root, source);
     const header = this.asRecordOrNull(envelope.header ?? root.header) ?? {};
+    const gateway = this.asRecordOrNull(root.OpenAPI_ServiceResponse);
+    const gatewayHeader = this.asRecordOrNull(gateway?.cmmMsgHeader);
     const resultCode = this.readText(
-      header.resultCode ?? root.resultCode ?? envelope.resultCode,
+      gatewayHeader?.returnReasonCode ??
+        header.resultCode ??
+        root.resultCode ??
+        envelope.resultCode,
     );
 
     if (!resultCode || !SUCCESS_CODES.has(resultCode.toUpperCase())) {
-      throw new TenderSourceError(source, "PROVIDER_RESULT_ERROR", 200);
+      throw new TenderSourceError(
+        source,
+        "PROVIDER_RESULT_ERROR",
+        200,
+        undefined,
+        request.operation,
+        pageNo,
+        resultCode,
+        attempt,
+      );
     }
 
     const body = this.asRecord(envelope.body ?? root.body ?? envelope, source);
@@ -285,6 +478,121 @@ export class PublicApiClient implements TenderApiClient {
       return DEFAULT_REQUEST_TIMEOUT_MS;
     }
     return value;
+  }
+
+  private toNonNegativeMs(value: number | undefined): number {
+    if (!Number.isFinite(value) || value === undefined || value < 0) {
+      return 0;
+    }
+    return value;
+  }
+
+  private reserveRequestSlot(
+    request: PublicApiRequest,
+    pageNo: number,
+    attempt: number,
+  ): Promise<void> | null {
+    const now = Date.now();
+    const requestAt = Math.max(now, this.nextRequestAt);
+    this.nextRequestAt = requestAt + this.minimumRequestIntervalMs;
+    const delayMs = requestAt - now;
+    if (delayMs <= 0 && !request.signal?.aborted) {
+      return null;
+    }
+    return this.wait(delayMs, request, pageNo, attempt);
+  }
+
+  private wait(
+    delayMs: number,
+    request: PublicApiRequest,
+    pageNo: number,
+    attempt: number,
+  ): Promise<void> {
+    if (request.signal?.aborted) {
+      return Promise.reject(
+        new TenderSourceError(
+          request.source,
+          "REQUEST_ABORTED",
+          null,
+          undefined,
+          request.operation,
+          pageNo,
+          null,
+          attempt,
+        ),
+      );
+    }
+    if (delayMs <= 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const onAbort = () => {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+        request.signal?.removeEventListener("abort", onAbort);
+        reject(
+          new TenderSourceError(
+            request.source,
+            "REQUEST_ABORTED",
+            null,
+            undefined,
+            request.operation,
+            pageNo,
+            null,
+            attempt,
+          ),
+        );
+      };
+
+      timer = setTimeout(() => {
+        request.signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, delayMs);
+      request.signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
+  private isRetryable(error: TenderSourceError): boolean {
+    if (error.code === "PROVIDER_RESULT_ERROR") {
+      return error.providerResultCode === "23";
+    }
+    if (error.code === "HTTP_ERROR") {
+      return error.status !== null && RETRYABLE_HTTP_STATUSES.has(error.status);
+    }
+    return error.code === "REQUEST_TIMEOUT" || error.code === "NETWORK_ERROR";
+  }
+
+  private withRequestMetadata(
+    error: unknown,
+    request: PublicApiRequest,
+    pageNo: number,
+    attempt: number,
+  ): TenderSourceError {
+    if (error instanceof TenderSourceError) {
+      return new TenderSourceError(
+        error.source,
+        error.code,
+        error.status,
+        error.cause,
+        error.operation ?? request.operation,
+        error.pageNo ?? pageNo,
+        error.providerResultCode,
+        attempt,
+      );
+    }
+    return new TenderSourceError(
+      request.source,
+      "NETWORK_ERROR",
+      null,
+      error,
+      request.operation,
+      pageNo,
+      null,
+      attempt,
+    );
   }
 }
 
