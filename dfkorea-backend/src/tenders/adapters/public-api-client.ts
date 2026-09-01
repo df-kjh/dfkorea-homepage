@@ -93,7 +93,8 @@ export class PublicApiClient implements TenderApiClient {
   private readonly minimumRequestIntervalMs: number;
   private readonly retryDelaysMs: readonly number[];
   private readonly onRetry?: (event: PublicApiRetryEvent) => void;
-  private nextRequestAt = 0;
+  private requestStartGate = Promise.resolve();
+  private lastRequestStartedAt: number | null = null;
 
   constructor(
     private readonly fetcher: Fetcher = globalThis.fetch,
@@ -151,14 +152,14 @@ export class PublicApiClient implements TenderApiClient {
         );
       }
 
-      // Slot reservation mutates nextRequestAt before the first await, so
-      // concurrent callers cannot reserve the same request-start timestamp.
-      const slotWait = this.reserveRequestSlot(request, pageNo, attempt);
-      if (slotWait) {
-        await slotWait;
-      }
+      const requestStart = this.acquireRequestStart(request, pageNo, attempt);
+      const markRequestStarted = requestStart ? await requestStart : null;
 
       try {
+        // Releasing the gate schedules the next waiter as a microtask. This
+        // synchronous call then reaches fetcher first and records its actual
+        // request-start boundary immediately beforehand.
+        markRequestStarted?.();
         const body = await this.fetchPage(request, pageNo, attempt);
         return this.readPage<T>(body, request, pageNo, attempt);
       } catch (error) {
@@ -487,19 +488,68 @@ export class PublicApiClient implements TenderApiClient {
     return value;
   }
 
-  private reserveRequestSlot(
+  private acquireRequestStart(
     request: PublicApiRequest,
     pageNo: number,
     attempt: number,
-  ): Promise<void> | null {
-    const now = Date.now();
-    const requestAt = Math.max(now, this.nextRequestAt);
-    this.nextRequestAt = requestAt + this.minimumRequestIntervalMs;
-    const delayMs = requestAt - now;
-    if (delayMs <= 0 && !request.signal?.aborted) {
+  ): Promise<() => void> | null {
+    if (this.minimumRequestIntervalMs <= 0) {
       return null;
     }
-    return this.wait(delayMs, request, pageNo, attempt);
+
+    let releaseGate: () => void = () => undefined;
+    const precedingRequestStart = this.requestStartGate;
+    this.requestStartGate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+
+    return this.waitForRequestStart(
+      precedingRequestStart,
+      releaseGate,
+      request,
+      pageNo,
+      attempt,
+    );
+  }
+
+  private async waitForRequestStart(
+    precedingRequestStart: Promise<void>,
+    releaseGate: () => void,
+    request: PublicApiRequest,
+    pageNo: number,
+    attempt: number,
+  ): Promise<() => void> {
+    try {
+      await precedingRequestStart;
+
+      // Re-check after every timer release. Multiple overdue timers may run in
+      // the same event-loop turn, so a one-time future-slot calculation does
+      // not guarantee spacing between actual request starts.
+      while (this.lastRequestStartedAt !== null) {
+        const elapsedMs = Date.now() - this.lastRequestStartedAt;
+        const remainingMs = this.minimumRequestIntervalMs - elapsedMs;
+        if (remainingMs <= 0) {
+          break;
+        }
+        await this.wait(remainingMs, request, pageNo, attempt);
+      }
+
+      // This also closes the abort window while waiting for the preceding gate.
+      await this.wait(0, request, pageNo, attempt);
+
+      let released = false;
+      return () => {
+        if (released) {
+          return;
+        }
+        released = true;
+        this.lastRequestStartedAt = Date.now();
+        releaseGate();
+      };
+    } catch (error) {
+      releaseGate();
+      throw error;
+    }
   }
 
   private wait(

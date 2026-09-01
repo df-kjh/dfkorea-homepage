@@ -461,6 +461,41 @@ describe("PublicApiClient", () => {
     jest.useRealTimers();
   });
 
+  it("rechecks the actual last start after overdue pacing timers resume", async () => {
+    jest.useFakeTimers({ now: 0 });
+    let blockedUntil = 0;
+    const dateNow = jest
+      .spyOn(Date, "now")
+      .mockImplementation(() => Math.max(jest.now(), blockedUntil));
+    const starts: number[] = [];
+    const fetcher = jest.fn(async () => {
+      starts.push(Date.now());
+      return providerResponse("00", [], 0);
+    });
+    const client = new PublicApiClient(fetcher, {
+      minimumRequestIntervalMs: 1_100,
+    });
+    const requests = Promise.all([
+      client.getAllPages(requestFor("construction")),
+      client.getAllPages(requestFor("goods")),
+      client.getAllPages(requestFor("service")),
+    ]);
+
+    await jest.advanceTimersByTimeAsync(0);
+    blockedUntil = 2_500;
+    await jest.runAllTimersAsync();
+    await requests;
+
+    try {
+      expect(starts).toHaveLength(3);
+      expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1_100);
+      expect(starts[2] - starts[1]).toBeGreaterThanOrEqual(1_100);
+    } finally {
+      dateNow.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it("sends the exact official G2B minute-window and pagination parameters for every operation", async () => {
     const row = g2bFixture.response.body.items[0];
     const fetcher = jest.fn(async (urlText: string) => {
