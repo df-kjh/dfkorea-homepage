@@ -1,20 +1,14 @@
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
-import {
-  TenderSourceAdapter,
-  TenderSourceFetchResult,
-} from "../domain/tender-source.adapter";
+import { TenderSourceAdapter } from "../domain/tender-source.adapter";
 import {
   ProcurementType,
   SyncRunStatus,
-  TenderOpportunityType,
   TenderRelevance,
   TenderSource,
 } from "../domain/tender.enums";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { TenderIngestionService } from "./tender-ingestion.service";
-import { TenderOpportunityClassifier } from "../domain/tender-opportunity-classifier";
-import { Logger } from "@nestjs/common";
 
 const NOW = new Date("2026-08-27T03:00:00.000Z");
 
@@ -37,8 +31,6 @@ const directNotice: NormalizedTender = {
   itemName: "LED 등기구",
   description: "공용부 조명 교체",
   attachmentNames: ["spec.pdf"],
-  licenseLimits: [],
-  licenseLimitsVerified: true,
   rawData: { bidNtceNo: "G2B-1" },
 };
 
@@ -62,14 +54,6 @@ const irrelevantNotice: NormalizedTender = {
 
 const createAdapter = (source: TenderSource): jest.Mocked<TenderSourceAdapter> =>
   ({ source, fetchNotices: jest.fn() });
-
-const successfulFetch = (
-  notices: NormalizedTender[] = [],
-): TenderSourceFetchResult => ({
-  notices,
-  status: SyncRunStatus.SUCCEEDED,
-  errorCode: null,
-});
 
 const createBodyThrowingAdapters = (thrown: unknown): TenderSourceAdapter[] =>
   new Proxy([] as TenderSourceAdapter[], {
@@ -124,15 +108,14 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
-      new TenderOpportunityClassifier(),
       [g2b, kapt, kepco],
     );
   });
 
   it("fetches each provider across the initial preceding 24 hours", async () => {
-    g2b.fetchNotices.mockResolvedValue(successfulFetch());
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
@@ -146,9 +129,9 @@ describe("TenderIngestionService", () => {
     syncRunRepository.findOne.mockResolvedValue({
       finishedAt: new Date("2026-08-27T01:30:00.000Z"),
     });
-    g2b.fetchNotices.mockResolvedValue(successfulFetch());
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
@@ -159,11 +142,9 @@ describe("TenderIngestionService", () => {
   });
 
   it("excludes irrelevant notices and persists classifier evidence for relevant notices", async () => {
-    g2b.fetchNotices.mockResolvedValue(
-      successfulFetch([directNotice, irrelevantNotice]),
-    );
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([directNotice, irrelevantNotice]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
@@ -176,8 +157,6 @@ describe("TenderIngestionService", () => {
           relevanceReasons: expect.arrayContaining([
             expect.objectContaining({ keyword: "LED" }),
           ]),
-          opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
-          opportunityReasons: ["공사 업무구분"],
           rawData: { bidNtceNo: "G2B-1" },
         }),
       ],
@@ -203,17 +182,9 @@ describe("TenderIngestionService", () => {
         revision: "0",
       },
     ]);
-    g2b.fetchNotices.mockResolvedValue(
-      successfulFetch([
-        {
-          ...directNotice,
-          title: "MAS LED 조명",
-          procurementType: ProcurementType.GOODS,
-        },
-      ]),
-    );
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([directNotice]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
@@ -225,13 +196,7 @@ describe("TenderIngestionService", () => {
       }),
     );
     expect(tenderRepository.upsert).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({
-          title: "MAS LED 조명",
-          opportunityType: TenderOpportunityType.MAS,
-          opportunityReasons: ["MAS 표현: 제목"],
-        }),
-      ],
+      [expect.objectContaining({ title: "LED 가로등 교체공사" })],
       expect.objectContaining({
         conflictPaths: ["source", "sourceNoticeId", "revision"],
       }),
@@ -242,8 +207,8 @@ describe("TenderIngestionService", () => {
     g2b.fetchNotices.mockRejectedValue(
       new TenderSourceError(TenderSource.G2B, "HTTP_ERROR", 503),
     );
-    kapt.fetchNotices.mockResolvedValue(successfulFetch([potentialNotice]));
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    kapt.fetchNotices.mockResolvedValue([potentialNotice]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     const summary = await service.collectAll(NOW);
 
@@ -267,102 +232,6 @@ describe("TenderIngestionService", () => {
     );
   });
 
-  it("logs only safe provider diagnostics for a failed G2B operation", async () => {
-    const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
-    g2b.fetchNotices.mockRejectedValue(
-      Object.assign(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "PROVIDER_RESULT_ERROR",
-          200,
-        ),
-        {
-          operation: "getBidPblancListInfoThng",
-          providerResultCode: "30",
-        },
-      ),
-    );
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
-
-    await service.collectAll(NOW);
-
-    expect(warn).toHaveBeenCalledWith(
-      "G2B collection failed: PROVIDER_RESULT_ERROR; operation=getBidPblancListInfoThng; providerResultCode=30",
-    );
-    expect(JSON.stringify(warn.mock.calls)).not.toContain("serviceKey");
-    warn.mockRestore();
-  });
-
-  it("persists notices and reports PARTIAL when only G2B license enrichment is unavailable", async () => {
-    const partialNotices: NormalizedTender[] = [
-      { ...directNotice, licenseLimitsVerified: false } as NormalizedTender,
-      {
-        ...directNotice,
-        sourceNoticeId: "G2B-GOODS",
-        title: "LED 조명기구 구매",
-        procurementType: ProcurementType.GOODS,
-        licenseLimitsVerified: false,
-      } as NormalizedTender,
-      {
-        ...directNotice,
-        sourceNoticeId: "G2B-SERVICE",
-        title: "LED 조명 유지관리 용역",
-        procurementType: ProcurementType.SERVICE,
-        licenseLimitsVerified: false,
-      } as NormalizedTender,
-    ];
-    g2b.fetchNotices.mockResolvedValue({
-      notices: partialNotices,
-      status: "PARTIAL",
-      errorCode: "LICENSE_LIMIT_UNAVAILABLE",
-    } as never);
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
-
-    const summary = await service.collectAll(NOW);
-
-    expect(summary.failedSources).toEqual([]);
-    expect(summary.sources).toContainEqual(
-      expect.objectContaining({
-        source: TenderSource.G2B,
-        status: "PARTIAL",
-        fetchedCount: 3,
-        errorCode: "LICENSE_LIMIT_UNAVAILABLE",
-      }),
-    );
-    expect(tenderRepository.upsert).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          sourceNoticeId: "G2B-1",
-          opportunityType: TenderOpportunityType.EXCLUDED_CONSTRUCTION,
-        }),
-        expect.objectContaining({
-          sourceNoticeId: "G2B-GOODS",
-          opportunityType: TenderOpportunityType.EXCLUDED_NON_SUPPLY,
-          opportunityReasons: ["면허제한 정보 확인 불가"],
-        }),
-        expect.objectContaining({
-          sourceNoticeId: "G2B-SERVICE",
-          opportunityType: TenderOpportunityType.EXCLUDED_NON_SUPPLY,
-        }),
-      ]),
-      expect.objectContaining({
-        conflictPaths: ["source", "sourceNoticeId", "revision"],
-      }),
-    );
-    expect(syncRunRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        source: TenderSource.G2B,
-        status: "PARTIAL",
-        fetchedCount: 3,
-        errorCode: "LICENSE_LIMIT_UNAVAILABLE",
-        errorMessage: null,
-      }),
-    );
-    expect(JSON.stringify(summary)).not.toContain("serviceKey");
-  });
-
   it("does not collect when another process owns the advisory lock", async () => {
     lockRunner.query.mockReset();
     lockRunner.query.mockResolvedValue([{ locked: false }]);
@@ -379,9 +248,9 @@ describe("TenderIngestionService", () => {
   });
 
   it("uses one session-pinned runner to acquire and release the advisory lock", async () => {
-    g2b.fetchNotices.mockResolvedValue(successfulFetch());
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
@@ -401,8 +270,8 @@ describe("TenderIngestionService", () => {
 
   it("unlocks before releasing the session when source collection fails", async () => {
     g2b.fetchNotices.mockRejectedValue(new Error("upstream failed"));
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await service.collectAll(NOW);
 
@@ -428,7 +297,6 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
-      new TenderOpportunityClassifier(),
       throwingAdapters,
     );
 
@@ -454,7 +322,6 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
-      new TenderOpportunityClassifier(),
       new Proxy([] as TenderSourceAdapter[], {
         get(target, property, receiver) {
           if (property === "map") {
@@ -480,9 +347,9 @@ describe("TenderIngestionService", () => {
     lockRunner.query
       .mockResolvedValueOnce([{ locked: true }])
       .mockRejectedValueOnce(unlockError);
-    g2b.fetchNotices.mockResolvedValue(successfulFetch());
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await expect(service.collectAll(NOW)).rejects.toBe(unlockError);
     expect(lockRunner.release).toHaveBeenCalledTimes(1);
@@ -491,9 +358,9 @@ describe("TenderIngestionService", () => {
   it("propagates a release failure after a successful collection", async () => {
     const releaseError = new Error("release failed");
     lockRunner.release.mockRejectedValue(releaseError);
-    g2b.fetchNotices.mockResolvedValue(successfulFetch());
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await expect(service.collectAll(NOW)).rejects.toBe(releaseError);
   });
@@ -506,9 +373,9 @@ describe("TenderIngestionService", () => {
       .mockResolvedValueOnce([{ locked: true }])
       .mockRejectedValueOnce(unlockError);
     lockRunner.release.mockRejectedValue(releaseError);
-    g2b.fetchNotices.mockResolvedValue(successfulFetch());
-    kapt.fetchNotices.mockResolvedValue(successfulFetch());
-    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+    g2b.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue([]);
+    kepco.fetchNotices.mockResolvedValue([]);
 
     await expect(service.collectAll(NOW)).rejects.toMatchObject({
       name: "AggregateError",
@@ -521,7 +388,6 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
-      new TenderOpportunityClassifier(),
       createBodyThrowingAdapters(undefined),
     );
 
@@ -539,7 +405,6 @@ describe("TenderIngestionService", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
-      new TenderOpportunityClassifier(),
       createBodyThrowingAdapters(null),
     );
 

@@ -2,13 +2,8 @@ import { NormalizedTender } from "../domain/normalized-tender";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
-  TenderSourceFetchResult,
 } from "../domain/tender-source.adapter";
-import {
-  ProcurementType,
-  SyncRunStatus,
-  TenderSource,
-} from "../domain/tender.enums";
+import { ProcurementType, TenderSource } from "../domain/tender.enums";
 import {
   formatKstDate,
   parseKstDate,
@@ -29,9 +24,7 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
     private readonly config: KaptTenderAdapterConfig,
   ) {}
 
-  async fetchNotices(
-    window: TenderFetchWindow,
-  ): Promise<TenderSourceFetchResult> {
+  async fetchNotices(window: TenderFetchWindow): Promise<NormalizedTender[]> {
     const rows = await this.client.getAllPages({
       source: this.source,
       baseUrl: this.config.baseUrl,
@@ -44,14 +37,10 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
       },
     });
 
-    return {
-      notices: rows.flatMap((row) => {
-        const normalized = this.normalize(row);
-        return normalized ? [normalized] : [];
-      }),
-      status: SyncRunStatus.SUCCEEDED,
-      errorCode: null,
-    };
+    return rows.flatMap((row) => {
+      const normalized = this.normalize(row);
+      return normalized ? [normalized] : [];
+    });
   }
 
   private normalize(row: Record<string, unknown>): NormalizedTender | null {
@@ -76,30 +65,16 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
       bidEndedAt: parseKstDate(row.bidDeadline),
       openedAt: null,
       region: toNullableText(row.bidArea),
-      procurementType: this.mapProcurementType(row.codeClassifyType2),
+      // The V3 list fields expose a status, not a procurement category. Do not
+      // infer a type from the title or status; classification is a later step.
+      procurementType: ProcurementType.OTHER,
       contractMethod: null,
       estimatedAmount: null,
       sourceUrl: `https://www.k-apt.go.kr/web/bid/bidDetail.do?bidNum=${encodeURIComponent(sourceNoticeId)}`,
       itemName: "",
       description: toNullableText(row.bidContent) ?? "",
       attachmentNames: [],
-      licenseLimits: [],
-      // K-apt has no separate G2B license-limit enrichment requirement.
-      licenseLimitsVerified: true,
       rawData: row,
     };
-  }
-
-  private mapProcurementType(value: unknown): ProcurementType {
-    switch (toNullableText(value)) {
-      case "02":
-        return ProcurementType.CONSTRUCTION;
-      case "03":
-        return ProcurementType.SERVICE;
-      case "04":
-        return ProcurementType.GOODS;
-      default:
-        return ProcurementType.OTHER;
-    }
   }
 }

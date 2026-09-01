@@ -14,7 +14,6 @@ import {
   ProcurementType,
   TenderRelevance,
   TenderSource,
-  TenderOpportunityType,
 } from "../domain/tender.enums";
 import type { TenderClassificationReason } from "../domain/tender-classifier";
 
@@ -98,8 +97,6 @@ export interface TenderSummaryDto {
   relevance: TenderRelevance;
   relevanceScore: number;
   relevanceReasons: TenderClassificationReason[];
-  opportunityType: TenderOpportunityType;
-  opportunityReasons: string[];
 }
 
 export type TenderDetailDto = TenderSummaryDto;

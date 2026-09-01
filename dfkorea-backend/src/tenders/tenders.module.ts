@@ -11,7 +11,6 @@ import { G2bTenderAdapter } from "./adapters/g2b-tender.adapter";
 import { KaptTenderAdapter } from "./adapters/kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./adapters/kepco-tender.adapter";
 import { TenderClassifier } from "./domain/tender-classifier";
-import { TenderOpportunityClassifier } from "./domain/tender-opportunity-classifier";
 import { TENDER_SOURCE_ADAPTERS } from "./domain/tender-source.adapter";
 import { Tender } from "./entities/tender.entity";
 import { TenderMailDelivery } from "./entities/tender-mail-delivery.entity";
@@ -49,18 +48,14 @@ import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
   controllers: [TendersController, TenderMailOAuthController],
   providers: [
     TenderClassifier,
-    TenderOpportunityClassifier,
     {
       provide: G2B_TENDER_ADAPTER,
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>
-        new G2bTenderAdapter(
-          new PublicApiClient(undefined, { minimumRequestIntervalMs: 400 }),
-          {
-            baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
-            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
-          },
-        ),
+        new G2bTenderAdapter(new PublicApiClient(), {
+          baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
+          serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+        }),
     },
     {
       provide: KAPT_TENDER_ADAPTER,

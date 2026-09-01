@@ -11,7 +11,6 @@ import { TenderQueryService } from "../src/tenders/services/tender-query.service
 import { TenderSubscriptionService } from "../src/tenders/services/tender-subscription.service";
 import { TendersController } from "../src/tenders/tenders.controller";
 import { TenderClassifier } from "../src/tenders/domain/tender-classifier";
-import { TenderOpportunityClassifier } from "../src/tenders/domain/tender-opportunity-classifier";
 import {
   ProcurementType,
   MailDeliveryStatus,
@@ -19,13 +18,9 @@ import {
   TenderRelevance,
   TenderSource,
   SyncRunStatus,
-  TenderOpportunityType,
 } from "../src/tenders/domain/tender.enums";
 import { NormalizedTender } from "../src/tenders/domain/normalized-tender";
-import {
-  TenderSourceAdapter,
-  TenderSourceFetchResult,
-} from "../src/tenders/domain/tender-source.adapter";
+import { TenderSourceAdapter } from "../src/tenders/domain/tender-source.adapter";
 import { Tender } from "../src/tenders/entities/tender.entity";
 import { TenderMailDelivery } from "../src/tenders/entities/tender-mail-delivery.entity";
 import { TenderRecipient } from "../src/tenders/entities/tender-recipient.entity";
@@ -89,12 +84,12 @@ describe("Tender admin HTTP contract", () => {
       sources: [
         {
           source: TenderSource.G2B,
-          status: SyncRunStatus.PARTIAL,
+          status: SyncRunStatus.SUCCEEDED,
           fetchedCount: 2,
           createdCount: 1,
           updatedCount: 1,
           excludedCount: 0,
-          errorCode: "LICENSE_LIMIT_UNAVAILABLE",
+          errorCode: null,
         },
         {
           source: TenderSource.KEPCO,
@@ -172,12 +167,12 @@ describe("Tender admin HTTP contract", () => {
           sources: [
             {
               source: "G2B",
-              status: "PARTIAL",
+              status: "SUCCEEDED",
               fetchedCount: 2,
               createdCount: 1,
               updatedCount: 1,
               excludedCount: 0,
-              errorCode: "LICENSE_LIMIT_UNAVAILABLE",
+              errorCode: null,
             },
             {
               source: "KEPCO",
@@ -237,23 +232,6 @@ describe("Tender admin HTTP contract", () => {
       });
   });
 
-  it("returns not found when an excluded tender is hidden by detail lookup", async () => {
-    query.getTender.mockResolvedValueOnce(null);
-
-    await request(app!.getHttpServer())
-      .get(`/tenders/${TENDER_ID}`)
-      .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
-      .expect(404)
-      .expect(({ body }) => {
-        expect(body).toEqual(
-          expect.objectContaining({
-            statusCode: 404,
-            message: "Tender not found",
-          }),
-        );
-      });
-  });
-
   it("stores only shared recipient and delivery-time settings", async () => {
     const payload = {
       enabled: true,
@@ -305,51 +283,37 @@ describe("Tender collection and delivery service contracts", () => {
     itemName: "LED 등기구",
     description: "",
     attachmentNames: [],
-    licenseLimits: [],
-    licenseLimitsVerified: true,
     rawData: { notice: "sanitized fixture" },
     ...overrides,
-  });
-
-  const successfulFetch = (
-    notices: NormalizedTender[] = [],
-  ): TenderSourceFetchResult => ({
-    notices,
-    status: SyncRunStatus.SUCCEEDED,
-    errorCode: null,
   });
 
   it("runs mocked source adapters through classification and conflict upsert", async () => {
     const g2b = {
       source: TenderSource.G2B,
-      fetchNotices: jest.fn().mockResolvedValue(successfulFetch([notice({})])),
+      fetchNotices: jest.fn().mockResolvedValue([notice({})]),
     } as jest.Mocked<TenderSourceAdapter>;
     const kapt = {
       source: TenderSource.KAPT,
-      fetchNotices: jest.fn().mockResolvedValue(
-        successfulFetch([
-          notice({
-            source: TenderSource.KAPT,
-            sourceNoticeId: "KAPT-1",
-            title: "지하주차장 전기시설 개선공사",
-            itemName: "",
-            description: "",
-          }),
-        ]),
-      ),
+      fetchNotices: jest.fn().mockResolvedValue([
+        notice({
+          source: TenderSource.KAPT,
+          sourceNoticeId: "KAPT-1",
+          title: "지하주차장 전기시설 개선공사",
+          itemName: "",
+          description: "",
+        }),
+      ]),
     } as jest.Mocked<TenderSourceAdapter>;
     const kepco = {
       source: TenderSource.KEPCO,
-      fetchNotices: jest.fn().mockResolvedValue(
-        successfulFetch([
-          notice({
-            source: TenderSource.KEPCO,
-            sourceNoticeId: "KEPCO-ignored",
-            title: "구내식당 식자재 구매",
-            itemName: "",
-          }),
-        ]),
-      ),
+      fetchNotices: jest.fn().mockResolvedValue([
+        notice({
+          source: TenderSource.KEPCO,
+          sourceNoticeId: "KEPCO-ignored",
+          title: "구내식당 식자재 구매",
+          itemName: "",
+        }),
+      ]),
     } as jest.Mocked<TenderSourceAdapter>;
     const tenderRepository = {
       find: jest.fn().mockResolvedValue([]),
@@ -378,7 +342,6 @@ describe("Tender collection and delivery service contracts", () => {
       dataSource as never,
       syncRunRepository as never,
       new TenderClassifier(),
-      new TenderOpportunityClassifier(),
       [g2b, kapt, kepco],
     );
 
@@ -442,8 +405,6 @@ describe("Tender collection and delivery service contracts", () => {
       relevance: TenderRelevance.DIRECT,
       relevanceScore: 100,
       relevanceReasons: [],
-      opportunityType: TenderOpportunityType.GOODS_SUPPLY,
-      opportunityReasons: ["물품 업무구분"],
       firstCollectedAt: now,
       lastUpdatedAt: now,
     } as Tender;

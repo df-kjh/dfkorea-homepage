@@ -7,10 +7,6 @@ import {
   MailItemStatus,
   TenderRelevance,
 } from "../domain/tender.enums";
-import {
-  ELIGIBLE_TENDER_OPPORTUNITY_TYPES,
-  isEligibleTenderOpportunityType,
-} from "../domain/tender-opportunity-eligibility";
 import { Tender } from "../entities/tender.entity";
 import { TenderMailDelivery } from "../entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "../entities/tender-mail-item.entity";
@@ -273,7 +269,6 @@ export class TenderMailService {
         const tenders = await tenderRepository.find({
           where: {
             relevance: In([TenderRelevance.DIRECT, TenderRelevance.POTENTIAL]),
-            opportunityType: In(ELIGIBLE_TENDER_OPPORTUNITY_TYPES),
           },
         });
         const missing = tenders
@@ -294,12 +289,11 @@ export class TenderMailService {
           ...(inserted as TenderMailItem[]),
         ].filter(
           (item) =>
-            isEligibleTenderOpportunityType(item.tender.opportunityType) &&
-            (item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
-              (item.status === MailItemStatus.PENDING &&
+            item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
+            (item.status === MailItemStatus.PENDING &&
               (!item.lastDelivery ||
                 item.lastDelivery.status === MailDeliveryStatus.FAILED ||
-                item.lastDelivery.status === MailDeliveryStatus.CANCELLED))),
+                item.lastDelivery.status === MailDeliveryStatus.CANCELLED)),
         );
         const targetDate = this.toKstDate(now);
         if (eligible.length === 0) {
@@ -378,53 +372,24 @@ export class TenderMailService {
       where: { lastDeliveryId: delivery.id, status: MailItemStatus.PENDING },
       relations: { tender: true },
     });
-    const eligibleItems = items.filter((item) =>
-      isEligibleTenderOpportunityType(item.tender.opportunityType),
-    );
-    const excludedMailItemIds = items
-      .filter((item) => !isEligibleTenderOpportunityType(item.tender.opportunityType))
-      .map((item) => item.id);
-    if (eligibleItems.length === 0)
+    if (items.length === 0)
       return this.cancelRetry(
         delivery,
         now,
         "Delivery cancelled because no pending mail items remain",
       );
-    if (!(await this.isCurrentEnabledRecipient(delivery, eligibleItems[0]))) {
+    if (!(await this.isCurrentEnabledRecipient(delivery, items[0]))) {
       return this.cancelRetry(
         delivery,
         now,
         "Delivery cancelled because its recipient is no longer active",
       );
     }
-    await this.detachExcludedRetryItems(delivery.id, excludedMailItemIds);
     await this.deliver(
       delivery,
-      eligibleItems.map((item) => item.tender),
+      items.map((item) => item.tender),
       now,
-      eligibleItems.map((item) => item.id),
     );
-  }
-
-  private async detachExcludedRetryItems(
-    deliveryId: string,
-    excludedMailItemIds: string[],
-  ): Promise<void> {
-    if (excludedMailItemIds.length === 0) return;
-
-    await this.dataSource.transaction(async (manager) => {
-      const result = await manager.getRepository(TenderMailItem).update(
-        {
-          id: In(excludedMailItemIds),
-          lastDeliveryId: deliveryId,
-          status: MailItemStatus.PENDING,
-        },
-        { lastDeliveryId: null },
-      );
-      if (result.affected !== excludedMailItemIds.length) {
-        throw new Error("Retry delivery item detach was incomplete");
-      }
-    });
   }
 
   private async isCurrentEnabledRecipient(
@@ -514,7 +479,6 @@ export class TenderMailService {
     delivery: TenderMailDelivery,
     tenders: Tender[],
     now: Date,
-    deliveredMailItemIds?: string[],
   ): Promise<void> {
     let message: {
       to: string;
@@ -543,7 +507,7 @@ export class TenderMailService {
       } else if (outcome === MailDeliveryOutcome.PERMANENT_REJECTION) {
         await this.persistPermanentFailure(delivery, now);
       } else {
-        await this.persistUncertain(delivery, now, deliveredMailItemIds);
+        await this.persistUncertain(delivery, now);
       }
       return;
     }
@@ -552,27 +516,19 @@ export class TenderMailService {
     // however, item and delivery success state must commit or roll back as one
     // unit; a failed commit leaves the durable lease to become terminal
     // DELIVERY_UNCERTAIN, deliberately preferring possible loss to duplication.
-    await this.persistSuccess(
-      delivery,
-      result,
-      now,
-      deliveredMailItemIds,
-    );
+    await this.persistSuccess(delivery, result, now);
   }
 
   private async persistSuccess(
     delivery: TenderMailDelivery,
     result: { providerMessageId?: string | null },
     now: Date,
-    deliveredMailItemIds?: string[],
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const mailItemRepository = manager.getRepository(TenderMailItem);
       const deliveryRepository = manager.getRepository(TenderMailDelivery);
       await mailItemRepository.update(
-        deliveredMailItemIds
-          ? { id: In(deliveredMailItemIds), lastDeliveryId: delivery.id }
-          : { lastDeliveryId: delivery.id },
+        { lastDeliveryId: delivery.id },
         { status: MailItemStatus.SENT, sentAt: now, uncertainAt: null },
       );
       await deliveryRepository.save({
@@ -648,7 +604,6 @@ export class TenderMailService {
   private async persistUncertain(
     delivery: TenderMailDelivery,
     now: Date,
-    deliveredMailItemIds?: string[],
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const deliveryRepository = manager.getRepository(TenderMailDelivery);
@@ -670,16 +625,10 @@ export class TenderMailService {
       );
       if (transitioned.affected !== 1) return;
       await mailItemRepository.update(
-        deliveredMailItemIds
-          ? {
-              id: In(deliveredMailItemIds),
-              lastDeliveryId: delivery.id,
-              status: MailItemStatus.PENDING,
-            }
-          : {
-              lastDeliveryId: delivery.id,
-              status: MailItemStatus.PENDING,
-            },
+        {
+          lastDeliveryId: delivery.id,
+          status: MailItemStatus.PENDING,
+        },
         {
           status: MailItemStatus.DELIVERY_UNCERTAIN,
           uncertainAt: now,

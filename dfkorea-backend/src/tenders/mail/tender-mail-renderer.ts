@@ -43,8 +43,6 @@ export class TenderMailRenderer {
         ? `<p><a href="${this.escape(safeUrl)}" rel="noopener noreferrer">공식 원문 보기</a></p>`
         : "";
       return `<article><h3>${this.escape(tender.title)}</h3>` +
-        `<p>기회: ${this.escape(this.renderOpportunityLabel(tender.opportunityType))}</p>` +
-        `<p>기회 판정 근거: ${this.escape(this.renderOpportunityReasons(tender.opportunityReasons))}</p>` +
         `<p>발주기관: ${this.escape(tender.orderingOrganization)}</p>` +
         `<p>출처: ${this.escape(tender.source)} · 등록일: ${this.escape(this.toKstDate(tender.registeredAt))}</p>` +
         `<p>마감일: ${this.escape(tender.bidEndedAt ? this.toKstDateTime(tender.bidEndedAt) : "미정")}</p>` +
@@ -59,8 +57,6 @@ export class TenderMailRenderer {
       `${label} (${items.length}건)`,
       ...items.map((tender) => [
         tender.title,
-        `기회: ${this.renderOpportunityLabel(tender.opportunityType)}`,
-        `기회 판정 근거: ${this.renderOpportunityReasons(tender.opportunityReasons)}`,
         `발주기관: ${tender.orderingOrganization}`,
         `출처: ${tender.source} | 등록일: ${this.toKstDate(tender.registeredAt)}`,
         `마감일: ${tender.bidEndedAt ? this.toKstDateTime(tender.bidEndedAt) : "미정"}`,
@@ -99,14 +95,6 @@ export class TenderMailRenderer {
       )
       .map((reason) => `${reason.field} · ${reason.keyword} · ${reason.score}점`);
     return formatted.join(", ") || "없음";
-  }
-
-  private renderOpportunityLabel(opportunityType: Tender["opportunityType"]): string {
-    return opportunityType === "MAS" ? "🧾 MAS" : "📦 물품 납품";
-  }
-
-  private renderOpportunityReasons(reasons: readonly string[]): string {
-    return reasons.join(", ") || "없음";
   }
 
   private escape(value: string): string {

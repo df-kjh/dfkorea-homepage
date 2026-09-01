@@ -1,6 +1,6 @@
 export type TenderSource = 'G2B' | 'KAPT' | 'KEPCO'
 
-export type TenderCollectionSourceStatus = 'SUCCEEDED' | 'PARTIAL' | 'FAILED'
+export type TenderCollectionSourceStatus = 'SUCCEEDED' | 'FAILED'
 
 export interface TenderCollectionSourceResult {
   source: TenderSource
@@ -22,9 +22,6 @@ export interface TenderCollectionResponse {
 export type TenderProcurementType = 'GOODS' | 'CONSTRUCTION' | 'SERVICE' | 'OTHER'
 
 export type TenderRelevance = 'DIRECT' | 'POTENTIAL'
-
-// Calendar, list, and mail only receive tender opportunities eligible for delivery.
-export type TenderOpportunityType = 'GOODS_SUPPLY' | 'MAS'
 
 export interface TenderRelevanceReason {
   field: string
@@ -52,8 +49,6 @@ export interface Tender {
   relevance: TenderRelevance
   relevanceScore: number
   relevanceReasons: TenderRelevanceReason[]
-  opportunityType: TenderOpportunityType
-  opportunityReasons: string[]
 }
 
 export interface TenderCalendarDay {

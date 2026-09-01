@@ -5,7 +5,6 @@ import { TenderMailDelivery } from "./tender-mail-delivery.entity";
 import { TenderRecipient } from "./tender-recipient.entity";
 import { TenderDailyDispatch } from "./tender-daily-dispatch.entity";
 import { TenderMailOAuthCredential } from "./tender-mail-oauth-credential.entity";
-import { TenderOpportunityType } from "../domain/tender.enums";
 
 describe("tender entity metadata", () => {
   it("deduplicates source notice revisions", () => {
@@ -16,28 +15,6 @@ describe("tender entity metadata", () => {
     );
 
     expect(unique?.columns).toEqual(["source", "sourceNoticeId", "revision"]);
-  });
-
-  it("stores indexed opportunity eligibility and its classifier evidence", () => {
-    const storage = getMetadataArgsStorage();
-    const opportunityType = storage.columns.find(
-      (item) => item.target === Tender && item.propertyName === "opportunityType",
-    );
-    const opportunityReasons = storage.columns.find(
-      (item) => item.target === Tender && item.propertyName === "opportunityReasons",
-    );
-    const index = storage.indices.find(
-      (item) => item.target === Tender && item.name === "IDX_tender_opportunity_type",
-    );
-
-    expect(opportunityType?.options).toEqual(
-      expect.objectContaining({ type: "varchar", nullable: false }),
-    );
-    expect(opportunityReasons?.options).toEqual(
-      expect.objectContaining({ type: "jsonb", nullable: false }),
-    );
-    expect(index?.columns).toEqual(["opportunityType"]);
-    expect(TenderOpportunityType.GOODS_SUPPLY).toBe("GOODS_SUPPLY");
   });
 
   it("tracks one delivery state per recipient and tender", () => {

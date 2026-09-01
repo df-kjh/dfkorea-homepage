@@ -32,8 +32,7 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    const { notices } = await adapter.fetchNotices(window);
-    const [notice] = notices;
+    const [notice] = await adapter.fetchNotices(window);
 
     expect(notice).toEqual(
       expect.objectContaining({
@@ -52,187 +51,8 @@ describe("official tender adapters", () => {
         rawData: g2bFixture.response.body.items[0],
       }),
     );
-    expect(client.getAllPages).toHaveBeenCalledTimes(4);
+    expect(client.getAllPages).toHaveBeenCalledTimes(3);
     expect(notice?.attachmentNames).toEqual(["LED 등기구 시방서.pdf"]);
-    expect(notice?.licenseLimits).toEqual([]);
-    expect(notice?.licenseLimitsVerified).toBe(true);
-  });
-
-  it("enriches G2B notices with matching official license limits", async () => {
-    const client = createClient();
-    client.getAllPages
-      .mockResolvedValueOnce([g2bFixture.response.body.items[0]])
-      .mockResolvedValueOnce([g2bFixture.response.body.items[1]])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(g2bFixture.licenseLimitItems);
-    const adapter = new G2bTenderAdapter(client, {
-      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
-      serviceKey: "test-key",
-    });
-
-    const { notices } = await adapter.fetchNotices(window);
-
-    expect(client.getAllPages).toHaveBeenCalledWith({
-      source: TenderSource.G2B,
-      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
-      operation: "getBidPblancListInfoLicenseLimit",
-      query: {
-        serviceKey: "test-key",
-        type: "json",
-        inqryDiv: "1",
-        inqryBgnDt: "202608260900",
-        inqryEndDt: "202608270900",
-      },
-    });
-    expect(
-      notices.find(
-        (notice) =>
-          notice.sourceNoticeId === "R26BK00000002" &&
-          notice.revision === "001",
-      )?.licenseLimits,
-    ).toEqual([{ name: "조명기구 제조업", permittedIndustries: "0037" }]);
-  });
-
-  it("starts license enrichment only after every base notice operation settles", async () => {
-    const client = createClient();
-    const baseResolvers = new Map<
-      string,
-      (rows: Record<string, unknown>[]) => void
-    >();
-    client.getAllPages.mockImplementation(
-      ({ operation }) =>
-        new Promise<Record<string, unknown>[]>((resolve) => {
-          if (operation === "getBidPblancListInfoLicenseLimit") {
-            resolve([]);
-            return;
-          }
-          baseResolvers.set(operation, resolve);
-        }),
-    );
-    const adapter = new G2bTenderAdapter(client, {
-      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
-      serviceKey: "test-key",
-    });
-
-    const pending = adapter.fetchNotices(window);
-    await Promise.resolve();
-
-    expect(baseResolvers.size).toBe(3);
-    expect(client.getAllPages).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        operation: "getBidPblancListInfoLicenseLimit",
-      }),
-    );
-
-    for (const resolve of baseResolvers.values()) {
-      resolve([]);
-    }
-    await pending;
-
-    expect(client.getAllPages).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        operation: "getBidPblancListInfoLicenseLimit",
-      }),
-    );
-  });
-
-  it("retries a G2B operation once after provider per-second limit code 23", async () => {
-    const attemptsByOperation = new Map<string, number>();
-    const fetcher = jest.fn(async (urlText: string) => {
-      const operation = new URL(urlText).pathname.split("/").at(-1)!;
-      const attempt = (attemptsByOperation.get(operation) ?? 0) + 1;
-      attemptsByOperation.set(operation, attempt);
-      const resultCode =
-        operation === "getBidPblancListInfoThng" && attempt === 1
-          ? "23"
-          : "00";
-      return new Response(
-        JSON.stringify(
-          resultCode === "23"
-            ? {
-                OpenAPI_ServiceResponse: {
-                  cmmMsgHeader: {
-                    errMsg: "LIMITED_NUMBER_OF_SERVICE_REQUESTS_PER_SECOND_EXCEEDS_ERROR",
-                    returnAuthMsg: "serviceKey=secret-key rate limited",
-                    returnReasonCode: "23",
-                  },
-                },
-              }
-            : {
-                response: {
-                  header: {
-                    resultCode,
-                    resultMsg: "NORMAL SERVICE",
-                  },
-                  body: { totalCount: 0, items: [] },
-                },
-              },
-        ),
-        { status: 200 },
-      );
-    });
-    const adapter = new G2bTenderAdapter(new PublicApiClient(fetcher), {
-      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
-      serviceKey: "secret-key",
-    });
-
-    await expect(adapter.fetchNotices(window)).resolves.toEqual(
-      expect.objectContaining({ status: "SUCCEEDED" }),
-    );
-    expect(attemptsByOperation.get("getBidPblancListInfoThng")).toBe(2);
-  });
-
-  it("returns partial G2B notices without secrets when only license enrichment fails", async () => {
-    const client = createClient();
-    const noticeOperations: Record<string, Record<string, unknown>> = {
-      getBidPblancListInfoCnstwk: {
-        ...g2bFixture.response.body.items[0],
-        bidNtceNo: "G2B-CONSTRUCTION",
-        bidNtceNm: "LED 조명 교체공사",
-      },
-      getBidPblancListInfoThng: {
-        ...g2bFixture.response.body.items[0],
-        bidNtceNo: "G2B-GOODS",
-        bidNtceNm: "LED 조명기구 구매",
-      },
-      getBidPblancListInfoServc: {
-        ...g2bFixture.response.body.items[0],
-        bidNtceNo: "G2B-SERVICE",
-        bidNtceNm: "LED 조명 유지관리 용역",
-      },
-    };
-    client.getAllPages.mockImplementation(async ({ operation }) => {
-      if (operation === "getBidPblancListInfoLicenseLimit") {
-        throw new Error("permission denied for serviceKey=secret-key");
-      }
-      return [noticeOperations[operation]];
-    });
-    const adapter = new G2bTenderAdapter(client, {
-      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
-      serviceKey: "secret-key",
-    });
-
-    const result = await adapter.fetchNotices(window);
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        status: "PARTIAL",
-        errorCode: "LICENSE_LIMIT_UNAVAILABLE",
-      }),
-    );
-    expect(result.notices).toHaveLength(3);
-    expect(result.notices).toContainEqual(
-      expect.objectContaining({
-        sourceNoticeId: "G2B-GOODS",
-        procurementType: ProcurementType.GOODS,
-        licenseLimitsVerified: false,
-      }),
-    );
-    expect(result.notices.every((notice) => !notice.licenseLimitsVerified)).toBe(
-      true,
-    );
-    expect(JSON.stringify(result)).not.toContain("secret-key");
-    expect(JSON.stringify(result)).not.toContain("permission denied");
   });
 
   it("classifies a notice from a documented G2B attachment filename", async () => {
@@ -250,8 +70,7 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    const { notices } = await adapter.fetchNotices(window);
-    const [notice] = notices;
+    const [notice] = await adapter.fetchNotices(window);
 
     expect(new TenderClassifier().classify(notice!)).toEqual(
       expect.objectContaining({
@@ -275,8 +94,7 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    const { notices } = await adapter.fetchNotices(window);
-    const [notice] = notices;
+    const [notice] = await adapter.fetchNotices(window);
 
     expect(notice).toEqual(
       expect.objectContaining({
@@ -288,7 +106,7 @@ describe("official tender adapters", () => {
         demandOrganization: null,
         registeredAt: new Date("2026-08-26T06:30:00.000Z"),
         bidEndedAt: new Date("2026-09-02T01:00:00.000Z"),
-        procurementType: ProcurementType.CONSTRUCTION,
+        procurementType: ProcurementType.OTHER,
         region: "서울특별시 송파구",
         estimatedAmount: null,
         sourceUrl:
@@ -297,18 +115,6 @@ describe("official tender adapters", () => {
         rawData: kaptFixture.response.body.items[0],
       }),
     );
-    expect(
-      (await adapter.fetchNotices(window)).notices.map(
-        (item) => item.procurementType,
-      ),
-    ).toEqual([
-      ProcurementType.CONSTRUCTION,
-      ProcurementType.SERVICE,
-      ProcurementType.GOODS,
-      ProcurementType.OTHER,
-    ]);
-    expect(notice?.licenseLimits).toEqual([]);
-    expect(notice?.licenseLimitsVerified).toBe(true);
   });
 
   it("maps the isolated KEPCO recorded contract and validates enabled configuration", async () => {
@@ -320,8 +126,7 @@ describe("official tender adapters", () => {
       apiKey: "test-key",
     });
 
-    const { notices } = await adapter.fetchNotices(window);
-    const [notice] = notices;
+    const [notice] = await adapter.fetchNotices(window);
 
     expect(notice).toEqual(
       expect.objectContaining({
@@ -339,7 +144,6 @@ describe("official tender adapters", () => {
         rawData: kepcoFixture.items[0],
       }),
     );
-    expect(notice?.licenseLimitsVerified).toBe(true);
 
     expect(
       () =>
@@ -364,9 +168,7 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    await expect(adapter.fetchNotices(window)).resolves.toEqual(
-      expect.objectContaining({ notices: [] }),
-    );
+    await expect(adapter.fetchNotices(window)).resolves.toEqual([]);
   });
 });
 
@@ -398,9 +200,8 @@ describe("PublicApiClient", () => {
       "getBidPblancListInfoCnstwk",
       "getBidPblancListInfoThng",
       "getBidPblancListInfoServc",
-      "getBidPblancListInfoLicenseLimit",
     ];
-    expect(fetcher).toHaveBeenCalledTimes(8);
+    expect(fetcher).toHaveBeenCalledTimes(6);
     for (const operation of operations) {
       for (const pageNo of ["1", "2"]) {
         const request = fetcher.mock.calls
@@ -469,46 +270,6 @@ describe("PublicApiClient", () => {
     expect(fetcher.mock.calls[1][0]).toContain("pageNo=2");
   });
 
-  it("paces concurrent page requests through one shared client", async () => {
-    jest.useFakeTimers();
-    const fetcher = jest.fn(async () =>
-      new Response(
-        JSON.stringify({
-          response: {
-            header: { resultCode: "00" },
-            body: { totalCount: 0, items: [] },
-          },
-        }),
-        { status: 200 },
-      ),
-    );
-    const client = new PublicApiClient(fetcher, {
-      minimumRequestIntervalMs: 400,
-    } as never);
-    const request = (operation: string) =>
-      client.getAllPages({
-        source: TenderSource.G2B,
-        baseUrl: "https://api.example.test/bids",
-        operation,
-        query: {},
-      });
-
-    const first = request("construction");
-    const second = request("goods");
-    const third = request("service");
-    await Promise.resolve();
-
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    await jest.advanceTimersByTimeAsync(399);
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    await jest.advanceTimersByTimeAsync(1);
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    await jest.advanceTimersByTimeAsync(400);
-    await Promise.all([first, second, third]);
-    expect(fetcher).toHaveBeenCalledTimes(3);
-    jest.useRealTimers();
-  });
-
   it("redacts provider response details from failed result errors", async () => {
     const fetcher = jest.fn().mockResolvedValue(
       new Response(
@@ -534,22 +295,7 @@ describe("PublicApiClient", () => {
       source: TenderSource.G2B,
       code: "PROVIDER_RESULT_ERROR",
       status: 200,
-      operation: "notices",
-      providerResultCode: "30",
     });
-
-    try {
-      await client.getAllPages({
-        source: TenderSource.G2B,
-        baseUrl: "https://api.example.test/bids",
-        operation: "notices",
-        query: { serviceKey: "secret-key" },
-      });
-      fail("expected a provider result error");
-    } catch (error) {
-      expect(JSON.stringify(error)).not.toContain("secret-key");
-      expect(JSON.stringify(error)).not.toContain("resultMsg");
-    }
   });
 
   it("accepts a recorded LINK response with a top-level result code", async () => {

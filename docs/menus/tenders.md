@@ -8,15 +8,11 @@
 - 필터는 검색어, 출처, 지역, 공고 유형, 관련도만 제공하며 공고 목록과 월간 캘린더 집계에만 적용된다.
 - 지역은 입력 문자열을 포함하는 부분 검색이며 `%`, `_`, `!`는 일반 문자로 안전하게 처리한다.
 - 수신 설정은 최대 20개 이메일 주소와 공통 발송 시각만 입력받으며 캘린더 필터를 포함하지 않는다. 수신 주소가 있는 설정을 저장하면 메일 수신이 자동으로 시작되고, 중지는 별도의 `메일 수신 중지` 버튼으로만 수행해 주소·시각을 유지한다.
-- 공고 상세는 캘린더·목록과 동일하게 `GOODS_SUPPLY`·`MAS`만 조회하며 출처·기관·등록/마감 일시·분류 근거와 안전한 공식 원문 링크를 제공한다. 제외 판정 공고 ID를 직접 요청하면 찾을 수 없음으로 응답한다.
+- 공고 상세는 출처·기관·등록/마감 일시·분류 근거와 안전한 공식 원문 링크를 제공한다.
 - 목록과 상세의 등록·마감 일시는 `Asia/Seoul`로 일관되게 표시하고, 큰 추정 금액은 bigint 정밀도를 유지한다.
 - 백엔드는 나라장터·K-apt 공식 API 어댑터와 비활성화된 한전 어댑터, 판정 근거 저장, 등록일(KST) 기준 조회, NAVER WORKS Mail API(HTTPS/OAuth), 수신 주소별 영속 메일 재시도 계약을 구현했다.
+- 물품 납품·MAS만 노출하던 기회 유형 제한은 제거했다. 직접·잠재 LED 관련으로 판정된 물품·공사·용역 공고를 이전의 광범위 수집·캘린더·목록·메일 흐름으로 처리한다.
 - 나라장터는 공사·물품·용역 operation에 `type=json`과 KST `YYYYMMDDHHmm` 등록 범위를 사용하며, 응답의 실제 첨부파일명도 분류 입력에 포함한다.
-- 나라장터 공고 3개 operation은 면허제한 보강과 독립적으로 수집한다. 면허제한 호출만 실패하면 공사·용역을 포함한 수집 공고는 저장을 계속하고 해당 출처 결과를 `PARTIAL`·`LICENSE_LIMIT_UNAVAILABLE`로 반환한다. 이때 면허제한을 검증하지 못한 나라장터 물품은 보수적으로 제외하며, 즉시 수집 화면은 부분 수집 경고를 표시한다.
-- 나라장터의 모든 페이지 요청은 한 클라이언트에서 최소 400ms 간격으로 시작한다. 면허제한 operation은 공사·물품·용역 기본 operation이 모두 끝난 뒤 실행해 24시간 초기 수집처럼 페이지가 많은 경우에도 공공데이터포털에 병렬 burst를 만들지 않는다. 일반 응답의 `resultCode`와 게이트웨이 오류 응답 `OpenAPI_ServiceResponse.cmmMsgHeader.returnReasonCode`를 함께 판독하며, 공급자 결과 코드 `23`은 1.1초 뒤 한 번만 재시도한다. 권한·키·일일 한도 오류는 자동 재시도하지 않고, 실패 로그에는 API 키와 공급자 메시지를 제외한 내부 operation 이름과 숫자 결과 코드만 기록한다.
-- 관리용 캘린더·목록과 메일은 공통 기회 판정으로 `GOODS_SUPPLY`와 `MAS` 공고만 표시·전송한다. 수집 때 공사 업무구분·전기공사업 면허제한·MAS 표현을 판정 근거와 함께 저장하며, 이미 대기 중이던 메일과 재시도 항목도 현재 판정이 제외 상태이면 발송하지 않는다.
-- 목록·상세는 관련도 배지와 함께 `📦 물품 납품` 또는 `🧾 MAS` 기회 배지를 표시하고, 상세와 HTML·텍스트 메일에는 기회 판정 근거를 표시한다. 원본 API 응답(`rawData`)은 화면이나 메일에 노출하지 않는다.
-- K-apt의 공식 `codeClassifyType2`는 `02=공사`, `03=용역`, `04=물품`으로 매핑한다. 물품이면서 제목·계약방법·공식 원본 응답에 MAS 표현이 있는 공개 공고만 `MAS`로 표기·전송하며, 종합쇼핑몰 등록 품목·납품요구와 기존 MAS 계약업체만의 2단계 경쟁 요청은 일반 공개 공고로 취급하지 않는다.
 - 수신 주소를 제거하면 비활성화하고, 다시 추가하면 같은 ID와 발송 이력을 복원한다. 설정 모달은 열 때마다 새 세대로 최신값을 조회하고, 늦게 도착한 이전 요청은 상태를 덮어쓰지 못한다. 최신 조회 실패 상태에서는 저장할 수 없으며 모달 안의 `다시 시도`로 새 요청을 실행한다.
 - 수집은 `Asia/Seoul` 기준 매시 정각에 예약된다. 관리자는 필터 왼쪽의 `즉시 수집` 버튼으로 같은 수집 파이프라인을 실행할 수 있고, 완료 후 현재 월 캘린더와 선택 날짜 목록이 갱신된다. 정기·수동 수집이 겹치면 PostgreSQL advisory lock으로 중복 실행을 막고, 출처별 부분 실패를 화면에 안내한다. 메일은 매분 공용 설정을 다시 읽고 KST 날짜·설정 시각 고유 claim과 PostgreSQL advisory lock으로 같은 시각의 중복 실행을 막는다. 같은 날 공용 발송 시각을 변경하면 새 슬롯으로 다시 발송할 수 있다.
 - display-only `LED전광판`/`LED 전광판`/`LED디스플레이`/`LED 디스플레이`는 대소문자와 공백 수에 관계없이 일반 LED 근거를 제외한다. display phrase가 공고 어디든 있으면 다른 필드의 bare `LED`도 독립 근거로 보지 않으며, `가로등`·`조명`·`등기구`·`보안등` 같은 구체 조명 근거가 있어야 직접 관련으로 유지한다.
@@ -33,14 +29,12 @@
 
 ## 부족하거나 개선이 필요한 기능
 
-- 나라장터·K-apt는 공식 응답 fixture와 어댑터 계약 테스트를 통과했다. 배포 환경의 승인 키로 K-apt 기본 수집은 확인했지만, 나라장터 면허제한 operation을 포함한 수정 버전은 재배포 후 즉시 수집으로 운영 검증해야 한다.
-- 나라장터 물품의 전기공사업 면허제한 제외는 `getBidPblancListInfoLicenseLimit` 응답에 의존한다. 재배포 후 G2B가 `SUCCEEDED`인지 확인하고, 실패하면 Railway의 `TenderIngestionService` 경고에서 안전하게 기록된 operation과 `providerResultCode`로 권한·일일 한도·초당 한도를 구분해야 한다.
+- 나라장터·K-apt는 공식 응답 fixture와 어댑터 계약 테스트만 통과했다. 공공데이터포털에서 승인된 실운영 키로 실제 응답을 받은 검증은 아직 하지 않았다.
 - 한전은 LINK API의 승인 계정·실제 OpenAPI 매뉴얼이 없어 기록 계약 fixture만 사용한다. `KEPCO_TENDER_ENABLED=false`가 기본이며, 실제 base URL·인증 파라미터·필드 매핑 검증 전에는 활성화하면 안 된다.
 - NAVER WORKS Mail API는 전송기 이중(mock)과 OAuth 암호화·갱신 및 영속 재시도 계약까지 검증했다. 스테이징에서 실제 Developer Console 앱의 `mail` scope, callback, 발신 계정 승인, `202` 성공, 주소 비중복, `429`/토큰 endpoint 일시 실패의 10분 후 1회 재시도를 확인해야 한다.
 - Mail API의 `429`처럼 수신이 명시적으로 거절된 일시 오류만 같은 슬롯에서 10분 뒤 한 번 재시도한다. `401`은 access token을 한 번 갱신하며, 그 밖의 `4xx`는 영구 실패다. Mail API는 idempotency key를 제공하지 않으므로 발송 요청의 network/timeout 오류와 `5xx`는 제공자가 이미 승인했을 가능성을 배제할 수 없어 해당 슬롯에서는 `DELIVERY_UNCERTAIN`으로 종결한다. 이후 관리자가 같은 날 발송 시각을 변경하거나 다음 날짜 슬롯이 열리면 이 공고는 다시 발송될 수 있으므로 드문 경우 중복 메일 가능성이 있다.
-- 재시도 delivery에 현재 제외 판정 공고가 섞여 있으면 provider 호출 전에 해당 mail item을 트랜잭션으로 분리한다. 분리에 실패하면 provider를 호출하지 않으며, 불확실 결과와 ACK 이후 저장 실패 복구는 실제 payload에 포함한 항목만 대상으로 한다. 제외 항목은 미발송 상태로 남아 이후 재분류 시 복구할 수 있다.
 - 빠른 HTTP·서비스 계약 테스트와 화면 테스트는 안전한 이중(mock)을 사용한다. 별도 `test:tender:integration` 실행기는 실제 AppModule, JWT, TypeORM, migration을 검증하도록 준비했지만, 현재 disposable PostgreSQL이 없어 실행하지 못했다. 이 파괴적 러너는 로컬/명시 Docker 테스트 DB만 허용하며 원격 스테이징 DB에는 실행할 수 없다. KST SQL 집계, 다중 연결 lock/unique claim, 권한 만료, 대량 데이터, 모바일 실기기 시각 검증은 배포 전 추가 확인이 필요하다.
-- 기존 행의 기회 판정 backfill은 이미 저장된 업무구분, K-apt `codeClassifyType2`, 제목·계약방법·원본 응답의 MAS 표현으로 수행한다. 과거 나라장터 물품은 전기공사업 면허제한 응답을 별도 정규화 열로 보존하지 않았으므로, 재수집에서 면허 제한을 검증할 때까지 보수적으로 제외한다.
+- 이미 운영 DB에 적용된 `opportunityType`·`opportunityReasons` 컬럼은 기존 데이터와 마이그레이션 이력을 보호하기 위해 삭제하지 않는다. 현재 애플리케이션은 이 레거시 컬럼을 조회·메일 대상 제한에 사용하지 않는다.
 
 ## 관련 파일
 
@@ -55,7 +49,6 @@
 - `dfkorea-backend/src/migrations/1787820300000-DropLegacyTenderSmtpMessageId.ts`
 - `dfkorea-backend/src/migrations/1787820400000-AllowMultipleDailyDispatchTimes.ts`
 - `dfkorea-backend/src/migrations/1788135000000-AddTenderOpportunityType.ts`
-- `dfkorea-backend/src/tenders/domain/tender-opportunity-eligibility.ts`
 - `dfkorea-backend/test/tenders.contract-spec.ts`
 - `dfkorea-backend/test/tender-app-integration.spec.ts`
 - `DEPLOYMENT.md`

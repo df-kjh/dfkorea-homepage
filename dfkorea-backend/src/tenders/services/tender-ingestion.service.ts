@@ -1,10 +1,9 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, QueryRunner, Repository } from "typeorm";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
-import { TenderOpportunityClassifier } from "../domain/tender-opportunity-classifier";
 import {
   TenderFetchWindow,
   TenderSourceAdapter,
@@ -20,10 +19,7 @@ const COLLECTION_OVERLAP_MS = 60 * 60 * 1000;
 
 export interface SourceCollectionSummary {
   source: TenderSource;
-  status:
-    | SyncRunStatus.SUCCEEDED
-    | SyncRunStatus.PARTIAL
-    | SyncRunStatus.FAILED;
+  status: SyncRunStatus.SUCCEEDED | SyncRunStatus.FAILED;
   fetchedCount: number;
   createdCount: number;
   updatedCount: number;
@@ -42,14 +38,11 @@ type TenderUpsert = Omit<Tender, "id" | "firstCollectedAt" | "lastUpdatedAt">;
 
 @Injectable()
 export class TenderIngestionService {
-  private readonly logger = new Logger(TenderIngestionService.name);
-
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectRepository(TenderSyncRun)
     private readonly syncRunRepository: Repository<TenderSyncRun>,
     private readonly classifier: TenderClassifier,
-    private readonly opportunityClassifier: TenderOpportunityClassifier,
     @Inject(TENDER_SOURCE_ADAPTERS)
     private readonly adapters: readonly TenderSourceAdapter[],
   ) {}
@@ -185,8 +178,7 @@ export class TenderIngestionService {
         errorCode: null,
         errorMessage: null,
       });
-      const fetchResult = await adapter.fetchNotices(window);
-      const { notices } = fetchResult;
+      const notices = await adapter.fetchNotices(window);
       const { relevant, excludedCount } = this.classifyNotices(notices);
       const { createdCount, updatedCount } = await this.upsertRelevantTenders(
         relevant,
@@ -194,26 +186,25 @@ export class TenderIngestionService {
       await this.syncRunRepository.save({
         ...run,
         finishedAt: new Date(),
-        status: fetchResult.status,
+        status: SyncRunStatus.SUCCEEDED,
         fetchedCount: notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: fetchResult.errorCode,
+        errorCode: null,
         errorMessage: null,
       });
       return {
         source: adapter.source,
-        status: fetchResult.status,
+        status: SyncRunStatus.SUCCEEDED,
         fetchedCount: notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: fetchResult.errorCode,
+        errorCode: null,
       };
     } catch (error) {
       const { errorCode, errorMessage } = this.sanitizeError(error);
-      this.logger.warn(this.formatSafeCollectionError(adapter.source, error));
       // A provider error is isolated from the other two official sources. The
       // nested guard keeps an unavailable database write from turning one
       // source's failed run into a failed whole-collection job.
@@ -320,15 +311,6 @@ export class TenderIngestionService {
     notice: NormalizedTender,
     classification: NonNullable<ReturnType<TenderClassifier["classify"]>>,
   ): TenderUpsert {
-    const opportunity = this.opportunityClassifier.classify({
-      procurementType: notice.procurementType,
-      title: notice.title,
-      description: notice.description,
-      attachmentNames: notice.attachmentNames,
-      contractMethod: notice.contractMethod,
-      licenseLimits: notice.licenseLimits,
-      licenseLimitsVerified: notice.licenseLimitsVerified,
-    });
     return {
       source: notice.source,
       sourceNoticeId: notice.sourceNoticeId,
@@ -348,8 +330,6 @@ export class TenderIngestionService {
       relevance: classification.relevance,
       relevanceScore: classification.score,
       relevanceReasons: classification.reasons,
-      opportunityType: opportunity.type,
-      opportunityReasons: opportunity.reasons,
       // Adapters keep only provider response fields in rawData; request URLs
       // and configuration never cross this boundary, preventing key storage.
       rawData: notice.rawData,
@@ -374,22 +354,5 @@ export class TenderIngestionService {
       errorCode: "COLLECTION_ERROR",
       errorMessage: "Tender source collection failed",
     };
-  }
-
-  private formatSafeCollectionError(
-    source: TenderSource,
-    error: unknown,
-  ): string {
-    if (error instanceof TenderSourceError) {
-      const operation = error.operation
-        ? `; operation=${error.operation}`
-        : "";
-      const providerResultCode = error.providerResultCode
-        ? `; providerResultCode=${error.providerResultCode}`
-        : "";
-      return `${source} collection failed: ${error.code}${operation}${providerResultCode}`;
-    }
-
-    return `${source} collection failed: COLLECTION_ERROR`;
   }
 }

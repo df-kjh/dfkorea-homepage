@@ -1,12 +1,4 @@
 {
-  "licenseLimitItems": [
-    {
-      "bidNtceNo": "R26BK00000002",
-      "bidNtceOrd": "001",
-      "lcnsLmtNm": "  조명기구 제조업  ",
-      "permsnIndstrytyList": "  0037  "
-    }
-  ],
   "response": {
     "header": { "resultCode": "00", "resultMsg": "NORMAL SERVICE." },
     "body": {

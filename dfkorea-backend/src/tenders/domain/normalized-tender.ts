@@ -1,10 +1,5 @@
 import { ProcurementType, TenderSource } from "./tender.enums";
 
-export interface TenderLicenseLimit {
-  name: string;
-  permittedIndustries: string;
-}
-
 /**
  * A provider-neutral notice shape. Source adapters preserve their response in
  * rawData while exposing only fields the ingestion and query layers need.
@@ -28,7 +23,5 @@ export interface NormalizedTender {
   itemName: string;
   description: string;
   attachmentNames: string[];
-  licenseLimits: TenderLicenseLimit[];
-  licenseLimitsVerified: boolean;
   rawData: Record<string, unknown>;
 }

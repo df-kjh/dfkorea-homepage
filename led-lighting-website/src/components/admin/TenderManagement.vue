@@ -113,12 +113,9 @@ const collectTenders = async () => {
       return
     }
 
-    const hasPartialSource = data.sources.some(({ status }) => status === 'PARTIAL')
     collectionFeedback.value = data.failedSources.length > 0
       ? { role: 'alert', message: '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.' }
-      : hasPartialSource
-        ? { role: 'alert', message: '나라장터 면허제한 정보를 확인하지 못해 검증되지 않은 물품 공고는 제외했습니다.' }
-        : { role: 'status', message: '공고 수집이 완료되었습니다.' }
+      : { role: 'status', message: '공고 수집이 완료되었습니다.' }
     await Promise.all([fetchCalendar(), fetchList(currentListPage.value)])
   } catch {
     collectionFeedback.value = { role: 'alert', message: '공고 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.' }

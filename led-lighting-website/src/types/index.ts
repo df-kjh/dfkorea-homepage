@@ -221,7 +221,6 @@ export type {
   TenderSubscription,
   TenderMailOAuthAuthorization,
   TenderMailOAuthStatus,
-  TenderOpportunityType,
   UpdateTenderSubscription,
 } from './tender'
 
