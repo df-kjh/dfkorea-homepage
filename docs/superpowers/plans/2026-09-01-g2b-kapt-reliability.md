@@ -564,7 +564,7 @@ git commit -m "fix: repair K-apt official tender links"
 - Consumes: completed Task 1–4 commits.
 - Produces: verified `main`, successful Railway/Vercel deployments, and a production-health report without secret output.
 
-- [ ] **Step 1: Run full backend CI**
+- [x] **Step 1: Run full backend CI**
 
 ```bash
 cd dfkorea-backend
@@ -573,7 +573,7 @@ npm run test:ci
 
 Expected: lint check, all Jest suites, tender contracts, TypeScript, Nest build, compiled production-process probes, and compiled TypeORM discovery all exit 0. Confirm the new migration appears in compiled discovery.
 
-- [ ] **Step 2: Run full frontend tests and production build**
+- [x] **Step 2: Run full frontend tests and production build**
 
 ```bash
 cd led-lighting-website
@@ -583,11 +583,11 @@ VITE_API_BASE_URL=https://dfkorea-production.up.railway.app npm run build
 
 Expected: all Vitest suites PASS and Nuxt production build exits 0. Existing chunk-size warnings are non-blocking; any test, type, or build error is blocking.
 
-- [ ] **Step 3: Perform the required code review gates**
+- [x] **Step 3: Perform the required code review gates**
 
 Use `superpowers:requesting-code-review`. Review exact spec coverage, error redaction, retry bounds, timer cleanup, partial watermark behavior, and migration row-safety. Resolve every blocking finding and rerun the affected focused test before continuing.
 
-- [ ] **Step 4: Run final repository checks and push main**
+- [x] **Step 4: Run final repository checks and push main**
 
 ```bash
 git diff --check
@@ -598,7 +598,7 @@ git push origin main
 
 Expected before push: no unstaged or uncommitted files and `main` contains the Task 1–4 commits after the approved design/plan commits.
 
-- [ ] **Step 5: Confirm deployments and health**
+- [x] **Step 5: Confirm deployments and health**
 
 Poll commit statuses until Railway and Vercel both report `success`. Then run:
 
@@ -609,11 +609,11 @@ curl -sS -o /tmp/dfkorea-health -w '%{http_code}\n' \
 
 Expected: `200`. Inspect Railway deployment logs for migration success and application startup without printing environment variables.
 
-- [ ] **Step 6: Run production-safe provider and link smoke checks**
+- [x] **Step 6: Run production-safe provider and link smoke checks**
 
 Using Railway-provided environment variables without echoing them, call one recent G2B window through the actual adapter and report only status, counts, operation failures, and elapsed time. Use one real K-apt `bidNum` to confirm the old route returns 404 and the canonical route returns 200. Do not call the authenticated collect endpoint without an admin session and do not print API keys or full provider response bodies.
 
-- [ ] **Step 7: Hand off the authenticated final check**
+- [x] **Step 7: Hand off the authenticated final check**
 
 Ask the user to refresh the admin page, press `즉시 수집`, and verify:
 
