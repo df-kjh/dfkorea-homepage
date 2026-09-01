@@ -713,6 +713,37 @@ describe("PublicApiClient", () => {
     }
   });
 
+  it("keeps the gate held through synchronous fetcher invocation work", async () => {
+    jest.useFakeTimers({ now: 0 });
+    const starts: number[] = [];
+    let invocation = 0;
+    const fetcher = jest.fn(() => {
+      if (invocation === 0) {
+        jest.setSystemTime(Date.now() + 1_250);
+      }
+      invocation += 1;
+      starts.push(Date.now());
+      return Promise.resolve(providerResponse("00", [], 0));
+    });
+    const client = new PublicApiClient(fetcher, {
+      minimumRequestIntervalMs: 1_100,
+    });
+    const requests = Promise.all([
+      client.getAllPages(requestFor("construction")),
+      client.getAllPages(requestFor("goods")),
+    ]);
+
+    await jest.runAllTimersAsync();
+    await requests;
+
+    try {
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1_100);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("releases pacing without marking a start when query serialization fails", async () => {
     jest.useFakeTimers({ now: 0 });
     const starts: number[] = [];
@@ -743,13 +774,59 @@ describe("PublicApiClient", () => {
 
     try {
       await expect(failedRequest).resolves.toMatchObject({
-        code: "NETWORK_ERROR",
+        code: "CONFIGURATION_ERROR",
         operation: "construction",
         pageNo: 1,
       });
       expect((await failedRequest).message).not.toContain("secret-key");
       await expect(nextRequest).resolves.toEqual([]);
       expect(starts).toEqual([0]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("treats query serialization failures as non-retryable configuration errors", async () => {
+    jest.useFakeTimers();
+    let serializationAttempts = 0;
+    const fetcher = jest.fn();
+    const onRetry = jest.fn();
+    const invalidServiceKey = {
+      toString: () => {
+        serializationAttempts += 1;
+        throw new Error("query serialization serviceKey=secret-key");
+      },
+    } as unknown as string;
+    const client = new PublicApiClient(fetcher, {
+      retryDelaysMs: [1_000, 3_000],
+      onRetry,
+    });
+    const outcome: Promise<TenderSourceError> = client
+      .getAllPages({
+        ...requestFor("construction"),
+        query: { serviceKey: invalidServiceKey },
+      })
+      .then(
+        () => fail("expected query serialization to fail"),
+        (error: TenderSourceError) => error,
+      );
+
+    await jest.runAllTimersAsync();
+    const error = await outcome;
+
+    try {
+      expect(error).toMatchObject({
+        code: "CONFIGURATION_ERROR",
+        operation: "construction",
+        pageNo: 1,
+        attempts: 1,
+      });
+      expect(error.message).not.toContain("secret-key");
+      expect(JSON.stringify(error)).not.toContain("secret-key");
+      expect(serializationAttempts).toBe(1);
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(onRetry).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
     } finally {
       jest.useRealTimers();
     }

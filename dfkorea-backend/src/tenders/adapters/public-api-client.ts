@@ -349,11 +349,19 @@ export class PublicApiClient implements TenderApiClient {
     requestStartPermit: RequestStartPermit | null,
     signal: AbortSignal,
   ): Promise<unknown> {
-    // Gate release queues the next waiter as a microtask. The fetcher call
-    // below executes first in this same stack, so the recorded timestamp is
-    // immediately adjacent to the actual provider request start.
-    requestStartPermit?.markStarted();
-    const response = await this.fetcher(url, { signal });
+    let responsePromise: Promise<Response>;
+    try {
+      // Invoke first so synchronous work at the fetch boundary cannot make the
+      // recorded start stale. Gate release only queues the next waiter, while
+      // this stack records the completed invocation boundary immediately.
+      responsePromise = this.fetcher(url, { signal });
+      requestStartPermit?.markStarted();
+    } catch (error) {
+      requestStartPermit?.releaseWithoutStart();
+      throw error;
+    }
+
+    const response = await responsePromise;
     if (!response.ok) {
       throw new TenderSourceError(
         request.source,
@@ -387,25 +395,31 @@ export class PublicApiClient implements TenderApiClient {
   }
 
   private createUrl(request: PublicApiRequest, pageNo: number): string {
-    let url: URL;
     try {
-      url = new URL(
+      const url = new URL(
         request.operation,
         request.baseUrl.endsWith("/") ? request.baseUrl : `${request.baseUrl}/`,
       );
-    } catch {
-      throw new TenderSourceError(request.source, "CONFIGURATION_ERROR", null);
-    }
 
-    for (const [key, value] of Object.entries(request.query)) {
-      if (value !== undefined) {
-        url.searchParams.set(key, String(value));
+      for (const [key, value] of Object.entries(request.query)) {
+        if (value !== undefined) {
+          url.searchParams.set(key, String(value));
+        }
       }
-    }
-    url.searchParams.set("pageNo", String(pageNo));
-    url.searchParams.set("numOfRows", String(PAGE_SIZE));
+      url.searchParams.set("pageNo", String(pageNo));
+      url.searchParams.set("numOfRows", String(PAGE_SIZE));
 
-    return url.toString();
+      return url.toString();
+    } catch {
+      throw new TenderSourceError(
+        request.source,
+        "CONFIGURATION_ERROR",
+        null,
+        undefined,
+        request.operation,
+        pageNo,
+      );
+    }
   }
 
   private readPage<T extends Record<string, unknown>>(
