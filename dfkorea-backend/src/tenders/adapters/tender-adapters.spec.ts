@@ -93,6 +93,86 @@ describe("official tender adapters", () => {
     ).toEqual([{ name: "조명기구 제조업", permittedIndustries: "0037" }]);
   });
 
+  it("starts license enrichment only after every base notice operation settles", async () => {
+    const client = createClient();
+    const baseResolvers = new Map<
+      string,
+      (rows: Record<string, unknown>[]) => void
+    >();
+    client.getAllPages.mockImplementation(
+      ({ operation }) =>
+        new Promise<Record<string, unknown>[]>((resolve) => {
+          if (operation === "getBidPblancListInfoLicenseLimit") {
+            resolve([]);
+            return;
+          }
+          baseResolvers.set(operation, resolve);
+        }),
+    );
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const pending = adapter.fetchNotices(window);
+    await Promise.resolve();
+
+    expect(baseResolvers.size).toBe(3);
+    expect(client.getAllPages).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: "getBidPblancListInfoLicenseLimit",
+      }),
+    );
+
+    for (const resolve of baseResolvers.values()) {
+      resolve([]);
+    }
+    await pending;
+
+    expect(client.getAllPages).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        operation: "getBidPblancListInfoLicenseLimit",
+      }),
+    );
+  });
+
+  it("retries a G2B operation once after provider per-second limit code 23", async () => {
+    const attemptsByOperation = new Map<string, number>();
+    const fetcher = jest.fn(async (urlText: string) => {
+      const operation = new URL(urlText).pathname.split("/").at(-1)!;
+      const attempt = (attemptsByOperation.get(operation) ?? 0) + 1;
+      attemptsByOperation.set(operation, attempt);
+      const resultCode =
+        operation === "getBidPblancListInfoThng" && attempt === 1
+          ? "23"
+          : "00";
+      return new Response(
+        JSON.stringify({
+          response: {
+            header: {
+              resultCode,
+              resultMsg:
+                resultCode === "23"
+                  ? "serviceKey=secret-key rate limited"
+                  : "NORMAL SERVICE",
+            },
+            body: { totalCount: 0, items: [] },
+          },
+        }),
+        { status: 200 },
+      );
+    });
+    const adapter = new G2bTenderAdapter(new PublicApiClient(fetcher), {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "secret-key",
+    });
+
+    await expect(adapter.fetchNotices(window)).resolves.toEqual(
+      expect.objectContaining({ status: "SUCCEEDED" }),
+    );
+    expect(attemptsByOperation.get("getBidPblancListInfoThng")).toBe(2);
+  });
+
   it("returns partial G2B notices without secrets when only license enrichment fails", async () => {
     const client = createClient();
     const noticeOperations: Record<string, Record<string, unknown>> = {
@@ -405,7 +485,22 @@ describe("PublicApiClient", () => {
       source: TenderSource.G2B,
       code: "PROVIDER_RESULT_ERROR",
       status: 200,
+      operation: "notices",
+      providerResultCode: "30",
     });
+
+    try {
+      await client.getAllPages({
+        source: TenderSource.G2B,
+        baseUrl: "https://api.example.test/bids",
+        operation: "notices",
+        query: { serviceKey: "secret-key" },
+      });
+      fail("expected a provider result error");
+    } catch (error) {
+      expect(JSON.stringify(error)).not.toContain("secret-key");
+      expect(JSON.stringify(error)).not.toContain("resultMsg");
+    }
   });
 
   it("accepts a recorded LINK response with a top-level result code", async () => {

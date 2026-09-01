@@ -31,6 +31,8 @@ export class TenderSourceError extends Error {
     readonly code: TenderSourceErrorCode,
     readonly status: number | null = null,
     cause?: unknown,
+    readonly operation: string | null = null,
+    readonly providerResultCode: string | null = null,
   ) {
     super(`${source} tender source error: ${code}`);
     this.name = "TenderSourceError";
@@ -85,7 +87,7 @@ export class PublicApiClient implements TenderApiClient {
 
     for (let pageNo = 1; pageNo <= MAX_PAGES; pageNo += 1) {
       const body = await this.fetchPage(request, pageNo);
-      const page = this.readPage<T>(body, request.source);
+      const page = this.readPage<T>(body, request.source, request.operation);
       totalCount ??= page.totalCount;
       rows.push(...page.items);
 
@@ -217,6 +219,7 @@ export class PublicApiClient implements TenderApiClient {
   private readPage<T extends Record<string, unknown>>(
     response: unknown,
     source: TenderSource,
+    operation: string,
   ): { items: T[]; totalCount: number } {
     const root = this.asRecord(response, source);
     const envelope = this.asRecord(root.response ?? root, source);
@@ -226,7 +229,14 @@ export class PublicApiClient implements TenderApiClient {
     );
 
     if (!resultCode || !SUCCESS_CODES.has(resultCode.toUpperCase())) {
-      throw new TenderSourceError(source, "PROVIDER_RESULT_ERROR", 200);
+      throw new TenderSourceError(
+        source,
+        "PROVIDER_RESULT_ERROR",
+        200,
+        undefined,
+        operation,
+        resultCode,
+      );
     }
 
     const body = this.asRecord(envelope.body ?? root.body ?? envelope, source);

@@ -17,6 +17,7 @@ import {
   formatKstDateTimeMinute,
   parseKstDate,
   TenderApiClient,
+  TenderSourceError,
   toNullableText,
 } from "./public-api-client";
 
@@ -31,6 +32,8 @@ const G2B_OPERATIONS: ReadonlyArray<[string, ProcurementType]> = [
   ["getBidPblancListInfoServc", ProcurementType.SERVICE],
 ];
 const LICENSE_LIMIT_OPERATION = "getBidPblancListInfoLicenseLimit";
+const PER_SECOND_LIMIT_RESULT_CODE = "23";
+const PER_SECOND_LIMIT_RETRY_DELAY_MS = 1_100;
 
 export class G2bTenderAdapter implements TenderSourceAdapter {
   readonly source = TenderSource.G2B;
@@ -50,40 +53,33 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
       inqryBgnDt: formatKstDateTimeMinute(window.from),
       inqryEndDt: formatKstDateTimeMinute(window.to),
     };
-    const [collections, licenseLimitResult] = await Promise.all([
-      Promise.all(
-        G2B_OPERATIONS.map(async ([operation, procurementType]) => {
-          const rows = await this.client.getAllPages({
-            source: this.source,
-            baseUrl: this.config.baseUrl,
-            operation,
-            query,
-          });
+    // The three base operations were already stable in production. Waiting
+    // for them before license enrichment prevents the new fourth request from
+    // crossing the provider's per-second gateway limit as one parallel burst.
+    const collections = await Promise.all(
+      G2B_OPERATIONS.map(async ([operation, procurementType]) => {
+        const rows = await this.fetchOperation(operation, query);
 
-          return rows.flatMap((row) => {
-            const normalized = this.normalize(row, procurementType);
-            return normalized ? [normalized] : [];
-          });
-        }),
-      ),
-      this.client
-        .getAllPages({
-          source: this.source,
-          baseUrl: this.config.baseUrl,
-          operation: LICENSE_LIMIT_OPERATION,
-          query,
-        })
-        .then((rows) => ({
-          rows,
-          status: SyncRunStatus.SUCCEEDED as const,
-          errorCode: null,
-        }))
-        .catch(() => ({
-          rows: [] as Record<string, unknown>[],
-          status: SyncRunStatus.PARTIAL as const,
-          errorCode: LICENSE_LIMIT_UNAVAILABLE_ERROR_CODE,
-        })),
-    ]);
+        return rows.flatMap((row) => {
+          const normalized = this.normalize(row, procurementType);
+          return normalized ? [normalized] : [];
+        });
+      }),
+    );
+    const licenseLimitResult = await this.fetchOperation(
+      LICENSE_LIMIT_OPERATION,
+      query,
+    )
+      .then((rows) => ({
+        rows,
+        status: SyncRunStatus.SUCCEEDED as const,
+        errorCode: null,
+      }))
+      .catch(() => ({
+        rows: [] as Record<string, unknown>[],
+        status: SyncRunStatus.PARTIAL as const,
+        errorCode: LICENSE_LIMIT_UNAVAILABLE_ERROR_CODE,
+      }));
     const licenseLimitsByNotice = this.groupLicenseLimits(
       licenseLimitResult.rows,
     );
@@ -102,6 +98,34 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
       status: licenseLimitResult.status,
       errorCode: licenseLimitResult.errorCode,
     };
+  }
+
+  private async fetchOperation(
+    operation: string,
+    query: Record<string, string>,
+  ): Promise<Record<string, unknown>[]> {
+    const request = {
+      source: this.source,
+      baseUrl: this.config.baseUrl,
+      operation,
+      query,
+    };
+
+    try {
+      return await this.client.getAllPages(request);
+    } catch (error) {
+      if (
+        !(error instanceof TenderSourceError) ||
+        error.providerResultCode !== PER_SECOND_LIMIT_RESULT_CODE
+      ) {
+        throw error;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, PER_SECOND_LIMIT_RETRY_DELAY_MS),
+      );
+      return this.client.getAllPages(request);
+    }
   }
 
   private groupLicenseLimits(

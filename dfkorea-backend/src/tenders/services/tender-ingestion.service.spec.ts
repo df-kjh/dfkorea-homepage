@@ -14,6 +14,7 @@ import {
 import { TenderSourceError } from "../adapters/public-api-client";
 import { TenderIngestionService } from "./tender-ingestion.service";
 import { TenderOpportunityClassifier } from "../domain/tender-opportunity-classifier";
+import { Logger } from "@nestjs/common";
 
 const NOW = new Date("2026-08-27T03:00:00.000Z");
 
@@ -264,6 +265,33 @@ describe("TenderIngestionService", () => {
         status: SyncRunStatus.SUCCEEDED,
       }),
     );
+  });
+
+  it("logs only safe provider diagnostics for a failed G2B operation", async () => {
+    const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+    g2b.fetchNotices.mockRejectedValue(
+      Object.assign(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "PROVIDER_RESULT_ERROR",
+          200,
+        ),
+        {
+          operation: "getBidPblancListInfoThng",
+          providerResultCode: "30",
+        },
+      ),
+    );
+    kapt.fetchNotices.mockResolvedValue(successfulFetch());
+    kepco.fetchNotices.mockResolvedValue(successfulFetch());
+
+    await service.collectAll(NOW);
+
+    expect(warn).toHaveBeenCalledWith(
+      "G2B collection failed: PROVIDER_RESULT_ERROR; operation=getBidPblancListInfoThng; providerResultCode=30",
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("serviceKey");
+    warn.mockRestore();
   });
 
   it("persists notices and reports PARTIAL when only G2B license enrichment is unavailable", async () => {

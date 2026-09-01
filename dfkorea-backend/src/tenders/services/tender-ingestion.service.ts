@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, QueryRunner, Repository } from "typeorm";
 import { TenderSourceError } from "../adapters/public-api-client";
@@ -42,6 +42,8 @@ type TenderUpsert = Omit<Tender, "id" | "firstCollectedAt" | "lastUpdatedAt">;
 
 @Injectable()
 export class TenderIngestionService {
+  private readonly logger = new Logger(TenderIngestionService.name);
+
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectRepository(TenderSyncRun)
@@ -211,6 +213,7 @@ export class TenderIngestionService {
       };
     } catch (error) {
       const { errorCode, errorMessage } = this.sanitizeError(error);
+      this.logger.warn(this.formatSafeCollectionError(adapter.source, error));
       // A provider error is isolated from the other two official sources. The
       // nested guard keeps an unavailable database write from turning one
       // source's failed run into a failed whole-collection job.
@@ -371,5 +374,22 @@ export class TenderIngestionService {
       errorCode: "COLLECTION_ERROR",
       errorMessage: "Tender source collection failed",
     };
+  }
+
+  private formatSafeCollectionError(
+    source: TenderSource,
+    error: unknown,
+  ): string {
+    if (error instanceof TenderSourceError) {
+      const operation = error.operation
+        ? `; operation=${error.operation}`
+        : "";
+      const providerResultCode = error.providerResultCode
+        ? `; providerResultCode=${error.providerResultCode}`
+        : "";
+      return `${source} collection failed: ${error.code}${operation}${providerResultCode}`;
+    }
+
+    return `${source} collection failed: COLLECTION_ERROR`;
   }
 }
