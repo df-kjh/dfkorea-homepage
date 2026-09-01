@@ -85,6 +85,45 @@ describe("createG2bRelayFetcher", () => {
   });
 
   it.each([
+    ["an HTTP provider URL", providerUrl.replace("https://", "http://"), []],
+    ["an FTP provider URL", providerUrl.replace("https://", "ftp://"), []],
+    [
+      "a credentialed provider URL",
+      providerUrl.replace(
+        "https://",
+        "https://provider-user:provider-password@",
+      ),
+      ["provider-user", "provider-password"],
+    ],
+  ])(
+    "rejects %s before relay access without exposing its input",
+    async (_label, input, credentials) => {
+      const fetcher = jest.fn();
+      const relayFetcher = createG2bRelayFetcher(
+        { relayUrl, sharedSecret, now: () => timestamp },
+        fetcher as typeof fetch,
+      );
+
+      const pending = relayFetcher(input);
+
+      await expect(pending).rejects.toMatchObject({
+        source: TenderSource.G2B,
+        code: "CONFIGURATION_ERROR",
+      });
+      const error = await pending.catch((reason) => reason);
+      const serialized = JSON.stringify(error);
+      const enumerableValues = Object.values(error).join(" ");
+      expect(serialized).not.toContain(input);
+      expect(enumerableValues).not.toContain(input);
+      for (const credential of credentials) {
+        expect(serialized).not.toContain(credential);
+        expect(enumerableValues).not.toContain(credential);
+      }
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
     ["an invalid relay URL", "not a relay URL", sharedSecret],
     ["a short shared secret", relayUrl, "too-short"],
   ])(

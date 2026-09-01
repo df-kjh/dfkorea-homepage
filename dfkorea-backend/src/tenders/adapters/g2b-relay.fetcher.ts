@@ -26,15 +26,7 @@ const QUERY_FIELDS = [
 const configurationError = () =>
   new TenderSourceError(TenderSource.G2B, "CONFIGURATION_ERROR");
 
-const readProviderUrl = (input: string | URL | Request): URL => {
-  try {
-    return new URL(input instanceof Request ? input.url : input);
-  } catch {
-    throw configurationError();
-  }
-};
-
-const readRelayUrl = (value: string): URL => {
+const readSecureUrl = (value: string | URL): URL => {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password) {
@@ -48,6 +40,11 @@ const readRelayUrl = (value: string): URL => {
     throw configurationError();
   }
 };
+
+const readProviderUrl = (input: string | URL | Request): URL =>
+  readSecureUrl(input instanceof Request ? input.url : input);
+
+const readRelayUrl = (value: string): URL => readSecureUrl(value);
 
 const readOperation = (url: URL): string => {
   const operation = url.pathname.split("/").filter(Boolean).at(-1);
