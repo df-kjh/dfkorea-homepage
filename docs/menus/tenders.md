@@ -14,6 +14,7 @@
 - 물품 납품·MAS만 노출하던 기회 유형 제한은 제거했다. 직접·잠재 LED 관련으로 판정된 물품·공사·용역 공고를 이전의 광범위 수집·캘린더·목록·메일 흐름으로 처리한다.
 - 나라장터는 공사·물품·용역 operation에 `type=json`과 KST `YYYYMMDDHHmm` 등록 범위를 사용하며, 응답의 실제 첨부파일명도 분류 입력에 포함한다.
 - 나라장터는 Railway 직접 수집을 우선한다. HTTP 200이지만 결과 코드가 없는 안전하지 않은 응답만 작업 단위로 Vercel 보안 릴레이를 통해 재시도하므로, 정상 직접 수집 건을 중복 요청하지 않는다.
+- 나라장터 등록일 조회 시각은 KST 12자리 형식으로 만들며, Railway Node 20 Alpine ICU가 자정을 `24:00`으로 반환하는 경우 G2B가 허용하는 `00:00`으로 정규화한다.
 - Vercel 릴레이는 나라장터 공사·물품·용역의 세 작업과 고정된 한 페이지 쿼리만 허용한다. Railway 직접 수집은 Railway 서버 전용 `PUBLIC_DATA_SERVICE_KEY`를 사용하고, 릴레이 요청에는 `serviceKey`를 넣지 않는다. Vercel은 Railway 키의 같은 값을 Vercel 서버 전용 `G2B_DATA_SERVICE_KEY`로 복사해 릴레이 upstream 호출에만 붙인다.
 - Vercel 릴레이의 upstream은 `https://apis.data.go.kr/1230000/ad/BidPublicInfoService` 공식 경계만 허용하고 자동 리다이렉트를 거부한다. 공공데이터포털이 반환한 4xx·5xx 상태는 본문을 읽거나 노출하지 않은 채 그대로 백엔드에 전달하므로, 영구 4xx는 한 번만 시도하고 기존 일시 오류 상태만 제한적으로 재시도한다. 프로덕션 빌드는 `/api/internal/g2b-relay`가 Nitro 서버 산출물에 실제 등록됐는지 검사하며 누락되면 배포 빌드를 실패시킨다.
 - K-apt 신규 공고의 공식 원문은 현재 상세 경로인 `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=...`로 저장한다. 기존 `/web/bid/bidDetail.do` 링크는 데이터 마이그레이션으로 K-apt 행의 `sourceUrl`만 비파괴적으로 보정하며 공고·수집·메일 이력은 유지한다.

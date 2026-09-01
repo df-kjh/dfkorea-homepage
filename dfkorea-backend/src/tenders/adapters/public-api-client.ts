@@ -854,7 +854,12 @@ export const formatKstDateTimeMinute = (date: Date): string => {
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value;
 
-  return `${value("year")}${value("month")}${value("day")}${value("hour")}${value("minute")}`;
+  // Node 20 Alpine's ICU can represent local midnight as 24:00 while newer
+  // runtimes return 00:00 for the same civil date. G2B requires HH in 00-23,
+  // so normalize only this equivalent midnight representation.
+  const hour = value("hour") === "24" ? "00" : value("hour");
+
+  return `${value("year")}${value("month")}${value("day")}${hour}${value("minute")}`;
 };
 
 export const toNullableText = (value: unknown): string | null => {

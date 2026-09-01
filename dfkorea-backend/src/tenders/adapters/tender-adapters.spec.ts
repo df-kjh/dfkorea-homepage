@@ -5,6 +5,7 @@ import { G2bTenderAdapter } from "./g2b-tender.adapter";
 import { KaptTenderAdapter } from "./kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./kepco-tender.adapter";
 import {
+  formatKstDateTimeMinute,
   parseKstDate,
   PublicApiClient,
   PublicApiRequest,
@@ -73,6 +74,32 @@ const requestFor = (operation: string): PublicApiRequest => ({
   baseUrl: "https://api.example.test/bids",
   operation,
   query: { serviceKey: "secret-key" },
+});
+
+describe("KST provider date formatting", () => {
+  it("normalizes the Node 20 Alpine midnight hour from 24 to 00", () => {
+    const formatToParts = jest
+      .spyOn(Intl.DateTimeFormat.prototype, "formatToParts")
+      .mockReturnValue([
+        { type: "year", value: "2026" },
+        { type: "literal", value: "-" },
+        { type: "month", value: "09" },
+        { type: "literal", value: "-" },
+        { type: "day", value: "01" },
+        { type: "literal", value: ", " },
+        { type: "hour", value: "24" },
+        { type: "literal", value: ":" },
+        { type: "minute", value: "00" },
+      ]);
+
+    try {
+      expect(formatKstDateTimeMinute(new Date("2026-08-31T15:00:00.000Z"))).toBe(
+        "202609010000",
+      );
+    } finally {
+      formatToParts.mockRestore();
+    }
+  });
 });
 
 describe("official tender adapters", () => {
