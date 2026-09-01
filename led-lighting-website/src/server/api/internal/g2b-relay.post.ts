@@ -2,13 +2,12 @@ import {
   createError,
   defineEventHandler,
   getRequestHeader,
-  readRawBody,
   type H3Event,
 } from 'h3'
 
 import {
   buildG2bProviderUrl,
-  validateRelayPayload,
+  parseAndValidateRelayPayload,
   verifyRelaySignature,
 } from '../../utils/g2b-relay'
 
@@ -27,7 +26,7 @@ type RelayFetcher = (
 ) => Promise<Response>
 
 export interface G2bRelayHandlerDependencies {
-  readRawBody(event: H3Event): Promise<string | undefined>
+  readBody(event: H3Event, maximumBytes: number): Promise<Buffer>
   getHeader(event: H3Event, name: string): string | undefined
   getRuntimeConfig(event: H3Event): G2bRelayRuntimeConfig
   fetcher: RelayFetcher
@@ -40,8 +39,71 @@ const relayUnavailable = () =>
 const invalidRequest = () =>
   createError({ statusCode: 400, statusMessage: 'Invalid request' })
 
+const toBuffer = (chunk: unknown): Buffer => {
+  if (Buffer.isBuffer(chunk)) return chunk
+  if (typeof chunk === 'string') return Buffer.from(chunk)
+  if (chunk instanceof Uint8Array) {
+    return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+  }
+  if (chunk instanceof ArrayBuffer) return Buffer.from(chunk)
+  throw new Error('Invalid request body chunk')
+}
+
+const readWebBody = async (
+  stream: ReadableStream<Uint8Array>,
+  maximumBytes: number,
+): Promise<Buffer> => {
+  const reader = stream.getReader()
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) return Buffer.concat(chunks, totalBytes)
+
+      const chunk = toBuffer(value)
+      totalBytes += chunk.byteLength
+      if (totalBytes > maximumBytes) {
+        await reader.cancel().catch(() => undefined)
+        throw new Error('Request body too large')
+      }
+      chunks.push(chunk)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+export const readBoundedRequestBody = async (
+  event: H3Event,
+  maximumBytes: number,
+): Promise<Buffer> => {
+  const webStream = event.web?.request?.body
+  if (webStream) return readWebBody(webStream, maximumBytes)
+
+  const request = event.node?.req
+  if (!request || !(Symbol.asyncIterator in request)) {
+    throw new Error('Request body unavailable')
+  }
+
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+  for await (const value of request) {
+    const chunk = toBuffer(value)
+    totalBytes += chunk.byteLength
+    if (totalBytes > maximumBytes) {
+      request.destroy()
+      throw new Error('Request body too large')
+    }
+    chunks.push(chunk)
+  }
+
+  return Buffer.concat(chunks, totalBytes)
+}
+
 const defaultDependencies: G2bRelayHandlerDependencies = {
-  readRawBody: (event) => readRawBody(event),
+  readBody: readBoundedRequestBody,
   getHeader: getRequestHeader,
   getRuntimeConfig: (event) => {
     const config = useRuntimeConfig(event)
@@ -76,13 +138,13 @@ export const createG2bRelayHandler = (
       throw invalidRequest()
     }
 
-    let body: string | undefined
+    let body: Buffer
     try {
-      body = await dependencies.readRawBody(event)
+      body = await dependencies.readBody(event, MAX_BODY_BYTES)
     } catch {
       throw invalidRequest()
     }
-    if (!body || Buffer.byteLength(body, 'utf8') > MAX_BODY_BYTES) {
+    if (body.byteLength === 0 || body.byteLength > MAX_BODY_BYTES) {
       throw invalidRequest()
     }
 
@@ -100,9 +162,9 @@ export const createG2bRelayHandler = (
       throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
     }
 
-    let payload: ReturnType<typeof validateRelayPayload>
+    let payload: ReturnType<typeof parseAndValidateRelayPayload>
     try {
-      payload = validateRelayPayload(JSON.parse(body))
+      payload = parseAndValidateRelayPayload(body)
     } catch {
       throw invalidRequest()
     }

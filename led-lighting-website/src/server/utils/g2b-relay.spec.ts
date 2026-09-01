@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildG2bProviderUrl,
+  parseAndValidateRelayPayload,
   validateRelayPayload,
   verifyRelaySignature,
 } from './g2b-relay'
@@ -91,6 +92,25 @@ describe('validateRelayPayload', () => {
   })
 })
 
+describe('parseAndValidateRelayPayload', () => {
+  it('accepts a valid raw JSON payload', () => {
+    expect(parseAndValidateRelayPayload(Buffer.from(body))).toEqual(validPayload)
+  })
+
+  it.each([
+    [
+      'top-level key',
+      `{"operation":"getEverything","operation":"getBidPblancListInfoThng","query":${JSON.stringify(validPayload.query)}}`,
+    ],
+    [
+      'nested query key',
+      '{"operation":"getBidPblancListInfoThng","query":{"type":"xml","type":"json","inqryDiv":"1","inqryBgnDt":"202608311500","inqryEndDt":"202609010633","pageNo":"1","numOfRows":"100"}}',
+    ],
+  ])('rejects a duplicate %s even when its final value is valid', (_description, rawBody) => {
+    expect(() => parseAndValidateRelayPayload(Buffer.from(rawBody))).toThrow()
+  })
+})
+
 describe('verifyRelaySignature', () => {
   it('accepts a matching signature over the exact timestamp and body', () => {
     expect(
@@ -133,6 +153,25 @@ describe('verifyRelaySignature', () => {
         nowMs,
       }),
     ).toBe(false)
+  })
+
+  it('authenticates the exact raw bytes without UTF-8 replacement', () => {
+    const rawBody = Buffer.from([0xff, 0x00, 0x61])
+    const rawSignature = createHmac('sha256', secret)
+      .update(timestamp)
+      .update('.')
+      .update(rawBody)
+      .digest('hex')
+
+    expect(
+      verifyRelaySignature({
+        body: rawBody,
+        timestamp,
+        signature: rawSignature,
+        secret,
+        nowMs,
+      }),
+    ).toBe(true)
   })
 })
 

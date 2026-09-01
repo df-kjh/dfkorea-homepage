@@ -1,7 +1,10 @@
 import { createHmac } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createG2bRelayHandler } from './g2b-relay.post'
+import {
+  createG2bRelayHandler,
+  readBoundedRequestBody,
+} from './g2b-relay.post'
 
 const body = JSON.stringify({
   operation: 'getBidPblancListInfoThng',
@@ -31,7 +34,7 @@ const runtimeConfig = {
 const createDependencies = (
   overrides: Partial<Parameters<typeof createG2bRelayHandler>[0]> = {},
 ) => ({
-  readRawBody: vi.fn().mockResolvedValue(body),
+  readBody: vi.fn().mockResolvedValue(Buffer.from(body)),
   getHeader: vi.fn((_event, name: string) => {
     if (name === 'x-dfkorea-timestamp') return timestamp
     if (name === 'x-dfkorea-signature') return signature
@@ -61,7 +64,7 @@ describe('POST /api/internal/g2b-relay', () => {
   it('returns generic 400 for malformed JSON without calling upstream', async () => {
     const malformedBody = '{not-json'
     const dependencies = createDependencies({
-      readRawBody: vi.fn().mockResolvedValue(malformedBody),
+      readBody: vi.fn().mockResolvedValue(Buffer.from(malformedBody)),
       getHeader: vi.fn((_event, name: string) => {
         if (name === 'x-dfkorea-timestamp') return timestamp
         if (name === 'x-dfkorea-signature') {
@@ -84,7 +87,7 @@ describe('POST /api/internal/g2b-relay', () => {
   it('rejects a body larger than 4 KiB before calling upstream', async () => {
     const oversizedBody = 'x'.repeat(4097)
     const dependencies = createDependencies({
-      readRawBody: vi.fn().mockResolvedValue(oversizedBody),
+      readBody: vi.fn().mockResolvedValue(Buffer.from(oversizedBody)),
       getHeader: vi.fn((_event, name: string) => {
         if (name === 'x-dfkorea-timestamp') return timestamp
         if (name === 'x-dfkorea-signature') {
@@ -133,7 +136,7 @@ describe('POST /api/internal/g2b-relay', () => {
   it('returns generic 400 for an authenticated but invalid payload', async () => {
     const invalidBody = JSON.stringify({ ...JSON.parse(body), extra: true })
     const dependencies = createDependencies({
-      readRawBody: vi.fn().mockResolvedValue(invalidBody),
+      readBody: vi.fn().mockResolvedValue(Buffer.from(invalidBody)),
       getHeader: vi.fn((_event, name: string) => {
         if (name === 'x-dfkorea-timestamp') return timestamp
         if (name === 'x-dfkorea-signature') {
@@ -141,6 +144,38 @@ describe('POST /api/internal/g2b-relay', () => {
             .update(`${timestamp}.${invalidBody}`)
             .digest('hex')
         }
+        return undefined
+      }),
+    })
+    const handler = createG2bRelayHandler(dependencies)
+
+    await expect(handler({} as never)).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: 'Invalid request',
+    })
+    expect(dependencies.fetcher).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      'top-level operation',
+      `{"operation":"getEverything","operation":"getBidPblancListInfoThng","query":${JSON.stringify(JSON.parse(body).query)}}`,
+    ],
+    [
+      'nested query type',
+      '{"operation":"getBidPblancListInfoThng","query":{"type":"xml","type":"json","inqryDiv":"1","inqryBgnDt":"202608311500","inqryEndDt":"202609010633","pageNo":"1","numOfRows":"100"}}',
+    ],
+  ])('returns generic 400 for duplicate %s keys', async (_description, duplicateBody) => {
+    const duplicateSignature = createHmac('sha256', sharedSecret)
+      .update(timestamp)
+      .update('.')
+      .update(Buffer.from(duplicateBody))
+      .digest('hex')
+    const dependencies = createDependencies({
+      readBody: vi.fn().mockResolvedValue(Buffer.from(duplicateBody)),
+      getHeader: vi.fn((_event, name: string) => {
+        if (name === 'x-dfkorea-timestamp') return timestamp
+        if (name === 'x-dfkorea-signature') return duplicateSignature
         return undefined
       }),
     })
@@ -223,5 +258,40 @@ describe('POST /api/internal/g2b-relay', () => {
     expect(json).not.toHaveBeenCalled()
     expect(JSON.stringify(rejectedResponse)).not.toContain('vercel-key')
     expect(JSON.stringify(rejectedResponse)).not.toContain(providerBody)
+  })
+})
+
+describe('readBoundedRequestBody', () => {
+  it('cancels a multi-chunk stream at byte 4097 without pulling remaining chunks', async () => {
+    const chunks = [
+      new Uint8Array(2048),
+      new Uint8Array(2048),
+      new Uint8Array(1),
+      new TextEncoder().encode('must-not-be-read'),
+    ]
+    let pulls = 0
+    let cancelled = false
+    const bodyStream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          const chunk = chunks[pulls]
+          pulls += 1
+          if (chunk) controller.enqueue(chunk)
+          else controller.close()
+        },
+        cancel() {
+          cancelled = true
+        },
+      },
+      { highWaterMark: 0 },
+    )
+    const event = {
+      method: 'POST',
+      web: { request: { body: bodyStream } },
+    }
+
+    await expect(readBoundedRequestBody(event as never, 4096)).rejects.toThrow()
+    expect(cancelled).toBe(true)
+    expect(pulls).toBe(3)
   })
 })

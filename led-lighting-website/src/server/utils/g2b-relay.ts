@@ -34,6 +34,125 @@ const VALID_PAGE = /^(?:[1-9]|[1-9]\d|100)$/
 const LOWERCASE_SHA256_HEX = /^[0-9a-f]{64}$/
 const SIGNATURE_WINDOW_MS = 5 * 60 * 1000
 
+class JsonObjectKeyScanner {
+  private index = 0
+
+  constructor(private readonly source: string) {}
+
+  assertNoDuplicateKeys(): void {
+    this.skipWhitespace()
+    this.scanValue()
+    this.skipWhitespace()
+    if (this.index !== this.source.length) {
+      throw new Error('Invalid relay payload')
+    }
+  }
+
+  private scanValue(): void {
+    this.skipWhitespace()
+    const token = this.source[this.index]
+    if (token === '{') {
+      this.scanObject()
+      return
+    }
+    if (token === '[') {
+      this.scanArray()
+      return
+    }
+    if (token === '"') {
+      this.scanString()
+      return
+    }
+
+    const start = this.index
+    while (
+      this.index < this.source.length &&
+      !/[\s,}\]]/.test(this.source[this.index]!)
+    ) {
+      this.index += 1
+    }
+    if (this.index === start) {
+      throw new Error('Invalid relay payload')
+    }
+  }
+
+  private scanObject(): void {
+    this.index += 1
+    this.skipWhitespace()
+    const keys = new Set<string>()
+    if (this.consume('}')) return
+
+    while (true) {
+      this.skipWhitespace()
+      if (this.source[this.index] !== '"') {
+        throw new Error('Invalid relay payload')
+      }
+      const key = this.scanString()
+      if (keys.has(key)) {
+        throw new Error('Invalid relay payload')
+      }
+      keys.add(key)
+
+      this.skipWhitespace()
+      if (!this.consume(':')) {
+        throw new Error('Invalid relay payload')
+      }
+      this.scanValue()
+      this.skipWhitespace()
+      if (this.consume('}')) return
+      if (!this.consume(',')) {
+        throw new Error('Invalid relay payload')
+      }
+    }
+  }
+
+  private scanArray(): void {
+    this.index += 1
+    this.skipWhitespace()
+    if (this.consume(']')) return
+
+    while (true) {
+      this.scanValue()
+      this.skipWhitespace()
+      if (this.consume(']')) return
+      if (!this.consume(',')) {
+        throw new Error('Invalid relay payload')
+      }
+    }
+  }
+
+  private scanString(): string {
+    const start = this.index
+    this.index += 1
+
+    while (this.index < this.source.length) {
+      const token = this.source[this.index]
+      if (token === '\\') {
+        this.index += 2
+        continue
+      }
+      this.index += 1
+      if (token === '"') {
+        return JSON.parse(this.source.slice(start, this.index)) as string
+      }
+    }
+
+    throw new Error('Invalid relay payload')
+  }
+
+  private consume(token: string): boolean {
+    if (this.source[this.index] !== token) return false
+    this.index += 1
+    return true
+  }
+
+  private skipWhitespace(): void {
+    while (/\s/.test(this.source[this.index] || '')) {
+      this.index += 1
+    }
+  }
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -96,8 +215,16 @@ export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
   }
 }
 
+export const parseAndValidateRelayPayload = (
+  rawBody: Uint8Array,
+): G2bRelayRequest => {
+  const source = new TextDecoder('utf-8', { fatal: true }).decode(rawBody)
+  new JsonObjectKeyScanner(source).assertNoDuplicateKeys()
+  return validateRelayPayload(JSON.parse(source))
+}
+
 export interface VerifyRelaySignatureInput {
-  body: string
+  body: string | Uint8Array
   timestamp: string
   signature: string
   secret: string
@@ -128,7 +255,9 @@ export const verifyRelaySignature = ({
   }
 
   const expected = createHmac('sha256', secret)
-    .update(`${timestamp}.${body}`)
+    .update(timestamp)
+    .update('.')
+    .update(body)
     .digest()
   const actual = Buffer.from(signature, 'hex')
 
