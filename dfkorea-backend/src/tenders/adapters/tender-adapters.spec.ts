@@ -28,6 +28,19 @@ const createClient = (): jest.Mocked<TenderApiClient> => ({
   getAllPages: jest.fn(),
 });
 
+const eligibleG2bRelayError = (operation: string) =>
+  new TenderSourceError(
+    TenderSource.G2B,
+    "PROVIDER_RESULT_ERROR",
+    200,
+    undefined,
+    operation,
+    1,
+    null,
+    1,
+    "UNKNOWN_RESPONSE_SHAPE",
+  );
+
 const providerResponse = (
   resultCode: string,
   items: Record<string, unknown>[] = [],
@@ -386,6 +399,212 @@ describe("official tender adapters", () => {
         },
       ],
     });
+  });
+
+  it("recovers every eligible G2B operation through the relay", async () => {
+    const directClient = createClient();
+    const relayClient = createClient();
+    directClient.getAllPages.mockImplementation(({ operation }) =>
+      Promise.reject(eligibleG2bRelayError(operation)),
+    );
+    relayClient.getAllPages.mockImplementation(({ operation }) =>
+      Promise.resolve([
+        {
+          ...g2bFixture.response.body.items[0],
+          bidNtceNo: operation,
+        },
+      ]),
+    );
+    const adapter = new G2bTenderAdapter(
+      directClient,
+      {
+        baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+        serviceKey: "test-key",
+        relayEnabled: true,
+      },
+      relayClient,
+    );
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result.status).toBe(SyncRunStatus.SUCCEEDED);
+    expect(result.errorCode).toBeNull();
+    expect(result.failures).toEqual([]);
+    expect(result.notices.map((notice) => notice.procurementType)).toEqual([
+      ProcurementType.CONSTRUCTION,
+      ProcurementType.GOODS,
+      ProcurementType.SERVICE,
+    ]);
+    expect(
+      relayClient.getAllPages.mock.calls.map(([request]) => request.operation),
+    ).toEqual([
+      "getBidPblancListInfoCnstwk",
+      "getBidPblancListInfoThng",
+      "getBidPblancListInfoServc",
+    ]);
+  });
+
+  it("never repeats directly successful G2B operations through the relay", async () => {
+    const directClient = createClient();
+    const relayClient = createClient();
+    directClient.getAllPages.mockResolvedValue(
+      g2bFixture.response.body.items,
+    );
+    const adapter = new G2bTenderAdapter(
+      directClient,
+      {
+        baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+        serviceKey: "test-key",
+        relayEnabled: true,
+      },
+      relayClient,
+    );
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result.status).toBe(SyncRunStatus.SUCCEEDED);
+    expect(directClient.getAllPages).toHaveBeenCalledTimes(3);
+    expect(relayClient.getAllPages).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "an HTTP error",
+      new TenderSourceError(
+        TenderSource.G2B,
+        "HTTP_ERROR",
+        503,
+        undefined,
+        "getBidPblancListInfoCnstwk",
+        1,
+        null,
+        3,
+      ),
+      true,
+    ],
+    [
+      "a provider result code",
+      new TenderSourceError(
+        TenderSource.G2B,
+        "PROVIDER_RESULT_ERROR",
+        200,
+        undefined,
+        "getBidPblancListInfoCnstwk",
+        1,
+        "23",
+        3,
+      ),
+      true,
+    ],
+    [
+      "a non-200 provider response",
+      new TenderSourceError(
+        TenderSource.G2B,
+        "PROVIDER_RESULT_ERROR",
+        503,
+        undefined,
+        "getBidPblancListInfoCnstwk",
+        1,
+        null,
+        1,
+        "UNKNOWN_RESPONSE_SHAPE",
+      ),
+      true,
+    ],
+    [
+      "an eligible error while relay is disabled",
+      eligibleG2bRelayError("getBidPblancListInfoCnstwk"),
+      false,
+    ],
+  ])("does not relay %s", async (_label, directError, relayEnabled) => {
+    const directClient = createClient();
+    const relayClient = createClient();
+    directClient.getAllPages
+      .mockRejectedValueOnce(directError)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const adapter = new G2bTenderAdapter(
+      directClient,
+      {
+        baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+        serviceKey: "test-key",
+        relayEnabled,
+      },
+      relayClient,
+    );
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result.status).toBe(SyncRunStatus.PARTIAL);
+    expect(relayClient.getAllPages).not.toHaveBeenCalled();
+  });
+
+  it("keeps only the relay failure when another eligible operation is recovered", async () => {
+    const constructionRow = {
+      ...g2bFixture.response.body.items[0],
+      bidNtceNo: "CONSTRUCTION-RELAY",
+    };
+    const goodsRow = {
+      ...g2bFixture.response.body.items[0],
+      bidNtceNo: "GOODS-DIRECT",
+    };
+    const directClient = createClient();
+    directClient.getAllPages
+      .mockRejectedValueOnce(
+        eligibleG2bRelayError("getBidPblancListInfoCnstwk"),
+      )
+      .mockResolvedValueOnce([goodsRow])
+      .mockRejectedValueOnce(
+        eligibleG2bRelayError("getBidPblancListInfoServc"),
+      );
+    const relayClient = createClient();
+    relayClient.getAllPages
+      .mockResolvedValueOnce([constructionRow])
+      .mockRejectedValueOnce(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "HTTP_ERROR",
+          502,
+          undefined,
+          "getBidPblancListInfoServc",
+          1,
+          null,
+          3,
+        ),
+      );
+    const adapter = new G2bTenderAdapter(
+      directClient,
+      {
+        baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+        serviceKey: "test-key",
+        relayEnabled: true,
+      },
+      relayClient,
+    );
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result.status).toBe(SyncRunStatus.PARTIAL);
+    expect(result.notices.map((notice) => notice.sourceNoticeId)).toEqual([
+      "CONSTRUCTION-RELAY",
+      "GOODS-DIRECT",
+    ]);
+    expect(result.failures).toEqual([
+      {
+        operation: "getBidPblancListInfoServc",
+        errorCode: "HTTP_ERROR",
+        pageNo: 1,
+        providerResultCode: null,
+        httpStatus: 502,
+        attempts: 3,
+      },
+    ]);
+    expect(
+      relayClient.getAllPages.mock.calls.map(([request]) => request.operation),
+    ).toEqual([
+      "getBidPblancListInfoCnstwk",
+      "getBidPblancListInfoServc",
+    ]);
   });
 });
 

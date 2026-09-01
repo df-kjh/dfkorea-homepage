@@ -21,6 +21,7 @@ import {
 export interface G2bTenderAdapterConfig {
   baseUrl: string;
   serviceKey: string;
+  relayEnabled?: boolean;
 }
 
 const G2B_OPERATIONS: ReadonlyArray<[string, ProcurementType]> = [
@@ -35,6 +36,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
   constructor(
     private readonly client: TenderApiClient,
     private readonly config: G2bTenderAdapterConfig,
+    private readonly relayClient?: TenderApiClient,
   ) {}
 
   async fetchNotices(
@@ -45,30 +47,34 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
     let successfulOperationCount = 0;
 
     for (const [operation, procurementType] of G2B_OPERATIONS) {
+      let rows: Record<string, unknown>[];
       try {
-        const rows = await this.client.getAllPages({
-          source: this.source,
-          baseUrl: this.config.baseUrl,
-          operation,
-          query: {
-            serviceKey: this.config.serviceKey,
-            type: "json",
-            inqryDiv: "1",
-            inqryBgnDt: formatKstDateTimeMinute(window.from),
-            inqryEndDt: formatKstDateTimeMinute(window.to),
-          },
-        });
-
-        notices.push(
-          ...rows.flatMap((row) => {
-            const normalized = this.normalize(row, procurementType);
-            return normalized ? [normalized] : [];
-          }),
-        );
-        successfulOperationCount += 1;
+        rows = await this.fetchOperation(this.client, operation, window);
       } catch (error) {
-        failures.push(this.toOperationFailure(operation, error));
+        if (!this.shouldUseRelay(error)) {
+          failures.push(this.toOperationFailure(operation, error));
+          continue;
+        }
+
+        try {
+          rows = await this.fetchOperation(
+            this.relayClient!,
+            operation,
+            window,
+          );
+        } catch (relayError) {
+          failures.push(this.toOperationFailure(operation, relayError));
+          continue;
+        }
       }
+
+      notices.push(
+        ...rows.flatMap((row) => {
+          const normalized = this.normalize(row, procurementType);
+          return normalized ? [normalized] : [];
+        }),
+      );
+      successfulOperationCount += 1;
     }
 
     const status =
@@ -89,6 +95,36 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
             : null,
       failures,
     };
+  }
+
+  private fetchOperation(
+    client: TenderApiClient,
+    operation: string,
+    window: TenderFetchWindow,
+  ): Promise<Record<string, unknown>[]> {
+    return client.getAllPages({
+      source: this.source,
+      baseUrl: this.config.baseUrl,
+      operation,
+      query: {
+        serviceKey: this.config.serviceKey,
+        type: "json",
+        inqryDiv: "1",
+        inqryBgnDt: formatKstDateTimeMinute(window.from),
+        inqryEndDt: formatKstDateTimeMinute(window.to),
+      },
+    });
+  }
+
+  private shouldUseRelay(error: unknown): error is TenderSourceError {
+    return (
+      this.config.relayEnabled === true &&
+      this.relayClient !== undefined &&
+      error instanceof TenderSourceError &&
+      error.code === "PROVIDER_RESULT_ERROR" &&
+      error.status === 200 &&
+      error.providerResultCode === null
+    );
   }
 
   private toOperationFailure(
