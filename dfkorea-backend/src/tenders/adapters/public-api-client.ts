@@ -462,7 +462,7 @@ export class PublicApiClient implements TenderApiClient {
         hasErrorEnvelope,
       )
     ) {
-      const totalCount = this.readNumber(canonicalBody.totalCount);
+      const totalCount = this.readCanonicalTotalCount(canonicalBody.totalCount);
       // isCanonicalBodyWithoutCode verifies totalCount before this branch.
       return {
         items: this.readItems<T>(canonicalBody.items),
@@ -521,7 +521,7 @@ export class PublicApiClient implements TenderApiClient {
       return false;
     }
 
-    const totalCount = this.readNumber(body.totalCount);
+    const totalCount = this.readCanonicalTotalCount(body.totalCount);
     return totalCount !== null && totalCount >= 0;
   }
 
@@ -571,6 +571,18 @@ export class PublicApiClient implements TenderApiClient {
   }
 
   private readNumber(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private readCanonicalTotalCount(value: unknown): number | null {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value !== "string" || !value.trim()) {
+      return null;
+    }
+
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }

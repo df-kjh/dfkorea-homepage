@@ -410,6 +410,25 @@ describe("PublicApiClient", () => {
     ]);
   });
 
+  it("accepts a non-empty numeric total count string without a result header", async () => {
+    const client = new PublicApiClient(
+      jest.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            response: {
+              body: { items: [{ bidNtceNo: "1" }], totalCount: "1" },
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    await expect(client.getAllPages(requestFor("notices"))).resolves.toEqual([
+      { bidNtceNo: "1" },
+    ]);
+  });
+
   it("classifies a gateway error without serializing provider details", async () => {
     const gatewayError = {
       OpenAPI_ServiceResponse: {
@@ -476,6 +495,35 @@ describe("PublicApiClient", () => {
       responseShape: "UNKNOWN_RESPONSE_SHAPE",
     });
   });
+
+  it.each([
+    ["null", null],
+    ["false", false],
+    ["an empty string", ""],
+    ["a whitespace-only string", "  \t "],
+    ["an empty array", []],
+  ])(
+    "rejects a missing-code response with %s as totalCount",
+    async (_label, totalCount) => {
+      const client = new PublicApiClient(
+        jest.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              response: { body: { items: [{ bidNtceNo: "1" }], totalCount } },
+            }),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      await expect(
+        client.getAllPages(requestFor("notices")),
+      ).rejects.toMatchObject({
+        code: "PROVIDER_RESULT_ERROR",
+        responseShape: "UNKNOWN_RESPONSE_SHAPE",
+      });
+    },
+  );
 
   it("retries provider code 23 twice and retains safe page diagnostics", async () => {
     jest.useFakeTimers();
