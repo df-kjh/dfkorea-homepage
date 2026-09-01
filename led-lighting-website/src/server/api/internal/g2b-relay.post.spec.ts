@@ -229,6 +229,24 @@ describe('POST /api/internal/g2b-relay', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
+  it('uses the bounded body stream when an intermediary normalizes content-length', async () => {
+    const dependencies = createDependencies({
+      getHeader: vi.fn((_event, name: string) => {
+        if (name === 'content-length') return `${Buffer.byteLength(body)}, ${Buffer.byteLength(body)}`
+        if (name === 'x-dfkorea-timestamp') return timestamp
+        if (name === 'x-dfkorea-signature') return signature
+        return undefined
+      }),
+    })
+    const handler = createG2bRelayHandler(dependencies)
+
+    await expect(handler({} as never)).resolves.toMatchObject({
+      response: { header: { resultCode: '00' } },
+    })
+    expect(dependencies.readBody).toHaveBeenCalledWith(expect.anything(), 4 * 1024)
+    expect(dependencies.fetcher).toHaveBeenCalledTimes(1)
+  })
+
   it.each([
     'http://apis.data.go.kr/1230000/ad/BidPublicInfoService',
     'https://user:password@apis.data.go.kr/1230000/ad/BidPublicInfoService',

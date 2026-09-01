@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { verifyG2bRelayArtifact } from './verify-g2b-relay-artifact.mjs'
+import {
+  selectG2bRelayArtifactOutput,
+  verifyG2bRelayArtifact,
+} from './verify-g2b-relay-artifact.mjs'
 
 const temporaryDirectories: string[] = []
 
@@ -56,5 +59,26 @@ describe('verifyG2bRelayArtifact', () => {
     )
 
     await expect(verifyG2bRelayArtifact(outputDirectory)).resolves.toBeUndefined()
+  })
+
+  it('selects only the Vercel output when a stale node-server artifact also exists', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'g2b-relay-project-'))
+    temporaryDirectories.push(projectDirectory)
+    await mkdir(join(projectDirectory, '.output', 'server'), { recursive: true })
+    await writeFile(
+      join(projectDirectory, '.output', 'server', 'routes.mjs'),
+      'export const route = "/api/internal/g2b-relay"',
+    )
+    await mkdir(join(projectDirectory, '.vercel', 'output', 'functions'), { recursive: true })
+    await writeFile(
+      join(projectDirectory, '.vercel', 'output', 'functions', 'routes.mjs'),
+      'export const routes = []',
+    )
+
+    const selectedOutput = selectG2bRelayArtifactOutput(projectDirectory, { VERCEL: '1' })
+
+    await expect(verifyG2bRelayArtifact(selectedOutput)).rejects.toThrow(
+      'G2B relay route is absent from the Nitro server artifact',
+    )
   })
 })

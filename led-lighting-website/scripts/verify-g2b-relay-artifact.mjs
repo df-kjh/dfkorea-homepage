@@ -20,25 +20,29 @@ const collectFiles = async (directory) => {
   return files
 }
 
-export const verifyG2bRelayArtifact = async (outputDirectoryOrDirectories) => {
-  const outputDirectories = Array.isArray(outputDirectoryOrDirectories)
-    ? outputDirectoryOrDirectories
-    : [outputDirectoryOrDirectories]
+export const selectG2bRelayArtifactOutput = (projectDirectory, environment = process.env) =>
+  resolve(
+    projectDirectory,
+    environment.VERCEL === '1' || environment.NITRO_PRESET === 'vercel'
+      ? '.vercel/output'
+      : '.output',
+  )
+
+export const verifyG2bRelayArtifact = async (outputDirectory) => {
   const files = []
 
-  for (const outputDirectory of outputDirectories) {
-    // Nitro's node-server preset writes `.output/server`, while its Vercel
-    // preset writes server code under `.vercel/output/functions`.
-    for (const artifactDirectory of [
-      resolve(outputDirectory, 'server'),
-      resolve(outputDirectory, 'functions'),
-    ]) {
-      try {
-        files.push(...(await collectFiles(artifactDirectory)))
-      } catch (error) {
-        if (error?.code !== 'ENOENT') {
-          throw error
-        }
+  // Nitro's node-server preset writes `server`, while its Vercel preset writes
+  // server code under `functions`. Only the selected preset output is scanned
+  // so a stale artifact from another preset cannot make this check pass.
+  for (const artifactDirectory of [
+    resolve(outputDirectory, 'server'),
+    resolve(outputDirectory, 'functions'),
+  ]) {
+    try {
+      files.push(...(await collectFiles(artifactDirectory)))
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        throw error
       }
     }
   }
@@ -53,9 +57,6 @@ export const verifyG2bRelayArtifact = async (outputDirectoryOrDirectories) => {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
-  await verifyG2bRelayArtifact([
-    resolve(process.cwd(), '.output'),
-    resolve(process.cwd(), '.vercel/output'),
-  ])
+  await verifyG2bRelayArtifact(selectG2bRelayArtifactOutput(process.cwd()))
   console.log(`Verified ${RELAY_ROUTE} in the Nitro server artifact.`)
 }

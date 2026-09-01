@@ -120,14 +120,6 @@ export const createG2bRelayHandler = (
       throw relayUnavailable()
     }
 
-    const contentLength = dependencies.getHeader(event, 'content-length')
-    if (
-      contentLength !== undefined &&
-      (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_BODY_BYTES)
-    ) {
-      throw invalidRequest()
-    }
-
     let body: Buffer
     try {
       body = await dependencies.readBody(event, MAX_BODY_BYTES)
