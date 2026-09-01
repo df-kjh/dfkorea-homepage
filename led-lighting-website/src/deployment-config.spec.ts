@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { createJiti } from 'jiti'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const frontendRoot = resolve(process.cwd())
 const repositoryRoot = resolve(frontendRoot, '..')
@@ -24,6 +25,12 @@ const tendersController = readFileSync(
   'utf8',
 )
 const r2Quickstart = readFileSync(resolve(repositoryRoot, 'dfkorea-backend/R2_QUICKSTART.md'), 'utf8')
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+  vi.resetModules()
+})
 
 describe('production API URL deployment contract', () => {
   it('validates and passes the Docker API build argument to Nuxt', () => {
@@ -74,5 +81,42 @@ describe('production API URL deployment contract', () => {
     expect(verifier).toContain('.output')
     expect(verifier).toContain('http://localhost:3000')
     expect(verifier).toContain('VITE_API_BASE_URL')
+  })
+})
+
+describe('server-only G2B relay configuration', () => {
+  it('keeps all relay credentials outside public runtime configuration', async () => {
+    const markers = {
+      G2B_RELAY_SHARED_SECRET: 'private-relay-secret-marker',
+      G2B_TENDER_API_BASE_URL: 'https://private-provider.example.test/base',
+      PUBLIC_DATA_SERVICE_KEY: 'private-public-data-key-marker',
+    }
+    for (const [name, value] of Object.entries(markers)) {
+      vi.stubEnv(name, value)
+    }
+    vi.stubGlobal('defineNuxtConfig', <T>(config: T) => config)
+
+    const jiti = createJiti(import.meta.url, { moduleCache: false })
+    const config = await jiti.import<Record<string, unknown>>(
+      resolve(frontendRoot, 'nuxt.config.ts'),
+      { default: true },
+    )
+    const runtimeConfig = config.runtimeConfig as Record<string, unknown> & {
+      public: Record<string, unknown>
+    }
+
+    expect(runtimeConfig).toMatchObject({
+      g2bRelaySharedSecret: markers.G2B_RELAY_SHARED_SECRET,
+      g2bTenderApiBaseUrl: markers.G2B_TENDER_API_BASE_URL,
+      publicDataServiceKey: markers.PUBLIC_DATA_SERVICE_KEY,
+    })
+    expect(runtimeConfig.public).not.toHaveProperty('g2bRelaySharedSecret')
+    expect(runtimeConfig.public).not.toHaveProperty('g2bTenderApiBaseUrl')
+    expect(runtimeConfig.public).not.toHaveProperty('publicDataServiceKey')
+
+    const clientConfig = JSON.stringify(runtimeConfig.public)
+    expect(clientConfig).not.toContain(markers.G2B_RELAY_SHARED_SECRET)
+    expect(clientConfig).not.toContain(markers.G2B_TENDER_API_BASE_URL)
+    expect(clientConfig).not.toContain(markers.PUBLIC_DATA_SERVICE_KEY)
   })
 })

@@ -1,4 +1,7 @@
 import { TenderSource } from "../domain/tender.enums";
+import type { TenderResponseShape } from "../domain/tender-source.adapter";
+
+export type { TenderResponseShape } from "../domain/tender-source.adapter";
 
 export const G2B_TENDER_ADAPTER = Symbol("G2B_TENDER_ADAPTER");
 export const KAPT_TENDER_ADAPTER = Symbol("KAPT_TENDER_ADAPTER");
@@ -36,6 +39,7 @@ export class TenderSourceError extends Error {
     readonly pageNo: number | null = null,
     readonly providerResultCode: string | null = null,
     readonly attempts = 1,
+    readonly responseShape: TenderResponseShape | null = null,
   ) {
     super(`${source} tender source error: ${code}`);
     this.name = "TenderSourceError";
@@ -430,18 +434,45 @@ export class PublicApiClient implements TenderApiClient {
   ): { items: T[]; totalCount: number } {
     const source = request.source;
     const root = this.asRecord(response, source);
-    const envelope = this.asRecord(root.response ?? root, source);
-    const header = this.asRecordOrNull(envelope.header ?? root.header) ?? {};
+    const canonicalResponse = this.asRecordOrNull(root.response);
+    const canonicalBody = this.asRecordOrNull(canonicalResponse?.body);
     const gateway = this.asRecordOrNull(root.OpenAPI_ServiceResponse);
     const gatewayHeader = this.asRecordOrNull(gateway?.cmmMsgHeader);
+    const envelope = canonicalResponse ?? root;
+    const header = this.asRecordOrNull(envelope.header ?? root.header) ?? {};
     const resultCode = this.readText(
       gatewayHeader?.returnReasonCode ??
         header.resultCode ??
         root.resultCode ??
         envelope.resultCode,
     );
+    const hasErrorEnvelope =
+      gateway !== null ||
+      this.hasErrorRecord(root) ||
+      this.hasErrorRecord(envelope) ||
+      (canonicalBody !== null && this.hasErrorRecord(canonicalBody));
 
-    if (!resultCode || !SUCCESS_CODES.has(resultCode.toUpperCase())) {
+    if (
+      !resultCode &&
+      this.isCanonicalBodyWithoutCode(
+        canonicalResponse,
+        canonicalBody,
+        hasErrorEnvelope,
+      )
+    ) {
+      const totalCount = this.readCanonicalTotalCount(canonicalBody.totalCount);
+      // isCanonicalBodyWithoutCode verifies totalCount before this branch.
+      return {
+        items: this.readItems<T>(canonicalBody.items),
+        totalCount: totalCount!,
+      };
+    }
+
+    if (
+      hasErrorEnvelope ||
+      !resultCode ||
+      !SUCCESS_CODES.has(resultCode.toUpperCase())
+    ) {
       throw new TenderSourceError(
         source,
         "PROVIDER_RESULT_ERROR",
@@ -451,18 +482,17 @@ export class PublicApiClient implements TenderApiClient {
         pageNo,
         resultCode,
         attempt,
+        gateway !== null
+          ? "GATEWAY_ERROR_SHAPE"
+          : hasErrorEnvelope || !resultCode
+            ? "UNKNOWN_RESPONSE_SHAPE"
+            : null,
       );
     }
 
     const body = this.asRecord(envelope.body ?? root.body ?? envelope, source);
     const itemsValue = body.items ?? body.item ?? body.data ?? [];
-    const itemsContainer = this.asRecordOrNull(itemsValue);
-    const rawItems = itemsContainer?.item ?? itemsValue;
-    const items = Array.isArray(rawItems)
-      ? rawItems.filter((item): item is T => this.isRecord(item))
-      : this.isRecord(rawItems)
-        ? [rawItems as T]
-        : [];
+    const items = this.readItems<T>(itemsValue);
     const totalCount = this.readNumber(
       body.totalCount ?? body.total_count ?? body.total ?? items.length,
     );
@@ -472,6 +502,44 @@ export class PublicApiClient implements TenderApiClient {
     }
 
     return { items, totalCount };
+  }
+
+  private isCanonicalBodyWithoutCode(
+    response: Record<string, unknown> | null,
+    body: Record<string, unknown> | null,
+    hasErrorEnvelope: boolean,
+  ): body is Record<string, unknown> {
+    if (
+      response === null ||
+      body === null ||
+      hasErrorEnvelope ||
+      !Object.prototype.hasOwnProperty.call(body, "items") ||
+      !Object.prototype.hasOwnProperty.call(body, "totalCount")
+    ) {
+      return false;
+    }
+
+    const totalCount = this.readCanonicalTotalCount(body.totalCount);
+    return totalCount !== null && totalCount >= 0;
+  }
+
+  private hasErrorRecord(value: Record<string, unknown>): boolean {
+    return (
+      this.asRecordOrNull(value.error) !== null ||
+      this.asRecordOrNull(value.errors) !== null
+    );
+  }
+
+  private readItems<T extends Record<string, unknown>>(
+    itemsValue: unknown,
+  ): T[] {
+    const itemsContainer = this.asRecordOrNull(itemsValue);
+    const rawItems = itemsContainer?.item ?? itemsValue;
+    return Array.isArray(rawItems)
+      ? rawItems.filter((item): item is T => this.isRecord(item))
+      : this.isRecord(rawItems)
+        ? [rawItems as T]
+        : [];
   }
 
   private asRecord(
@@ -501,6 +569,18 @@ export class PublicApiClient implements TenderApiClient {
   }
 
   private readNumber(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private readCanonicalTotalCount(value: unknown): number | null {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value !== "string" || !value.trim()) {
+      return null;
+    }
+
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -668,6 +748,7 @@ export class PublicApiClient implements TenderApiClient {
         error.pageNo ?? pageNo,
         error.providerResultCode,
         attempt,
+        error.responseShape,
       );
     }
     return new TenderSourceError(

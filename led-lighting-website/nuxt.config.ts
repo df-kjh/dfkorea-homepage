@@ -11,9 +11,13 @@ if (isProductionBuild && !configuredApiBaseUrl) {
 export default defineNuxtConfig({
   compatibilityDate: "2026-06-11",
   srcDir: "src/",
+  serverDir: "src/server",
   ssr: true,
   css: ["@/assets/main.css", "@/assets/dark-mode.css"],
   runtimeConfig: {
+    g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",
+    g2bTenderApiBaseUrl: process.env.G2B_TENDER_API_BASE_URL || "",
+    publicDataServiceKey: process.env.PUBLIC_DATA_SERVICE_KEY || "",
     public: {
       apiBaseUrl:
         configuredApiBaseUrl ||

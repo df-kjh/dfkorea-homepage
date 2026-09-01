@@ -6,6 +6,7 @@ import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
 import {
   TenderOperationFailure,
+  type TenderResponseShape,
   TenderFetchWindow,
   TenderSourceAdapter,
   TENDER_SOURCE_ADAPTERS,
@@ -17,6 +18,14 @@ import { TenderSyncRun } from "../entities/tender-sync-run.entity";
 const COLLECTION_LOCK_ID = 824001;
 const INITIAL_COLLECTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLLECTION_OVERLAP_MS = 60 * 60 * 1000;
+const TENDER_RESPONSE_SHAPES = new Set<TenderResponseShape>([
+  "CANONICAL_BODY_WITHOUT_CODE",
+  "GATEWAY_ERROR_SHAPE",
+  "UNKNOWN_RESPONSE_SHAPE",
+]);
+const isTenderResponseShape = (value: unknown): value is TenderResponseShape =>
+  typeof value === "string" &&
+  TENDER_RESPONSE_SHAPES.has(value as TenderResponseShape);
 
 export interface SourceCollectionSummary {
   source: TenderSource;
@@ -387,6 +396,9 @@ export class TenderIngestionService {
         providerResultCode: error.providerResultCode,
         httpStatus: error.status,
         attempts: error.attempts,
+        ...(error.responseShape === null
+          ? {}
+          : { responseShape: error.responseShape }),
       };
     }
 
@@ -404,6 +416,9 @@ export class TenderIngestionService {
     source: TenderSource,
     failure: TenderOperationFailure,
   ): string {
-    return `source=${source}; errorCode=${failure.errorCode}; operation=${failure.operation}; page=${failure.pageNo ?? "none"}; providerCode=${failure.providerResultCode ?? "none"}; httpStatus=${failure.httpStatus ?? "none"}; attempts=${failure.attempts}`;
+    const responseShape = isTenderResponseShape(failure.responseShape)
+      ? failure.responseShape
+      : "none";
+    return `source=${source}; errorCode=${failure.errorCode}; operation=${failure.operation}; page=${failure.pageNo ?? "none"}; providerCode=${failure.providerResultCode ?? "none"}; httpStatus=${failure.httpStatus ?? "none"}; attempts=${failure.attempts}; responseShape=${responseShape}`;
   }
 }

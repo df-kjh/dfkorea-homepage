@@ -6,8 +6,10 @@ import {
   KAPT_TENDER_ADAPTER,
   KEPCO_TENDER_ADAPTER,
   PublicApiClient,
+  PublicApiRetryEvent,
 } from "./adapters/public-api-client";
 import { G2bTenderAdapter } from "./adapters/g2b-tender.adapter";
+import { createG2bRelayFetcher } from "./adapters/g2b-relay.fetcher";
 import { KaptTenderAdapter } from "./adapters/kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./adapters/kepco-tender.adapter";
 import { TenderClassifier } from "./domain/tender-classifier";
@@ -35,6 +37,14 @@ import { NaverWorksOAuthService } from "./mail/naver-works-oauth.service";
 import { NaverWorksTokenCipher } from "./mail/naver-works-token-cipher";
 import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
 
+const createSafeRetryLogger = (context: string) => {
+  const logger = new Logger(context);
+  return (event: PublicApiRetryEvent) =>
+    logger.warn(
+      `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${event.providerResultCode ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
+    );
+};
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -55,20 +65,37 @@ import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
       provide: G2B_TENDER_ADAPTER,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const logger = new Logger("G2bPublicApiClient");
-        const client = new PublicApiClient(undefined, {
+        const directClient = new PublicApiClient(undefined, {
           minimumRequestIntervalMs: 1_100,
           retryDelaysMs: [1_000, 3_000],
-          onRetry: (event) =>
-            logger.warn(
-              `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${event.providerResultCode ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
-            ),
+          onRetry: createSafeRetryLogger("G2bPublicApiClient"),
         });
+        const relayEnabled =
+          config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const relayClient = relayEnabled
+          ? new PublicApiClient(
+              createG2bRelayFetcher({
+                relayUrl: config.get<string>("G2B_RELAY_URL") ?? "",
+                sharedSecret:
+                  config.get<string>("G2B_RELAY_SHARED_SECRET") ?? "",
+              }),
+              {
+                minimumRequestIntervalMs: 1_500,
+                retryDelaysMs: [1_000, 3_000],
+                onRetry: createSafeRetryLogger("G2bRelayPublicApiClient"),
+              },
+            )
+          : undefined;
 
-        return new G2bTenderAdapter(client, {
-          baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
-          serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
-        });
+        return new G2bTenderAdapter(
+          directClient,
+          {
+            baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
+            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+            relayEnabled,
+          },
+          relayClient,
+        );
       },
     },
     {

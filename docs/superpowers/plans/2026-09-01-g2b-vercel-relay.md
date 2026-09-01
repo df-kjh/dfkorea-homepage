@@ -37,7 +37,7 @@
 - Produces: exported `TenderResponseShape` union and `TenderSourceError.responseShape: TenderResponseShape | null`
 - Produces: fail-closed parsing for unknown missing-code responses and accepted parsing for canonical missing-code responses
 
-- [ ] **Step 1: Write failing parser and redaction tests**
+- [x] **Step 1: Write failing parser and redaction tests**
 
 Add focused Jest cases under `describe("PublicApiClient")` proving these exact shapes:
 
@@ -69,7 +69,7 @@ await expect(unknownClient.getAllPages(request)).rejects.toMatchObject({
 
 Also assert `JSON.stringify(error)` contains none of the gateway message, URL, query, service key, or raw cause.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -80,7 +80,7 @@ npm test -- --runInBand src/tenders/adapters/tender-adapters.spec.ts
 
 Expected: FAIL because `responseShape` and canonical missing-header acceptance do not exist.
 
-- [ ] **Step 3: Add the response-shape contract**
+- [x] **Step 3: Add the response-shape contract**
 
 Implement this exported union and append an optional constructor field without changing existing call-site semantics:
 
@@ -107,7 +107,7 @@ export class TenderSourceError extends Error {
 
 In `readPage`, identify canonical structure before permissive fallbacks. Treat a gateway object, `error`, or `errors` record as an error envelope. When no result code exists, accept only when `root.response` is a record, `response.body` is a record, the body owns both `items` and `totalCount`, `totalCount` is finite/non-negative, and no error envelope exists. Do not accept `body.data`, root-level bodies, or inferred counts in this branch.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 
@@ -118,7 +118,7 @@ npm test -- --runInBand src/tenders/adapters/tender-adapters.spec.ts
 
 Expected: PASS, including existing retry, pagination, abort, timeout, and pacing cases.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add dfkorea-backend/src/tenders/adapters/public-api-client.ts dfkorea-backend/src/tenders/adapters/tender-adapters.spec.ts
@@ -142,7 +142,7 @@ git commit -m "fix: validate missing G2B result codes safely"
 - Produces: `G2bRelayRequest`, `validateRelayPayload(value: unknown): G2bRelayRequest`, `verifyRelaySignature(input): boolean`, `buildG2bProviderUrl(input): URL`
 - Produces: `POST /api/internal/g2b-relay` which performs exactly one provider-page fetch and returns provider JSON
 
-- [ ] **Step 1: Write failing pure utility tests**
+- [x] **Step 1: Write failing pure utility tests**
 
 Use the following public contract and deterministic fixture:
 
@@ -166,7 +166,7 @@ expect(() => validateRelayPayload({ ...JSON.parse(body), extra: true })).toThrow
 
 Cover all three allowed operations, unknown/duplicate query fields, invalid dates, reversed date window, invalid page range, non-100 row count, expired/future timestamps, malformed hex signatures, and URL construction where Vercel's key replaces all client-supplied key material.
 
-- [ ] **Step 2: Run utility tests and verify RED**
+- [x] **Step 2: Run utility tests and verify RED**
 
 Run:
 
@@ -177,7 +177,7 @@ npm test -- src/server/utils/g2b-relay.spec.ts
 
 Expected: FAIL because the utility module does not exist.
 
-- [ ] **Step 3: Implement the relay utility**
+- [x] **Step 3: Implement the relay utility**
 
 Define exact types and constants:
 
@@ -203,7 +203,7 @@ export interface G2bRelayRequest {
 
 Use `createHmac("sha256", secret)`, `timingSafeEqual`, strict own-key set equality, `/^\d{12}$/`, integer page validation, and `new URL(operation, normalizedBaseUrl)`. Set only the six allowed query fields plus Vercel's `serviceKey`.
 
-- [ ] **Step 4: Write failing route tests**
+- [x] **Step 4: Write failing route tests**
 
 Test the event-handler boundary with mocked raw-body/header/runtime-config/fetch dependencies. Require generic 400 for invalid body, generic 401 for invalid/expired HMAC, generic 500 for missing server configuration, exactly one upstream fetch for valid input, response JSON forwarding, and generic status-only upstream failure without provider body leakage.
 
@@ -214,7 +214,7 @@ expect(JSON.stringify(rejectedResponse)).not.toContain("vercel-key");
 expect(JSON.stringify(rejectedResponse)).not.toContain("provider secret body");
 ```
 
-- [ ] **Step 5: Run route tests and verify RED**
+- [x] **Step 5: Run route tests and verify RED**
 
 Run:
 
@@ -225,7 +225,7 @@ npm test -- src/server/api/internal/g2b-relay.post.spec.ts
 
 Expected: FAIL because the server route does not exist.
 
-- [ ] **Step 6: Implement the server route and private runtime configuration**
+- [x] **Step 6: Implement the server route and private runtime configuration**
 
 Read the exact raw request body with a hard 4 KiB limit before JSON parsing, authenticate `<timestamp>.<exact body>`, validate the payload, call upstream once with a bounded abort timeout, parse JSON, and return it. Convert errors to generic `createError({ statusCode, statusMessage })` values; never include provider content.
 
@@ -242,7 +242,7 @@ runtimeConfig: {
 
 Extend `deployment-config.spec.ts` to assert these names are outside `runtimeConfig.public` and that client bundles/config do not contain their environment values.
 
-- [ ] **Step 7: Run relay and deployment-config tests and verify GREEN**
+- [x] **Step 7: Run relay and deployment-config tests and verify GREEN**
 
 Run:
 
@@ -254,7 +254,7 @@ npm run type-check
 
 Expected: all tests PASS and Nuxt type checking exits 0.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 ```bash
 git add led-lighting-website/src/server led-lighting-website/nuxt.config.ts led-lighting-website/src/deployment-config.spec.ts
@@ -278,7 +278,7 @@ git commit -m "feat: add secured G2B relay route"
 - Produces: optional `relayClient?: TenderApiClient` and `relayEnabled?: boolean` in `G2bTenderAdapterConfig`
 - Produces: operation-local fallback with unchanged `TenderSourceFetchResult` contract
 
-- [ ] **Step 1: Write failing relay fetcher tests**
+- [x] **Step 1: Write failing relay fetcher tests**
 
 Define this contract:
 
@@ -297,7 +297,7 @@ export function createG2bRelayFetcher(
 
 Pass a provider URL containing `serviceKey=production-key` and assert the POST body contains only operation plus six whitelisted query fields, signature equals the deterministic HMAC, timestamp matches `now`, response is passed through, and malformed/provider-disallowed input throws a safe `TenderSourceError` without the key, secret, URL, query, body, or raw cause in enumerable/loggable output.
 
-- [ ] **Step 2: Run fetcher tests and verify RED**
+- [x] **Step 2: Run fetcher tests and verify RED**
 
 Run:
 
@@ -308,11 +308,11 @@ npm test -- --runInBand src/tenders/adapters/g2b-relay.fetcher.spec.ts
 
 Expected: FAIL because the relay fetcher does not exist.
 
-- [ ] **Step 3: Implement the signed relay fetcher**
+- [x] **Step 3: Implement the signed relay fetcher**
 
 Parse the input provider URL, require an exact allowed terminal operation, obtain each query value with `getAll(name).length === 1`, discard `serviceKey`, serialize the object once with `JSON.stringify`, sign `${timestamp}.${body}`, and POST with JSON/HMAC headers. Reject an empty/malformed relay URL or shared secret shorter than 32 characters as `CONFIGURATION_ERROR`. Do not log inputs or caught errors.
 
-- [ ] **Step 4: Write failing adapter fallback tests**
+- [x] **Step 4: Write failing adapter fallback tests**
 
 Add tests proving:
 
@@ -337,7 +337,7 @@ const directError = new TenderSourceError(
 - one unrecovered operation plus recovered/successful operations returns `PARTIAL` with only the remaining failure;
 - relay failure metadata replaces the eligible direct failure without nested retries.
 
-- [ ] **Step 5: Run adapter tests and verify RED**
+- [x] **Step 5: Run adapter tests and verify RED**
 
 Run:
 
@@ -348,7 +348,7 @@ npm test -- --runInBand src/tenders/adapters/tender-adapters.spec.ts
 
 Expected: FAIL because `G2bTenderAdapter` has no relay client or eligibility predicate.
 
-- [ ] **Step 6: Implement operation-local fallback**
+- [x] **Step 6: Implement operation-local fallback**
 
 Change the adapter configuration and constructor to accept:
 
@@ -368,7 +368,7 @@ constructor(
 
 Extract one `fetchOperation(client, operation, window)` helper so direct and relay paths share exactly the same request construction. Catch a direct error and call relay only when enabled, configured, and the error matches the approved eligibility tuple. Normalize rows only after the final successful client result.
 
-- [ ] **Step 7: Wire relay configuration in `TendersModule`**
+- [x] **Step 7: Wire relay configuration in `TendersModule`**
 
 Construct the direct client exactly as today. When `G2B_RELAY_ENABLED === "true"`, construct a second `PublicApiClient(createG2bRelayFetcher(...), { minimumRequestIntervalMs: 1_500, retryDelaysMs: [1_000, 3_000], onRetry: safeLogger })` and pass it to the adapter. Read only:
 
@@ -380,7 +380,7 @@ G2B_RELAY_SHARED_SECRET
 
 Keep logging limited to source, safe error code, operation, page, provider code, HTTP status, attempt, and response-shape category.
 
-- [ ] **Step 8: Run backend focused tests and verify GREEN**
+- [x] **Step 8: Run backend focused tests and verify GREEN**
 
 Run:
 
@@ -392,7 +392,7 @@ npx tsc --noEmit
 
 Expected: all tests PASS and TypeScript exits 0.
 
-- [ ] **Step 9: Commit Task 3**
+- [x] **Step 9: Commit Task 3**
 
 ```bash
 git add dfkorea-backend/src/tenders/adapters/g2b-relay.fetcher.ts dfkorea-backend/src/tenders/adapters/g2b-relay.fetcher.spec.ts dfkorea-backend/src/tenders/adapters/g2b-tender.adapter.ts dfkorea-backend/src/tenders/adapters/tender-adapters.spec.ts dfkorea-backend/src/tenders/tenders.module.ts
@@ -411,7 +411,7 @@ git commit -m "fix: recover G2B collection through relay"
 - Consumes: all code and deployment variables from Tasks 1 through 3
 - Produces: an operator-readable tender menu status document and a fully verified branch
 
-- [ ] **Step 1: Update the tender menu status document**
+- [x] **Step 1: Update the tender menu status document**
 
 Preserve the document's required headings (`구현 완료`, `미구현`, `부족하거나 개선이 필요한 기능`, `관련 파일`, `갱신 규칙`) and add:
 
@@ -423,7 +423,7 @@ Preserve the document's required headings (`구현 완료`, `미구현`, `부족
 - 릴레이에서도 공공데이터포털 응답이 차단되면 별도 국내 호스팅 수집기가 필요하다.
 ```
 
-- [ ] **Step 2: Run backend CI verification**
+- [x] **Step 2: Run backend CI verification**
 
 Run:
 
@@ -434,7 +434,7 @@ npm run test:ci
 
 Expected: lint, unit tests, tender contract tests, type check, clean build, production-process probe, and TypeORM discovery all exit 0.
 
-- [ ] **Step 3: Run frontend CI-equivalent verification**
+- [x] **Step 3: Run frontend CI-equivalent verification**
 
 Run:
 
@@ -447,7 +447,7 @@ NODE_ENV=production VITE_API_BASE_URL=https://dfkorea-production.up.railway.app 
 
 Expected: all Vitest tests pass, type check exits 0, and Nuxt production build completes.
 
-- [ ] **Step 4: Run secret and placeholder scans**
+- [x] **Step 4: Run secret and placeholder scans**
 
 Run:
 
@@ -458,11 +458,11 @@ rg -n "TBD|TODO|implement later|fill in details" docs/superpowers/plans/2026-09-
 
 Expected: no real secret-like value and no implementation placeholder are found; fixture strings may appear only in tests.
 
-- [ ] **Step 5: Request final code review and resolve findings**
+- [x] **Step 5: Request final code review and resolve findings**
 
 Provide the reviewer the approved spec, this plan, and the complete task commit range. Require explicit checks for fail-closed parsing, HMAC correctness, secret leakage, fallback eligibility, request pacing, and regression risk. Resolve every Critical/Important finding and rerun the affected focused suite.
 
-- [ ] **Step 6: Commit documentation**
+- [x] **Step 6: Commit documentation**
 
 ```bash
 git add docs/menus/tenders.md docs/superpowers/plans/2026-09-01-g2b-vercel-relay.md
