@@ -113,9 +113,12 @@ const collectTenders = async () => {
       return
     }
 
+    const partialSources = data.sources.filter(({ status }) => status === 'PARTIAL')
     collectionFeedback.value = data.failedSources.length > 0
       ? { role: 'alert', message: '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.' }
-      : { role: 'status', message: '공고 수집이 완료되었습니다.' }
+      : partialSources.length > 0
+        ? { role: 'alert', message: '나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.' }
+        : { role: 'status', message: '공고 수집이 완료되었습니다.' }
     await Promise.all([fetchCalendar(), fetchList(currentListPage.value)])
   } catch {
     collectionFeedback.value = { role: 'alert', message: '공고 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.' }

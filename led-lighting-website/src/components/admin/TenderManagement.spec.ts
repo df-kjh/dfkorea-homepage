@@ -233,6 +233,36 @@ describe('TenderManagement', () => {
     }))
   })
 
+  it('reports a partial source and refreshes successful notices', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-09-01T01:53:57.683Z',
+        sources: [{
+          source: 'G2B',
+          status: 'PARTIAL',
+          fetchedCount: 120,
+          createdCount: 4,
+          updatedCount: 3,
+          excludedCount: 113,
+          errorCode: 'PARTIAL_PROVIDER_FAILURE',
+        }],
+        failedSources: [],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      '나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.',
+    )
+    expect(api.getCalendar).toHaveBeenCalledTimes(2)
+    expect(api.getAll).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps existing calendar and list data visible when immediate collection fails', async () => {
     api.collect.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mountTenderManagement()
