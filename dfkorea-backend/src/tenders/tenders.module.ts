@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
@@ -25,7 +25,10 @@ import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
 import { TenderMailRenderer } from "./mail/tender-mail-renderer";
-import { TENDER_MAIL_TRANSPORT, TenderMailService } from "./services/tender-mail.service";
+import {
+  TENDER_MAIL_TRANSPORT,
+  TenderMailService,
+} from "./services/tender-mail.service";
 import { TendersController } from "./tenders.controller";
 import { TenderMailOAuthController } from "./tender-mail-oauth.controller";
 import { NaverWorksOAuthService } from "./mail/naver-works-oauth.service";
@@ -51,11 +54,22 @@ import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
     {
       provide: G2B_TENDER_ADAPTER,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) =>
-        new G2bTenderAdapter(new PublicApiClient(), {
+      useFactory: (config: ConfigService) => {
+        const logger = new Logger("G2bPublicApiClient");
+        const client = new PublicApiClient(undefined, {
+          minimumRequestIntervalMs: 1_100,
+          retryDelaysMs: [1_000, 3_000],
+          onRetry: (event) =>
+            logger.warn(
+              `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${event.providerResultCode ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
+            ),
+        });
+
+        return new G2bTenderAdapter(client, {
           baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
           serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
-        }),
+        });
+      },
     },
     {
       provide: KAPT_TENDER_ADAPTER,
@@ -88,10 +102,8 @@ import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
     {
       provide: TENDER_MAIL_TRANSPORT,
       inject: [ConfigService, NaverWorksOAuthService],
-      useFactory: (
-        config: ConfigService,
-        oauth: NaverWorksOAuthService,
-      ) => new NaverWorksMailTransport(config, oauth),
+      useFactory: (config: ConfigService, oauth: NaverWorksOAuthService) =>
+        new NaverWorksMailTransport(config, oauth),
     },
     TenderMailService,
     TenderSchedulerService,

@@ -20,7 +20,10 @@ import {
   SyncRunStatus,
 } from "../src/tenders/domain/tender.enums";
 import { NormalizedTender } from "../src/tenders/domain/normalized-tender";
-import { TenderSourceAdapter } from "../src/tenders/domain/tender-source.adapter";
+import {
+  TenderSourceAdapter,
+  TenderSourceFetchResult,
+} from "../src/tenders/domain/tender-source.adapter";
 import { Tender } from "../src/tenders/entities/tender.entity";
 import { TenderMailDelivery } from "../src/tenders/entities/tender-mail-delivery.entity";
 import { TenderRecipient } from "../src/tenders/entities/tender-recipient.entity";
@@ -84,12 +87,12 @@ describe("Tender admin HTTP contract", () => {
       sources: [
         {
           source: TenderSource.G2B,
-          status: SyncRunStatus.SUCCEEDED,
+          status: SyncRunStatus.PARTIAL,
           fetchedCount: 2,
           createdCount: 1,
           updatedCount: 1,
           excludedCount: 0,
-          errorCode: null,
+          errorCode: "PARTIAL_PROVIDER_FAILURE",
         },
         {
           source: TenderSource.KEPCO,
@@ -167,12 +170,12 @@ describe("Tender admin HTTP contract", () => {
           sources: [
             {
               source: "G2B",
-              status: "SUCCEEDED",
+              status: "PARTIAL",
               fetchedCount: 2,
               createdCount: 1,
               updatedCount: 1,
               excludedCount: 0,
-              errorCode: null,
+              errorCode: "PARTIAL_PROVIDER_FAILURE",
             },
             {
               source: "KEPCO",
@@ -287,33 +290,46 @@ describe("Tender collection and delivery service contracts", () => {
     ...overrides,
   });
 
+  const successful = (
+    notices: NormalizedTender[] = [],
+  ): TenderSourceFetchResult => ({
+    notices,
+    status: SyncRunStatus.SUCCEEDED,
+    errorCode: null,
+    failures: [],
+  });
+
   it("runs mocked source adapters through classification and conflict upsert", async () => {
     const g2b = {
       source: TenderSource.G2B,
-      fetchNotices: jest.fn().mockResolvedValue([notice({})]),
+      fetchNotices: jest.fn().mockResolvedValue(successful([notice({})])),
     } as jest.Mocked<TenderSourceAdapter>;
     const kapt = {
       source: TenderSource.KAPT,
-      fetchNotices: jest.fn().mockResolvedValue([
-        notice({
-          source: TenderSource.KAPT,
-          sourceNoticeId: "KAPT-1",
-          title: "지하주차장 전기시설 개선공사",
-          itemName: "",
-          description: "",
-        }),
-      ]),
+      fetchNotices: jest.fn().mockResolvedValue(
+        successful([
+          notice({
+            source: TenderSource.KAPT,
+            sourceNoticeId: "KAPT-1",
+            title: "지하주차장 전기시설 개선공사",
+            itemName: "",
+            description: "",
+          }),
+        ]),
+      ),
     } as jest.Mocked<TenderSourceAdapter>;
     const kepco = {
       source: TenderSource.KEPCO,
-      fetchNotices: jest.fn().mockResolvedValue([
-        notice({
-          source: TenderSource.KEPCO,
-          sourceNoticeId: "KEPCO-ignored",
-          title: "구내식당 식자재 구매",
-          itemName: "",
-        }),
-      ]),
+      fetchNotices: jest.fn().mockResolvedValue(
+        successful([
+          notice({
+            source: TenderSource.KEPCO,
+            sourceNoticeId: "KEPCO-ignored",
+            title: "구내식당 식자재 구매",
+            itemName: "",
+          }),
+        ]),
+      ),
     } as jest.Mocked<TenderSourceAdapter>;
     const tenderRepository = {
       find: jest.fn().mockResolvedValue([]),
@@ -491,7 +507,8 @@ describe("Tender collection and delivery service contracts", () => {
       execute: jest.fn().mockResolvedValue({ raw: [{ id: "dispatch-1" }] }),
     };
     Object.values(dispatchBuilder).forEach((method) => {
-      if (method !== dispatchBuilder.execute) method.mockReturnValue(dispatchBuilder);
+      if (method !== dispatchBuilder.execute)
+        method.mockReturnValue(dispatchBuilder);
     });
     const dailyDispatchRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(dispatchBuilder),
@@ -503,9 +520,7 @@ describe("Tender collection and delivery service contracts", () => {
           ([call]) => call.to === failedRecipient.email,
         ).length;
         if (message.to === failedRecipient.email && failedAttempts === 1) {
-          throw new MailDeliveryError(
-            MailDeliveryOutcome.RETRYABLE_REJECTION,
-          );
+          throw new MailDeliveryError(MailDeliveryOutcome.RETRYABLE_REJECTION);
         }
         return { providerMessageId: `provider-${message.to}` };
       }),

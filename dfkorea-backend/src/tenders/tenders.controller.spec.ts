@@ -1,7 +1,7 @@
 import { GUARDS_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { NotFoundException } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { TenderSource } from "./domain/tender.enums";
+import { SyncRunStatus, TenderSource } from "./domain/tender.enums";
 import { TendersController } from "./tenders.controller";
 
 describe("TendersController", () => {
@@ -78,6 +78,28 @@ describe("TendersController", () => {
       collectedAt: new Date("2026-08-31T00:00:00.000Z"),
       sources: [],
       failedSources: [TenderSource.G2B],
+    };
+    ingestion.collectAll.mockResolvedValue(summary);
+
+    await expect(controller.collect()).resolves.toBe(summary);
+  });
+
+  it("returns a PARTIAL source outcome without adding it to failedSources", async () => {
+    const summary = {
+      lockAcquired: true,
+      collectedAt: new Date("2026-08-31T00:00:00.000Z"),
+      sources: [
+        {
+          source: TenderSource.G2B,
+          status: SyncRunStatus.PARTIAL,
+          fetchedCount: 1,
+          createdCount: 1,
+          updatedCount: 0,
+          excludedCount: 0,
+          errorCode: "PARTIAL_PROVIDER_FAILURE",
+        },
+      ],
+      failedSources: [],
     };
     ingestion.collectAll.mockResolvedValue(summary);
 

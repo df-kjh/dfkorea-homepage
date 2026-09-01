@@ -10,10 +10,14 @@ import {
   KEPCO_TENDER_ADAPTER,
 } from "../src/tenders/adapters/public-api-client";
 import { NormalizedTender } from "../src/tenders/domain/normalized-tender";
-import { TenderSourceAdapter } from "../src/tenders/domain/tender-source.adapter";
+import {
+  TenderSourceAdapter,
+  TenderSourceFetchResult,
+} from "../src/tenders/domain/tender-source.adapter";
 import {
   MailDeliveryStatus,
   ProcurementType,
+  SyncRunStatus,
   TenderRelevance,
   TenderSource,
 } from "../src/tenders/domain/tender.enums";
@@ -57,6 +61,15 @@ const NOTICE: NormalizedTender = {
   rawData: { fixture: true },
 };
 
+const successful = (
+  notices: NormalizedTender[] = [],
+): TenderSourceFetchResult => ({
+  notices,
+  status: SyncRunStatus.SUCCEEDED,
+  errorCode: null,
+  failures: [],
+});
+
 describe("Tender AppModule PostgreSQL integration", () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -82,7 +95,8 @@ describe("Tender AppModule PostgreSQL integration", () => {
     try {
       await migrationDataSource.runMigrations();
     } finally {
-      if (migrationDataSource.isInitialized) await migrationDataSource.destroy();
+      if (migrationDataSource.isInitialized)
+        await migrationDataSource.destroy();
     }
 
     process.env.NAVER_WORKS_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 3).toString(
@@ -142,9 +156,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
   });
 
   it("uses real TypeORM storage for mocked-adapter ingestion and authenticated queries", async () => {
-    g2b.fetchNotices.mockResolvedValue([NOTICE]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful([NOTICE]));
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await app
       .get(TenderIngestionService)
@@ -210,9 +224,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
   });
 
   it("keeps recipients isolated and makes exactly one due provider retry", async () => {
-    g2b.fetchNotices.mockResolvedValue([NOTICE]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful([NOTICE]));
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
     await app
       .get(TenderIngestionService)
       .collectAll(new Date("2026-08-27T03:00:00.000Z"));
@@ -231,9 +245,7 @@ describe("Tender AppModule PostgreSQL integration", () => {
         ([message]) => message.to === to,
       ).length;
       if (to === "failed@example.com" && attempts === 1) {
-        throw new MailDeliveryError(
-          MailDeliveryOutcome.RETRYABLE_REJECTION,
-        );
+        throw new MailDeliveryError(MailDeliveryOutcome.RETRYABLE_REJECTION);
       }
       return { providerMessageId: `test-${to}` };
     });
@@ -246,10 +258,12 @@ describe("Tender AppModule PostgreSQL integration", () => {
         .map(([message]) => message.to)
         .filter((email) => email === "successful@example.com"),
     ).toEqual(["successful@example.com"]);
-    const retry = await dataSource.getRepository(TenderMailDelivery).findOneByOrFail({
-      recipientEmail: "failed@example.com",
-      status: MailDeliveryStatus.RETRY_SCHEDULED,
-    });
+    const retry = await dataSource
+      .getRepository(TenderMailDelivery)
+      .findOneByOrFail({
+        recipientEmail: "failed@example.com",
+        status: MailDeliveryStatus.RETRY_SCHEDULED,
+      });
     expect(retry.attemptCount).toBe(1);
 
     await service.retryDue(new Date(firstAttempt.getTime() + 10 * 60 * 1000));

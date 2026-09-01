@@ -1,10 +1,11 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, QueryRunner, Repository } from "typeorm";
 import { TenderSourceError } from "../adapters/public-api-client";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
 import {
+  TenderOperationFailure,
   TenderFetchWindow,
   TenderSourceAdapter,
   TENDER_SOURCE_ADAPTERS,
@@ -19,7 +20,10 @@ const COLLECTION_OVERLAP_MS = 60 * 60 * 1000;
 
 export interface SourceCollectionSummary {
   source: TenderSource;
-  status: SyncRunStatus.SUCCEEDED | SyncRunStatus.FAILED;
+  status:
+    | SyncRunStatus.SUCCEEDED
+    | SyncRunStatus.PARTIAL
+    | SyncRunStatus.FAILED;
   fetchedCount: number;
   createdCount: number;
   updatedCount: number;
@@ -38,6 +42,8 @@ type TenderUpsert = Omit<Tender, "id" | "firstCollectedAt" | "lastUpdatedAt">;
 
 @Injectable()
 export class TenderIngestionService {
+  private readonly logger = new Logger(TenderIngestionService.name);
+
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectRepository(TenderSyncRun)
@@ -153,7 +159,10 @@ export class TenderIngestionService {
       throw cleanupErrors[0];
     }
     if (cleanupErrors.length > 1) {
-      throw new AggregateError(cleanupErrors, "Tender collection cleanup failed");
+      throw new AggregateError(
+        cleanupErrors,
+        "Tender collection cleanup failed",
+      );
     }
   }
 
@@ -178,33 +187,43 @@ export class TenderIngestionService {
         errorCode: null,
         errorMessage: null,
       });
-      const notices = await adapter.fetchNotices(window);
-      const { relevant, excludedCount } = this.classifyNotices(notices);
-      const { createdCount, updatedCount } = await this.upsertRelevantTenders(
-        relevant,
+      const fetchResult = await adapter.fetchNotices(window);
+      for (const failure of fetchResult.failures) {
+        this.logger.warn(this.formatOperationFailure(adapter.source, failure));
+      }
+      const { relevant, excludedCount } = this.classifyNotices(
+        fetchResult.notices,
       );
+      const { createdCount, updatedCount } =
+        await this.upsertRelevantTenders(relevant);
       await this.syncRunRepository.save({
         ...run,
         finishedAt: new Date(),
-        status: SyncRunStatus.SUCCEEDED,
-        fetchedCount: notices.length,
+        status: fetchResult.status,
+        fetchedCount: fetchResult.notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: null,
+        errorCode: fetchResult.errorCode,
         errorMessage: null,
       });
       return {
         source: adapter.source,
-        status: SyncRunStatus.SUCCEEDED,
-        fetchedCount: notices.length,
+        status: fetchResult.status,
+        fetchedCount: fetchResult.notices.length,
         createdCount,
         updatedCount,
         excludedCount,
-        errorCode: null,
+        errorCode: fetchResult.errorCode,
       };
     } catch (error) {
       const { errorCode, errorMessage } = this.sanitizeError(error);
+      this.logger.warn(
+        this.formatOperationFailure(
+          adapter.source,
+          this.toOperationFailure(adapter.source, error),
+        ),
+      );
       // A provider error is isolated from the other two official sources. The
       // nested guard keeps an unavailable database write from turning one
       // source's failed run into a failed whole-collection job.
@@ -354,5 +373,37 @@ export class TenderIngestionService {
       errorCode: "COLLECTION_ERROR",
       errorMessage: "Tender source collection failed",
     };
+  }
+
+  private toOperationFailure(
+    defaultOperation: string,
+    error: unknown,
+  ): TenderOperationFailure {
+    if (error instanceof TenderSourceError) {
+      return {
+        operation: error.operation ?? defaultOperation,
+        errorCode: error.code,
+        pageNo: error.pageNo,
+        providerResultCode: error.providerResultCode,
+        httpStatus: error.status,
+        attempts: error.attempts,
+      };
+    }
+
+    return {
+      operation: defaultOperation,
+      errorCode: "COLLECTION_ERROR",
+      pageNo: null,
+      providerResultCode: null,
+      httpStatus: null,
+      attempts: 1,
+    };
+  }
+
+  private formatOperationFailure(
+    source: TenderSource,
+    failure: TenderOperationFailure,
+  ): string {
+    return `source=${source}; errorCode=${failure.errorCode}; operation=${failure.operation}; page=${failure.pageNo ?? "none"}; providerCode=${failure.providerResultCode ?? "none"}; httpStatus=${failure.httpStatus ?? "none"}; attempts=${failure.attempts}`;
   }
 }

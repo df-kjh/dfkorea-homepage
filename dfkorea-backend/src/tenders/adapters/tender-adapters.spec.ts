@@ -12,7 +12,11 @@ import {
   TenderSourceError,
 } from "./public-api-client";
 import { TenderFetchWindow } from "../domain/tender-source.adapter";
-import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import {
+  ProcurementType,
+  SyncRunStatus,
+  TenderSource,
+} from "../domain/tender.enums";
 import { TenderClassifier } from "../domain/tender-classifier";
 
 const window: TenderFetchWindow = {
@@ -67,7 +71,9 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    const [notice] = await adapter.fetchNotices(window);
+    const {
+      notices: [notice],
+    } = await adapter.fetchNotices(window);
 
     expect(notice).toEqual(
       expect.objectContaining({
@@ -105,7 +111,9 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    const [notice] = await adapter.fetchNotices(window);
+    const {
+      notices: [notice],
+    } = await adapter.fetchNotices(window);
 
     expect(new TenderClassifier().classify(notice!)).toEqual(
       expect.objectContaining({
@@ -129,7 +137,9 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    const [notice] = await adapter.fetchNotices(window);
+    const {
+      notices: [notice],
+    } = await adapter.fetchNotices(window);
 
     expect(notice).toEqual(
       expect.objectContaining({
@@ -161,7 +171,9 @@ describe("official tender adapters", () => {
       apiKey: "test-key",
     });
 
-    const [notice] = await adapter.fetchNotices(window);
+    const {
+      notices: [notice],
+    } = await adapter.fetchNotices(window);
 
     expect(notice).toEqual(
       expect.objectContaining({
@@ -203,7 +215,138 @@ describe("official tender adapters", () => {
       serviceKey: "test-key",
     });
 
-    await expect(adapter.fetchNotices(window)).resolves.toEqual([]);
+    await expect(adapter.fetchNotices(window)).resolves.toEqual(
+      expect.objectContaining({
+        notices: [],
+        status: SyncRunStatus.SUCCEEDED,
+        failures: [],
+      }),
+    );
+  });
+
+  it("runs broad G2B operations sequentially and keeps successful notices when one operation fails", async () => {
+    const constructionRow = {
+      ...g2bFixture.response.body.items[0],
+      bidNtceNo: "CONSTRUCTION-1",
+    };
+    const serviceRow = {
+      ...g2bFixture.response.body.items[0],
+      bidNtceNo: "SERVICE-1",
+    };
+    const client = createClient();
+    client.getAllPages
+      .mockResolvedValueOnce([constructionRow])
+      .mockRejectedValueOnce(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "PROVIDER_RESULT_ERROR",
+          200,
+          undefined,
+          "getBidPblancListInfoThng",
+          1,
+          "23",
+          3,
+        ),
+      )
+      .mockResolvedValueOnce([serviceRow]);
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(
+      client.getAllPages.mock.calls.map(([request]) => request.operation),
+    ).toEqual([
+      "getBidPblancListInfoCnstwk",
+      "getBidPblancListInfoThng",
+      "getBidPblancListInfoServc",
+    ]);
+    expect(result.status).toBe(SyncRunStatus.PARTIAL);
+    expect(result.notices.map((notice) => notice.procurementType)).toEqual([
+      ProcurementType.CONSTRUCTION,
+      ProcurementType.SERVICE,
+    ]);
+    expect(result.errorCode).toBe("PARTIAL_PROVIDER_FAILURE");
+    expect(result.failures).toEqual([
+      expect.objectContaining({
+        operation: "getBidPblancListInfoThng",
+        errorCode: "PROVIDER_RESULT_ERROR",
+        pageNo: 1,
+        providerResultCode: "23",
+        httpStatus: 200,
+        attempts: 3,
+      }),
+    ]);
+  });
+
+  it("reports G2B as failed with no notices when all broad operations fail", async () => {
+    const client = createClient();
+    client.getAllPages
+      .mockRejectedValueOnce(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "HTTP_ERROR",
+          503,
+          undefined,
+          "getBidPblancListInfoCnstwk",
+          1,
+          null,
+          3,
+        ),
+      )
+      .mockRejectedValueOnce(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "PROVIDER_RESULT_ERROR",
+          200,
+          undefined,
+          "getBidPblancListInfoThng",
+          2,
+          "30",
+          1,
+        ),
+      )
+      .mockRejectedValueOnce(new Error("raw provider body secret-key"));
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result).toEqual({
+      notices: [],
+      status: SyncRunStatus.FAILED,
+      errorCode: "HTTP_ERROR",
+      failures: [
+        {
+          operation: "getBidPblancListInfoCnstwk",
+          errorCode: "HTTP_ERROR",
+          pageNo: 1,
+          providerResultCode: null,
+          httpStatus: 503,
+          attempts: 3,
+        },
+        {
+          operation: "getBidPblancListInfoThng",
+          errorCode: "PROVIDER_RESULT_ERROR",
+          pageNo: 2,
+          providerResultCode: "30",
+          httpStatus: 200,
+          attempts: 1,
+        },
+        {
+          operation: "getBidPblancListInfoServc",
+          errorCode: "COLLECTION_ERROR",
+          pageNo: null,
+          providerResultCode: null,
+          httpStatus: null,
+          attempts: 1,
+        },
+      ],
+    });
   });
 });
 

@@ -1,13 +1,20 @@
 import { NormalizedTender } from "../domain/normalized-tender";
 import {
+  TenderOperationFailure,
   TenderFetchWindow,
   TenderSourceAdapter,
+  TenderSourceFetchResult,
 } from "../domain/tender-source.adapter";
-import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import {
+  ProcurementType,
+  SyncRunStatus,
+  TenderSource,
+} from "../domain/tender.enums";
 import {
   formatKstDateTimeMinute,
   parseKstDate,
   TenderApiClient,
+  TenderSourceError,
   toNullableText,
 } from "./public-api-client";
 
@@ -30,9 +37,14 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
     private readonly config: G2bTenderAdapterConfig,
   ) {}
 
-  async fetchNotices(window: TenderFetchWindow): Promise<NormalizedTender[]> {
-    const collections = await Promise.all(
-      G2B_OPERATIONS.map(async ([operation, procurementType]) => {
+  async fetchNotices(
+    window: TenderFetchWindow,
+  ): Promise<TenderSourceFetchResult> {
+    const notices: NormalizedTender[] = [];
+    const failures: TenderOperationFailure[] = [];
+
+    for (const [operation, procurementType] of G2B_OPERATIONS) {
+      try {
         const rows = await this.client.getAllPages({
           source: this.source,
           baseUrl: this.config.baseUrl,
@@ -46,14 +58,60 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
           },
         });
 
-        return rows.flatMap((row) => {
-          const normalized = this.normalize(row, procurementType);
-          return normalized ? [normalized] : [];
-        });
-      }),
-    );
+        notices.push(
+          ...rows.flatMap((row) => {
+            const normalized = this.normalize(row, procurementType);
+            return normalized ? [normalized] : [];
+          }),
+        );
+      } catch (error) {
+        failures.push(this.toOperationFailure(operation, error));
+      }
+    }
 
-    return collections.flat();
+    const status =
+      failures.length === 0
+        ? SyncRunStatus.SUCCEEDED
+        : notices.length > 0
+          ? SyncRunStatus.PARTIAL
+          : SyncRunStatus.FAILED;
+
+    return {
+      notices,
+      status,
+      errorCode:
+        status === SyncRunStatus.PARTIAL
+          ? "PARTIAL_PROVIDER_FAILURE"
+          : status === SyncRunStatus.FAILED
+            ? (failures[0]?.errorCode ?? "COLLECTION_ERROR")
+            : null,
+      failures,
+    };
+  }
+
+  private toOperationFailure(
+    operation: string,
+    error: unknown,
+  ): TenderOperationFailure {
+    if (error instanceof TenderSourceError) {
+      return {
+        operation: error.operation ?? operation,
+        errorCode: error.code,
+        pageNo: error.pageNo,
+        providerResultCode: error.providerResultCode,
+        httpStatus: error.status,
+        attempts: error.attempts,
+      };
+    }
+
+    return {
+      operation,
+      errorCode: "COLLECTION_ERROR",
+      pageNo: null,
+      providerResultCode: null,
+      httpStatus: null,
+      attempts: 1,
+    };
   }
 
   private normalize(

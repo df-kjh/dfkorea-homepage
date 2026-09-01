@@ -1,6 +1,11 @@
+import { Logger } from "@nestjs/common";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { TenderClassifier } from "../domain/tender-classifier";
-import { TenderSourceAdapter } from "../domain/tender-source.adapter";
+import {
+  TenderOperationFailure,
+  TenderSourceAdapter,
+  TenderSourceFetchResult,
+} from "../domain/tender-source.adapter";
 import {
   ProcurementType,
   SyncRunStatus,
@@ -52,8 +57,18 @@ const irrelevantNotice: NormalizedTender = {
   description: "",
 };
 
-const createAdapter = (source: TenderSource): jest.Mocked<TenderSourceAdapter> =>
-  ({ source, fetchNotices: jest.fn() });
+const createAdapter = (
+  source: TenderSource,
+): jest.Mocked<TenderSourceAdapter> => ({ source, fetchNotices: jest.fn() });
+
+const successful = (
+  notices: NormalizedTender[] = [],
+): TenderSourceFetchResult => ({
+  notices,
+  status: SyncRunStatus.SUCCEEDED,
+  errorCode: null,
+  failures: [],
+});
 
 const createBodyThrowingAdapters = (thrown: unknown): TenderSourceAdapter[] =>
   new Proxy([] as TenderSourceAdapter[], {
@@ -84,7 +99,9 @@ describe("TenderIngestionService", () => {
     kepco = createAdapter(TenderSource.KEPCO);
     syncRunRepository = {
       findOne: jest.fn().mockResolvedValue(null),
-      save: jest.fn().mockImplementation(async (value) => ({ id: "run-id", ...value })),
+      save: jest
+        .fn()
+        .mockImplementation(async (value) => ({ id: "run-id", ...value })),
     };
     tenderRepository = {
       find: jest.fn().mockResolvedValue([]),
@@ -100,9 +117,11 @@ describe("TenderIngestionService", () => {
     };
     dataSource = {
       createQueryRunner: jest.fn().mockReturnValue(lockRunner),
-      transaction: jest.fn().mockImplementation(async (work) =>
-        work({ getRepository: () => tenderRepository }),
-      ),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (work) =>
+          work({ getRepository: () => tenderRepository }),
+        ),
     };
     service = new TenderIngestionService(
       dataSource as never,
@@ -113,9 +132,9 @@ describe("TenderIngestionService", () => {
   });
 
   it("fetches each provider across the initial preceding 24 hours", async () => {
-    g2b.fetchNotices.mockResolvedValue([]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful());
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await service.collectAll(NOW);
 
@@ -129,9 +148,9 @@ describe("TenderIngestionService", () => {
     syncRunRepository.findOne.mockResolvedValue({
       finishedAt: new Date("2026-08-27T01:30:00.000Z"),
     });
-    g2b.fetchNotices.mockResolvedValue([]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful());
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await service.collectAll(NOW);
 
@@ -142,9 +161,11 @@ describe("TenderIngestionService", () => {
   });
 
   it("excludes irrelevant notices and persists classifier evidence for relevant notices", async () => {
-    g2b.fetchNotices.mockResolvedValue([directNotice, irrelevantNotice]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(
+      successful([directNotice, irrelevantNotice]),
+    );
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await service.collectAll(NOW);
 
@@ -182,9 +203,9 @@ describe("TenderIngestionService", () => {
         revision: "0",
       },
     ]);
-    g2b.fetchNotices.mockResolvedValue([directNotice]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful([directNotice]));
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await service.collectAll(NOW);
 
@@ -207,8 +228,8 @@ describe("TenderIngestionService", () => {
     g2b.fetchNotices.mockRejectedValue(
       new TenderSourceError(TenderSource.G2B, "HTTP_ERROR", 503),
     );
-    kapt.fetchNotices.mockResolvedValue([potentialNotice]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue(successful([potentialNotice]));
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     const summary = await service.collectAll(NOW);
 
@@ -232,6 +253,108 @@ describe("TenderIngestionService", () => {
     );
   });
 
+  it("persists partial notices without treating the run as a successful watermark", async () => {
+    const safeFailure: TenderOperationFailure = {
+      operation: "getBidPblancListInfoThng",
+      errorCode: "PROVIDER_RESULT_ERROR",
+      pageNo: 1,
+      providerResultCode: "23",
+      httpStatus: 200,
+      attempts: 3,
+    };
+    const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+    g2b.fetchNotices.mockResolvedValue({
+      notices: [directNotice],
+      status: SyncRunStatus.PARTIAL,
+      errorCode: "PARTIAL_PROVIDER_FAILURE",
+      failures: [safeFailure],
+    });
+    kapt.fetchNotices.mockResolvedValue({
+      notices: [],
+      status: SyncRunStatus.SUCCEEDED,
+      errorCode: null,
+      failures: [],
+    });
+    kepco.fetchNotices.mockResolvedValue({
+      notices: [],
+      status: SyncRunStatus.SUCCEEDED,
+      errorCode: null,
+      failures: [],
+    });
+
+    const summary = await service.collectAll(NOW);
+
+    expect(tenderRepository.upsert).toHaveBeenCalled();
+    expect(summary.sources).toContainEqual(
+      expect.objectContaining({
+        source: TenderSource.G2B,
+        status: SyncRunStatus.PARTIAL,
+        fetchedCount: 1,
+        errorCode: "PARTIAL_PROVIDER_FAILURE",
+      }),
+    );
+    expect(summary.failedSources).toEqual([]);
+    expect(syncRunRepository.findOne).toHaveBeenCalledWith({
+      where: {
+        source: TenderSource.G2B,
+        status: SyncRunStatus.SUCCEEDED,
+      },
+      order: { finishedAt: "DESC" },
+    });
+    expect(warn).toHaveBeenCalledWith(
+      "source=G2B; errorCode=PROVIDER_RESULT_ERROR; operation=getBidPblancListInfoThng; page=1; providerCode=23; httpStatus=200; attempts=3",
+    );
+    const warningText = JSON.stringify(warn.mock.calls);
+    expect(warningText).not.toContain("secret-key");
+    expect(warningText).not.toContain("https://");
+    expect(warningText).not.toContain("raw provider response");
+    warn.mockRestore();
+  });
+
+  it("does not upsert when an adapter reports that every operation failed", async () => {
+    const failures: TenderOperationFailure[] = [
+      {
+        operation: "getBidPblancListInfoCnstwk",
+        errorCode: "HTTP_ERROR",
+        pageNo: 1,
+        providerResultCode: null,
+        httpStatus: 503,
+        attempts: 3,
+      },
+    ];
+    g2b.fetchNotices.mockResolvedValue({
+      notices: [],
+      status: SyncRunStatus.FAILED,
+      errorCode: "HTTP_ERROR",
+      failures,
+    });
+    kapt.fetchNotices.mockResolvedValue({
+      notices: [],
+      status: SyncRunStatus.SUCCEEDED,
+      errorCode: null,
+      failures: [],
+    });
+    kepco.fetchNotices.mockResolvedValue({
+      notices: [],
+      status: SyncRunStatus.SUCCEEDED,
+      errorCode: null,
+      failures: [],
+    });
+
+    const summary = await service.collectAll(NOW);
+
+    expect(summary.failedSources).toEqual([TenderSource.G2B]);
+    expect(tenderRepository.upsert).not.toHaveBeenCalled();
+    expect(syncRunRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: TenderSource.G2B,
+        status: SyncRunStatus.FAILED,
+        fetchedCount: 0,
+        errorCode: "HTTP_ERROR",
+      }),
+    );
+  });
+
   it("does not collect when another process owns the advisory lock", async () => {
     lockRunner.query.mockReset();
     lockRunner.query.mockResolvedValue([{ locked: false }]);
@@ -248,9 +371,9 @@ describe("TenderIngestionService", () => {
   });
 
   it("uses one session-pinned runner to acquire and release the advisory lock", async () => {
-    g2b.fetchNotices.mockResolvedValue([]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful());
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await service.collectAll(NOW);
 
@@ -270,8 +393,8 @@ describe("TenderIngestionService", () => {
 
   it("unlocks before releasing the session when source collection fails", async () => {
     g2b.fetchNotices.mockRejectedValue(new Error("upstream failed"));
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await service.collectAll(NOW);
 
@@ -300,7 +423,9 @@ describe("TenderIngestionService", () => {
       throwingAdapters,
     );
 
-    await expect(service.collectAll(NOW)).rejects.toThrow("collection body failed");
+    await expect(service.collectAll(NOW)).rejects.toThrow(
+      "collection body failed",
+    );
 
     expect(lockRunner.query).toHaveBeenLastCalledWith(
       "SELECT pg_advisory_unlock($1) AS unlocked",
@@ -347,9 +472,9 @@ describe("TenderIngestionService", () => {
     lockRunner.query
       .mockResolvedValueOnce([{ locked: true }])
       .mockRejectedValueOnce(unlockError);
-    g2b.fetchNotices.mockResolvedValue([]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful());
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await expect(service.collectAll(NOW)).rejects.toBe(unlockError);
     expect(lockRunner.release).toHaveBeenCalledTimes(1);
@@ -358,9 +483,9 @@ describe("TenderIngestionService", () => {
   it("propagates a release failure after a successful collection", async () => {
     const releaseError = new Error("release failed");
     lockRunner.release.mockRejectedValue(releaseError);
-    g2b.fetchNotices.mockResolvedValue([]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful());
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await expect(service.collectAll(NOW)).rejects.toBe(releaseError);
   });
@@ -373,9 +498,9 @@ describe("TenderIngestionService", () => {
       .mockResolvedValueOnce([{ locked: true }])
       .mockRejectedValueOnce(unlockError);
     lockRunner.release.mockRejectedValue(releaseError);
-    g2b.fetchNotices.mockResolvedValue([]);
-    kapt.fetchNotices.mockResolvedValue([]);
-    kepco.fetchNotices.mockResolvedValue([]);
+    g2b.fetchNotices.mockResolvedValue(successful());
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
 
     await expect(service.collectAll(NOW)).rejects.toMatchObject({
       name: "AggregateError",
