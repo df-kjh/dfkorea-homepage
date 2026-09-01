@@ -33,7 +33,7 @@
 - Consumes: existing `PublicApiRequest` and `TenderSourceErrorCode`.
 - Produces: `PublicApiRetryEvent`, expanded `TenderSourceError`, and `PublicApiClientOptions` with `minimumRequestIntervalMs`, `retryDelaysMs`, and optional `onRetry`.
 
-- [ ] **Step 1: Write failing retry, parsing, and pacing tests**
+- [x] **Step 1: Write failing retry, parsing, and pacing tests**
 
 Add tests that exercise the real client with a controlled `fetcher`. The production change that makes them pass is page-level retry and shared request-slot scheduling.
 
@@ -112,7 +112,7 @@ it("paces concurrent callers through one shared request-start slot", async () =>
 
 Also add exact cases for HTTP `429/502/503/504`, `REQUEST_TIMEOUT`, and `NETWORK_ERROR`, plus gateway envelopes under `OpenAPI_ServiceResponse.cmmMsgHeader.returnReasonCode`. Assert that error messages and retry events contain none of `serviceKey`, the request URL, provider message, or response body.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -123,7 +123,7 @@ npm test -- --runInBand src/tenders/adapters/tender-adapters.spec.ts
 
 Expected: FAIL because retry options, gateway code parsing, request metadata, and shared pacing do not exist.
 
-- [ ] **Step 3: Implement the minimal client behavior**
+- [x] **Step 3: Implement the minimal client behavior**
 
 Use these exact public shapes:
 
@@ -163,11 +163,11 @@ constructor(
 )
 ```
 
-- [ ] **Step 4: Run focused and existing cancellation tests and verify GREEN**
+- [x] **Step 4: Run focused and existing cancellation tests and verify GREEN**
 
 Run the same Jest command. Expected: all adapter/client tests PASS, including timeout and caller-abort cleanup tests with no open timers.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add dfkorea-backend/src/tenders/adapters/public-api-client.ts \
