@@ -147,18 +147,27 @@ describe("official tender adapters", () => {
           ? "23"
           : "00";
       return new Response(
-        JSON.stringify({
-          response: {
-            header: {
-              resultCode,
-              resultMsg:
-                resultCode === "23"
-                  ? "serviceKey=secret-key rate limited"
-                  : "NORMAL SERVICE",
-            },
-            body: { totalCount: 0, items: [] },
-          },
-        }),
+        JSON.stringify(
+          resultCode === "23"
+            ? {
+                OpenAPI_ServiceResponse: {
+                  cmmMsgHeader: {
+                    errMsg: "LIMITED_NUMBER_OF_SERVICE_REQUESTS_PER_SECOND_EXCEEDS_ERROR",
+                    returnAuthMsg: "serviceKey=secret-key rate limited",
+                    returnReasonCode: "23",
+                  },
+                },
+              }
+            : {
+                response: {
+                  header: {
+                    resultCode,
+                    resultMsg: "NORMAL SERVICE",
+                  },
+                  body: { totalCount: 0, items: [] },
+                },
+              },
+        ),
         { status: 200 },
       );
     });

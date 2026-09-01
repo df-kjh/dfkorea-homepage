@@ -224,8 +224,16 @@ export class PublicApiClient implements TenderApiClient {
     const root = this.asRecord(response, source);
     const envelope = this.asRecord(root.response ?? root, source);
     const header = this.asRecordOrNull(envelope.header ?? root.header) ?? {};
+    const gatewayErrorEnvelope = this.asRecordOrNull(
+      root.OpenAPI_ServiceResponse,
+    );
+    const gatewayErrorHeader =
+      this.asRecordOrNull(gatewayErrorEnvelope?.cmmMsgHeader) ?? {};
     const resultCode = this.readText(
-      header.resultCode ?? root.resultCode ?? envelope.resultCode,
+      header.resultCode ??
+        root.resultCode ??
+        envelope.resultCode ??
+        gatewayErrorHeader.returnReasonCode,
     );
 
     if (!resultCode || !SUCCESS_CODES.has(resultCode.toUpperCase())) {
