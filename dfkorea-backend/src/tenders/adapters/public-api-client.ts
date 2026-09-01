@@ -67,16 +67,23 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 export interface PublicApiClientOptions {
   /** Timeout per provider page request. Defaults to ten seconds. */
   timeoutMs?: number;
+  /** Minimum interval between request starts made by this client. */
+  minimumRequestIntervalMs?: number;
 }
 
 export class PublicApiClient implements TenderApiClient {
   private readonly timeoutMs: number;
+  private readonly minimumRequestIntervalMs: number;
+  private nextRequestAt = 0;
 
   constructor(
     private readonly fetcher: Fetcher = globalThis.fetch,
     options: PublicApiClientOptions = {},
   ) {
     this.timeoutMs = this.toTimeoutMs(options.timeoutMs);
+    this.minimumRequestIntervalMs = this.toMinimumRequestIntervalMs(
+      options.minimumRequestIntervalMs,
+    );
   }
 
   async getAllPages<T extends Record<string, unknown>>(
@@ -105,6 +112,10 @@ export class PublicApiClient implements TenderApiClient {
   ): Promise<unknown> {
     if (request.signal?.aborted) {
       throw new TenderSourceError(request.source, "REQUEST_ABORTED", null);
+    }
+
+    if (this.minimumRequestIntervalMs > 0) {
+      await this.waitForRequestSlot(request.source, request.signal);
     }
 
     const url = this.createUrl(request, pageNo);
@@ -303,6 +314,35 @@ export class PublicApiClient implements TenderApiClient {
       return DEFAULT_REQUEST_TIMEOUT_MS;
     }
     return value;
+  }
+
+  private toMinimumRequestIntervalMs(value: number | undefined): number {
+    if (!Number.isFinite(value) || value === undefined || value < 0) {
+      return 0;
+    }
+    return value;
+  }
+
+  private async waitForRequestSlot(
+    source: TenderSource,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (this.minimumRequestIntervalMs === 0) {
+      return;
+    }
+
+    // JavaScript executes these assignments synchronously before the first
+    // await, so concurrent callers reserve distinct request-start slots.
+    const now = Date.now();
+    const scheduledAt = Math.max(now, this.nextRequestAt);
+    this.nextRequestAt = scheduledAt + this.minimumRequestIntervalMs;
+    const waitMs = scheduledAt - now;
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+    if (signal?.aborted) {
+      throw new TenderSourceError(source, "REQUEST_ABORTED", null);
+    }
   }
 }
 

@@ -54,10 +54,13 @@ import { NaverWorksMailTransport } from "./mail/naver-works-mail.transport";
       provide: G2B_TENDER_ADAPTER,
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>
-        new G2bTenderAdapter(new PublicApiClient(), {
-          baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
-          serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
-        }),
+        new G2bTenderAdapter(
+          new PublicApiClient(undefined, { minimumRequestIntervalMs: 400 }),
+          {
+            baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
+            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+          },
+        ),
     },
     {
       provide: KAPT_TENDER_ADAPTER,

@@ -469,6 +469,46 @@ describe("PublicApiClient", () => {
     expect(fetcher.mock.calls[1][0]).toContain("pageNo=2");
   });
 
+  it("paces concurrent page requests through one shared client", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn(async () =>
+      new Response(
+        JSON.stringify({
+          response: {
+            header: { resultCode: "00" },
+            body: { totalCount: 0, items: [] },
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new PublicApiClient(fetcher, {
+      minimumRequestIntervalMs: 400,
+    } as never);
+    const request = (operation: string) =>
+      client.getAllPages({
+        source: TenderSource.G2B,
+        baseUrl: "https://api.example.test/bids",
+        operation,
+        query: {},
+      });
+
+    const first = request("construction");
+    const second = request("goods");
+    const third = request("service");
+    await Promise.resolve();
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(399);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(400);
+    await Promise.all([first, second, third]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    jest.useRealTimers();
+  });
+
   it("redacts provider response details from failed result errors", async () => {
     const fetcher = jest.fn().mockResolvedValue(
       new Response(
