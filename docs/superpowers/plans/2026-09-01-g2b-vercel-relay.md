@@ -458,7 +458,7 @@ rg -n "TBD|TODO|implement later|fill in details" docs/superpowers/plans/2026-09-
 
 Expected: no real secret-like value and no implementation placeholder are found; fixture strings may appear only in tests.
 
-- [ ] **Step 5: Request final code review and resolve findings**
+- [x] **Step 5: Request final code review and resolve findings**
 
 Provide the reviewer the approved spec, this plan, and the complete task commit range. Require explicit checks for fail-closed parsing, HMAC correctness, secret leakage, fallback eligibility, request pacing, and regression risk. Resolve every Critical/Important finding and rerun the affected focused suite.
 
