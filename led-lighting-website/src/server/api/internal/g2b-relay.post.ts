@@ -29,6 +29,12 @@ const relayUnavailable = () => createError({ statusCode: 500, statusMessage: 'Re
 
 const invalidRequest = () => createError({ statusCode: 400, statusMessage: 'Invalid request' })
 
+const warnRejectedRequest = (stage: 'body_read' | 'body_size' | 'payload_validation') => {
+  // Keep this diagnostic deliberately value-free: request bodies, signatures,
+  // provider configuration, and query strings must never reach runtime logs.
+  console.warn(`[G2B relay] request rejected; stage=${stage}`)
+}
+
 const toBuffer = (chunk: unknown): Buffer => {
   if (Buffer.isBuffer(chunk)) return chunk
   if (typeof chunk === 'string') return Buffer.from(chunk)
@@ -124,9 +130,11 @@ export const createG2bRelayHandler = (
     try {
       body = await dependencies.readBody(event, MAX_BODY_BYTES)
     } catch {
+      warnRejectedRequest('body_read')
       throw invalidRequest()
     }
     if (body.byteLength === 0 || body.byteLength > MAX_BODY_BYTES) {
+      warnRejectedRequest('body_size')
       throw invalidRequest()
     }
 
@@ -148,6 +156,7 @@ export const createG2bRelayHandler = (
     try {
       payload = parseAndValidateRelayPayload(body)
     } catch {
+      warnRejectedRequest('payload_validation')
       throw invalidRequest()
     }
 
