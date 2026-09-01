@@ -84,7 +84,7 @@ export class KaptTenderAdapter implements TenderSourceAdapter {
       procurementType: ProcurementType.OTHER,
       contractMethod: null,
       estimatedAmount: null,
-      sourceUrl: `https://www.k-apt.go.kr/web/bid/bidDetail.do?bidNum=${encodeURIComponent(sourceNoticeId)}`,
+      sourceUrl: `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=${encodeURIComponent(sourceNoticeId)}`,
       itemName: "",
       description: toNullableText(row.bidContent) ?? "",
       attachmentNames: [],

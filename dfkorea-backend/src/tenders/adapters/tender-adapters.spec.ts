@@ -155,7 +155,7 @@ describe("official tender adapters", () => {
         region: "서울특별시 송파구",
         estimatedAmount: null,
         sourceUrl:
-          "https://www.k-apt.go.kr/web/bid/bidDetail.do?bidNum=202608260001",
+          "https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=202608260001",
         description: "공용부 실내 조명 및 등기구 교체",
         rawData: kaptFixture.response.body.items[0],
       }),
