@@ -496,6 +496,83 @@ describe("PublicApiClient", () => {
     }
   });
 
+  it("measures pacing immediately before fetch after slow query serialization", async () => {
+    jest.useFakeTimers({ now: 0 });
+    const starts: number[] = [];
+    const fetcher = jest.fn(async () => {
+      starts.push(Date.now());
+      return providerResponse("00", [], 0);
+    });
+    const slowServiceKey = {
+      toString: () => {
+        jest.setSystemTime(Date.now() + 1_250);
+        return "secret-key";
+      },
+    } as unknown as string;
+    const client = new PublicApiClient(fetcher, {
+      minimumRequestIntervalMs: 1_100,
+    });
+    const requests = Promise.all([
+      client.getAllPages({
+        ...requestFor("construction"),
+        query: { serviceKey: slowServiceKey },
+      }),
+      client.getAllPages(requestFor("goods")),
+    ]);
+
+    await jest.runAllTimersAsync();
+    await requests;
+
+    try {
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1_100);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("releases pacing without marking a start when query serialization fails", async () => {
+    jest.useFakeTimers({ now: 0 });
+    const starts: number[] = [];
+    const fetcher = jest.fn(async () => {
+      starts.push(Date.now());
+      return providerResponse("00", [], 0);
+    });
+    const invalidServiceKey = {
+      toString: () => {
+        throw new Error("query serialization serviceKey=secret-key");
+      },
+    } as unknown as string;
+    const client = new PublicApiClient(fetcher, {
+      minimumRequestIntervalMs: 1_100,
+    });
+    const failedRequest = client
+      .getAllPages({
+        ...requestFor("construction"),
+        query: { serviceKey: invalidServiceKey },
+      })
+      .then(
+        () => fail("expected query serialization to fail"),
+        (error: TenderSourceError) => error,
+      );
+    const nextRequest = client.getAllPages(requestFor("goods"));
+
+    await jest.runAllTimersAsync();
+
+    try {
+      await expect(failedRequest).resolves.toMatchObject({
+        code: "NETWORK_ERROR",
+        operation: "construction",
+        pageNo: 1,
+      });
+      expect((await failedRequest).message).not.toContain("secret-key");
+      await expect(nextRequest).resolves.toEqual([]);
+      expect(starts).toEqual([0]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("sends the exact official G2B minute-window and pagination parameters for every operation", async () => {
     const row = g2bFixture.response.body.items[0];
     const fetcher = jest.fn(async (urlText: string) => {

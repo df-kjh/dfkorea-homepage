@@ -67,6 +67,11 @@ export interface TenderApiClient {
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
+interface RequestStartPermit {
+  markStarted(): void;
+  releaseWithoutStart(): void;
+}
+
 export interface PublicApiClientOptions {
   /** Timeout per provider page request. Defaults to ten seconds. */
   timeoutMs?: number;
@@ -153,14 +158,15 @@ export class PublicApiClient implements TenderApiClient {
       }
 
       const requestStart = this.acquireRequestStart(request, pageNo, attempt);
-      const markRequestStarted = requestStart ? await requestStart : null;
+      const requestStartPermit = requestStart ? await requestStart : null;
 
       try {
-        // Releasing the gate schedules the next waiter as a microtask. This
-        // synchronous call then reaches fetcher first and records its actual
-        // request-start boundary immediately beforehand.
-        markRequestStarted?.();
-        const body = await this.fetchPage(request, pageNo, attempt);
+        const body = await this.fetchPage(
+          request,
+          pageNo,
+          attempt,
+          requestStartPermit,
+        );
         return this.readPage<T>(body, request, pageNo, attempt);
       } catch (error) {
         const sourceError = this.withRequestMetadata(
@@ -182,6 +188,10 @@ export class PublicApiClient implements TenderApiClient {
           httpStatus: sourceError.status,
           attempt,
         });
+      } finally {
+        // URL or query serialization can fail before fetcher is reached. Such
+        // attempts must unblock the next waiter without recording a start.
+        requestStartPermit?.releaseWithoutStart();
       }
     }
 
@@ -201,6 +211,7 @@ export class PublicApiClient implements TenderApiClient {
     request: PublicApiRequest,
     pageNo: number,
     attempt: number,
+    requestStartPermit: RequestStartPermit | null,
   ): Promise<unknown> {
     if (request.signal?.aborted) {
       throw new TenderSourceError(
@@ -276,6 +287,7 @@ export class PublicApiClient implements TenderApiClient {
         request,
         pageNo,
         attempt,
+        requestStartPermit,
         controller.signal,
       );
       pending.push(timeoutPromise, requestPromise);
@@ -334,8 +346,13 @@ export class PublicApiClient implements TenderApiClient {
     request: PublicApiRequest,
     pageNo: number,
     attempt: number,
+    requestStartPermit: RequestStartPermit | null,
     signal: AbortSignal,
   ): Promise<unknown> {
+    // Gate release queues the next waiter as a microtask. The fetcher call
+    // below executes first in this same stack, so the recorded timestamp is
+    // immediately adjacent to the actual provider request start.
+    requestStartPermit?.markStarted();
     const response = await this.fetcher(url, { signal });
     if (!response.ok) {
       throw new TenderSourceError(
@@ -492,7 +509,7 @@ export class PublicApiClient implements TenderApiClient {
     request: PublicApiRequest,
     pageNo: number,
     attempt: number,
-  ): Promise<() => void> | null {
+  ): Promise<RequestStartPermit> | null {
     if (this.minimumRequestIntervalMs <= 0) {
       return null;
     }
@@ -518,7 +535,7 @@ export class PublicApiClient implements TenderApiClient {
     request: PublicApiRequest,
     pageNo: number,
     attempt: number,
-  ): Promise<() => void> {
+  ): Promise<RequestStartPermit> {
     try {
       await precedingRequestStart;
 
@@ -538,13 +555,19 @@ export class PublicApiClient implements TenderApiClient {
       await this.wait(0, request, pageNo, attempt);
 
       let released = false;
-      return () => {
+      const release = (started: boolean) => {
         if (released) {
           return;
         }
         released = true;
-        this.lastRequestStartedAt = Date.now();
+        if (started) {
+          this.lastRequestStartedAt = Date.now();
+        }
         releaseGate();
+      };
+      return {
+        markStarted: () => release(true),
+        releaseWithoutStart: () => release(false),
       };
     } catch (error) {
       releaseGate();
