@@ -469,7 +469,7 @@ git commit -m "fix: report partial tender collection"
 - Consumes: K-apt `bidNum` mapped to `NormalizedTender.sourceNoticeId`.
 - Produces: canonical `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum={encodedBidNum}` for new rows and a data-only correction for old rows.
 
-- [ ] **Step 1: Change tests first and verify the old route fails expectations**
+- [x] **Step 1: Change tests first and verify the old route fails expectations**
 
 Update the existing K-apt adapter expectation to:
 
@@ -502,7 +502,7 @@ describe("FixKaptSourceUrls1788135100000", () => {
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 cd dfkorea-backend
@@ -513,7 +513,7 @@ npm test -- --runInBand \
 
 Expected: adapter expectation FAILS on `/web/bid/`; migration test cannot import the new class.
 
-- [ ] **Step 3: Implement canonical URL generation and the data migration**
+- [x] **Step 3: Implement canonical URL generation and the data migration**
 
 Change the adapter route to `/bid/bidDetail.do`. Add `FixKaptSourceUrls1788135100000 implements MigrationInterface` with `name = "FixKaptSourceUrls1788135100000"`. `up` must return when `tenders` does not exist, then execute one parameterized update:
 
@@ -533,15 +533,15 @@ await queryRunner.query(
 
 `down` contains only a comment explaining that a valid canonical URL must not be reverted to a known 404 route. Do not update rows from other sources or already canonical K-apt URLs.
 
-- [ ] **Step 4: Update operating documentation**
+- [x] **Step 4: Update operating documentation**
 
 In `docs/menus/tenders.md`, add the canonical K-apt official-link behavior under `구현 완료`, add the data migration to `관련 파일`, and record the live-link verification limitation under `부족하거나 개선이 필요한 기능`. In `database-schema.md`, add `1788135100000-FixKaptSourceUrls` to migration history as a data-only, row-preserving correction; do not change the `tenders` column table.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run the Step 2 command. Expected: both adapter and migration suites PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add dfkorea-backend/src/migrations/1788135100000-FixKaptSourceUrls.ts \
