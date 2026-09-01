@@ -196,7 +196,7 @@ git commit -m "fix: harden public tender API requests"
 - Consumes: Task 1 `TenderSourceError` metadata and `PublicApiClient` options.
 - Produces: `TenderSourceFetchResult`, `TenderOperationFailure`, and `SyncRunStatus.PARTIAL` used by ingestion and the frontend contract.
 
-- [ ] **Step 1: Write failing adapter and ingestion tests**
+- [x] **Step 1: Write failing adapter and ingestion tests**
 
 Define tests before changing the interface:
 
@@ -283,7 +283,7 @@ it("persists partial notices without treating the run as a successful watermark"
 
 Add a separate all-three-fail test expecting `FAILED`, zero notices, and no upsert. Spy on `Logger.prototype.warn` and assert safe operation/page/code/status/attempt fields are present while secret strings and raw response text are absent. Keep the existing `resolveWindow` assertion that queries only `status: SUCCEEDED`.
 
-- [ ] **Step 2: Run adapter, ingestion, and contract tests and verify RED**
+- [x] **Step 2: Run adapter, ingestion, and contract tests and verify RED**
 
 ```bash
 cd dfkorea-backend
@@ -296,7 +296,7 @@ npm run test:tender:contract
 
 Expected: FAIL because adapters still return arrays and `PARTIAL` is not a valid status.
 
-- [ ] **Step 3: Add the provider-neutral result contract**
+- [x] **Step 3: Add the provider-neutral result contract**
 
 Use these exact types in `tender-source.adapter.ts`:
 
@@ -325,14 +325,14 @@ export interface TenderSourceAdapter {
 
 Add `PARTIAL = "PARTIAL"` to `SyncRunStatus`. Wrap K-apt and enabled/disabled KEPCO array results as `SUCCEEDED` with `failures: []`; do not change their request policies.
 
-- [ ] **Step 4: Implement sequential G2B results and safe ingestion logging**
+- [x] **Step 4: Implement sequential G2B results and safe ingestion logging**
 
-Replace `Promise.all` in `G2bTenderAdapter` with a `for...of` loop. Catch each operation, convert `TenderSourceError` through one private `toOperationFailure(operation, error)` helper, and continue. Calculate the result exactly:
+Replace `Promise.all` in `G2bTenderAdapter` with a `for...of` loop. Catch each operation, convert `TenderSourceError` through one private `toOperationFailure(operation, error)` helper, and continue. Track `successfulOperationCount` independently from the notice count so a valid empty provider response still counts as a successful operation. Calculate the result exactly:
 
 ```ts
 const status = failures.length === 0
   ? SyncRunStatus.SUCCEEDED
-  : notices.length > 0
+  : successfulOperationCount > 0
     ? SyncRunStatus.PARTIAL
     : SyncRunStatus.FAILED;
 return {
@@ -362,11 +362,11 @@ const client = new PublicApiClient(undefined, {
 
 In `TenderIngestionService`, classify and upsert `fetchResult.notices`, persist `fetchResult.status/errorCode`, and log each final failure through a formatter that accepts only the `TenderOperationFailure` fields. Expand `SourceCollectionSummary.status` to include `SyncRunStatus.PARTIAL`. `failedSources` continues to contain only `FAILED` sources, so the existing API field retains its meaning.
 
-- [ ] **Step 5: Run focused and contract tests and verify GREEN**
+- [x] **Step 5: Run focused and contract tests and verify GREEN**
 
 Run the Step 2 commands. Expected: all selected suites and all contract suites PASS.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 ```bash
 git add dfkorea-backend/src/tenders
