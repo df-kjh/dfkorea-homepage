@@ -114,7 +114,7 @@ API 키, 전체 URL, query string, provider 응답 본문, 예외 cause는 로�
 
 이미 저장된 공고도 즉시 고치기 위해 data migration을 실행한다. migration은 `source='KAPT'`이고 기존 `/web/bid/bidDetail.do?bidNum=` prefix를 가진 행의 `sourceUrl`만 새 prefix로 치환한다. 공고 ID, 공고번호, 원문 응답, 관련도, 수집·메일 이력은 변경하거나 삭제하지 않는다. `down`은 유효한 주소를 다시 404 주소로 훼손하지 않도록 의도적인 no-op으로 둔다.
 
-## 9. 데이터 안전과 배포
+## 9. 데이터 안전과 운영 반영
 
 DB 스키마 변경은 없다. G2B 관련 데이터는 수정하지 않으며 기존 `tenders`, `tender_sync_runs`, 메일 이력을 유지한다. K-apt data migration은 잘못된 `sourceUrl` 문자열만 비파괴적으로 보정하고 어떤 행이나 이력도 삭제하지 않는다.
 
