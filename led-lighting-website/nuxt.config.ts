@@ -17,7 +17,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",
     g2bTenderApiBaseUrl: process.env.G2B_TENDER_API_BASE_URL || "",
-    publicDataServiceKey: process.env.PUBLIC_DATA_SERVICE_KEY || "",
+    // Vercel reserves PUBLIC_* for browser-exposed values, so the relay must
+    // fail closed unless its separately named server-only key is configured.
+    publicDataServiceKey: process.env.G2B_DATA_SERVICE_KEY || "",
     public: {
       apiBaseUrl:
         configuredApiBaseUrl ||

@@ -235,7 +235,7 @@ Add only private properties above `public` in `runtimeConfig`:
 runtimeConfig: {
   g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",
   g2bTenderApiBaseUrl: process.env.G2B_TENDER_API_BASE_URL || "",
-  publicDataServiceKey: process.env.PUBLIC_DATA_SERVICE_KEY || "",
+  publicDataServiceKey: process.env.G2B_DATA_SERVICE_KEY || "",
   public: { /* existing values unchanged */ },
 },
 ```
@@ -419,7 +419,7 @@ Preserve the document's required headings (`구현 완료`, `미구현`, `부족
 - G2B는 Railway 직접 수집을 우선하고, HTTP 200이지만 결과 코드가 없는 특정 실패만 Vercel 보안 릴레이로 작업 단위 재시도한다.
 - 릴레이는 세 가지 G2B 작업과 고정 쿼리만 허용하며 HMAC 인증, 5분 시각 제한, 서버 전용 키를 사용한다.
 - Railway 운영 변수: `G2B_RELAY_ENABLED`, `G2B_RELAY_URL`, `G2B_RELAY_SHARED_SECRET`.
-- Vercel 운영 변수: `G2B_RELAY_SHARED_SECRET`, `G2B_TENDER_API_BASE_URL`, `PUBLIC_DATA_SERVICE_KEY`.
+- Vercel 운영 변수: `G2B_RELAY_SHARED_SECRET`, `G2B_TENDER_API_BASE_URL`, `G2B_DATA_SERVICE_KEY`.
 - 릴레이에서도 공공데이터포털 응답이 차단되면 별도 국내 호스팅 수집기가 필요하다.
 ```
 
@@ -490,7 +490,7 @@ Generate at least 32 random bytes in a temporary shell variable, feed the same v
 
 - [ ] **Step 3: Copy server-only provider configuration to Vercel without displaying values**
 
-Read `G2B_TENDER_API_BASE_URL` and `PUBLIC_DATA_SERVICE_KEY` from the linked Railway production environment directly into process variables, add them to Vercel production environment through stdin, then unset them. Set Railway:
+Read `G2B_TENDER_API_BASE_URL` and Railway's `PUBLIC_DATA_SERVICE_KEY` from the linked Railway production environment directly into process variables. Add the former to Vercel under the same name and the latter to Vercel under `G2B_DATA_SERVICE_KEY` through stdin, then unset them. Never place the key in a relay request. Set Railway:
 
 ```text
 G2B_RELAY_ENABLED=true

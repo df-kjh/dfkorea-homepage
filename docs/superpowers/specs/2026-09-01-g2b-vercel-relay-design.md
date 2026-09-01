@@ -74,7 +74,7 @@ Allowed payload fields:
 
 The only allowed operation values are the three G2B operations above. Dates must be 12 decimal digits, `pageNo` must be 1–100, `numOfRows` must be exactly 100, `type` must be `json`, and `inqryDiv` must be `1`. Unknown or duplicate fields are rejected. Request bodies are size-limited.
 
-Vercel reconstructs the provider URL from its own `G2B_TENDER_API_BASE_URL` and `PUBLIC_DATA_SERVICE_KEY`, performs one provider-page request, and returns the provider JSON to Railway without logging it. Railway's existing `PublicApiClient` remains responsible for provider result validation and pagination.
+Vercel reconstructs the provider URL from its own `G2B_TENDER_API_BASE_URL` and `G2B_DATA_SERVICE_KEY`, performs one provider-page request, and returns the provider JSON to Railway without logging it. Railway's existing `PublicApiClient` remains responsible for provider result validation and pagination. Railway retains `PUBLIC_DATA_SERVICE_KEY` for its direct collector only; the same key value is copied into Vercel under the non-public name `G2B_DATA_SERVICE_KEY` and is never transported in relay requests.
 
 The relay client uses a conservative 1,500 ms minimum request-start interval. Calls are sequential, so this also keeps proxied provider page starts safely above the existing 1,100 ms target despite network-latency variation.
 
@@ -99,7 +99,7 @@ Required Vercel variables:
 
 - `G2B_RELAY_SHARED_SECRET`: the exact same generated value used by Railway
 - `G2B_TENDER_API_BASE_URL`: the existing production G2B base URL
-- `PUBLIC_DATA_SERVICE_KEY`: the existing production public-data service key
+- `G2B_DATA_SERVICE_KEY`: the existing production public-data service key, copied from Railway's `PUBLIC_DATA_SERVICE_KEY` under this Vercel-only non-public name
 
 Secrets are set through authenticated CLIs without echoing their values.
 

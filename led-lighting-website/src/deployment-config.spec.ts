@@ -89,7 +89,10 @@ describe('server-only G2B relay configuration', () => {
     const markers = {
       G2B_RELAY_SHARED_SECRET: 'private-relay-secret-marker',
       G2B_TENDER_API_BASE_URL: 'https://private-provider.example.test/base',
-      PUBLIC_DATA_SERVICE_KEY: 'private-public-data-key-marker',
+      G2B_DATA_SERVICE_KEY: 'private-g2b-data-key-marker',
+      // Railway keeps this name for its direct collector. Vercel must not use
+      // it because `PUBLIC_` variables are exposed by Vercel's secret model.
+      PUBLIC_DATA_SERVICE_KEY: 'railway-only-data-key-marker',
     }
     for (const [name, value] of Object.entries(markers)) {
       vi.stubEnv(name, value)
@@ -108,7 +111,7 @@ describe('server-only G2B relay configuration', () => {
     expect(runtimeConfig).toMatchObject({
       g2bRelaySharedSecret: markers.G2B_RELAY_SHARED_SECRET,
       g2bTenderApiBaseUrl: markers.G2B_TENDER_API_BASE_URL,
-      publicDataServiceKey: markers.PUBLIC_DATA_SERVICE_KEY,
+      publicDataServiceKey: markers.G2B_DATA_SERVICE_KEY,
     })
     expect(runtimeConfig.public).not.toHaveProperty('g2bRelaySharedSecret')
     expect(runtimeConfig.public).not.toHaveProperty('g2bTenderApiBaseUrl')
@@ -117,6 +120,9 @@ describe('server-only G2B relay configuration', () => {
     const clientConfig = JSON.stringify(runtimeConfig.public)
     expect(clientConfig).not.toContain(markers.G2B_RELAY_SHARED_SECRET)
     expect(clientConfig).not.toContain(markers.G2B_TENDER_API_BASE_URL)
+    expect(clientConfig).not.toContain(markers.G2B_DATA_SERVICE_KEY)
     expect(clientConfig).not.toContain(markers.PUBLIC_DATA_SERVICE_KEY)
+    expect(nuxtConfig).toContain('process.env.G2B_DATA_SERVICE_KEY')
+    expect(nuxtConfig).not.toContain('process.env.PUBLIC_DATA_SERVICE_KEY')
   })
 })
