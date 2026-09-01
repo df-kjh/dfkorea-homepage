@@ -480,15 +480,15 @@ git commit -m "docs: document G2B relay operations"
 - Consumes: authenticated Railway project `dfkorea`, Vercel project `dfkorea-frontend`, production URLs, and the verified commits from Tasks 1 through 4
 - Produces: deployed relay/backend fallback and an evidence-backed production G2B collection result
 
-- [ ] **Step 1: Merge the verified worktree branch into local `main`**
+- [x] **Step 1: Merge the verified worktree branch into local `main`**
 
 Confirm `main` has no unrelated changes, merge with a non-fast-forward merge, and rerun `git status --short --branch`. Do not reset, discard, or overwrite user changes.
 
-- [ ] **Step 2: Generate and set the shared secret without printing it**
+- [x] **Step 2: Generate and set the shared secret without printing it**
 
 Generate at least 32 random bytes in a temporary shell variable, feed the same value through authenticated Vercel and Railway CLI stdin/environment-variable commands, and unset the shell variable immediately. Never pass the value as an echoed command argument and never include CLI secret output in commentary.
 
-- [ ] **Step 3: Copy server-only provider configuration to Vercel without displaying values**
+- [x] **Step 3: Copy server-only provider configuration to Vercel without displaying values**
 
 Read `G2B_TENDER_API_BASE_URL` and Railway's `PUBLIC_DATA_SERVICE_KEY` from the linked Railway production environment directly into process variables. Add the former to Vercel under the same name and the latter to Vercel under `G2B_DATA_SERVICE_KEY` through stdin, then unset them. Never place the key in a relay request. Set Railway:
 
