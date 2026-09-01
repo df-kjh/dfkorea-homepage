@@ -29,6 +29,28 @@ const SIGNATURE_WINDOW_MS = 5 * 60 * 1000
 const OFFICIAL_G2B_HOST = 'apis.data.go.kr'
 const OFFICIAL_G2B_PATH_PREFIX = '/1230000/ad/BidPublicInfoService'
 
+export type RelayPayloadRejectionReason =
+  | 'top_level_keys'
+  | 'operation'
+  | 'query_keys'
+  | 'type'
+  | 'inquiry_division'
+  | 'begin_date'
+  | 'end_date'
+  | 'date_order'
+  | 'page_no'
+  | 'row_count'
+
+export class RelayPayloadValidationError extends Error {
+  constructor(readonly reason: RelayPayloadRejectionReason) {
+    super('Invalid relay payload')
+  }
+}
+
+const rejectPayload = (reason: RelayPayloadRejectionReason): never => {
+  throw new RelayPayloadValidationError(reason)
+}
+
 class JsonObjectKeyScanner {
   private index = 0
 
@@ -163,32 +185,31 @@ const isAllowedOperation = (value: unknown): value is G2bRelayOperation =>
 
 export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
   if (!isRecord(value) || !hasExactOwnKeys(value, PAYLOAD_KEYS)) {
-    throw new Error('Invalid relay payload')
+    return rejectPayload('top_level_keys')
   }
 
   if (!isAllowedOperation(value.operation) || !isRecord(value.query)) {
-    throw new Error('Invalid relay payload')
+    return rejectPayload('operation')
   }
 
   const query = value.query
   if (!hasExactOwnKeys(query, QUERY_KEYS)) {
-    throw new Error('Invalid relay payload')
+    return rejectPayload('query_keys')
   }
 
-  if (
-    query.type !== 'json' ||
-    query.inqryDiv !== '1' ||
-    typeof query.inqryBgnDt !== 'string' ||
-    !TWELVE_DIGIT_DATE.test(query.inqryBgnDt) ||
-    typeof query.inqryEndDt !== 'string' ||
-    !TWELVE_DIGIT_DATE.test(query.inqryEndDt) ||
-    query.inqryBgnDt > query.inqryEndDt ||
-    typeof query.pageNo !== 'string' ||
-    !VALID_PAGE.test(query.pageNo) ||
-    query.numOfRows !== '100'
-  ) {
-    throw new Error('Invalid relay payload')
+  if (query.type !== 'json') return rejectPayload('type')
+  if (query.inqryDiv !== '1') return rejectPayload('inquiry_division')
+  if (typeof query.inqryBgnDt !== 'string' || !TWELVE_DIGIT_DATE.test(query.inqryBgnDt)) {
+    return rejectPayload('begin_date')
   }
+  if (typeof query.inqryEndDt !== 'string' || !TWELVE_DIGIT_DATE.test(query.inqryEndDt)) {
+    return rejectPayload('end_date')
+  }
+  if (query.inqryBgnDt > query.inqryEndDt) return rejectPayload('date_order')
+  if (typeof query.pageNo !== 'string' || !VALID_PAGE.test(query.pageNo)) {
+    return rejectPayload('page_no')
+  }
+  if (query.numOfRows !== '100') return rejectPayload('row_count')
 
   return {
     operation: value.operation,

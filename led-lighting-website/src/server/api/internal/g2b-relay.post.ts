@@ -3,6 +3,7 @@ import { createError, defineEventHandler, getRequestHeader, type H3Event } from 
 import {
   buildG2bProviderUrl,
   parseAndValidateRelayPayload,
+  RelayPayloadValidationError,
   verifyRelaySignature,
 } from '../../utils/g2b-relay'
 
@@ -29,10 +30,15 @@ const relayUnavailable = () => createError({ statusCode: 500, statusMessage: 'Re
 
 const invalidRequest = () => createError({ statusCode: 400, statusMessage: 'Invalid request' })
 
-const warnRejectedRequest = (stage: 'body_read' | 'body_size' | 'payload_validation') => {
+const warnRejectedRequest = (
+  stage: 'body_read' | 'body_size' | 'payload_validation',
+  reason?: string,
+) => {
   // Keep this diagnostic deliberately value-free: request bodies, signatures,
   // provider configuration, and query strings must never reach runtime logs.
-  console.warn(`[G2B relay] request rejected; stage=${stage}`)
+  console.warn(
+    `[G2B relay] request rejected; stage=${stage}${reason ? `; reason=${reason}` : ''}`,
+  )
 }
 
 const toBuffer = (chunk: unknown): Buffer => {
@@ -155,8 +161,11 @@ export const createG2bRelayHandler = (
     let payload: ReturnType<typeof parseAndValidateRelayPayload>
     try {
       payload = parseAndValidateRelayPayload(body)
-    } catch {
-      warnRejectedRequest('payload_validation')
+    } catch (error) {
+      warnRejectedRequest(
+        'payload_validation',
+        error instanceof RelayPayloadValidationError ? error.reason : 'syntax_or_duplicate_keys',
+      )
       throw invalidRequest()
     }
 
