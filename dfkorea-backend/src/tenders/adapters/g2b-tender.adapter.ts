@@ -42,6 +42,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
   ): Promise<TenderSourceFetchResult> {
     const notices: NormalizedTender[] = [];
     const failures: TenderOperationFailure[] = [];
+    let successfulOperationCount = 0;
 
     for (const [operation, procurementType] of G2B_OPERATIONS) {
       try {
@@ -64,6 +65,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
             return normalized ? [normalized] : [];
           }),
         );
+        successfulOperationCount += 1;
       } catch (error) {
         failures.push(this.toOperationFailure(operation, error));
       }
@@ -72,7 +74,7 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
     const status =
       failures.length === 0
         ? SyncRunStatus.SUCCEEDED
-        : notices.length > 0
+        : successfulOperationCount > 0
           ? SyncRunStatus.PARTIAL
           : SyncRunStatus.FAILED;
 

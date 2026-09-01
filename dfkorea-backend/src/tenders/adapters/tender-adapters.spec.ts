@@ -281,6 +281,45 @@ describe("official tender adapters", () => {
     ]);
   });
 
+  it("reports PARTIAL when successful G2B operations have no notices and another operation fails", async () => {
+    const client = createClient();
+    client.getAllPages
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "PROVIDER_RESULT_ERROR",
+          200,
+          undefined,
+          "getBidPblancListInfoThng",
+          1,
+          "23",
+          3,
+        ),
+      )
+      .mockResolvedValueOnce([]);
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        notices: [],
+        status: SyncRunStatus.PARTIAL,
+        errorCode: "PARTIAL_PROVIDER_FAILURE",
+        failures: [
+          expect.objectContaining({
+            operation: "getBidPblancListInfoThng",
+            errorCode: "PROVIDER_RESULT_ERROR",
+          }),
+        ],
+      }),
+    );
+  });
+
   it("reports G2B as failed with no notices when all broad operations fail", async () => {
     const client = createClient();
     client.getAllPages
