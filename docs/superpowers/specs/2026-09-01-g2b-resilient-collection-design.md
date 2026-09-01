@@ -1,8 +1,8 @@
-# G2B 광범위 공고 수집 안정화 설계
+# G2B 광범위 공고 수집 안정화 및 K-apt 원문 링크 수정 설계
 
 ## 1. 목적
 
-나라장터의 공사·물품·용역 공고를 기존처럼 모두 수집하면서, 공공데이터포털의 간헐적 제한 또는 일시 오류 하나가 G2B 전체 수집을 무조건 실패시키는 문제를 제거한다. 물품 납품·MAS 중심 분류는 다시 도입하지 않는다.
+나라장터의 공사·물품·용역 공고를 기존처럼 모두 수집하면서, 공공데이터포털의 간헐적 제한 또는 일시 오류 하나가 G2B 전체 수집을 무조건 실패시키는 문제를 제거한다. 물품 납품·MAS 중심 분류는 다시 도입하지 않는다. K-apt 공고의 공식 원문 버튼은 현재 유효한 상세 페이지로 이동하도록 신규·기존 데이터를 함께 수정한다.
 
 ## 2. 확인된 원인과 설계 전제
 
@@ -10,6 +10,7 @@
 - 현재 롤백된 어댑터는 공사·물품·용역을 `Promise.all`로 동시에 시작하고, 어느 한 operation의 한 페이지라도 비정상 provider code를 반환하면 이미 성공한 결과까지 버리고 G2B 전체를 `FAILED`로 끝낸다.
 - 현재 오류 객체는 operation, page, provider result code를 보존하지 않는다. 이 때문에 collect API에는 `PROVIDER_RESULT_ERROR`만 보이고 Railway 로그에는 원인 경계가 남지 않는다.
 - 같은 입력이 직접 재현에서는 성공하고 실제 수집에서는 간헐적으로 실패하므로, 공급자의 일시적 응답 및 병렬 호출 타이밍을 견디는 수집 경계가 필요하다.
+- 현재 K-apt 어댑터가 만드는 `https://www.k-apt.go.kr/web/bid/bidDetail.do?bidNum=...`는 실공고 번호로 HTTP 404를 반환한다. 공식 사이트의 현재 상세 경로 `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=...`는 같은 번호로 HTTP 200과 상세 내용을 반환한다.
 
 ## 3. 범위
 
@@ -22,13 +23,15 @@
 - 민감정보를 제외한 operation·page·provider code 로깅
 - collect API와 즉시 수집 UI의 `PARTIAL` 상태 처리
 - 회귀 테스트와 입찰 메뉴 기능 문서 갱신
+- K-apt 신규 공고의 공식 상세 URL 생성 수정
+- 기존 K-apt 공고의 잘못된 URL을 행 삭제 없이 일괄 보정하는 migration
 
 ### 3.2 제외
 
 - 물품 납품·MAS 전용 수집, 표시 또는 메일 제한
 - 나라장터 면허제한 API 추가
-- K-apt·KEPCO 수집 정책 변경
-- DB 스키마 또는 기존 공고·메일 데이터 변경
+- K-apt·KEPCO 수집 주기·분류·재시도 정책 변경
+- DB 스키마 변경 또는 기존 공고·메일 행 삭제
 - 외부 작업 큐나 별도 수집 서버 도입
 
 ## 4. 수집 구조
@@ -98,11 +101,21 @@ API 키, 전체 URL, query string, provider 응답 본문, 예외 cause는 로�
 - 모두 실패 시 `FAILED`가 되는지 검증
 - `PARTIAL`이 완전 성공 watermark로 선택되지 않는 기존 조회 조건 검증
 - 로그와 collect 응답에 키·URL·provider body가 포함되지 않는지 검증
+- K-apt 어댑터가 `/bid/bidDetail.do?bidNum=` 공식 URL을 생성하는지 검증
+- URL 보정 migration이 K-apt의 기존 `/web/bid/` 링크만 수정하고 다른 출처와 이미 올바른 링크는 건드리지 않는지 검증
 - 백엔드 전체 CI, 계약 테스트, 프론트엔드 테스트·운영 빌드 실행
 - 배포 후 Railway/Vercel 성공, 운영 API HTTP 200 확인
 
-## 8. 데이터 안전과 배포
+## 8. K-apt 공식 원문 링크
 
-DB migration과 데이터 수정은 없다. 기존 `tenders`, `tender_sync_runs`, 메일 이력은 유지한다. 변경은 수집 요청 순서, 어댑터 결과 계약, 오류 관측성, 즉시 수집 상태 안내에 한정한다.
+`KaptTenderAdapter`는 `sourceNoticeId`를 URL encoding해 다음 canonical URL을 저장한다.
+
+`https://www.k-apt.go.kr/bid/bidDetail.do?bidNum={sourceNoticeId}`
+
+이미 저장된 공고도 즉시 고치기 위해 data migration을 실행한다. migration은 `source='KAPT'`이고 기존 `/web/bid/bidDetail.do?bidNum=` prefix를 가진 행의 `sourceUrl`만 새 prefix로 치환한다. 공고 ID, 공고번호, 원문 응답, 관련도, 수집·메일 이력은 변경하거나 삭제하지 않는다. rollback은 해당 migration이 만든 canonical K-apt prefix만 이전 prefix로 되돌린다.
+
+## 9. 데이터 안전과 배포
+
+DB 스키마 변경은 없다. G2B 관련 데이터는 수정하지 않으며 기존 `tenders`, `tender_sync_runs`, 메일 이력을 유지한다. K-apt data migration은 잘못된 `sourceUrl` 문자열만 비파괴적으로 보정하고 어떤 행이나 이력도 삭제하지 않는다.
 
 구현은 새 커밋으로 `main`에 푸시하고 Railway·Vercel 자동 배포를 확인한다. 운영 관리자 인증이 필요한 collect endpoint는 배포 상태와 서버 health 확인 후 사용자가 즉시 수집으로 최종 확인한다.
