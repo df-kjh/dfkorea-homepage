@@ -447,9 +447,7 @@ describe("official tender adapters", () => {
   it("never repeats directly successful G2B operations through the relay", async () => {
     const directClient = createClient();
     const relayClient = createClient();
-    directClient.getAllPages.mockResolvedValue(
-      g2bFixture.response.body.items,
-    );
+    directClient.getAllPages.mockResolvedValue(g2bFixture.response.body.items);
     const adapter = new G2bTenderAdapter(
       directClient,
       {
@@ -465,6 +463,39 @@ describe("official tender adapters", () => {
     expect(result.status).toBe(SyncRunStatus.SUCCEEDED);
     expect(directClient.getAllPages).toHaveBeenCalledTimes(3);
     expect(relayClient.getAllPages).not.toHaveBeenCalled();
+  });
+
+  it("preserves the bounded response shape in a G2B operation failure", async () => {
+    const directClient = createClient();
+    directClient.getAllPages
+      .mockRejectedValueOnce(
+        new TenderSourceError(
+          TenderSource.G2B,
+          "PROVIDER_RESULT_ERROR",
+          200,
+          undefined,
+          "getBidPblancListInfoCnstwk",
+          1,
+          null,
+          1,
+          "GATEWAY_ERROR_SHAPE",
+        ),
+      )
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const adapter = new G2bTenderAdapter(directClient, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result.failures).toEqual([
+      expect.objectContaining({
+        operation: "getBidPblancListInfoCnstwk",
+        responseShape: "GATEWAY_ERROR_SHAPE",
+      }),
+    ]);
   });
 
   it.each([
@@ -601,10 +632,7 @@ describe("official tender adapters", () => {
     ]);
     expect(
       relayClient.getAllPages.mock.calls.map(([request]) => request.operation),
-    ).toEqual([
-      "getBidPblancListInfoCnstwk",
-      "getBidPblancListInfoServc",
-    ]);
+    ).toEqual(["getBidPblancListInfoCnstwk", "getBidPblancListInfoServc"]);
   });
 });
 

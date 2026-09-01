@@ -1,4 +1,7 @@
 import { TenderSource } from "../domain/tender.enums";
+import type { TenderResponseShape } from "../domain/tender-source.adapter";
+
+export type { TenderResponseShape } from "../domain/tender-source.adapter";
 
 export const G2B_TENDER_ADAPTER = Symbol("G2B_TENDER_ADAPTER");
 export const KAPT_TENDER_ADAPTER = Symbol("KAPT_TENDER_ADAPTER");
@@ -19,11 +22,6 @@ export type TenderSourceErrorCode =
   | "INVALID_RESPONSE"
   | "PROVIDER_RESULT_ERROR"
   | "PAGINATION_LIMIT";
-
-export type TenderResponseShape =
-  | "CANONICAL_BODY_WITHOUT_CODE"
-  | "GATEWAY_ERROR_SHAPE"
-  | "UNKNOWN_RESPONSE_SHAPE";
 
 /**
  * Error details intentionally exclude URLs, query strings, and provider bodies

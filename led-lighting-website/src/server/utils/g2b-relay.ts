@@ -21,18 +21,13 @@ export interface G2bRelayRequest {
 }
 
 const PAYLOAD_KEYS = ['operation', 'query'] as const
-const QUERY_KEYS = [
-  'type',
-  'inqryDiv',
-  'inqryBgnDt',
-  'inqryEndDt',
-  'pageNo',
-  'numOfRows',
-] as const
+const QUERY_KEYS = ['type', 'inqryDiv', 'inqryBgnDt', 'inqryEndDt', 'pageNo', 'numOfRows'] as const
 const TWELVE_DIGIT_DATE = /^\d{12}$/
 const VALID_PAGE = /^(?:[1-9]|[1-9]\d|100)$/
 const LOWERCASE_SHA256_HEX = /^[0-9a-f]{64}$/
 const SIGNATURE_WINDOW_MS = 5 * 60 * 1000
+const OFFICIAL_G2B_HOST = 'apis.data.go.kr'
+const OFFICIAL_G2B_PATH_PREFIX = '/1230000/ad/BidPublicInfoService'
 
 class JsonObjectKeyScanner {
   private index = 0
@@ -65,10 +60,7 @@ class JsonObjectKeyScanner {
     }
 
     const start = this.index
-    while (
-      this.index < this.source.length &&
-      !/[\s,}\]]/.test(this.source[this.index]!)
-    ) {
+    while (this.index < this.source.length && !/[\s,}\]]/.test(this.source[this.index]!)) {
       this.index += 1
     }
     if (this.index === start) {
@@ -156,10 +148,7 @@ class JsonObjectKeyScanner {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const hasExactOwnKeys = (
-  value: Record<string, unknown>,
-  expectedKeys: readonly string[],
-) => {
+const hasExactOwnKeys = (value: Record<string, unknown>, expectedKeys: readonly string[]) => {
   const actualKeys = Object.keys(value).sort()
   const sortedExpectedKeys = [...expectedKeys].sort()
 
@@ -170,8 +159,7 @@ const hasExactOwnKeys = (
 }
 
 const isAllowedOperation = (value: unknown): value is G2bRelayOperation =>
-  typeof value === 'string' &&
-  G2B_RELAY_OPERATIONS.some((operation) => operation === value)
+  typeof value === 'string' && G2B_RELAY_OPERATIONS.some((operation) => operation === value)
 
 export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
   if (!isRecord(value) || !hasExactOwnKeys(value, PAYLOAD_KEYS)) {
@@ -215,9 +203,7 @@ export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
   }
 }
 
-export const parseAndValidateRelayPayload = (
-  rawBody: Uint8Array,
-): G2bRelayRequest => {
+export const parseAndValidateRelayPayload = (rawBody: Uint8Array): G2bRelayRequest => {
   const source = new TextDecoder('utf-8', { fatal: true }).decode(rawBody)
   new JsonObjectKeyScanner(source).assertNoDuplicateKeys()
   return validateRelayPayload(JSON.parse(source))
@@ -238,27 +224,16 @@ export const verifyRelaySignature = ({
   secret,
   nowMs = Date.now(),
 }: VerifyRelaySignatureInput): boolean => {
-  if (
-    !secret ||
-    !/^\d+$/.test(timestamp) ||
-    !LOWERCASE_SHA256_HEX.test(signature)
-  ) {
+  if (!secret || !/^\d+$/.test(timestamp) || !LOWERCASE_SHA256_HEX.test(signature)) {
     return false
   }
 
   const timestampMs = Number(timestamp)
-  if (
-    !Number.isSafeInteger(timestampMs) ||
-    Math.abs(nowMs - timestampMs) > SIGNATURE_WINDOW_MS
-  ) {
+  if (!Number.isSafeInteger(timestampMs) || Math.abs(nowMs - timestampMs) > SIGNATURE_WINDOW_MS) {
     return false
   }
 
-  const expected = createHmac('sha256', secret)
-    .update(timestamp)
-    .update('.')
-    .update(body)
-    .digest()
+  const expected = createHmac('sha256', secret).update(timestamp).update('.').update(body).digest()
   const actual = Buffer.from(signature, 'hex')
 
   return actual.length === expected.length && timingSafeEqual(actual, expected)
@@ -275,7 +250,23 @@ export const buildG2bProviderUrl = ({
   serviceKey,
   request,
 }: BuildG2bProviderUrlInput): URL => {
-  const normalizedBaseUrl = new URL(baseUrl)
+  let normalizedBaseUrl: URL
+  try {
+    normalizedBaseUrl = new URL(baseUrl)
+    const pathname = normalizedBaseUrl.pathname.replace(/\/+$/, '')
+    if (
+      normalizedBaseUrl.protocol !== 'https:' ||
+      normalizedBaseUrl.host !== OFFICIAL_G2B_HOST ||
+      normalizedBaseUrl.username !== '' ||
+      normalizedBaseUrl.password !== '' ||
+      (pathname !== OFFICIAL_G2B_PATH_PREFIX &&
+        !pathname.startsWith(`${OFFICIAL_G2B_PATH_PREFIX}/`))
+    ) {
+      throw new Error()
+    }
+  } catch {
+    throw new Error('Invalid provider configuration')
+  }
   normalizedBaseUrl.search = ''
   normalizedBaseUrl.hash = ''
   normalizedBaseUrl.pathname = `${normalizedBaseUrl.pathname.replace(/\/+$/, '')}/`

@@ -1,9 +1,4 @@
-import {
-  createError,
-  defineEventHandler,
-  getRequestHeader,
-  type H3Event,
-} from 'h3'
+import { createError, defineEventHandler, getRequestHeader, type H3Event } from 'h3'
 
 import {
   buildG2bProviderUrl,
@@ -20,10 +15,7 @@ interface G2bRelayRuntimeConfig {
   publicDataServiceKey: string
 }
 
-type RelayFetcher = (
-  input: string | URL | Request,
-  init?: RequestInit,
-) => Promise<Response>
+type RelayFetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
 export interface G2bRelayHandlerDependencies {
   readBody(event: H3Event, maximumBytes: number): Promise<Buffer>
@@ -33,11 +25,9 @@ export interface G2bRelayHandlerDependencies {
   now(): number
 }
 
-const relayUnavailable = () =>
-  createError({ statusCode: 500, statusMessage: 'Relay unavailable' })
+const relayUnavailable = () => createError({ statusCode: 500, statusMessage: 'Relay unavailable' })
 
-const invalidRequest = () =>
-  createError({ statusCode: 400, statusMessage: 'Invalid request' })
+const invalidRequest = () => createError({ statusCode: 400, statusMessage: 'Invalid request' })
 
 const toBuffer = (chunk: unknown): Buffer => {
   if (Buffer.isBuffer(chunk)) return chunk
@@ -184,6 +174,7 @@ export const createG2bRelayHandler = (
     try {
       response = await dependencies.fetcher(providerUrl, {
         method: 'GET',
+        redirect: 'error',
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       })
     } catch {
@@ -197,7 +188,10 @@ export const createG2bRelayHandler = (
       // Provider bodies can contain implementation details and are deliberately
       // not consumed on failures so they cannot be copied into relay errors.
       throw createError({
-        statusCode: 502,
+        statusCode:
+          Number.isInteger(response.status) && response.status >= 400 && response.status <= 599
+            ? response.status
+            : 502,
         statusMessage: 'Provider request failed',
       })
     }

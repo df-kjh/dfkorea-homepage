@@ -11,6 +11,7 @@ if (isProductionBuild && !configuredApiBaseUrl) {
 export default defineNuxtConfig({
   compatibilityDate: "2026-06-11",
   srcDir: "src/",
+  serverDir: "src/server",
   ssr: true,
   css: ["@/assets/main.css", "@/assets/dark-mode.css"],
   runtimeConfig: {

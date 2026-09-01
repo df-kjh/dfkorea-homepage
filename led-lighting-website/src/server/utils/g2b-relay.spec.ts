@@ -26,9 +26,7 @@ const nowMs = 1788222791000
 const secret = 'relay-test-secret-with-at-least-32-bytes'
 
 const sign = (timestampValue: string, bodyValue: string) =>
-  createHmac('sha256', secret)
-    .update(`${timestampValue}.${bodyValue}`)
-    .digest('hex')
+  createHmac('sha256', secret).update(`${timestampValue}.${bodyValue}`).digest('hex')
 
 describe('validateRelayPayload', () => {
   it.each([
@@ -81,12 +79,12 @@ describe('validateRelayPayload', () => {
     ['page zero', { ...validPayload, query: { ...validPayload.query, pageNo: '0' } }],
     ['page 101', { ...validPayload, query: { ...validPayload.query, pageNo: '101' } }],
     ['a decimal page', { ...validPayload, query: { ...validPayload.query, pageNo: '1.5' } }],
-    [
-      'a non-100 row count',
-      { ...validPayload, query: { ...validPayload.query, numOfRows: '99' } },
-    ],
+    ['a non-100 row count', { ...validPayload, query: { ...validPayload.query, numOfRows: '99' } }],
     ['a non-json type', { ...validPayload, query: { ...validPayload.query, type: 'xml' } }],
-    ['another inquiry division', { ...validPayload, query: { ...validPayload.query, inqryDiv: '2' } }],
+    [
+      'another inquiry division',
+      { ...validPayload, query: { ...validPayload.query, inqryDiv: '2' } },
+    ],
   ])('rejects %s', (_description, candidate) => {
     expect(() => validateRelayPayload(candidate)).toThrow()
   })
@@ -185,9 +183,7 @@ describe('buildG2bProviderUrl', () => {
     })
 
     expect(url.origin).toBe('https://apis.data.go.kr')
-    expect(url.pathname).toBe(
-      '/1230000/ad/BidPublicInfoService/getBidPblancListInfoThng',
-    )
+    expect(url.pathname).toBe('/1230000/ad/BidPublicInfoService/getBidPblancListInfoThng')
     expect([...url.searchParams.keys()]).toEqual([
       'type',
       'inqryDiv',
@@ -199,5 +195,34 @@ describe('buildG2bProviderUrl', () => {
     ])
     expect(url.searchParams.getAll('serviceKey')).toEqual(['vercel-key'])
     expect(url.searchParams.has('extra')).toBe(false)
+  })
+
+  it.each([
+    ['a non-HTTPS provider base', 'http://apis.data.go.kr/1230000/ad/BidPublicInfoService'],
+    [
+      'a credentialed provider base',
+      'https://provider-user:provider-password@apis.data.go.kr/1230000/ad/BidPublicInfoService',
+    ],
+    [
+      'a different provider host',
+      'https://apis.data.go.kr.example.test/1230000/ad/BidPublicInfoService',
+    ],
+    ['a different provider path', 'https://apis.data.go.kr/1230000/ad/AnotherService'],
+  ])('rejects %s with a generic error', (_description, baseUrl) => {
+    let rejected: unknown
+    try {
+      buildG2bProviderUrl({
+        baseUrl,
+        serviceKey: 'vercel-key',
+        request: validateRelayPayload(validPayload),
+      })
+    } catch (error) {
+      rejected = error
+    }
+
+    expect(rejected).toMatchObject({ message: 'Invalid provider configuration' })
+    expect(JSON.stringify(rejected)).not.toContain(baseUrl)
+    expect(JSON.stringify(rejected)).not.toContain('provider-user')
+    expect(JSON.stringify(rejected)).not.toContain('provider-password')
   })
 })

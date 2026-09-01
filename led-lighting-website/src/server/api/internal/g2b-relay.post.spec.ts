@@ -1,10 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  createG2bRelayHandler,
-  readBoundedRequestBody,
-} from './g2b-relay.post'
+import { createG2bRelayHandler, readBoundedRequestBody } from './g2b-relay.post'
 
 const body = JSON.stringify({
   operation: 'getBidPblancListInfoThng',
@@ -20,14 +17,11 @@ const body = JSON.stringify({
 const timestamp = '1788222791000'
 const nowMs = 1788222791000
 const sharedSecret = 'relay-test-secret-with-at-least-32-bytes'
-const signature = createHmac('sha256', sharedSecret)
-  .update(`${timestamp}.${body}`)
-  .digest('hex')
+const signature = createHmac('sha256', sharedSecret).update(`${timestamp}.${body}`).digest('hex')
 
 const runtimeConfig = {
   g2bRelaySharedSecret: sharedSecret,
-  g2bTenderApiBaseUrl:
-    'https://apis.data.go.kr/1230000/ad/BidPublicInfoService',
+  g2bTenderApiBaseUrl: 'https://apis.data.go.kr/1230000/ad/BidPublicInfoService',
   publicDataServiceKey: 'vercel-key',
 }
 
@@ -231,34 +225,62 @@ describe('POST /api/internal/g2b-relay', () => {
     const [input, init] = fetcher.mock.calls[0]!
     expect(String(input)).toContain('serviceKey=vercel-key')
     expect(String(input)).not.toContain('client-key')
-    expect(init).toMatchObject({ method: 'GET' })
+    expect(init).toMatchObject({ method: 'GET', redirect: 'error' })
     expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
-  it('returns a generic status-only error without reading or leaking an upstream failure body', async () => {
-    const providerBody = 'provider secret body'
-    const text = vi.fn().mockResolvedValue(providerBody)
-    const json = vi.fn().mockRejectedValue(new Error(providerBody))
-    const fetcher = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 403,
-      text,
-      json,
-    } as unknown as Response)
-    const dependencies = createDependencies({ fetcher })
+  it.each([
+    'http://apis.data.go.kr/1230000/ad/BidPublicInfoService',
+    'https://user:password@apis.data.go.kr/1230000/ad/BidPublicInfoService',
+    'https://example.test/1230000/ad/BidPublicInfoService',
+    'https://apis.data.go.kr/1230000/ad/AnotherService',
+  ])('returns a generic unavailable error for unsafe provider base %s', async (baseUrl) => {
+    const dependencies = createDependencies({
+      getRuntimeConfig: vi.fn(() => ({
+        ...runtimeConfig,
+        g2bTenderApiBaseUrl: baseUrl,
+      })),
+    })
     const handler = createG2bRelayHandler(dependencies)
 
     const rejectedResponse = await handler({} as never).catch((error) => error)
 
     expect(rejectedResponse).toMatchObject({
-      statusCode: 502,
-      statusMessage: 'Provider request failed',
+      statusCode: 500,
+      statusMessage: 'Relay unavailable',
     })
-    expect(text).not.toHaveBeenCalled()
-    expect(json).not.toHaveBeenCalled()
-    expect(JSON.stringify(rejectedResponse)).not.toContain('vercel-key')
-    expect(JSON.stringify(rejectedResponse)).not.toContain(providerBody)
+    expect(JSON.stringify(rejectedResponse)).not.toContain(baseUrl)
+    expect(JSON.stringify(rejectedResponse)).not.toContain('password')
+    expect(dependencies.fetcher).not.toHaveBeenCalled()
   })
+
+  it.each([403, 503])(
+    'preserves upstream status %s without reading or leaking its failure body',
+    async (providerStatus) => {
+      const providerBody = 'provider secret body'
+      const text = vi.fn().mockResolvedValue(providerBody)
+      const json = vi.fn().mockRejectedValue(new Error(providerBody))
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: false,
+        status: providerStatus,
+        text,
+        json,
+      } as unknown as Response)
+      const dependencies = createDependencies({ fetcher })
+      const handler = createG2bRelayHandler(dependencies)
+
+      const rejectedResponse = await handler({} as never).catch((error) => error)
+
+      expect(rejectedResponse).toMatchObject({
+        statusCode: providerStatus,
+        statusMessage: 'Provider request failed',
+      })
+      expect(text).not.toHaveBeenCalled()
+      expect(json).not.toHaveBeenCalled()
+      expect(JSON.stringify(rejectedResponse)).not.toContain('vercel-key')
+      expect(JSON.stringify(rejectedResponse)).not.toContain(providerBody)
+    },
+  )
 })
 
 describe('readBoundedRequestBody', () => {

@@ -139,6 +139,9 @@ export class G2bTenderAdapter implements TenderSourceAdapter {
         providerResultCode: error.providerResultCode,
         httpStatus: error.status,
         attempts: error.attempts,
+        ...(error.responseShape === null
+          ? {}
+          : { responseShape: error.responseShape }),
       };
     }
 

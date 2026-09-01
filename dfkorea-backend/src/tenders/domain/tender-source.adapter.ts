@@ -8,6 +8,11 @@ export interface TenderFetchWindow {
   to: Date;
 }
 
+export type TenderResponseShape =
+  | "CANONICAL_BODY_WITHOUT_CODE"
+  | "GATEWAY_ERROR_SHAPE"
+  | "UNKNOWN_RESPONSE_SHAPE";
+
 export interface TenderOperationFailure {
   operation: string;
   errorCode: string;
@@ -15,6 +20,7 @@ export interface TenderOperationFailure {
   providerResultCode: string | null;
   httpStatus: number | null;
   attempts: number;
+  responseShape?: TenderResponseShape;
 }
 
 export interface TenderSourceFetchResult {

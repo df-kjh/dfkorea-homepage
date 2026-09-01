@@ -261,6 +261,7 @@ describe("TenderIngestionService", () => {
       providerResultCode: "23",
       httpStatus: 200,
       attempts: 3,
+      responseShape: "GATEWAY_ERROR_SHAPE",
     };
     const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
     g2b.fetchNotices.mockResolvedValue({
@@ -302,12 +303,44 @@ describe("TenderIngestionService", () => {
       order: { finishedAt: "DESC" },
     });
     expect(warn).toHaveBeenCalledWith(
-      "source=G2B; errorCode=PROVIDER_RESULT_ERROR; operation=getBidPblancListInfoThng; page=1; providerCode=23; httpStatus=200; attempts=3",
+      "source=G2B; errorCode=PROVIDER_RESULT_ERROR; operation=getBidPblancListInfoThng; page=1; providerCode=23; httpStatus=200; attempts=3; responseShape=GATEWAY_ERROR_SHAPE",
     );
     const warningText = JSON.stringify(warn.mock.calls);
     expect(warningText).not.toContain("secret-key");
     expect(warningText).not.toContain("https://");
     expect(warningText).not.toContain("raw provider response");
+    warn.mockRestore();
+  });
+
+  it("redacts an unrecognized response shape from the final warning", async () => {
+    const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+    g2b.fetchNotices.mockResolvedValue({
+      notices: [directNotice],
+      status: SyncRunStatus.PARTIAL,
+      errorCode: "PARTIAL_PROVIDER_FAILURE",
+      failures: [
+        {
+          operation: "getBidPblancListInfoThng",
+          errorCode: "PROVIDER_RESULT_ERROR",
+          pageNo: 1,
+          providerResultCode: null,
+          httpStatus: 200,
+          attempts: 1,
+          responseShape: "raw provider response secret" as never,
+        },
+      ],
+    });
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
+
+    await service.collectAll(NOW);
+
+    expect(warn).toHaveBeenCalledWith(
+      "source=G2B; errorCode=PROVIDER_RESULT_ERROR; operation=getBidPblancListInfoThng; page=1; providerCode=none; httpStatus=200; attempts=1; responseShape=none",
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(
+      "raw provider response secret",
+    );
     warn.mockRestore();
   });
 
