@@ -263,6 +263,71 @@ describe('TenderManagement', () => {
     expect(api.getAll).toHaveBeenCalledTimes(2)
   })
 
+  it('prioritizes a failed source warning when the response also contains a partial source', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-09-01T01:53:57.683Z',
+        sources: [
+          {
+            source: 'G2B',
+            status: 'PARTIAL',
+            fetchedCount: 120,
+            createdCount: 4,
+            updatedCount: 3,
+            excludedCount: 113,
+            errorCode: 'PARTIAL_PROVIDER_FAILURE',
+          },
+          {
+            source: 'KAPT',
+            status: 'FAILED',
+            fetchedCount: 0,
+            createdCount: 0,
+            updatedCount: 0,
+            excludedCount: 0,
+            errorCode: 'HTTP_ERROR',
+          },
+        ],
+        failedSources: ['KAPT'],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.',
+    )
+  })
+
+  it('reports success when every collected source succeeded', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-09-01T01:53:57.683Z',
+        sources: [{
+          source: 'G2B',
+          status: 'SUCCEEDED',
+          fetchedCount: 120,
+          createdCount: 4,
+          updatedCount: 3,
+          excludedCount: 113,
+          errorCode: null,
+        }],
+        failedSources: [],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toContain('공고 수집이 완료되었습니다.')
+  })
+
   it('keeps existing calendar and list data visible when immediate collection fails', async () => {
     api.collect.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mountTenderManagement()
