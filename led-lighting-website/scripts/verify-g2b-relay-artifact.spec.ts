@@ -16,6 +16,15 @@ const createOutput = async (serverSource: string) => {
   return outputDirectory
 }
 
+const createVercelOutput = async (serverSource: string) => {
+  const outputDirectory = await mkdtemp(join(tmpdir(), 'g2b-relay-vercel-artifact-'))
+  temporaryDirectories.push(outputDirectory)
+  const functionsDirectory = join(outputDirectory, 'functions', '__fallback.func', 'chunks', 'routes')
+  await mkdir(functionsDirectory, { recursive: true })
+  await writeFile(join(functionsDirectory, 'g2b-relay.post.mjs'), serverSource)
+  return outputDirectory
+}
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -36,6 +45,14 @@ describe('verifyG2bRelayArtifact', () => {
   it('accepts a production artifact that registers the internal relay route', async () => {
     const outputDirectory = await createOutput(
       'export const routes = [{ route: "/api/internal/g2b-relay" }]',
+    )
+
+    await expect(verifyG2bRelayArtifact(outputDirectory)).resolves.toBeUndefined()
+  })
+
+  it('accepts the Vercel preset functions artifact that registers the relay route', async () => {
+    const outputDirectory = await createVercelOutput(
+      'export const route = "/api/internal/g2b-relay"',
     )
 
     await expect(verifyG2bRelayArtifact(outputDirectory)).resolves.toBeUndefined()

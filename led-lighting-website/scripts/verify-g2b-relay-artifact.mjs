@@ -20,9 +20,28 @@ const collectFiles = async (directory) => {
   return files
 }
 
-export const verifyG2bRelayArtifact = async (outputDirectory) => {
-  const serverDirectory = resolve(outputDirectory, 'server')
-  const files = await collectFiles(serverDirectory)
+export const verifyG2bRelayArtifact = async (outputDirectoryOrDirectories) => {
+  const outputDirectories = Array.isArray(outputDirectoryOrDirectories)
+    ? outputDirectoryOrDirectories
+    : [outputDirectoryOrDirectories]
+  const files = []
+
+  for (const outputDirectory of outputDirectories) {
+    // Nitro's node-server preset writes `.output/server`, while its Vercel
+    // preset writes server code under `.vercel/output/functions`.
+    for (const artifactDirectory of [
+      resolve(outputDirectory, 'server'),
+      resolve(outputDirectory, 'functions'),
+    ]) {
+      try {
+        files.push(...(await collectFiles(artifactDirectory)))
+      } catch (error) {
+        if (error?.code !== 'ENOENT') {
+          throw error
+        }
+      }
+    }
+  }
 
   for (const file of files) {
     if ((await readFile(file, 'utf8')).includes(RELAY_ROUTE)) {
@@ -34,6 +53,9 @@ export const verifyG2bRelayArtifact = async (outputDirectory) => {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
-  await verifyG2bRelayArtifact(resolve(process.cwd(), '.output'))
+  await verifyG2bRelayArtifact([
+    resolve(process.cwd(), '.output'),
+    resolve(process.cwd(), '.vercel/output'),
+  ])
   console.log(`Verified ${RELAY_ROUTE} in the Nitro server artifact.`)
 }
