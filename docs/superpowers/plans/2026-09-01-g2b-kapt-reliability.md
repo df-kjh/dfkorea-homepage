@@ -387,7 +387,7 @@ git commit -m "fix: preserve partial G2B collection results"
 - Consumes: Task 2 `sources[].status = "PARTIAL"` collect response.
 - Produces: user-visible partial G2B warning while retaining calendar/list refresh.
 
-- [ ] **Step 1: Write the failing component test**
+- [x] **Step 1: Write the failing component test**
 
 ```ts
 it("reports a partial source and refreshes successful notices", async () => {
@@ -421,7 +421,7 @@ it("reports a partial source and refreshes successful notices", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the component test and verify RED**
+- [x] **Step 2: Run the component test and verify RED**
 
 ```bash
 cd led-lighting-website
@@ -430,7 +430,7 @@ npm test -- --run src/components/admin/TenderManagement.spec.ts
 
 Expected: FAIL because `PARTIAL` is not typed or rendered as an alert.
 
-- [ ] **Step 3: Implement the minimal UI contract**
+- [x] **Step 3: Implement the minimal UI contract**
 
 Change `TenderCollectionSourceStatus` to:
 
@@ -440,11 +440,11 @@ export type TenderCollectionSourceStatus = "SUCCEEDED" | "PARTIAL" | "FAILED";
 
 In `collectTenders`, compute `const partialSources = data.sources.filter(({ status }) => status === "PARTIAL")`. Give `failedSources` precedence, then show the exact Korean partial warning when `partialSources.length > 0`, otherwise show success. Preserve the existing refresh and lock-held branches.
 
-- [ ] **Step 4: Run the component suite and verify GREEN**
+- [x] **Step 4: Run the component suite and verify GREEN**
 
 Run the Step 2 command. Expected: all `TenderManagement` tests PASS.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 git add led-lighting-website/src/types/tender.ts \
