@@ -1,6 +1,3 @@
-// Three 0.185.1 ships this runtime entry without declarations. The task intentionally
-// keeps `three` as the only direct dependency, so this boundary remains runtime-typed.
-// @ts-expect-error -- See the direct-dependency constraint above.
 import * as THREE from 'three'
 import type { QualityProfile } from './parkingGarageQuality'
 

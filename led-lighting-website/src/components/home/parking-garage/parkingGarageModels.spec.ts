@@ -1,7 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-// Three 0.185.1 ships this runtime entry without declarations. The production module
-// documents why the task does not add the companion declaration package.
-// @ts-expect-error -- Keep the test on the same direct runtime boundary as production.
 import { Mesh, type BufferGeometry, type Material, type Object3D } from 'three'
 import {
   createParkingGarageModel,
