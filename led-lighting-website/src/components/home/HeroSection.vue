@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import ParkingGarageScene from './ParkingGarageScene.vue'
 
 interface Props {
   title?: string
@@ -23,13 +23,6 @@ const emit = defineEmits<{
   primaryClick: []
   secondaryClick: []
 }>()
-
-// 동영상 로딩 상태
-const videoLoading = ref(true)
-
-const handleVideoLoaded = () => {
-  videoLoading.value = false
-}
 
 const scrollDown = (): void => {
   window.scrollTo({
@@ -82,21 +75,20 @@ onUnmounted(() => {
     class="relative h-[100dvh] flex flex-col items-center justify-center overflow-hidden"
     style="perspective: 1000px"
   >
-    <!-- Background Video with Overlay -->
+    <!-- Interactive parking garage with non-blocking contrast overlays -->
     <div class="absolute inset-0 z-0">
-      <!-- 로딩 스피너 -->
       <div
-        v-if="videoLoading"
-        class="absolute inset-0 bg-black z-20 flex items-center justify-center"
+        class="absolute inset-0 will-change-transform"
+        :style="`transform: ${bgTransform}; transform-style: preserve-3d;`"
       >
-        <LoadingSpinner message="동영상 로딩 중..." :size="60" />
+        <ParkingGarageScene />
       </div>
 
       <!-- Black Overlay -->
-      <div class="absolute inset-0 bg-black opacity-20 z-10"></div>
+      <div class="pointer-events-none absolute inset-0 bg-black opacity-20 z-10"></div>
       <!-- Gradient Overlay - 하단을 흰색으로 페이드 -->
       <div
-        class="absolute inset-0 z-10"
+        class="pointer-events-none absolute inset-0 z-10"
         style="
           background: linear-gradient(
             to bottom,
@@ -106,17 +98,6 @@ onUnmounted(() => {
           );
         "
       ></div>
-      <video
-        class="w-full h-full object-cover will-change-transform"
-        :style="`transform: ${bgTransform}; transform-style: preserve-3d;`"
-        autoplay
-        loop
-        muted
-        playsinline
-        @loadeddata="handleVideoLoaded"
-      >
-        <source src="/videos/HeroSection.mp4" type="video/mp4" />
-      </video>
     </div>
 
     <!-- Content -->
@@ -151,6 +132,7 @@ onUnmounted(() => {
     <!-- Scroll Down Arrow -->
     <div
       @click="scrollDown"
+      data-test="hero-scroll-down"
       class="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 animate-bounce opacity-50 cursor-pointer"
     >
       <span class="material-symbols-outlined text-gray-700 text-[60px]">expand_more</span>

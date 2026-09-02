@@ -14,6 +14,11 @@ export default defineNuxtConfig({
   serverDir: "src/server",
   ssr: true,
   css: ["@/assets/main.css", "@/assets/dark-mode.css"],
+  // Component auto-discovery should only register Vue SFCs. TypeScript files in
+  // components/ are controllers and helpers imported explicitly by their owners.
+  components: {
+    dirs: [{ path: "@/components", extensions: ["vue"] }],
+  },
   runtimeConfig: {
     g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",
     g2bTenderApiBaseUrl: process.env.G2B_TENDER_API_BASE_URL || "",
