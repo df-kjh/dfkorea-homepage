@@ -12,6 +12,7 @@ const defaultFallbackImage = '/images/main-hero.jpg'
 
 let controller: ParkingGarageController | null = null
 let reducedMotionQuery: MediaQueryList | null = null
+let hasTerminalFallback = false
 
 const startController = (reducedMotion: boolean): void => {
   if (!rendererContainer.value) return
@@ -24,6 +25,7 @@ const startController = (reducedMotion: boolean): void => {
       rendererReady.value = true
     },
     onFallback: () => {
+      hasTerminalFallback = true
       rendererReady.value = false
     },
   })
@@ -31,6 +33,8 @@ const startController = (reducedMotion: boolean): void => {
 }
 
 const handleReducedMotionChange = (event: MediaQueryListEvent): void => {
+  if (hasTerminalFallback) return
+
   controller?.dispose()
   controller = null
   startController(event.matches)

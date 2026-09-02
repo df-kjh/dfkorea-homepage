@@ -14,10 +14,10 @@ export default defineNuxtConfig({
   serverDir: "src/server",
   ssr: true,
   css: ["@/assets/main.css", "@/assets/dark-mode.css"],
-  // Component auto-discovery should only register Vue SFCs. TypeScript files in
-  // components/ are controllers and helpers imported explicitly by their owners.
+  // Keep Nuxt's default component extensions while excluding the explicitly
+  // imported parking-garage controllers that collide with ParkingGarageScene.vue.
   components: {
-    dirs: [{ path: "@/components", extensions: ["vue"] }],
+    dirs: [{ path: "@/components", ignore: ["home/parking-garage/**"] }],
   },
   runtimeConfig: {
     g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",

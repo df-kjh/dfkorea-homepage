@@ -98,6 +98,19 @@ describe('ParkingGarageScene', () => {
     wrapper.unmount()
   })
 
+  it('does not restart after terminal fallback when the motion preference changes', () => {
+    const wrapper = mount(ParkingGarageScene)
+    const options = createParkingGarageController.mock.calls[0]?.[0]
+    const motionListener = mediaQuery.addEventListener.mock.calls[0]?.[1]
+
+    options.onFallback('runtime')
+    motionListener({ matches: false } as MediaQueryListEvent)
+
+    expect(createParkingGarageController).toHaveBeenCalledOnce()
+    expect(controller.start).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
   it('restarts at the new motion preference when the system setting changes', () => {
     const wrapper = mount(ParkingGarageScene)
     const motionListener = mediaQuery.addEventListener.mock.calls[0]?.[1]
