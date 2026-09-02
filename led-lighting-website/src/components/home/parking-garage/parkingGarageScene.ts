@@ -10,6 +10,7 @@ import {
 import { selectParkingGarageQuality } from './parkingGarageQuality'
 
 type Camera = InstanceType<typeof THREE.Camera>
+type DirectionalLight = InstanceType<typeof THREE.DirectionalLight>
 type Object3D = InstanceType<typeof THREE.Object3D>
 type PerspectiveCamera = InstanceType<typeof THREE.PerspectiveCamera>
 type Scene = InstanceType<typeof THREE.Scene>
@@ -112,6 +113,7 @@ export const createParkingGarageController = (
   }
 
   let camera: PerspectiveCamera | null = null
+  let directionalLight: DirectionalLight | null = null
   let disposed = false
   let failed = false
   let frameId: number | null = null
@@ -213,6 +215,8 @@ export const createParkingGarageController = (
     resourcesDisposed = true
     if (model) disposeGarageModel(model)
     model = null
+    directionalLight?.shadow.dispose()
+    directionalLight = null
     scene?.clear()
     scene = null
     camera = null
@@ -345,7 +349,7 @@ export const createParkingGarageController = (
     scene.background = new THREE.Color(0xb8bec2)
     camera = new THREE.PerspectiveCamera(58, 1, 0.1, 120)
     const ambientLight = new THREE.AmbientLight(0xdce5ea, 1.4)
-    const directionalLight = new THREE.DirectionalLight(0xf5f8ff, 2.2)
+    directionalLight = new THREE.DirectionalLight(0xf5f8ff, 2.2)
     directionalLight.position.set(-4, 8, 10)
     directionalLight.castShadow = profile.shadows
     directionalLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize)

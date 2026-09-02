@@ -267,6 +267,28 @@ describe('parking garage renderer and camera', () => {
     controller.dispose()
   })
 
+  it('disposes the directional-light shadow exactly once before the renderer', () => {
+    const harness = createHarness()
+    harness.setViewport(1_440, 2)
+    const controller = createController(harness)
+    controller.start()
+    harness.runNextFrame()
+
+    const scene = vi.mocked(harness.renderer.render).mock.calls[0]![0]
+    const directional = scene.children.find((child) => child instanceof DirectionalLight)
+    expect(directional).toBeInstanceOf(DirectionalLight)
+    const disposeShadow = vi.spyOn((directional as DirectionalLight).shadow, 'dispose')
+
+    controller.dispose()
+    controller.dispose()
+
+    expect(disposeShadow).toHaveBeenCalledTimes(1)
+    expect(harness.renderer.dispose).toHaveBeenCalledTimes(1)
+    expect(disposeShadow.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(harness.renderer.dispose).mock.invocationCallOrder[0]!,
+    )
+  })
+
   it('disables antialiasing and shadows for the mobile quality profile', () => {
     const harness = createHarness()
     harness.setViewport(390, 3)
