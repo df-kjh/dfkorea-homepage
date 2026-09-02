@@ -51,7 +51,7 @@ const NOTICE: NormalizedTender = {
   bidEndedAt: null,
   openedAt: null,
   region: "서울",
-  procurementType: ProcurementType.CONSTRUCTION,
+  procurementType: ProcurementType.GOODS,
   contractMethod: null,
   estimatedAmount: "1000000",
   sourceUrl: "https://example.invalid/tender/test-g2b-1",

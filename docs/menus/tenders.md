@@ -11,15 +11,16 @@
 - 공고 상세는 출처·기관·등록/마감 일시·분류 근거와 안전한 공식 원문 링크를 제공한다.
 - 목록과 상세의 등록·마감 일시는 `Asia/Seoul`로 일관되게 표시하고, 큰 추정 금액은 bigint 정밀도를 유지한다.
 - 백엔드는 나라장터·K-apt 공식 API 어댑터와 비활성화된 한전 어댑터, 판정 근거 저장, 등록일(KST) 기준 조회, NAVER WORKS Mail API(HTTPS/OAuth), 수신 주소별 영속 메일 재시도 계약을 구현했다.
-- 물품 납품·MAS만 노출하던 기회 유형 제한은 제거했다. 직접·잠재 LED 관련으로 판정된 물품·공사·용역 공고를 이전의 광범위 수집·캘린더·목록·메일 흐름으로 처리한다.
-- 나라장터는 공사·물품·용역 operation에 `type=json`과 KST `YYYYMMDDHHmm` 등록 범위를 사용하며, 응답의 실제 첨부파일명도 분류 입력에 포함한다.
+- 나라장터는 회사가 참여할 수 있는 물품 공고만 수집·표시·메일 발송한다. K-apt는 기존 범위를 유지하여 물품·공사 여부와 관계없이 직접·잠재 LED 관련 공고를 계속 처리하고, 한전의 기존 동작도 변경하지 않는다.
+- 운영 DB에 이미 저장된 나라장터 공사·용역 공고는 이력 보존을 위해 삭제하지 않지만 캘린더 집계·목록·상세·신규 메일·메일 재시도에서 제외한다.
+- 나라장터는 물품 operation `getBidPblancListInfoThng`에만 `type=json`과 KST `YYYYMMDDHHmm` 등록 범위를 사용하며, 응답의 실제 첨부파일명도 분류 입력에 포함한다.
 - 나라장터는 Railway 직접 수집을 우선한다. HTTP 200이지만 결과 코드가 없는 안전하지 않은 응답만 작업 단위로 Vercel 보안 릴레이를 통해 재시도하므로, 정상 직접 수집 건을 중복 요청하지 않는다.
 - 나라장터 등록일 조회 시각은 KST 12자리 형식으로 만들며, Railway Node 20 Alpine ICU가 자정을 `24:00`으로 반환하는 경우 G2B가 허용하는 `00:00`으로 정규화한다.
-- Vercel 릴레이는 나라장터 공사·물품·용역의 세 작업과 고정된 한 페이지 쿼리만 허용한다. Railway 직접 수집은 Railway 서버 전용 `PUBLIC_DATA_SERVICE_KEY`를 사용하고, 릴레이 요청에는 `serviceKey`를 넣지 않는다. Vercel은 Railway 키의 같은 값을 Vercel 서버 전용 `G2B_DATA_SERVICE_KEY`로 복사해 릴레이 upstream 호출에만 붙인다.
+- Vercel 릴레이는 나라장터 물품 작업 `getBidPblancListInfoThng`과 고정된 한 페이지 쿼리만 허용하며 공사·용역 요청은 거부한다. Railway 직접 수집은 Railway 서버 전용 `PUBLIC_DATA_SERVICE_KEY`를 사용하고, 릴레이 요청에는 `serviceKey`를 넣지 않는다. Vercel은 Railway 키의 같은 값을 Vercel 서버 전용 `G2B_DATA_SERVICE_KEY`로 복사해 릴레이 upstream 호출에만 붙인다.
 - Vercel 릴레이의 upstream은 `https://apis.data.go.kr/1230000/ad/BidPublicInfoService` 공식 경계만 허용하고 자동 리다이렉트를 거부한다. 공공데이터포털이 반환한 4xx·5xx 상태는 본문을 읽거나 노출하지 않은 채 그대로 백엔드에 전달하므로, 영구 4xx는 한 번만 시도하고 기존 일시 오류 상태만 제한적으로 재시도한다. 프로덕션 빌드는 `/api/internal/g2b-relay`가 Nitro 서버 산출물에 실제 등록됐는지 검사하며 누락되면 배포 빌드를 실패시킨다.
 - K-apt 신규 공고의 공식 원문은 현재 상세 경로인 `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=...`로 저장한다. 기존 `/web/bid/bidDetail.do` 링크는 데이터 마이그레이션으로 K-apt 행의 `sourceUrl`만 비파괴적으로 보정하며 공고·수집·메일 이력은 유지한다.
 - 수신 주소를 제거하면 비활성화하고, 다시 추가하면 같은 ID와 발송 이력을 복원한다. 설정 모달은 열 때마다 새 세대로 최신값을 조회하고, 늦게 도착한 이전 요청은 상태를 덮어쓰지 못한다. 최신 조회 실패 상태에서는 저장할 수 없으며 모달 안의 `다시 시도`로 새 요청을 실행한다.
-- 수집은 `Asia/Seoul` 기준 매시 정각에 예약된다. 관리자는 필터 왼쪽의 `즉시 수집` 버튼으로 같은 수집 파이프라인을 실행할 수 있고, 완료 후 현재 월 캘린더와 선택 날짜 목록이 갱신된다. 정기·수동 수집이 겹치면 PostgreSQL advisory lock으로 중복 실행을 막는다. 나라장터 공사·물품·용역 중 일부 operation만 실패한 `PARTIAL` 결과는 성공한 공고를 반영하고 `나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.` 경고를 표시한다. 다른 출처의 `FAILED`가 함께 있으면 출처 실패 안내가 `PARTIAL` 안내보다 우선하며, 일시적인 나라장터 제한·네트워크 오류는 수집 중 제한적으로 재시도하고 복구되지 않은 operation은 다음 정기·수동 수집에서 다시 조회한다. 메일은 매분 공용 설정을 다시 읽고 KST 날짜·설정 시각 고유 claim과 PostgreSQL advisory lock으로 같은 시각의 중복 실행을 막는다. 같은 날 공용 발송 시각을 변경하면 새 슬롯으로 다시 발송할 수 있다.
+- 수집은 `Asia/Seoul` 기준 매시 정각에 예약된다. 관리자는 필터 왼쪽의 `즉시 수집` 버튼으로 같은 수집 파이프라인을 실행할 수 있고, 완료 후 현재 월 캘린더와 선택 날짜 목록이 갱신된다. 정기·수동 수집이 겹치면 PostgreSQL advisory lock으로 중복 실행을 막는다. 나라장터 물품 수집과 K-apt 수집은 출처별로 독립 처리하므로 한 출처가 실패해도 다른 출처의 성공 공고는 반영한다. 일시적인 나라장터 제한·네트워크 오류는 수집 중 제한적으로 재시도하고 복구되지 않으면 다음 정기·수동 수집에서 다시 조회한다. 메일은 매분 공용 설정을 다시 읽고 KST 날짜·설정 시각 고유 claim과 PostgreSQL advisory lock으로 같은 시각의 중복 실행을 막는다. 같은 날 공용 발송 시각을 변경하면 새 슬롯으로 다시 발송할 수 있다.
 - display-only `LED전광판`/`LED 전광판`/`LED디스플레이`/`LED 디스플레이`는 대소문자와 공백 수에 관계없이 일반 LED 근거를 제외한다. display phrase가 공고 어디든 있으면 다른 필드의 bare `LED`도 독립 근거로 보지 않으며, `가로등`·`조명`·`등기구`·`보안등` 같은 구체 조명 근거가 있어야 직접 관련으로 유지한다.
 - 발송 슬롯 claim은 15분 lease를 사용한다. 각 delivery는 `(dailyDispatchId, recipientId)` 고유 identity를 기록한다. recipient delivery를 만들기 전 DB 오류가 나면 완료하지 않고 stale lease에서 재개한다. 새 설정 시각 슬롯에서는 이미 `SENT`인 공고를 제외하며, 이전 슬롯의 `DELIVERY_UNCERTAIN` 공고는 다시 발송 대상으로 전환한다.
 - NAVER WORKS OAuth 시작·연결 상태 API는 관리자 JWT로 보호하고, callback은 10분 유효 SHA-256 state 검증 후에만 토큰을 저장한다. access/refresh token은 배포 secret의 32-byte key로 AES-256-GCM 암호화해 DB에 저장하고, 만료 전 자동 갱신한다.
@@ -54,6 +55,7 @@
 - `led-lighting-website/src/types/tender.ts`
 - `led-lighting-website/src/utils/tender-calendar.ts`
 - `dfkorea-backend/src/tenders/`
+- `dfkorea-backend/src/tenders/domain/tender-visibility.ts`
 - `dfkorea-backend/src/tenders/adapters/g2b-relay.fetcher.ts`
 - `led-lighting-website/src/server/api/internal/g2b-relay.post.ts`
 - `led-lighting-website/src/server/utils/g2b-relay.ts`

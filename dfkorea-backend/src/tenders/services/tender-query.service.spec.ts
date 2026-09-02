@@ -1,4 +1,8 @@
-import { TenderRelevance, TenderSource, ProcurementType } from "../domain/tender.enums";
+import {
+  TenderRelevance,
+  TenderSource,
+  ProcurementType,
+} from "../domain/tender.enums";
 import { TenderQueryService } from "./tender-query.service";
 
 const createQueryBuilder = () => {
@@ -33,6 +37,37 @@ describe("TenderQueryService", () => {
   beforeEach(() => {
     repository = { createQueryBuilder: jest.fn() };
     service = new TenderQueryService(repository as never);
+  });
+
+  it("hides persisted non-goods G2B notices from calendar, list, and detail queries", async () => {
+    const visibilityCondition =
+      "(tender.source <> :visibleG2bSource OR tender.procurementType = :visibleG2bProcurementType)";
+    const visibilityParameters = {
+      visibleG2bSource: TenderSource.G2B,
+      visibleG2bProcurementType: ProcurementType.GOODS,
+    };
+
+    const calendarBuilder = createQueryBuilder();
+    calendarBuilder.getRawMany.mockResolvedValue([]);
+    repository.createQueryBuilder.mockReturnValueOnce(calendarBuilder);
+    await service.getCalendar("2026-08");
+
+    const listBuilder = createQueryBuilder();
+    listBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+    repository.createQueryBuilder.mockReturnValueOnce(listBuilder);
+    await service.getTenders({ page: 1, pageSize: 20 });
+
+    const detailBuilder = createQueryBuilder();
+    detailBuilder.getOne.mockResolvedValue(null);
+    repository.createQueryBuilder.mockReturnValueOnce(detailBuilder);
+    await service.getTender("00000000-0000-4000-8000-000000000001");
+
+    for (const builder of [calendarBuilder, listBuilder, detailBuilder]) {
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        visibilityCondition,
+        visibilityParameters,
+      );
+    }
   });
 
   it("groups registrations by Korea Standard Time calendar date", async () => {
@@ -206,12 +241,16 @@ describe("TenderQueryService", () => {
     });
     repository.createQueryBuilder.mockReturnValue(builder);
 
-    const detail = await service.getTender("00000000-0000-4000-8000-000000000001");
+    const detail = await service.getTender(
+      "00000000-0000-4000-8000-000000000001",
+    );
 
-    expect(detail).toEqual(expect.objectContaining({
-      title: "전기시설 개선",
-      relevanceReasons: [{ field: "title", keyword: "전기시설", score: 40 }],
-    }));
+    expect(detail).toEqual(
+      expect.objectContaining({
+        title: "전기시설 개선",
+        relevanceReasons: [{ field: "title", keyword: "전기시설", score: 40 }],
+      }),
+    );
     expect(detail).not.toHaveProperty("rawData");
   });
 
@@ -220,6 +259,8 @@ describe("TenderQueryService", () => {
     builder.getOne.mockResolvedValue(null);
     repository.createQueryBuilder.mockReturnValue(builder);
 
-    await expect(service.getTender("00000000-0000-4000-8000-000000000001")).resolves.toBeNull();
+    await expect(
+      service.getTender("00000000-0000-4000-8000-000000000001"),
+    ).resolves.toBeNull();
   });
 });

@@ -93,9 +93,9 @@ describe("KST provider date formatting", () => {
       ]);
 
     try {
-      expect(formatKstDateTimeMinute(new Date("2026-08-31T15:00:00.000Z"))).toBe(
-        "202609010000",
-      );
+      expect(
+        formatKstDateTimeMinute(new Date("2026-08-31T15:00:00.000Z")),
+      ).toBe("202609010000");
     } finally {
       formatToParts.mockRestore();
     }
@@ -124,7 +124,7 @@ describe("official tender adapters", () => {
         orderingOrganization: "서울특별시 강남구",
         registeredAt: new Date("2026-08-26T06:30:00.000Z"),
         bidEndedAt: new Date("2026-09-02T01:00:00.000Z"),
-        procurementType: ProcurementType.CONSTRUCTION,
+        procurementType: ProcurementType.GOODS,
         region: "서울특별시",
         estimatedAmount: "125000000",
         sourceUrl:
@@ -132,7 +132,7 @@ describe("official tender adapters", () => {
         rawData: g2bFixture.response.body.items[0],
       }),
     );
-    expect(client.getAllPages).toHaveBeenCalledTimes(3);
+    expect(client.getAllPages).toHaveBeenCalledTimes(1);
     expect(notice?.attachmentNames).toEqual(["LED 등기구 시방서.pdf"]);
   });
 
@@ -264,31 +264,9 @@ describe("official tender adapters", () => {
     );
   });
 
-  it("runs broad G2B operations sequentially and keeps successful notices when one operation fails", async () => {
-    const constructionRow = {
-      ...g2bFixture.response.body.items[0],
-      bidNtceNo: "CONSTRUCTION-1",
-    };
-    const serviceRow = {
-      ...g2bFixture.response.body.items[0],
-      bidNtceNo: "SERVICE-1",
-    };
+  it("requests and normalizes only the G2B goods operation", async () => {
     const client = createClient();
-    client.getAllPages
-      .mockResolvedValueOnce([constructionRow])
-      .mockRejectedValueOnce(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "PROVIDER_RESULT_ERROR",
-          200,
-          undefined,
-          "getBidPblancListInfoThng",
-          1,
-          "23",
-          3,
-        ),
-      )
-      .mockResolvedValueOnce([serviceRow]);
+    client.getAllPages.mockResolvedValue(g2bFixture.response.body.items);
     const adapter = new G2bTenderAdapter(client, {
       baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
       serviceKey: "test-key",
@@ -298,17 +276,39 @@ describe("official tender adapters", () => {
 
     expect(
       client.getAllPages.mock.calls.map(([request]) => request.operation),
-    ).toEqual([
-      "getBidPblancListInfoCnstwk",
-      "getBidPblancListInfoThng",
-      "getBidPblancListInfoServc",
-    ]);
-    expect(result.status).toBe(SyncRunStatus.PARTIAL);
-    expect(result.notices.map((notice) => notice.procurementType)).toEqual([
-      ProcurementType.CONSTRUCTION,
-      ProcurementType.SERVICE,
-    ]);
-    expect(result.errorCode).toBe("PARTIAL_PROVIDER_FAILURE");
+    ).toEqual(["getBidPblancListInfoThng"]);
+    expect(result.notices).not.toHaveLength(0);
+    expect(result.notices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ procurementType: ProcurementType.GOODS }),
+      ]),
+    );
+  });
+
+  it("reports a failed G2B goods operation with bounded provider details", async () => {
+    const client = createClient();
+    client.getAllPages.mockRejectedValueOnce(
+      new TenderSourceError(
+        TenderSource.G2B,
+        "PROVIDER_RESULT_ERROR",
+        200,
+        undefined,
+        "getBidPblancListInfoThng",
+        1,
+        "23",
+        3,
+      ),
+    );
+    const adapter = new G2bTenderAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    });
+
+    const result = await adapter.fetchNotices(window);
+
+    expect(result.status).toBe(SyncRunStatus.FAILED);
+    expect(result.notices).toEqual([]);
+    expect(result.errorCode).toBe("PROVIDER_RESULT_ERROR");
     expect(result.failures).toEqual([
       expect.objectContaining({
         operation: "getBidPblancListInfoThng",
@@ -321,23 +321,20 @@ describe("official tender adapters", () => {
     ]);
   });
 
-  it("reports PARTIAL when successful G2B operations have no notices and another operation fails", async () => {
+  it("reports G2B as failed when its single goods operation fails", async () => {
     const client = createClient();
-    client.getAllPages
-      .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "PROVIDER_RESULT_ERROR",
-          200,
-          undefined,
-          "getBidPblancListInfoThng",
-          1,
-          "23",
-          3,
-        ),
-      )
-      .mockResolvedValueOnce([]);
+    client.getAllPages.mockRejectedValueOnce(
+      new TenderSourceError(
+        TenderSource.G2B,
+        "PROVIDER_RESULT_ERROR",
+        200,
+        undefined,
+        "getBidPblancListInfoThng",
+        1,
+        "23",
+        3,
+      ),
+    );
     const adapter = new G2bTenderAdapter(client, {
       baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
       serviceKey: "test-key",
@@ -348,8 +345,8 @@ describe("official tender adapters", () => {
     expect(result).toEqual(
       expect.objectContaining({
         notices: [],
-        status: SyncRunStatus.PARTIAL,
-        errorCode: "PARTIAL_PROVIDER_FAILURE",
+        status: SyncRunStatus.FAILED,
+        errorCode: "PROVIDER_RESULT_ERROR",
         failures: [
           expect.objectContaining({
             operation: "getBidPblancListInfoThng",
@@ -360,34 +357,20 @@ describe("official tender adapters", () => {
     );
   });
 
-  it("reports G2B as failed with no notices when all broad operations fail", async () => {
+  it("uses the goods operation error as the G2B source failure", async () => {
     const client = createClient();
-    client.getAllPages
-      .mockRejectedValueOnce(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "HTTP_ERROR",
-          503,
-          undefined,
-          "getBidPblancListInfoCnstwk",
-          1,
-          null,
-          3,
-        ),
-      )
-      .mockRejectedValueOnce(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "PROVIDER_RESULT_ERROR",
-          200,
-          undefined,
-          "getBidPblancListInfoThng",
-          2,
-          "30",
-          1,
-        ),
-      )
-      .mockRejectedValueOnce(new Error("raw provider body secret-key"));
+    client.getAllPages.mockRejectedValueOnce(
+      new TenderSourceError(
+        TenderSource.G2B,
+        "HTTP_ERROR",
+        503,
+        undefined,
+        "getBidPblancListInfoThng",
+        1,
+        null,
+        3,
+      ),
+    );
     const adapter = new G2bTenderAdapter(client, {
       baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
       serviceKey: "test-key",
@@ -401,34 +384,18 @@ describe("official tender adapters", () => {
       errorCode: "HTTP_ERROR",
       failures: [
         {
-          operation: "getBidPblancListInfoCnstwk",
+          operation: "getBidPblancListInfoThng",
           errorCode: "HTTP_ERROR",
           pageNo: 1,
           providerResultCode: null,
           httpStatus: 503,
           attempts: 3,
         },
-        {
-          operation: "getBidPblancListInfoThng",
-          errorCode: "PROVIDER_RESULT_ERROR",
-          pageNo: 2,
-          providerResultCode: "30",
-          httpStatus: 200,
-          attempts: 1,
-        },
-        {
-          operation: "getBidPblancListInfoServc",
-          errorCode: "COLLECTION_ERROR",
-          pageNo: null,
-          providerResultCode: null,
-          httpStatus: null,
-          attempts: 1,
-        },
       ],
     });
   });
 
-  it("recovers every eligible G2B operation through the relay", async () => {
+  it("recovers the eligible G2B goods operation through the relay", async () => {
     const directClient = createClient();
     const relayClient = createClient();
     directClient.getAllPages.mockImplementation(({ operation }) =>
@@ -458,17 +425,11 @@ describe("official tender adapters", () => {
     expect(result.errorCode).toBeNull();
     expect(result.failures).toEqual([]);
     expect(result.notices.map((notice) => notice.procurementType)).toEqual([
-      ProcurementType.CONSTRUCTION,
       ProcurementType.GOODS,
-      ProcurementType.SERVICE,
     ]);
     expect(
       relayClient.getAllPages.mock.calls.map(([request]) => request.operation),
-    ).toEqual([
-      "getBidPblancListInfoCnstwk",
-      "getBidPblancListInfoThng",
-      "getBidPblancListInfoServc",
-    ]);
+    ).toEqual(["getBidPblancListInfoThng"]);
   });
 
   it("never repeats directly successful G2B operations through the relay", async () => {
@@ -488,28 +449,25 @@ describe("official tender adapters", () => {
     const result = await adapter.fetchNotices(window);
 
     expect(result.status).toBe(SyncRunStatus.SUCCEEDED);
-    expect(directClient.getAllPages).toHaveBeenCalledTimes(3);
+    expect(directClient.getAllPages).toHaveBeenCalledTimes(1);
     expect(relayClient.getAllPages).not.toHaveBeenCalled();
   });
 
   it("preserves the bounded response shape in a G2B operation failure", async () => {
     const directClient = createClient();
-    directClient.getAllPages
-      .mockRejectedValueOnce(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "PROVIDER_RESULT_ERROR",
-          200,
-          undefined,
-          "getBidPblancListInfoCnstwk",
-          1,
-          null,
-          1,
-          "GATEWAY_ERROR_SHAPE",
-        ),
-      )
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+    directClient.getAllPages.mockRejectedValueOnce(
+      new TenderSourceError(
+        TenderSource.G2B,
+        "PROVIDER_RESULT_ERROR",
+        200,
+        undefined,
+        "getBidPblancListInfoThng",
+        1,
+        null,
+        1,
+        "GATEWAY_ERROR_SHAPE",
+      ),
+    );
     const adapter = new G2bTenderAdapter(directClient, {
       baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
       serviceKey: "test-key",
@@ -519,7 +477,7 @@ describe("official tender adapters", () => {
 
     expect(result.failures).toEqual([
       expect.objectContaining({
-        operation: "getBidPblancListInfoCnstwk",
+        operation: "getBidPblancListInfoThng",
         responseShape: "GATEWAY_ERROR_SHAPE",
       }),
     ]);
@@ -533,7 +491,7 @@ describe("official tender adapters", () => {
         "HTTP_ERROR",
         503,
         undefined,
-        "getBidPblancListInfoCnstwk",
+        "getBidPblancListInfoThng",
         1,
         null,
         3,
@@ -547,7 +505,7 @@ describe("official tender adapters", () => {
         "PROVIDER_RESULT_ERROR",
         200,
         undefined,
-        "getBidPblancListInfoCnstwk",
+        "getBidPblancListInfoThng",
         1,
         "23",
         3,
@@ -561,7 +519,7 @@ describe("official tender adapters", () => {
         "PROVIDER_RESULT_ERROR",
         503,
         undefined,
-        "getBidPblancListInfoCnstwk",
+        "getBidPblancListInfoThng",
         1,
         null,
         1,
@@ -571,16 +529,13 @@ describe("official tender adapters", () => {
     ],
     [
       "an eligible error while relay is disabled",
-      eligibleG2bRelayError("getBidPblancListInfoCnstwk"),
+      eligibleG2bRelayError("getBidPblancListInfoThng"),
       false,
     ],
   ])("does not relay %s", async (_label, directError, relayEnabled) => {
     const directClient = createClient();
     const relayClient = createClient();
-    directClient.getAllPages
-      .mockRejectedValueOnce(directError)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+    directClient.getAllPages.mockRejectedValueOnce(directError);
     const adapter = new G2bTenderAdapter(
       directClient,
       {
@@ -593,43 +548,28 @@ describe("official tender adapters", () => {
 
     const result = await adapter.fetchNotices(window);
 
-    expect(result.status).toBe(SyncRunStatus.PARTIAL);
+    expect(result.status).toBe(SyncRunStatus.FAILED);
     expect(relayClient.getAllPages).not.toHaveBeenCalled();
   });
 
-  it("keeps only the relay failure when another eligible operation is recovered", async () => {
-    const constructionRow = {
-      ...g2bFixture.response.body.items[0],
-      bidNtceNo: "CONSTRUCTION-RELAY",
-    };
-    const goodsRow = {
-      ...g2bFixture.response.body.items[0],
-      bidNtceNo: "GOODS-DIRECT",
-    };
+  it("keeps the relay failure for the G2B goods operation", async () => {
     const directClient = createClient();
-    directClient.getAllPages
-      .mockRejectedValueOnce(
-        eligibleG2bRelayError("getBidPblancListInfoCnstwk"),
-      )
-      .mockResolvedValueOnce([goodsRow])
-      .mockRejectedValueOnce(
-        eligibleG2bRelayError("getBidPblancListInfoServc"),
-      );
+    directClient.getAllPages.mockRejectedValueOnce(
+      eligibleG2bRelayError("getBidPblancListInfoThng"),
+    );
     const relayClient = createClient();
-    relayClient.getAllPages
-      .mockResolvedValueOnce([constructionRow])
-      .mockRejectedValueOnce(
-        new TenderSourceError(
-          TenderSource.G2B,
-          "HTTP_ERROR",
-          502,
-          undefined,
-          "getBidPblancListInfoServc",
-          1,
-          null,
-          3,
-        ),
-      );
+    relayClient.getAllPages.mockRejectedValueOnce(
+      new TenderSourceError(
+        TenderSource.G2B,
+        "HTTP_ERROR",
+        502,
+        undefined,
+        "getBidPblancListInfoThng",
+        1,
+        null,
+        3,
+      ),
+    );
     const adapter = new G2bTenderAdapter(
       directClient,
       {
@@ -642,14 +582,11 @@ describe("official tender adapters", () => {
 
     const result = await adapter.fetchNotices(window);
 
-    expect(result.status).toBe(SyncRunStatus.PARTIAL);
-    expect(result.notices.map((notice) => notice.sourceNoticeId)).toEqual([
-      "CONSTRUCTION-RELAY",
-      "GOODS-DIRECT",
-    ]);
+    expect(result.status).toBe(SyncRunStatus.FAILED);
+    expect(result.notices).toEqual([]);
     expect(result.failures).toEqual([
       {
-        operation: "getBidPblancListInfoServc",
+        operation: "getBidPblancListInfoThng",
         errorCode: "HTTP_ERROR",
         pageNo: 1,
         providerResultCode: null,
@@ -659,7 +596,7 @@ describe("official tender adapters", () => {
     ]);
     expect(
       relayClient.getAllPages.mock.calls.map(([request]) => request.operation),
-    ).toEqual(["getBidPblancListInfoCnstwk", "getBidPblancListInfoServc"]);
+    ).toEqual(["getBidPblancListInfoThng"]);
   });
 });
 
@@ -1241,7 +1178,7 @@ describe("PublicApiClient", () => {
     }
   });
 
-  it("sends the exact official G2B minute-window and pagination parameters for every operation", async () => {
+  it("sends the exact official G2B minute-window and pagination parameters for the goods operation", async () => {
     const row = g2bFixture.response.body.items[0];
     const fetcher = jest.fn(async (urlText: string) => {
       const url = new URL(urlText);
@@ -1265,12 +1202,8 @@ describe("PublicApiClient", () => {
 
     await adapter.fetchNotices(window);
 
-    const operations = [
-      "getBidPblancListInfoCnstwk",
-      "getBidPblancListInfoThng",
-      "getBidPblancListInfoServc",
-    ];
-    expect(fetcher).toHaveBeenCalledTimes(6);
+    const operations = ["getBidPblancListInfoThng"];
+    expect(fetcher).toHaveBeenCalledTimes(2);
     for (const operation of operations) {
       for (const pageNo of ["1", "2"]) {
         const request = fetcher.mock.calls

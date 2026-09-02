@@ -8,11 +8,7 @@ export interface G2bRelayFetcherConfig {
   now?: () => number;
 }
 
-const G2B_OPERATIONS = new Set([
-  "getBidPblancListInfoCnstwk",
-  "getBidPblancListInfoThng",
-  "getBidPblancListInfoServc",
-]);
+const G2B_OPERATIONS = new Set(["getBidPblancListInfoThng"]);
 
 const QUERY_FIELDS = [
   "type",
@@ -99,8 +95,8 @@ export function createG2bRelayFetcher(
         "x-dfkorea-signature": signature,
       },
       body,
-      signal: init?.signal ??
-        (input instanceof Request ? input.signal : undefined),
+      signal:
+        init?.signal ?? (input instanceof Request ? input.signal : undefined),
     });
   }) as typeof fetch;
 }

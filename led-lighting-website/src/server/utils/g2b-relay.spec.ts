@@ -29,12 +29,8 @@ const sign = (timestampValue: string, bodyValue: string) =>
   createHmac('sha256', secret).update(`${timestampValue}.${bodyValue}`).digest('hex')
 
 describe('validateRelayPayload', () => {
-  it.each([
-    'getBidPblancListInfoCnstwk',
-    'getBidPblancListInfoThng',
-    'getBidPblancListInfoServc',
-  ] as const)('accepts the allowed %s operation', (operation) => {
-    expect(validateRelayPayload({ ...validPayload, operation }).operation).toBe(operation)
+  it('accepts only the G2B goods operation', () => {
+    expect(validateRelayPayload(validPayload).operation).toBe('getBidPblancListInfoThng')
   })
 
   it.each([
@@ -44,6 +40,8 @@ describe('validateRelayPayload', () => {
       { ...validPayload, query: { ...validPayload.query, serviceKey: 'client-key' } },
     ],
     ['an unknown operation', { ...validPayload, operation: 'getEverything' }],
+    ['a construction operation', { ...validPayload, operation: 'getBidPblancListInfoCnstwk' }],
+    ['a service operation', { ...validPayload, operation: 'getBidPblancListInfoServc' }],
     [
       'a missing query field',
       {

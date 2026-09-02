@@ -1,10 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-export const G2B_RELAY_OPERATIONS = [
-  'getBidPblancListInfoCnstwk',
-  'getBidPblancListInfoThng',
-  'getBidPblancListInfoServc',
-] as const
+export const G2B_RELAY_OPERATIONS = ['getBidPblancListInfoThng'] as const
 
 export type G2bRelayOperation = (typeof G2B_RELAY_OPERATIONS)[number]
 

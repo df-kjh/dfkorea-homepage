@@ -25,9 +25,7 @@ export interface G2bTenderAdapterConfig {
 }
 
 const G2B_OPERATIONS: ReadonlyArray<[string, ProcurementType]> = [
-  ["getBidPblancListInfoCnstwk", ProcurementType.CONSTRUCTION],
   ["getBidPblancListInfoThng", ProcurementType.GOODS],
-  ["getBidPblancListInfoServc", ProcurementType.SERVICE],
 ];
 
 export class G2bTenderAdapter implements TenderSourceAdapter {

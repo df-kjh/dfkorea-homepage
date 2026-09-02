@@ -7,6 +7,7 @@ import {
   MailItemStatus,
   TenderRelevance,
 } from "../domain/tender.enums";
+import { isTenderVisible } from "../domain/tender-visibility";
 import { Tender } from "../entities/tender.entity";
 import { TenderMailDelivery } from "../entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "../entities/tender-mail-item.entity";
@@ -266,11 +267,16 @@ export class TenderMailService {
           relations: { tender: true, lastDelivery: true },
         });
         const knownTenderIds = new Set(existing.map((item) => item.tenderId));
-        const tenders = await tenderRepository.find({
-          where: {
-            relevance: In([TenderRelevance.DIRECT, TenderRelevance.POTENTIAL]),
-          },
-        });
+        const tenders = (
+          await tenderRepository.find({
+            where: {
+              relevance: In([
+                TenderRelevance.DIRECT,
+                TenderRelevance.POTENTIAL,
+              ]),
+            },
+          })
+        ).filter(isTenderVisible);
         const missing = tenders
           .filter((tender) => !knownTenderIds.has(tender.id))
           .map((tender) => ({
@@ -289,11 +295,12 @@ export class TenderMailService {
           ...(inserted as TenderMailItem[]),
         ].filter(
           (item) =>
-            item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
-            (item.status === MailItemStatus.PENDING &&
-              (!item.lastDelivery ||
-                item.lastDelivery.status === MailDeliveryStatus.FAILED ||
-                item.lastDelivery.status === MailDeliveryStatus.CANCELLED)),
+            isTenderVisible(item.tender) &&
+            (item.status === MailItemStatus.DELIVERY_UNCERTAIN ||
+              (item.status === MailItemStatus.PENDING &&
+                (!item.lastDelivery ||
+                  item.lastDelivery.status === MailDeliveryStatus.FAILED ||
+                  item.lastDelivery.status === MailDeliveryStatus.CANCELLED))),
         );
         const targetDate = this.toKstDate(now);
         if (eligible.length === 0) {
@@ -372,13 +379,30 @@ export class TenderMailService {
       where: { lastDeliveryId: delivery.id, status: MailItemStatus.PENDING },
       relations: { tender: true },
     });
-    if (items.length === 0)
+    const visibleItems = items.filter((item) => isTenderVisible(item.tender));
+    const hiddenItems = items.filter((item) => !isTenderVisible(item.tender));
+    if (hiddenItems.length > 0) {
+      // A retry claimed before the G2B goods-only policy may contain both
+      // visible and hidden items. Detach hidden rows before provider access so
+      // delivery outcome persistence cannot mark an item that was not mailed.
+      const detached = await this.mailItemRepository.update(
+        {
+          id: In(hiddenItems.map((item) => item.id)),
+          lastDeliveryId: delivery.id,
+        },
+        { lastDeliveryId: null },
+      );
+      if (detached.affected !== hiddenItems.length) {
+        throw new Error("Unable to detach hidden tender retry items");
+      }
+    }
+    if (visibleItems.length === 0)
       return this.cancelRetry(
         delivery,
         now,
         "Delivery cancelled because no pending mail items remain",
       );
-    if (!(await this.isCurrentEnabledRecipient(delivery, items[0]))) {
+    if (!(await this.isCurrentEnabledRecipient(delivery, visibleItems[0]))) {
       return this.cancelRetry(
         delivery,
         now,
@@ -387,7 +411,7 @@ export class TenderMailService {
     }
     await this.deliver(
       delivery,
-      items.map((item) => item.tender),
+      visibleItems.map((item) => item.tender),
       now,
     );
   }

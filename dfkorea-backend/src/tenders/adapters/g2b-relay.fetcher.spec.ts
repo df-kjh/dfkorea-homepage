@@ -54,6 +54,20 @@ describe("createG2bRelayFetcher", () => {
         "getBidPblancListInfoEverything",
       ),
     ],
+    [
+      "a construction operation",
+      providerUrl.replace(
+        "getBidPblancListInfoThng",
+        "getBidPblancListInfoCnstwk",
+      ),
+    ],
+    [
+      "a service operation",
+      providerUrl.replace(
+        "getBidPblancListInfoThng",
+        "getBidPblancListInfoServc",
+      ),
+    ],
     ["a duplicate required query field", `${providerUrl}&pageNo=2`],
     [
       "a missing required query field",

@@ -36,7 +36,7 @@ const TENDER = {
   bidEndedAt: null,
   openedAt: null,
   region: null,
-  procurementType: ProcurementType.CONSTRUCTION,
+  procurementType: ProcurementType.GOODS,
   contractMethod: null,
   estimatedAmount: null,
   sourceUrl: "https://example.com",
@@ -78,7 +78,7 @@ describe("TenderMailService", () => {
     mailItemRepository = {
       find: jest.fn().mockResolvedValue([]),
       save: jest.fn(async (value) => (Array.isArray(value) ? value : value)),
-      update: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     const dispatchBuilder = {
       insert: jest.fn(),
@@ -155,6 +155,36 @@ describe("TenderMailService", () => {
       }),
     );
     expect(dataSource.transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("emails G2B goods and K-apt notices while excluding persisted non-goods G2B notices", async () => {
+    const g2bConstruction = {
+      ...TENDER,
+      id: "g2b-construction",
+      sourceNoticeId: "G2B-CONSTRUCTION",
+      title: "나라장터 전기공사",
+      procurementType: ProcurementType.CONSTRUCTION,
+    } as Tender;
+    const kaptConstruction = {
+      ...TENDER,
+      id: "kapt-construction",
+      source: TenderSource.KAPT,
+      sourceNoticeId: "KAPT-CONSTRUCTION",
+      title: "K-apt 조명 교체공사",
+      procurementType: ProcurementType.CONSTRUCTION,
+    } as Tender;
+    tenderRepository.find.mockResolvedValue([
+      TENDER,
+      g2bConstruction,
+      kaptConstruction,
+    ]);
+
+    await service.sendDailyDigest(NOW);
+
+    const message = transport.sendMail.mock.calls[0]?.[0];
+    expect(message.text).toContain(TENDER.title);
+    expect(message.text).toContain(kaptConstruction.title);
+    expect(message.text).not.toContain(g2bConstruction.title);
   });
 
   it.each([
@@ -418,24 +448,24 @@ describe("TenderMailService", () => {
   });
 
   it("marks an unknown provider acceptance outcome terminal without retry", async () => {
-      transport.sendMail.mockRejectedValueOnce(
-        new MailDeliveryError(MailDeliveryOutcome.UNKNOWN_ACCEPTANCE),
-      );
+    transport.sendMail.mockRejectedValueOnce(
+      new MailDeliveryError(MailDeliveryOutcome.UNKNOWN_ACCEPTANCE),
+    );
 
-      await service.sendDailyDigest(NOW);
+    await service.sendDailyDigest(NOW);
 
-      expect(deliveryRepository.update).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "delivery-1" }),
-        expect.objectContaining({
-          status: MailDeliveryStatus.DELIVERY_UNCERTAIN,
-          nextRetryAt: null,
-          uncertainAt: NOW,
-        }),
-      );
-      expect(mailItemRepository.update).toHaveBeenCalledWith(
-        { lastDeliveryId: "delivery-1", status: MailItemStatus.PENDING },
-        { status: MailItemStatus.DELIVERY_UNCERTAIN, uncertainAt: NOW },
-      );
+    expect(deliveryRepository.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "delivery-1" }),
+      expect.objectContaining({
+        status: MailDeliveryStatus.DELIVERY_UNCERTAIN,
+        nextRetryAt: null,
+        uncertainAt: NOW,
+      }),
+    );
+    expect(mailItemRepository.update).toHaveBeenCalledWith(
+      { lastDeliveryId: "delivery-1", status: MailItemStatus.PENDING },
+      { status: MailItemStatus.DELIVERY_UNCERTAIN, uncertainAt: NOW },
+    );
   });
 
   it("marks a permanent provider rejection failed without scheduling a retry", async () => {
@@ -643,6 +673,88 @@ describe("TenderMailService", () => {
       }),
     );
     expect(mailItemRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("cancels a retry containing only a persisted non-goods G2B notice", async () => {
+    const delivery = {
+      id: "delivery-hidden-g2b",
+      recipientEmail: RECIPIENT.email,
+      status: MailDeliveryStatus.RETRY_SCHEDULED,
+      attemptCount: 1,
+      nextRetryAt: new Date(NOW.getTime() - 1),
+      targetDate: "2026-08-27",
+    } as TenderMailDelivery;
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
+    deliveryRepository.update.mockResolvedValue({ affected: 1 });
+    mailItemRepository.find.mockResolvedValue([
+      {
+        id: "hidden-item",
+        recipientId: RECIPIENT.id,
+        tender: {
+          ...TENDER,
+          source: TenderSource.G2B,
+          procurementType: ProcurementType.CONSTRUCTION,
+        },
+        lastDeliveryId: delivery.id,
+      },
+    ]);
+
+    await service.retryDue(NOW);
+
+    expect(transport.sendMail).not.toHaveBeenCalled();
+    expect(deliveryRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: MailDeliveryStatus.CANCELLED }),
+    );
+  });
+
+  it("detaches hidden G2B non-goods items before retrying visible notices", async () => {
+    const delivery = {
+      id: "delivery-mixed-g2b",
+      recipientEmail: RECIPIENT.email,
+      status: MailDeliveryStatus.RETRY_SCHEDULED,
+      attemptCount: 1,
+      nextRetryAt: new Date(NOW.getTime() - 1),
+      targetDate: "2026-08-27",
+    } as TenderMailDelivery;
+    const hiddenTender = {
+      ...TENDER,
+      id: "hidden-g2b-construction",
+      title: "숨겨야 할 나라장터 공사",
+      source: TenderSource.G2B,
+      procurementType: ProcurementType.CONSTRUCTION,
+    } as Tender;
+    deliveryRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([delivery]);
+    deliveryRepository.update.mockResolvedValue({ affected: 1 });
+    mailItemRepository.find.mockResolvedValue([
+      {
+        id: "visible-item",
+        recipientId: RECIPIENT.id,
+        tender: TENDER,
+        lastDeliveryId: delivery.id,
+      },
+      {
+        id: "hidden-item",
+        recipientId: RECIPIENT.id,
+        tender: hiddenTender,
+        lastDeliveryId: delivery.id,
+      },
+    ]);
+
+    await service.retryDue(NOW);
+
+    const detachCall = mailItemRepository.update.mock.calls.find(
+      ([where, update]) =>
+        where.lastDeliveryId === delivery.id && update.lastDeliveryId === null,
+    );
+    expect(detachCall?.[0].id.value).toEqual(["hidden-item"]);
+    expect(transport.sendMail.mock.calls[0]?.[0].text).toContain(TENDER.title);
+    expect(transport.sendMail.mock.calls[0]?.[0].text).not.toContain(
+      hiddenTender.title,
+    );
   });
 
   it("cancels a due retry without calling the provider when the shared subscription is disabled", async () => {

@@ -10,6 +10,7 @@ import {
   TenderSummaryDto,
 } from "../dto/tender-query.dto";
 import { Tender } from "../entities/tender.entity";
+import { ProcurementType, TenderSource } from "../domain/tender.enums";
 
 const KST_OFFSET_HOURS = -9;
 const LIKE_ESCAPE_CHARACTER = "!";
@@ -37,6 +38,7 @@ export class TenderQueryService {
         end,
       });
 
+    this.applyVisibilityScope(builder);
     this.applyFilters(builder, filters);
     const rows = await builder
       .groupBy(localRegisteredDate)
@@ -68,12 +70,12 @@ export class TenderQueryService {
     return [...grouped.values()];
   }
 
-  async getTenders(
-    query: TenderListQueryDto,
-  ): Promise<PaginatedTenderDto> {
+  async getTenders(query: TenderListQueryDto): Promise<PaginatedTenderDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const builder = this.tenderRepository.createQueryBuilder("tender");
+
+    this.applyVisibilityScope(builder);
 
     if (query.registeredDate) {
       const { start, end } = this.getKstDateBounds(query.registeredDate);
@@ -103,10 +105,11 @@ export class TenderQueryService {
   }
 
   async getTender(id: string): Promise<TenderDetailDto | null> {
-    const tender = await this.tenderRepository
+    const builder = this.tenderRepository
       .createQueryBuilder("tender")
-      .where("tender.id = :id", { id })
-      .getOne();
+      .where("tender.id = :id", { id });
+    this.applyVisibilityScope(builder);
+    const tender = await builder.getOne();
     return tender ? this.toSafeDto(tender) : null;
   }
 
@@ -168,6 +171,16 @@ export class TenderQueryService {
     }
   }
 
+  private applyVisibilityScope(builder: SelectQueryBuilder<Tender>): void {
+    builder.andWhere(
+      "(tender.source <> :visibleG2bSource OR tender.procurementType = :visibleG2bProcurementType)",
+      {
+        visibleG2bSource: TenderSource.G2B,
+        visibleG2bProcurementType: ProcurementType.GOODS,
+      },
+    );
+  }
+
   private getKstMonthBounds(month: string): { start: Date; end: Date } {
     const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
     if (!match) {
@@ -198,7 +211,11 @@ export class TenderQueryService {
     return { start, end };
   }
 
-  private kstMidnightToUtc(year: number, monthIndex: number, day: number): Date {
+  private kstMidnightToUtc(
+    year: number,
+    monthIndex: number,
+    day: number,
+  ): Date {
     // Korea has a fixed UTC+09:00 offset and does not observe DST. Date.UTC
     // safely handles last-day and year rollover for exclusive end bounds.
     return new Date(Date.UTC(year, monthIndex, day, KST_OFFSET_HOURS));
