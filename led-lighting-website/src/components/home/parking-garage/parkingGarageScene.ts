@@ -201,7 +201,8 @@ export const createParkingGarageController = (
 
   const handlePointerEnd = (event: PointerEvent): void => {
     if (event.pointerType !== 'touch') return
-    if (activeTouch?.pointerId === event.pointerId) activeTouch = null
+    if (!activeTouch || activeTouch.pointerId !== event.pointerId) return
+    activeTouch = null
     clearFixture()
   }
 

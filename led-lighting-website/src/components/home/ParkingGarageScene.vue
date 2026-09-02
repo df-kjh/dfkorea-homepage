@@ -6,19 +6,22 @@ import {
 } from './parking-garage/parkingGarageScene'
 
 const rendererContainer = ref<HTMLElement | null>(null)
+const sceneContainer = ref<HTMLElement | null>(null)
 const rendererReady = ref(false)
 const fallbackImage = '/images/home/parking-garage-fallback.webp'
 const defaultFallbackImage = '/images/main-hero.jpg'
 
 let controller: ParkingGarageController | null = null
+let intersectionObserver: IntersectionObserver | null = null
 let reducedMotionQuery: MediaQueryList | null = null
 let hasTerminalFallback = false
+let isSceneVisible = true
 
 const startController = (reducedMotion: boolean): void => {
   if (!rendererContainer.value) return
 
   rendererReady.value = false
-  controller = createParkingGarageController({
+  const nextController = createParkingGarageController({
     container: rendererContainer.value,
     reducedMotion,
     onReady: () => {
@@ -29,7 +32,17 @@ const startController = (reducedMotion: boolean): void => {
       rendererReady.value = false
     },
   })
-  controller.start()
+  controller = nextController
+  if (!hasTerminalFallback && isSceneVisible) nextController.start()
+}
+
+const handleIntersection: IntersectionObserverCallback = ([entry]) => {
+  if (!entry || entry.isIntersecting === isSceneVisible) return
+
+  isSceneVisible = entry.isIntersecting
+  if (hasTerminalFallback) return
+  if (isSceneVisible) controller?.start()
+  else controller?.pause()
 }
 
 const handleReducedMotionChange = (event: MediaQueryListEvent): void => {
@@ -43,10 +56,16 @@ const handleReducedMotionChange = (event: MediaQueryListEvent): void => {
 onMounted(() => {
   reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   reducedMotionQuery.addEventListener('change', handleReducedMotionChange)
+  if (typeof window.IntersectionObserver === 'function' && sceneContainer.value) {
+    intersectionObserver = new window.IntersectionObserver(handleIntersection)
+    intersectionObserver.observe(sceneContainer.value)
+  }
   startController(reducedMotionQuery.matches)
 })
 
 onUnmounted(() => {
+  intersectionObserver?.disconnect()
+  intersectionObserver = null
   reducedMotionQuery?.removeEventListener('change', handleReducedMotionChange)
   reducedMotionQuery = null
   controller?.dispose()
@@ -55,7 +74,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="absolute inset-0 overflow-hidden" style="touch-action: pan-y" aria-hidden="true">
+  <div
+    ref="sceneContainer"
+    class="absolute inset-0 overflow-hidden"
+    style="touch-action: pan-y"
+    aria-hidden="true"
+  >
     <picture class="absolute inset-0 block h-full w-full">
       <source :srcset="fallbackImage" type="image/webp" />
       <img

@@ -417,6 +417,48 @@ describe('parking garage fixture interaction', () => {
     controller.dispose()
   })
 
+  it('ignores unrelated touch releases until the active pointer ends', () => {
+    const harness = createHarness()
+    vi.mocked(harness.raycaster.intersectObjects).mockImplementation((objects) => [
+      { distance: 1, object: objects[0]! },
+    ])
+    const controller = createController(harness)
+    controller.start()
+    harness.runNextFrame()
+
+    harness.container.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 21,
+        pointerType: 'touch',
+      }),
+    )
+    const target = vi.mocked(harness.raycaster.intersectObjects).mock.calls[0]![0][0] as Mesh
+    const material = target.material as MeshStandardMaterial
+    harness.runNextFrame(180)
+    expect(material.emissiveIntensity).toBe(1)
+
+    harness.container.dispatchEvent(
+      new PointerEvent('pointerup', { pointerId: 22, pointerType: 'touch' }),
+    )
+    harness.runNextFrame(180)
+    expect(material.emissiveIntensity).toBe(1)
+
+    harness.container.dispatchEvent(
+      new PointerEvent('pointercancel', { pointerId: 23, pointerType: 'touch' }),
+    )
+    harness.runNextFrame(180)
+    expect(material.emissiveIntensity).toBe(1)
+
+    harness.container.dispatchEvent(
+      new PointerEvent('pointerup', { pointerId: 21, pointerType: 'touch' }),
+    )
+    harness.runNextFrame(180)
+    expect(material.emissiveIntensity).toBe(0.5)
+    controller.dispose()
+  })
+
   it('releases touch activation after a scroll-sized move without preventing the gesture', () => {
     const harness = createHarness()
     vi.mocked(harness.raycaster.intersectObjects).mockImplementation((objects) => [
