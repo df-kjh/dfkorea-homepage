@@ -1,37 +1,46 @@
-# 홈
+# 홈 메뉴 기능 현황
 
 ## 구현 완료
 
-- Hero는 기존 제목·부제·CTA props, `primaryClick`/`secondaryClick` 이벤트 계약, 콘텐츠 패럴랙스·페이드, 오버레이·하단 그라데이션과 스크롤 이동 동작을 유지한다.
-- Hero 배경은 25초마다 반복되는 주차장 카메라 경로와 몰드바·벽부등으로 구성된 WebGL 장면을 표시한다.
-- 포인터가 가리키거나 터치로 누른 개별 조명은 기본 50%에서 100% 밝기로 전환되며, 배경 Canvas는 CTA 클릭과 세로 스크롤을 막지 않는다.
-- 768 CSS px 미만에서는 픽셀 비율 1, 그림자 비활성화, 축소된 조명 수를 사용하는 모바일 품질 모드를 적용한다.
-- `prefers-reduced-motion: reduce`에서는 대표 시점에 카메라를 고정하고 조명 상호작용과 렌더링은 유지한다. 실행 중 설정이 바뀌면 해당 모션 설정으로 장면을 다시 시작하되, 이미 정적 폴백으로 전환된 세션은 다시 시작하지 않는다.
-- Hero가 화면 밖으로 벗어나면 WebGL 렌더링을 일시 중지하고, 다시 보이면 중단된 시점부터 재개한다. 모션 설정이 화면 밖에서 변경되면 새 controller는 Hero가 다시 보일 때까지 시작하지 않는다.
-- 첫 WebGL 프레임 전과 렌더러 생성·컨텍스트·실행·초기 성능 실패 시 `parking-garage-fallback.webp` 정적 이미지를 유지한다.
-- 기존 `public/videos/HeroSection.mp4` 파일은 복구 가능성을 위해 남겨 두지만 Hero 요청 경로에서는 제거했다.
+- HeroSection을 왼쪽 카피·CTA와 오른쪽 Three.js LED 전구 오브젝트의 2열 구성으로 표시한다.
+- 640px 미만 모바일에서는 Hero 높이를 `max(820px, 100svh)`로 유지하고 전용 레이아웃 레이어와 동일한 상하 패딩으로 카피와 CTA의 중심을 화면 정중앙에 배치한다. 3D 전구는 포인터 입력이 없는 32% 불투명도의 배경 레이어로 겹쳐 가장자리 페이드와 텍스트 그림자로 가독성을 유지한다.
+- 웹과 모바일 모두 Hero 하단에 마스킹된 블러와 다단계 그라데이션을 적용해 어두운 장면이 다음 흰색 통계 섹션으로 자연스럽게 전환된다.
+- 오른쪽 장면은 상단 가로 고정 구조 없이 화면 꼭대기에서 내려오는 단일 세로 전선과 LED 필라멘트 전구로 구성한다.
+- 전구는 LatheGeometry 기반 이중 고투과 유리구, 곡면 반사 하이라이트, 내부 발광 볼륨, 홈이 분리된 브라스 소켓, 세라믹 칼라, 유리 스템, 여섯 개의 곡선형 전구색 필라멘트와 지지 링·와이어를 계층적으로 모델링한다.
+- 전선은 단일 원통 메시와 120Hz 고정 스텝의 감쇠 진자로 표현하며, 다관절 파동을 생성하지 않는다.
+- 마우스가 전선을 스치면 수평 이동량만 제한된 각속도로 전달하고, 작은 접촉도 11~13도까지 반응하면서 극단적인 입력은 좌우 18도 안에서 부드럽게 감쇠한다.
+- 데스크톱 전구는 꺼지지 않는 35~82% 범위에서 여러 주기의 파형을 합성해 불규칙하게 밝기가 변하며, 전구에 마우스를 올리면 필라멘트와 PointLight가 함께 최대 광량으로 전환된다.
+- 모바일 전구는 12초 주기 안에서 간격과 길이가 다른 다섯 소등 구간을 반복하며, 소등 시 필라멘트·PointLight·내부 발광·광륜을 모두 0까지 낮춘다. CSS 폴백도 같은 주기의 점등 패턴을 사용한다.
+- 절차적으로 생성한 스튜디오 환경 반사, ACES 톤매핑, 확장된 도달 거리의 2700K 계열 PointLight, 필라멘트 외곽 발광층과 강화된 이중 전구색 광륜으로 유리 반사와 따뜻한 내부 발광을 표현한다.
+- 화면 크기에 따라 픽셀 비율과 전구 방사형 세그먼트를 모바일 64, 데스크톱 96으로 제한하고, 화면 밖에서는 애니메이션을 일시정지한다.
+- `prefers-reduced-motion` 환경에서는 줄 물리와 자동 밝기 변화를 정지하고 고정 밝기로 한 프레임만 렌더링하며, 전구 호버 밝기만 유지한다.
+- WebGL 초기화, 렌더 프레임 또는 컨텍스트 실패 시 GPU 리소스와 이벤트를 즉시 정리하고 동일한 구도의 CSS 정적 폴백을 표시한다.
+- 제품 보기, 회사 소개 CTA와 Hero의 실제 하단으로 이동하는 스크롤 컨트롤을 제공한다.
 
 ## 미구현
 
-- 실제 주차장 BIM/CAD 데이터 또는 제품별 광학 시뮬레이션과 연동하지 않는다.
-- 관리 화면에서 장면 배치·카메라 경로·조명 모델을 편집하는 기능은 제공하지 않는다.
+- 실제 자사 LED 전구 제품의 CAD/GLB 형상과 정확한 치수는 적용하지 않았다.
+- 실제 제품별 색온도, 배광 데이터와 광도 분포 시뮬레이션은 적용하지 않았다.
 
 ## 부족하거나 개선이 필요한 기능
 
-- 주차장은 제품 표현과 상호작용 검증을 위한 단순화된 절차형 모델이다. 실제 시공 구조, 배광, 조도와 색 정확도를 보증하지 않는다.
-- WebGL과 시작 성능 상태는 브라우저·GPU별 편차가 있으므로 배포 후 실제 대상 기기에서 정적 폴백 전환 비율을 관찰해야 한다.
-- 정적 폴백은 1440 × 900 대표 시점의 장면 캡처다. 향후 모델·재질·카메라 경로가 바뀌면 같은 장면에서 다시 생성해야 한다.
+- 현재 전구는 브랜드 인상을 위한 추상화 모델이므로 실제 제품 외형과 내부 기판 구조가 다를 수 있다.
+- 전선 물리는 과도한 파동을 방지하기 위한 2차원 단일 진자 방식이므로 깊이 방향의 회전, 전선 휨, 복잡한 충돌은 지원하지 않는다.
+- 실제 제품 모델이 제공되면 현재 물리·밝기·렌더러 생명주기를 유지한 채 전구 메시와 재질만 교체해야 한다.
+- 저사양 기기별 실제 프레임 시간 데이터가 축적되면 픽셀 비율과 관절 수 기준을 추가 조정할 수 있다.
 
 ## 관련 파일
 
 - `led-lighting-website/src/components/home/HeroSection.vue`
-- `led-lighting-website/src/components/home/ParkingGarageScene.vue`
-- `led-lighting-website/src/components/home/parking-garage/`
-- `led-lighting-website/public/images/home/parking-garage-fallback.webp`
-- `led-lighting-website/public/videos/HeroSection.mp4`
+- `led-lighting-website/src/components/home/HeroSection.spec.ts`
+- `led-lighting-website/src/components/home/HangingBulbScene.vue`
+- `led-lighting-website/src/components/home/HangingBulbScene.spec.ts`
+- `led-lighting-website/src/components/home/hanging-bulb/createHangingBulbController.ts`
+- `led-lighting-website/src/components/home/hanging-bulb/createHangingBulbController.spec.ts`
+- `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.ts`
+- `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.spec.ts`
 
 ## 갱신 규칙
 
-- 홈 Hero의 콘텐츠, CTA, 스크롤, 배경 장면, 품질 정책 또는 폴백 동작을 변경할 때 이 문서를 같은 변경에서 갱신한다.
-- 장면 모델이나 대표 카메라 시점을 변경하면 정적 폴백 이미지와 해당 한계 설명을 함께 갱신한다.
-- 실제 하드웨어·제품 데이터 연동 범위가 바뀌면 `구현 완료`, `미구현`, `부족하거나 개선이 필요한 기능`을 함께 조정한다.
+- 홈 Hero의 레이아웃, 카피, 3D 전구 모델, 줄 물리, 밝기 상호작용, 품질 정책 또는 fallback 방식이 변경되면 이 문서를 같은 작업에서 갱신한다.
+- 실제 제품 모델이나 측광 데이터를 적용할 때는 구현 완료와 한계 항목을 함께 수정한다.
