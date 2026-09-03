@@ -21,6 +21,8 @@ export type FallbackReason = 'renderer' | 'context-lost' | 'performance' | 'runt
 export interface ParkingGarageRenderer {
   domElement: HTMLCanvasElement
   outputColorSpace: string
+  toneMapping: number
+  toneMappingExposure: number
   shadowMap: {
     enabled: boolean
     type: number
@@ -68,6 +70,28 @@ const TOUCH_MOVE_THRESHOLD_PX = 8
 const PERFORMANCE_WARMUP_FRAMES = 30
 const PERFORMANCE_SAMPLE_FRAMES = 60
 const MINIMUM_STARTUP_FPS = 24
+
+const updateVisibleFixtureLights = (
+  model: GarageModel,
+  camera: PerspectiveCamera,
+  pointLightBudget: number,
+): void => {
+  const visibleFixtures = new Set(
+    [...model.fixtures]
+      .sort((left, right) => {
+        const intensityPriority = right.targetIntensity - left.targetIntensity
+        if (intensityPriority !== 0) return intensityPriority
+
+        return (
+          left.group.position.distanceToSquared(camera.position) -
+          right.group.position.distanceToSquared(camera.position)
+        )
+      })
+      .slice(0, pointLightBudget),
+  )
+
+  for (const fixture of model.fixtures) fixture.light.visible = visibleFixtures.has(fixture)
+}
 
 const createDefaultAdapters = (): ControllerAdapters => ({
   cancelAnimationFrame: (frameId) => window.cancelAnimationFrame(frameId),
@@ -184,7 +208,10 @@ export const createParkingGarageController = (
     }
     if (!activeTouch || activeTouch.pointerId !== event.pointerId) return
 
-    const distance = Math.hypot(event.clientX - activeTouch.startX, event.clientY - activeTouch.startY)
+    const distance = Math.hypot(
+      event.clientX - activeTouch.startX,
+      event.clientY - activeTouch.startY,
+    )
     if (distance > TOUCH_MOVE_THRESHOLD_PX) {
       // Release the decorative press state without preventing the pointer event;
       // the browser must remain free to turn this gesture into page scrolling.
@@ -295,6 +322,7 @@ export const createParkingGarageController = (
 
       camera!.position.set(pose.position.x, pose.position.y, pose.position.z)
       camera!.lookAt(pose.target.x, pose.target.y, pose.target.z)
+      updateVisibleFixtureLights(model!, camera!, profile.pointLightBudget)
       for (const fixture of model!.fixtures) updateFixtureIntensity(fixture, deltaMs / 1_000)
       renderer.render(scene!, camera!)
 
@@ -347,19 +375,31 @@ export const createParkingGarageController = (
   try {
     raycaster = adapters.createRaycaster()
     scene = new THREE.Scene()
-    scene.background = new THREE.Color(0xb8bec2)
-    camera = new THREE.PerspectiveCamera(58, 1, 0.1, 120)
-    const ambientLight = new THREE.AmbientLight(0xdce5ea, 1.4)
-    directionalLight = new THREE.DirectionalLight(0xf5f8ff, 2.2)
-    directionalLight.position.set(-4, 8, 10)
+    scene.background = new THREE.Color(0x090c0e)
+    scene.fog = new THREE.FogExp2(0x090c0e, 0.0125)
+    camera = new THREE.PerspectiveCamera(60, 1, 0.1, 120)
+    const ambientLight = new THREE.AmbientLight(0xb2bec5, 0.6)
+    const hemisphereLight = new THREE.HemisphereLight(0x82909a, 0x101315, 0.52)
+    directionalLight = new THREE.DirectionalLight(0xd8e0e4, 1.05)
+    directionalLight.position.set(-5, 9, 8)
     directionalLight.castShadow = profile.shadows
     directionalLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize)
-    scene.add(ambientLight, directionalLight)
+    directionalLight.shadow.bias = -0.0008
+    directionalLight.shadow.normalBias = 0.035
+    directionalLight.shadow.camera.near = 0.5
+    directionalLight.shadow.camera.far = 70
+    directionalLight.shadow.camera.left = -18
+    directionalLight.shadow.camera.right = 18
+    directionalLight.shadow.camera.top = 18
+    directionalLight.shadow.camera.bottom = -18
+    scene.add(ambientLight, hemisphereLight, directionalLight)
 
     model = createParkingGarageModel(profile)
     scene.add(model.group)
 
     renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 0.84
     renderer.shadowMap.enabled = profile.shadows
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.setPixelRatio(profile.pixelRatio)

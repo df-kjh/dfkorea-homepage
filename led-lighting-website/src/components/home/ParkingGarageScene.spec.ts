@@ -60,7 +60,10 @@ describe('ParkingGarageScene', () => {
     vi.clearAllMocks()
     intersectionCallback = null
     createParkingGarageController.mockReturnValue(controller)
-    vi.stubGlobal('matchMedia', vi.fn(() => mediaQuery))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => mediaQuery),
+    )
   })
 
   afterEach(() => {
@@ -124,8 +127,8 @@ describe('ParkingGarageScene', () => {
     expect(wrapper.attributes('aria-hidden')).toBe('true')
     expect(wrapper.attributes('style')).toContain('touch-action: pan-y')
     expect(source.attributes()).toMatchObject({
-      srcset: '/images/home/parking-garage-fallback.webp',
-      type: 'image/webp',
+      srcset: '/images/home/parking-garage-fallback-v2.jpg',
+      type: 'image/jpeg',
     })
     expect(image.attributes()).toMatchObject({
       alt: '',

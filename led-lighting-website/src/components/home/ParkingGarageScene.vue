@@ -8,7 +8,7 @@ import {
 const rendererContainer = ref<HTMLElement | null>(null)
 const sceneContainer = ref<HTMLElement | null>(null)
 const rendererReady = ref(false)
-const fallbackImage = '/images/home/parking-garage-fallback.webp'
+const fallbackImage = '/images/home/parking-garage-fallback-v2.jpg'
 const defaultFallbackImage = '/images/main-hero.jpg'
 
 let controller: ParkingGarageController | null = null
@@ -81,7 +81,7 @@ onUnmounted(() => {
     aria-hidden="true"
   >
     <picture class="absolute inset-0 block h-full w-full">
-      <source :srcset="fallbackImage" type="image/webp" />
+      <source :srcset="fallbackImage" type="image/jpeg" />
       <img
         :src="defaultFallbackImage"
         alt=""

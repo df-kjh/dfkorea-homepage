@@ -9,7 +9,7 @@ describe('selectParkingGarageQuality', () => {
         viewportWidth: 1440,
         devicePixelRatio: 3,
       }),
-    ).toMatchObject({ mode: 'desktop', pixelRatio: 1.5, shadows: true })
+    ).toMatchObject({ mode: 'desktop', pixelRatio: 1.5, pointLightBudget: 8, shadows: true })
   })
 
   it('uses the reduced mobile profile below 768 CSS pixels', () => {
@@ -19,7 +19,7 @@ describe('selectParkingGarageQuality', () => {
         viewportWidth: 390,
         devicePixelRatio: 3,
       }),
-    ).toMatchObject({ mode: 'mobile', pixelRatio: 1, shadows: false })
+    ).toMatchObject({ mode: 'mobile', pixelRatio: 1, pointLightBudget: 4, shadows: false })
 
     expect(
       selectParkingGarageQuality({
@@ -36,8 +36,8 @@ describe('selectParkingGarageQuality', () => {
         webglAvailable: false,
         viewportWidth: 1440,
         devicePixelRatio: 2,
-      }).mode,
-    ).toBe('fallback')
+      }),
+    ).toMatchObject({ mode: 'fallback', pointLightBudget: 0 })
   })
 })
 

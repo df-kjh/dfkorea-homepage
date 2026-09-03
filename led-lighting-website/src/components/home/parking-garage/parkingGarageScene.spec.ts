@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
+  ACESFilmicToneMapping,
   AmbientLight,
   DirectionalLight,
+  FogExp2,
   Mesh,
   MeshStandardMaterial,
   PCFSoftShadowMap,
+  PointLight,
   SRGBColorSpace,
 } from 'three'
 import { sampleParkingGaragePath } from './parkingGaragePath'
@@ -52,10 +55,15 @@ const createHarness = (): Harness => {
     toJSON: () => ({}),
   })
 
-  const renderer: ParkingGarageRenderer = {
+  const renderer: ParkingGarageRenderer & {
+    toneMapping: number
+    toneMappingExposure: number
+  } = {
     domElement: canvas,
     outputColorSpace: '',
     shadowMap: { enabled: false, type: 0 },
+    toneMapping: 0,
+    toneMappingExposure: 1,
     dispose: vi.fn(),
     render: vi.fn(),
     setPixelRatio: vi.fn(),
@@ -120,10 +128,7 @@ const createHarness = (): Harness => {
   }
 }
 
-const createController = (
-  harness: Harness,
-  overrides: Partial<{ reducedMotion: boolean }> = {},
-) =>
+const createController = (harness: Harness, overrides: Partial<{ reducedMotion: boolean }> = {}) =>
   createParkingGarageController({
     adapters: harness.adapters,
     container: harness.container,
@@ -252,6 +257,13 @@ describe('parking garage renderer and camera', () => {
     })
     expect(harness.renderer.outputColorSpace).toBe(SRGBColorSpace)
     expect(harness.renderer.shadowMap).toMatchObject({ enabled: true, type: PCFSoftShadowMap })
+    const renderer = harness.renderer as ParkingGarageRenderer & {
+      toneMapping: number
+      toneMappingExposure: number
+    }
+    expect(renderer.toneMapping).toBe(ACESFilmicToneMapping)
+    expect(renderer.toneMappingExposure).toBeLessThanOrEqual(0.85)
+    expect(renderer.toneMappingExposure).toBeGreaterThanOrEqual(0.82)
     expect(harness.renderer.setPixelRatio).toHaveBeenCalledWith(1.5)
     expect(harness.renderer.setSize).toHaveBeenCalledWith(1_200, 600, false)
 
@@ -261,6 +273,10 @@ describe('parking garage renderer and camera', () => {
     const ambient = scene.children.find((child) => child instanceof AmbientLight)
     const directional = scene.children.find((child) => child instanceof DirectionalLight)
     expect(ambient).toBeInstanceOf(AmbientLight)
+    expect((ambient as AmbientLight).intensity).toBeLessThanOrEqual(0.65)
+    expect((ambient as AmbientLight).intensity).toBeGreaterThanOrEqual(0.55)
+    expect(scene.fog).toBeInstanceOf(FogExp2)
+    expect((scene.fog as FogExp2).density).toBeLessThanOrEqual(0.014)
     expect(directional).toBeInstanceOf(DirectionalLight)
     expect((directional as DirectionalLight).castShadow).toBe(true)
     expect((directional as DirectionalLight).shadow.mapSize.toArray()).toEqual([1_024, 1_024])
@@ -326,6 +342,29 @@ describe('parking garage renderer and camera', () => {
     ])
     controller.dispose()
   })
+
+  it.each([
+    { devicePixelRatio: 2, pointLights: 8, width: 1_440 },
+    { devicePixelRatio: 3, pointLights: 4, width: 390 },
+  ])(
+    'limits active physical lights to $pointLights for each quality profile',
+    ({ devicePixelRatio, pointLights, width }) => {
+      const harness = createHarness()
+      harness.setViewport(width, devicePixelRatio)
+      const controller = createController(harness)
+      controller.start()
+      harness.runNextFrame()
+
+      const scene = vi.mocked(harness.renderer.render).mock.calls[0]![0]
+      const visibleLights: PointLight[] = []
+      scene.traverse((object) => {
+        if (object instanceof PointLight && object.visible) visibleLights.push(object)
+      })
+
+      expect(visibleLights).toHaveLength(pointLights)
+      controller.dispose()
+    },
+  )
 })
 
 describe('parking garage fixture interaction', () => {
