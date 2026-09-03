@@ -14,6 +14,11 @@ export default defineNuxtConfig({
   serverDir: "src/server",
   ssr: true,
   css: ["@/assets/main.css", "@/assets/dark-mode.css"],
+  // Keep Nuxt's default component extensions while excluding the explicitly
+  // imported parking-garage controllers that collide with ParkingGarageScene.vue.
+  components: {
+    dirs: [{ path: "@/components", ignore: ["home/parking-garage/**"] }],
+  },
   runtimeConfig: {
     g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",
     g2bTenderApiBaseUrl: process.env.G2B_TENDER_API_BASE_URL || "",
