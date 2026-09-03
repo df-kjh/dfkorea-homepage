@@ -14,9 +14,9 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   stats: () => [
     { value: '10+', label: '회사 설립', icon: 'business' },
-    { value: '20+', label: '다양한 제품군', icon: 'category' },
-    { value: '10+', label: '인증', icon: 'verified' },
-    { value: '100+', label: '설치 업체', icon: 'construction' },
+    { value: '30+', label: '다양한 제품군', icon: 'category' },
+    { value: '50+', label: '인증', icon: 'verified' },
+    { value: '300+', label: '설치 현장', icon: 'construction' },
   ],
 })
 
