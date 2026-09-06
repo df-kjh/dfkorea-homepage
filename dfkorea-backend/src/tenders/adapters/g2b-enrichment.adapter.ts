@@ -207,9 +207,7 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
     // narrow gate is documented beside the full official-schema-shaped fixture.
     if (
       row.intrbidYn !== "N" ||
-      !/총액(?:입찰)?/.test(title) ||
-      !/(?:원화|\bKRW\b)/i.test(title) ||
-      !/A\s*값\s*미적용/i.test(title) ||
+      !this.hasAffirmativePricingDeclarations(title) ||
       /단가|외화|USD|EUR|JPY|CNY|달러|엔화|유로|특수|보험료|순공사원가|아님|않|제외|변경/i.test(
         title,
       ) ||
@@ -241,6 +239,37 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
         evidence: evidence("getBidPblancListInfoThng", "sucsfbidMthdNm"),
       },
     ];
+  }
+
+  private hasAffirmativePricingDeclarations(title: string): boolean {
+    // A keyword inside a question, conditional or denial is not a fact. Keep
+    // this intentionally narrow: each title clause mentioning a pricing fact
+    // must be a complete affirmative declaration, including repeated mentions.
+    // Unknown grammar stays unpriced instead of guessing the provider's intent.
+    if (
+      /여부|가능|확인|검토|필요|예정|조건|경우|(?:라|이)면|불가|아니|아님|않|제외|변경/i.test(
+        title,
+      )
+    )
+      return false;
+    const clauses = title
+      .split(/[()[\]{};,，；·\n]/)
+      .map((value) => value.trim());
+    const declarations = [
+      { mentions: /총액/, affirmative: /^총액(?:입찰)?(?:\s*(?:방식|대상))?$/ },
+      {
+        mentions: /원화|\bKRW\b/i,
+        affirmative: /^(?:원화(?:\s*KRW)?|KRW)(?:\s*(?:결제|입찰))?$/i,
+      },
+      { mentions: /A\s*값/i, affirmative: /^A\s*값\s*미적용(?:\s*대상)?$/i },
+    ];
+    return declarations.every(({ mentions, affirmative }) => {
+      const matching = clauses.filter((clause) => mentions.test(clause));
+      return (
+        matching.length > 0 &&
+        matching.every((clause) => affirmative.test(clause))
+      );
+    });
   }
 
   private fetchOperation(
@@ -487,10 +516,39 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
   ): void {
     const operation = "getBidPblancListInfoThngPurchsObjPrdct";
     result.purchaseItems = rows.flatMap((row) => {
-      const classificationCode = toNullableText(
-        row.prdctClsfcNo ?? row.dtilPrdctClsfcNo,
+      // Validate every advertised alias, even when another alias is usable.
+      // Optional empty fields remain absent; malformed advertised values must
+      // survive as bounded diagnostics so readable documents cannot hide them.
+      const readFields = (
+        fields: string[],
+        kind: "text" | "number" | "code",
+      ) => {
+        const normalized = fields.map((field) => {
+          const value = row[field];
+          if (!this.advertised(value)) return null;
+          if (kind === "number")
+            return this.readNumber(value, operation, result);
+          const text =
+            typeof value === "string"
+              ? toNullableText(value)
+              : kind === "code" &&
+                  typeof value === "number" &&
+                  Number.isSafeInteger(value)
+                ? String(value)
+                : null;
+          if (!text) this.incomplete(result, operation, "SOURCE_FIELD_INVALID");
+          return text;
+        });
+        return normalized.find((value) => value !== null) ?? null;
+      };
+      const classificationCode = readFields(
+        ["prdctClsfcNo", "dtilPrdctClsfcNo"],
+        "code",
       );
-      const name = toNullableText(row.prdctClsfcNoNm ?? row.dtilPrdctClsfcNoNm);
+      const name = readFields(["prdctClsfcNoNm", "dtilPrdctClsfcNoNm"], "text");
+      const specification = readFields(["prdctSpecNm"], "text");
+      const quantity = readFields(["qty", "prdctQty"], "number");
+      const unit = readFields(["unit", "prdctUnit"], "text");
       if (!classificationCode || !name)
         this.incomplete(result, operation, "SOURCE_PURCHASE_ITEM_INCOMPLETE");
       return classificationCode && name
@@ -498,9 +556,9 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
             {
               classificationCode,
               name,
-              specification: toNullableText(row.prdctSpecNm),
-              quantity: toNullableText(row.qty ?? row.prdctQty),
-              unit: toNullableText(row.unit ?? row.prdctUnit),
+              specification,
+              quantity,
+              unit,
               evidence: evidence(operation, "prdctClsfcNo"),
             },
           ]

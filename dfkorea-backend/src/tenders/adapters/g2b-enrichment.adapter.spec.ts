@@ -504,6 +504,32 @@ describe("incomplete G2B data through parser and analyzer", () => {
       ).not.toMatch(/never-expose|invalid.example|required.pdf/);
     },
   );
+  it.each([
+    ["prdctSpecNm", { private: "never-expose" }],
+    ["prdctSpecNm", ["never-expose"]],
+    ["prdctSpecNm", 40],
+    ["qty", { private: "never-expose" }],
+    ["unit", { private: "never-expose" }],
+    ["prdctClsfcNoNm", { private: "never-expose" }],
+    ["prdctClsfcNo", { private: "never-expose" }],
+  ])(
+    "preserves malformed advertised purchase field %s as incomplete",
+    async (field, value) => {
+      const { enriched, result } = await run(
+        "getBidPblancListInfoThngPurchsObjPrdct",
+        {
+          prdctClsfcNo: "39111515",
+          prdctClsfcNoNm: "LED",
+          [field as string]: value,
+        },
+      );
+      expect(enriched.failures.length).toBeGreaterThan(0);
+      expect(result.suitability).toBe("REVIEW");
+      expect(
+        JSON.stringify({ failures: enriched.failures, result }),
+      ).not.toContain("never-expose");
+    },
+  );
   it("also treats a discovered but unreadable attachment as UNKNOWN", async () => {
     const { enriched, result } = await run("getBidPblancListInfoThng", {
       ntceSpecDocUrl1: rowsFor("getBidPblancListInfoThng")[1].ntceSpecDocUrl1,
@@ -556,8 +582,44 @@ describe("verified G2B production pricing context", () => {
       productGroup: "LED",
     });
   });
+  it.each(["미적용", "미적용 대상"])(
+    "prices an affirmative no-A declaration: %s",
+    async (declaration) => {
+      const result = await enriched({
+        bidNtceNm: `LED 구매 (총액입찰, 원화 KRW, A값 ${declaration})`,
+      });
+      const price = new TenderPriceAnalyzer().analyze(
+        {
+          ...new TenderRequirementParser().parse(result, []),
+          pricingContext: {
+            contractKind: "UNKNOWN",
+            currency: "UNKNOWN",
+            formulaKind: "UNKNOWN",
+            ...result.pricingContext,
+            source: "G2B",
+            now: new Date(),
+          },
+        },
+        [],
+      );
+      expect(result.pricingContext).toBeDefined();
+      expect(price.official.status).toBe("AVAILABLE");
+    },
+  );
   it.each([
     { bidNtceNm: "LED 구매" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 미적용 여부 확인 필요)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 미적용 가능)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 적용 여부 확인)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 미적용 또는 적용)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 미적용, A값 적용)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 미적용 대상일 경우)" },
+    { bidNtceNm: "LED 구매 (총액입찰 여부 확인, 원화, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액입찰 가능, 원화, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액, 원화 결제 여부 확인, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액, KRW 사용 가능, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액입찰 아님, 원화, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액, 원화 결제 불가, A값 미적용)" },
     { bidNtceNm: "LED 구매 (단가, 총액, 원화 KRW, A값 미적용)" },
     { bidNtceNm: "LED 구매 (총액, USD, A값 미적용)" },
     { bidNtceNm: "LED 구매 (총액, 원화)" },
@@ -585,6 +647,7 @@ describe("verified G2B production pricing context", () => {
         },
         [],
       );
+      expect(result.pricingContext).toBeUndefined();
       expect(price.official.status).toBe("FORMULA_REVIEW_REQUIRED");
     },
   );

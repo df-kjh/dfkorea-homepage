@@ -439,6 +439,90 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     expect(JSON.stringify(result)).not.toContain("invalid.example");
   });
 
+  it.each([
+    [
+      "advertised object",
+      { private: "never-expose-provider-body" },
+      "PARTIAL",
+      "REVIEW",
+    ],
+    ["absent optional", undefined, "COMPLETED", "RECOMMENDED"],
+  ])(
+    "keeps %s purchase specs distinct with a readable matching document through the real adapter",
+    async (_label, specification, status, suitability) => {
+      const fixture = JSON.parse(
+        readFileSync(
+          join(__dirname, "../adapters/fixtures/g2b-enrichment-pricing.json"),
+          "utf8",
+        ),
+      );
+      const detail = fixture.getBidPblancListInfoThng.response.body.items[0];
+      detail.ntceSpecDocUrl1 =
+        "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01000001&bidPbancOrd=000&fileType=&fileSeq=1&prcmBsneSeCd=01";
+      detail.ntceSpecFileNm1 = "spec.docx";
+      fixture.getBidPblancListInfoThngPurchsObjPrdct.response.body.items[0].prdctSpecNm =
+        specification;
+      await db
+        .getRepository(Tender)
+        .update(tender.id, { sourceNoticeId: detail.bidNtceNo });
+      await profile.replace(profileInput);
+      await db.getRepository(Product).save({
+        name: "private",
+        modelName: "private",
+        category: "LED",
+        dimensions: "10x20x30",
+        power: [40],
+        lifespan: 10000,
+        colorTemp: [6500],
+        ledChipManufacturer: "private",
+        description: "private",
+      });
+      extract.mockResolvedValue({
+        status: "EXTRACTED",
+        blocks: [
+          {
+            kind: "text",
+            ordinal: 0,
+            location: "p1",
+            text: "소비전력 40W 이하",
+          },
+        ],
+        metadata: {},
+      });
+      const client = new PublicApiClient(
+        async (url) =>
+          new Response(
+            JSON.stringify(fixture[new URL(url).pathname.split("/").at(-1)!]),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      );
+      service = new TenderAnalysisService(
+        db,
+        new G2bEnrichmentAdapter(client, {
+          baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+          serviceKey: "fixture",
+        }),
+        { enrich } as never,
+        { fetch },
+        { extract } as never,
+        profile,
+        new TenderPriceAnalyzer(),
+      );
+      await service.reanalyze(tender.id, now);
+      await service.processDue(now, 1);
+      const result = await service.getAnalysis(tender.id);
+      expect(extract).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        status,
+        suitability,
+        specificationScore: 100,
+      });
+      expect(JSON.stringify(result)).not.toContain(
+        "never-expose-provider-body",
+      );
+    },
+  );
+
   it("adds and reverses only the nullable validity boundary on PostgreSQL and preserves legacy data", async () => {
     await service.reanalyze(tender.id, now);
     const runner = db.createQueryRunner();

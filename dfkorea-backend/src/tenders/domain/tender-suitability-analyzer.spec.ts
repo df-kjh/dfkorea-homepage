@@ -1760,6 +1760,89 @@ describe("certification-aware coherent candidate selection", () => {
       expect(JSON.stringify(result)).not.toContain("private-");
     }
   });
+  it("a certified comparable-only 100% candidate cannot displace a known certified 80% candidate", () => {
+    const parsed = input();
+    parsed.items[0].specifications[4] = {
+      ...parsed.items[0].specifications[4],
+      kind: "CRI",
+      value: "80",
+    };
+    const known = product("private-known", {
+      power: [40],
+      colorRendering: "70",
+      certifications: ["KS"],
+    });
+    const unknown = product("private-unknown", {
+      power: [40],
+      certifications: ["KS"],
+    });
+    const run = (catalog: TenderProductSnapshot[]) =>
+      new TenderSuitabilityAnalyzer().analyze(parsed, profile(), catalog, now);
+    expect(run([unknown])).toMatchObject({
+      suitability: "REVIEW",
+      specificationScore: 100,
+      unknownCount: 1,
+    });
+    for (const catalog of [[known], [known, unknown], [unknown, known]]) {
+      expect(run(catalog)).toMatchObject({
+        suitability: "RECOMMENDED",
+        specificationScore: 80,
+        unknownCount: 0,
+      });
+      expect(JSON.stringify(run(catalog))).not.toContain("private-");
+    }
+    expect(run([known, unknown])).toEqual(run([unknown, known]));
+  });
+  it.each([49, 50, 79, 80])(
+    "ranks whole candidate outcomes across the %i boundary independent of catalog order",
+    (score) => {
+      const parsed = input();
+      parsed.items[0].specifications = Array.from({ length: 100 }, (_, index) =>
+        spec(`spec-${index}`, true, String(index + 1)),
+      );
+      parsed.items[0].specifications[99] = {
+        ...parsed.items[0].specifications[99],
+        kind: "CRI",
+        value: "80",
+      };
+      const known = product("known", {
+        power: [score],
+        colorRendering: "70",
+        certifications: ["KS"],
+      });
+      const unknownSpec = product("unknown-spec", {
+        power: [99],
+        certifications: ["KS"],
+      });
+      const unknownCert = product("unknown-cert", {
+        power: [100],
+        certifications: undefined,
+      });
+      const failedCert = product("failed-cert", {
+        power: [100],
+        certifications: [],
+      });
+      const run = (catalog: TenderProductSnapshot[]) =>
+        new TenderSuitabilityAnalyzer().analyze(
+          parsed,
+          profile(),
+          catalog,
+          now,
+        );
+      for (const [added, expected] of [
+        [unknownSpec, score >= 80 ? "RECOMMENDED" : "REVIEW"],
+        [unknownCert, score >= 80 ? "RECOMMENDED" : "REVIEW"],
+        [
+          failedCert,
+          score >= 80 ? "RECOMMENDED" : score >= 50 ? "REVIEW" : "DIFFICULT",
+        ],
+      ] as const) {
+        const forward = run([known, added]);
+        expect(forward.suitability).toBe(expected);
+        expect(forward).toEqual(run([added, known]));
+      }
+    },
+  );
   it("selects certified ties deterministically and keeps a hard failure when every candidate is explicitly uncertified", () => {
     const certified = product("z", { power: [40], certifications: ["KS"] });
     const uncertified = product("a", { power: [40], certifications: [] });

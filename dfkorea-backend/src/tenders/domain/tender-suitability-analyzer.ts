@@ -372,17 +372,61 @@ const evaluateParticipation = (
   }
 };
 
+// Candidate selection and the final aggregate must share the same unrounded
+// thresholds and UNKNOWN precedence. Comparable-only 100% is still REVIEW.
+const classifySuitability = (
+  exactScore: number | null,
+  hardFailure: boolean,
+  hasUnknown: boolean,
+): TenderSuitability =>
+  hardFailure
+    ? TenderSuitability.DIFFICULT
+    : hasUnknown || exactScore === null
+      ? TenderSuitability.REVIEW
+      : exactScore < 50
+        ? TenderSuitability.DIFFICULT
+        : exactScore < 80
+          ? TenderSuitability.REVIEW
+          : TenderSuitability.RECOMMENDED;
+
+const suitabilityRank = {
+  [TenderSuitability.RECOMMENDED]: 0,
+  [TenderSuitability.REVIEW]: 1,
+  [TenderSuitability.DIFFICULT]: 2,
+};
+
 interface ProductEvaluation {
   product: TenderProductSnapshot;
   specifications: TenderRequirementEvaluation[];
   certifications: TenderRequirementEvaluation[];
   weightedSatisfied: number;
   weightedUnsatisfied: number;
+  exactScore: number | null;
+  suitability: TenderSuitability;
   mandatoryCertificationRank: number;
   certificationSatisfied: number;
   certificationUnsatisfied: number;
   unknown: number;
 }
+
+const rankCandidate = (
+  candidate: Omit<ProductEvaluation, "exactScore" | "suitability">,
+): ProductEvaluation => {
+  const total = candidate.weightedSatisfied + candidate.weightedUnsatisfied;
+  const exactScore = total ? (candidate.weightedSatisfied / total) * 100 : null;
+  return {
+    ...candidate,
+    exactScore,
+    suitability: classifySuitability(
+      exactScore,
+      candidate.mandatoryCertificationRank === 2,
+      candidate.unknown > 0 ||
+        candidate.certifications.some(
+          ({ state }) => state === TenderRequirementState.UNKNOWN,
+        ),
+    ),
+  };
+};
 
 const resultFingerprintInputs = (
   requirements: ParsedTenderRequirements,
@@ -523,7 +567,7 @@ export class TenderSuitabilityAnalyzer {
           required: requirement.required,
           evidenceIds: requirement.evidenceIds,
         }));
-        return {
+        return rankCandidate({
           product,
           specifications,
           certifications,
@@ -547,8 +591,8 @@ export class TenderSuitabilityAnalyzer {
                 : 0),
             0,
           ),
-          // A candidate with a known mandatory failure can never displace
-          // one with complete (or still unknown) mandatory certification evidence.
+          // Within the same suitability class, prefer complete mandatory
+          // certification evidence before comparing specification scores.
           mandatoryCertificationRank: certifications.some(
             ({ required, state }) =>
               required && state === TenderRequirementState.UNSATISFIED,
@@ -569,11 +613,14 @@ export class TenderSuitabilityAnalyzer {
           unknown: specifications.filter(
             ({ state }) => state === TenderRequirementState.UNKNOWN,
           ).length,
-        };
+        });
       });
       candidates.sort(
         (left, right) =>
+          suitabilityRank[left.suitability] -
+            suitabilityRank[right.suitability] ||
           left.mandatoryCertificationRank - right.mandatoryCertificationRank ||
+          (right.exactScore ?? -1) - (left.exactScore ?? -1) ||
           right.weightedSatisfied - left.weightedSatisfied ||
           left.weightedUnsatisfied - right.weightedUnsatisfied ||
           right.certificationSatisfied - left.certificationSatisfied ||
@@ -678,15 +725,11 @@ export class TenderSuitabilityAnalyzer {
         ({ state }) => state === TenderRequirementState.UNKNOWN,
       ) ||
       requirements.evidence.some(({ state }) => state === "UNKNOWN");
-    const suitability = hardFailure
-      ? TenderSuitability.DIFFICULT
-      : hasUnknown || specificationScore === null
-        ? TenderSuitability.REVIEW
-        : exactSpecificationScore! < 50
-          ? TenderSuitability.DIFFICULT
-          : exactSpecificationScore! < 80
-            ? TenderSuitability.REVIEW
-            : TenderSuitability.RECOMMENDED;
+    const suitability = classifySuitability(
+      exactSpecificationScore,
+      hardFailure,
+      hasUnknown,
+    );
 
     return {
       suitability,
