@@ -64,7 +64,7 @@ const formatPrice = (price: number) => {
       </p>
 
       <!-- Specs Grid -->
-      <div class="grid grid-cols-2 gap-4 mb-10">
+      <div class="grid grid-cols-2 gap-4 mb-8">
         <div
           v-for="(spec, index) in specs"
           :key="index"
@@ -78,22 +78,9 @@ const formatPrice = (price: number) => {
         </div>
       </div>
 
-      <!-- TODO 제품 구매 기능 추가 Action Buttons -->
-      <!-- <div class="flex flex-col gap-4">
-        <button
-          @click="$emit('addToCart')"
-          class="w-full bg-primary text-white font-bold h-16 rounded-2xl text-xl shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all transform hover:-translate-y-1"
-        >
-          Add to Cart
-        </button>
-        <button
-          @click="$emit('addToWishlist')"
-          class="w-full bg-white border border-gray-200 text-text-main font-bold h-16 rounded-2xl text-lg hover:bg-surface transition-colors flex items-center justify-center gap-2"
-        >
-          <span class="material-symbols-outlined">favorite</span>
-          Save to Wishlist
-        </button>
-      </div> -->
+      <div v-if="$slots.actions" class="product-info-actions">
+        <slot name="actions" />
+      </div>
     </div>
   </div>
 </template>
@@ -105,5 +92,9 @@ const formatPrice = (price: number) => {
     'wght' 300,
     'GRAD' 0,
     'opsz' 24;
+}
+
+.product-info-actions {
+  margin-top: 0.5rem;
 }
 </style>

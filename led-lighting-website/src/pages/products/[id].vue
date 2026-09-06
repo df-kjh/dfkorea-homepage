@@ -17,11 +17,23 @@
             :specs="productSpecs"
             :is-new="product.isNew"
             :is-featured="product.isFeatured"
-          />
+          >
+            <template #actions>
+              <QuoteButton
+                variant="primary"
+                class="product-quote-button"
+                @click="quote.addProduct(product, $event)"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">shopping_cart</span>
+                <span>견적에 담기</span>
+              </QuoteButton>
+              <p class="product-quote-help">
+                희망 사양은 상담 후 결정할 수 있습니다. 수량은 견적 창에서 수정하세요.
+              </p>
+            </template>
+          </ProductInfo>
         </div>
       </section>
-
-      <div class="max-w-[1400px] mx-auto px-10 pb-12 flex flex-wrap items-center gap-4"><QuoteButton variant="primary" @click="quote.addProduct(product, $event)">견적에 담기</QuoteButton><p class="text-sm text-gray-600">희망 사양은 상담 후 결정할 수 있습니다. 수량은 견적 창에서 수정하세요.</p></div>
 
       <section v-if="product.description" class="py-24 bg-white border-t border-gray-100">
         <div class="max-w-4xl mx-auto px-10">
@@ -294,6 +306,27 @@ useHead({
 <style scoped>
 .product-detail {
   width: 100%;
+}
+
+.product-quote-button {
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 1rem;
+  gap: 0.625rem;
+  font-size: 1rem;
+}
+
+.product-quote-button .material-symbols-outlined {
+  font-size: 1.375rem;
+}
+
+.product-quote-help {
+  margin-top: 0.75rem;
+  padding-inline: 0.25rem;
+  color: #4b5563;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
 }
 
 .product-description-content :deep(p) {

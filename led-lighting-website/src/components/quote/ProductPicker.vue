@@ -9,7 +9,7 @@ import QuoteButton from '@/components/common/quote/QuoteButton.vue'
 import ProductFilters from '@/components/common/quote/ProductFilters.vue'
 import CatalogSpecification from './CatalogSpecification.vue'
 import { revealQuoteElement } from './quote-focus'
-const emit = defineEmits<{ custom: [event: MouseEvent]; added: [name: string] }>()
+const emit = defineEmits<{ custom: [event: MouseEvent]; added: [] }>()
 const search = ref(''),
   category = ref(''),
   filters = ref(emptyFilters())
@@ -28,7 +28,6 @@ const selected = ref<Product | null>(null),
 let selectionOrigin: HTMLElement | null = null
 defineExpose({
   isEditing: () => !!selected.value,
-  focusSearch: () => revealQuoteElement(browser.value?.querySelector('input') ?? null),
 })
 let generation = 0,
   debounce: ReturnType<typeof setTimeout> | undefined,
@@ -115,9 +114,8 @@ async function cancelSelection() {
   else revealQuoteElement(browser.value?.querySelector('input') ?? null)
 }
 function onAdded() {
-  const name = selected.value?.name || '선택한'
   selected.value = null
-  emit('added', name)
+  emit('added')
 }
 </script>
 <template>

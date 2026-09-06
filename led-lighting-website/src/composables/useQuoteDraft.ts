@@ -18,6 +18,7 @@ function createController() {
   const draft = reactive(createDraft())
   let opener: HTMLElement | null = null
   let verifyController: AbortController | null = null
+  let verificationExpiryTimer: ReturnType<typeof setTimeout> | undefined
   let verificationRevision = 0
   let sessionPromise: Promise<void> | null = null
   const uid = () => crypto.randomUUID()
@@ -43,6 +44,23 @@ function createController() {
           verifyController?.abort()
         }
       },
+    )
+    watch(
+      () => draft.verification?.expiresAt,
+      (expiresAt) => {
+        clearTimeout(verificationExpiryTimer)
+        verificationExpiryTimer = undefined
+        if (!expiresAt) return
+        const remaining = Date.parse(expiresAt) - Date.now()
+        if (!Number.isFinite(remaining) || remaining <= 0) {
+          draft.verification = null
+          return
+        }
+        verificationExpiryTimer = setTimeout(() => {
+          if (draft.verification?.expiresAt === expiresAt) draft.verification = null
+        }, remaining)
+      },
+      { flush: 'sync' },
     )
   })
   function open(event?: Event) {

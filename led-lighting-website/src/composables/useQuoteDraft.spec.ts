@@ -73,8 +73,26 @@ beforeEach(() => {
     },
   )
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 describe('quote asynchronous draft lifecycle', () => {
+  it('clears business verification as soon as its validity period expires', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-06T00:00:00.000Z'))
+    const quote = await controller()
+    quote.draft.verification = {
+      verificationToken: 'short-lived',
+      expiresAt: new Date(Date.now() + 1_000).toISOString(),
+    }
+
+    await vi.advanceTimersByTimeAsync(1_001)
+
+    expect(quote.draft.verification).toBeNull()
+    expect(quote.isVerified()).toBe(false)
+  })
+
   it('uses one stable photo identity when an upload response is lost', async () => {
     const quote = await controller()
     quote.addPhoto('item1', new File(['a'], 'one.jpg', { type: 'image/jpeg' }))

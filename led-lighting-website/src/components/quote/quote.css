@@ -513,10 +513,14 @@
 .q-item-summary > .q-status {
   margin-top: 0;
 }
-.q-item-summary:focus,
 .q-specification h4:focus,
 .q-custom-layout h3:focus {
   outline: none;
+}
+.q-item-summary:focus {
+  outline: 3px solid #91baff;
+  outline-offset: 4px;
+  border-radius: 12px;
 }
 .q-selection-help {
   padding: 16px;

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useQuoteDraft } from '@/composables/useQuoteDraft'
+import { validateCompany } from '@/composables/quote-draft'
 import QuoteButton from '@/components/common/quote/QuoteButton.vue'
 import CompanyStep from './CompanyStep.vue'
 import ProductStep from './ProductStep.vue'
 import ReviewStep from './ReviewStep.vue'
 import SuccessState from './SuccessState.vue'
-const { draft, close, next, submit } = useQuoteDraft()
+const { draft, close, next, submit, isVerified } = useQuoteDraft()
 const panel = ref<HTMLElement | null>(null),
   body = ref<HTMLElement | null>(null),
   productStep = ref<InstanceType<typeof ProductStep> | null>(null)
 const mobile = ref(false)
 const expanded = ref(true)
+const companyStepReady = computed(
+  () => !validateCompany(draft.company) && draft.consent && isVerified(),
+)
 let media: MediaQueryList | null = null
 let restoreBackground: (() => void) | null = null
 function syncBackground() {
@@ -218,7 +222,10 @@ onBeforeUnmount(() => {
           ><QuoteButton
             v-if="draft.step < 3"
             variant="primary"
-            :disabled="draft.busy"
+            :disabled="
+              draft.busy ||
+              (draft.step === 1 ? !companyStepReady : draft.items.length === 0)
+            "
             @click="advance"
             >{{ draft.step === 1 ? '제품 선택하기 →' : '요청 확인하기 →' }}</QuoteButton
           ><QuoteButton v-else variant="primary" :disabled="draft.busy" @click="submit">{{

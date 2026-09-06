@@ -157,7 +157,10 @@ describe('catalog append and selection continuity', () => {
   })
   it('treats pending catalog specifications as editing until cancelled or added', async () => {
     api.getPaginated.mockReset().mockResolvedValue(page('first'))
-    const wrapper = mount(ProductStep, { global: { stubs: { QuotePhotos: true } } })
+    const wrapper = mount(ProductStep, {
+      attachTo: document.body,
+      global: { stubs: { QuotePhotos: true } },
+    })
     await flushPromises()
     expect(wrapper.vm.isEditing()).toBe(false)
     await wrapper.get('.q-product button').trigger('click')
@@ -167,7 +170,10 @@ describe('catalog append and selection continuity', () => {
     await wrapper.get('.q-product button').trigger('click')
     await button(wrapper, '견적 목록에 담기').trigger('click')
     expect(wrapper.vm.isEditing()).toBe(false)
-    expect(wrapper.find('[role="status"]').text()).toContain('담았습니다')
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(button(wrapper, '제품 더 선택하기')).toBeUndefined()
+    expect(document.activeElement).toBe(wrapper.get('.q-item-summary').element)
+    expect(wrapper.get('.q-item-summary').attributes('aria-label')).toBe('담은 제품 요약')
     wrapper.unmount()
   })
 })
