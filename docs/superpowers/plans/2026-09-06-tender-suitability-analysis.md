@@ -318,19 +318,19 @@ git commit -m "feat: extract tender requirement documents"
 - Produces: `TenderSuitabilityAnalyzer.analyze(requirements, profile, products, now): TenderSuitabilityResult`.
 - `TenderSuitabilityResult` includes `suitability`, nullable `specificationScore`, four counts, `certifications`, `participationConditions`, `evidence`, and input fingerprints.
 
-- [ ] **Step 1: Write parser tests that fail on missing normalization behavior**
+- [x] **Step 1: Write parser tests that fail on missing normalization behavior**
 
 Use literal cases for W, lm/W, K, IP, CRI, dimensions, `이상/이하/초과/미만`, Korean certification aliases, regional limits, industry/license codes, SME, direct production, G2B registration, performance conditions, and lower-limit percentages. Add a conflict case where structured corrected data overrides an older attachment while preserving a conflict evidence item.
 
-- [ ] **Step 2: Run parser tests and verify RED**
+- [x] **Step 2: Run parser tests and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/domain/tender-requirement-parser.spec.ts`
 
-- [ ] **Step 3: Implement parser as small rule modules**
+- [x] **Step 3: Implement parser as small rule modules**
 
 Keep unit parsing, certification aliases, eligibility phrases, and bid-formula phrases in separate exported pure functions. Only explicit obligation words or structured restriction fields set `required: true`; unsupported prose produces an evidence note and `UNKNOWN`, never a guessed pass.
 
-- [ ] **Step 4: Write scoring tests and verify RED**
+- [x] **Step 4: Write scoring tests and verify RED**
 
 ```ts
 it.each([
@@ -346,15 +346,15 @@ it.each([
 
 Add a test with Product A satisfying wattage only and Product B satisfying certification only; the result must not report one fully matching procurement item.
 
-- [ ] **Step 5: Implement comparison and status precedence**
+- [x] **Step 5: Implement comparison and status precedence**
 
 Required specification weight is 2 and reference weight is 1. `UNSATISFIED` hard participation/certification wins, then unknown forces `REVIEW`, then score `<50` is `DIFFICULT`, `50..79` is `REVIEW`, and `>=80` is `RECOMMENDED`. No comparable specifications returns null score and `REVIEW` unless a hard failure already makes it `DIFFICULT`.
 
-- [ ] **Step 6: Run domain tests and verify GREEN**
+- [x] **Step 6: Run domain tests and verify GREEN**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/domain/tender-requirement-parser.spec.ts tenders/domain/tender-suitability-analyzer.spec.ts`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add dfkorea-backend/src/tenders/domain/tender-requirement.ts dfkorea-backend/src/tenders/domain/tender-requirement-parser.ts dfkorea-backend/src/tenders/domain/tender-requirement-parser.spec.ts dfkorea-backend/src/tenders/domain/tender-suitability-analyzer.ts dfkorea-backend/src/tenders/domain/tender-suitability-analyzer.spec.ts
