@@ -36,11 +36,42 @@ export const renderMarkdown = (markdown: string): string => {
     }
   };
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!.trim();
 
     if (!line) {
       closeList();
+      continue;
+    }
+
+    const header = splitTableRow(line);
+    const separator = splitTableRow(lines[index + 1] || "");
+    if (
+      header && separator && header.length === separator.length &&
+      separator.every((cell) => /^:?-{3,}:?$/.test(cell))
+    ) {
+      closeList();
+      const alignments = separator.map((cell) =>
+        cell.endsWith(":") ? (cell.startsWith(":") ? "center" : "right") : "left",
+      );
+      const renderRow = (cells: string[], tag: "th" | "td"): string =>
+        `<tr>${alignments.map((alignment, column) =>
+          `<${tag}${tag === "th" ? ' scope="col"' : ""} style="text-align:${alignment}">${renderInlineMarkdown(cells[column] || "")}</${tag}>`,
+        ).join("")}</tr>`;
+
+      html.push('<div class="markdown-table-wrapper" role="region" aria-label="표" tabindex="0"><table>');
+      html.push(`<thead>${renderRow(header, "th")}</thead><tbody>`);
+      index += 1;
+      while (index + 1 < lines.length) {
+        const nextLine = lines[index + 1]!.trim();
+        // A heading/list starts a new block even when its text includes a pipe.
+        if (/^(?:#{1,3} |[-*]\s+)/.test(nextLine)) break;
+        const row = splitTableRow(nextLine);
+        if (!row) break;
+        html.push(renderRow(row, "td"));
+        index += 1;
+      }
+      html.push("</tbody></table></div>");
       continue;
     }
 
@@ -88,10 +119,54 @@ export const stripMarkdown = (value: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-const renderInlineMarkdown = (value: string): string =>
-  escapeHtml(value)
+// A pipe inside an escaped pair or a complete code span belongs to its cell.
+// Match these first so only the remaining pipes divide the table columns.
+const splitTableRow = (value: string): string[] | null => {
+  const cells: string[] = [];
+  let start = 0;
+  for (const match of value.matchAll(/\\[\\|]|(`+)([^`]*?)\1|\|/g)) {
+    if (match[0] !== "|") continue;
+    cells.push(value.slice(start, match.index).trim());
+    start = match.index + 1;
+  }
+  if (cells.length === 0) return null;
+  cells.push(value.slice(start).trim());
+  if (cells[0] === "") cells.shift();
+  if (cells.at(-1) === "") cells.pop();
+  return cells.length ? cells : null;
+};
+
+const renderEmphasis = (value: string): string =>
+  escapeHtml(value.replace(/\\([\\|])/g, "$1"))
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+const renderInlineMarkdown = (value: string): string => {
+  const result: string[] = [];
+  let start = 0;
+  for (const match of value.matchAll(/(`+)([^`]*?)\1|(!?)\[([^\]]*)\]\(([^)]*)\)/g)) {
+    result.push(renderEmphasis(value.slice(start, match.index)));
+    if (match[1]) {
+      result.push(`<code>${escapeHtml(match[2]!)}</code>`);
+    } else {
+      const url = match[5]!.trim();
+      // Keep raw HTML disabled and reject executable/protocol-relative URLs.
+      // Attribute escaping also prevents a quoted URL from adding HTML attributes.
+      const isSafeUrl = !/[\s\\\u0000-\u001f\u007f]/.test(url) &&
+        (/^https?:\/\/[^/]+/i.test(url) || /^\/(?!\/)/.test(url));
+      if (!isSafeUrl) {
+        result.push(escapeHtml(match[0]));
+      } else if (match[3]) {
+        result.push(`<img src="${escapeHtml(url)}" alt="${escapeHtml(match[4]!)}" loading="lazy" />`);
+      } else {
+        result.push(`<a href="${escapeHtml(url)}">${renderEmphasis(match[4]!)}</a>`);
+      }
+    }
+    start = match.index + match[0].length;
+  }
+  result.push(renderEmphasis(value.slice(start)));
+  return result.join("");
+};
 
 const escapeHtml = (value: string): string =>
   value

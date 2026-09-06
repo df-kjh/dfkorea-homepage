@@ -1,0 +1,44 @@
+.product-description-content .markdown-table-wrapper {
+  @apply my-8 max-w-full overflow-x-auto rounded-xl border border-gray-200;
+}
+
+.product-description-content .markdown-table-wrapper:focus-visible {
+  @apply outline outline-2 outline-offset-2 outline-primary;
+}
+
+.product-description-content table {
+  @apply w-full border-collapse text-left text-base leading-relaxed;
+}
+
+.product-description-content th,
+.product-description-content td {
+  @apply px-5 py-4 border-b border-r border-gray-200 align-top;
+  min-width: 8rem;
+  overflow-wrap: anywhere;
+}
+
+.product-description-content th {
+  @apply bg-surface font-semibold text-text-main;
+}
+
+.product-description-content td {
+  @apply text-text-sub;
+}
+
+.product-description-content th:last-child,
+.product-description-content td:last-child {
+  border-right: 0;
+}
+
+.product-description-content tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.product-description-content img {
+  @apply my-8 max-w-full h-auto rounded-xl;
+}
+
+.product-description-content a {
+  @apply text-primary underline;
+  overflow-wrap: anywhere;
+}

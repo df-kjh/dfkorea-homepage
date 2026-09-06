@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import '@/assets/styles/product-markdown.css'
 import type { Product } from '@/types'
 import ProductImageGallery from '@/components/products/ProductImageGallery.vue'
 import ProductImageLightbox from '@/components/products/ProductImageLightbox.vue'
@@ -317,4 +318,5 @@ useHead({
 .product-description-content :deep(strong) {
   @apply font-semibold text-text-main;
 }
+
 </style>
