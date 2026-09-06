@@ -161,6 +161,10 @@ describe("deployment migration commands", () => {
         "docs/superpowers/plans/2026-08-27-led-tender-notification.md",
         "historical implementation plan, not an operational runbook",
       ],
+      [
+        "docs/superpowers/plans/2026-09-06-quote-deployment.md",
+        "completed historical quote deployment record, not an operational runbook",
+      ],
     ]);
     const auditableDocs = trackedMarkdown
       .filter((path) => !auditExclusions.has(path))
