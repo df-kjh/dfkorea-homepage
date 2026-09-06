@@ -17,7 +17,7 @@ import CompanyTimeline from '@/components/about/CompanyTimeline.vue'
 useSEO({
   title: '회사 소개 | (주)디에프코리아 - LED 조명 전문 기업',
   description:
-    '(주)디에프코리아는 혁신적인 LED 조명 기술로 더 나은 빛을 제공하는 전문 기업입니다. 우리의 비전과 가치, 그리고 LED 조명 산업을 선도하는 기술력을 확인하세요.',
+    '(주)디에프코리아는 2013년부터 교육시설, 주차장, 상업·산업 현장에 맞는 LED 조명을 개발·생산해 온 조명 제조사입니다.',
   keywords: '(주)디에프코리아, 회사 소개, LED 조명 기업, 조명 전문, 기업 비전, LED 기술',
   ogType: 'website',
 })

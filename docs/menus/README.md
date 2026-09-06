@@ -3,6 +3,7 @@
 | 메뉴 | 기능 현황 문서 |
 | --- | --- |
 | 홈 | [home.md](home.md) |
+| 회사 소개 | [about.md](about.md) |
 | 제품 | [products.md](products.md) |
 | 입찰 | [tenders.md](tenders.md) |
 | 온라인 견적 | [quote.md](quote.md) |
