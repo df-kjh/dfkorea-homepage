@@ -75,6 +75,8 @@ const NOTICE: NormalizedTender = {
   rawData: { fixture: true },
 };
 
+const enrichAnalysis = jest.fn(async () => emptyTenderEnrichment());
+
 const successful = (
   notices: NormalizedTender[] = [],
 ): TenderSourceFetchResult => ({
@@ -131,7 +133,7 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .overrideProvider(KEPCO_TENDER_ADAPTER)
       .useValue(kepco)
       .overrideProvider(G2B_TENDER_ENRICHMENT_ADAPTER)
-      .useValue({ enrich: async () => emptyTenderEnrichment() })
+      .useValue({ enrich: enrichAnalysis })
       .overrideProvider(KAPT_TENDER_ENRICHMENT_ADAPTER)
       .useValue({ enrich: async () => emptyTenderEnrichment() })
       .overrideProvider(TENDER_DOCUMENT_FETCHER)
@@ -183,6 +185,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
   });
 
   beforeEach(async () => {
+    enrichAnalysis
+      .mockReset()
+      .mockImplementation(async () => emptyTenderEnrichment());
     g2b.fetchNotices.mockReset();
     kapt.fetchNotices.mockReset();
     kepco.fetchNotices.mockReset();
@@ -297,6 +302,89 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .get("/tenders/award-results/status")
       .set(auth)
       .expect(200);
+  });
+
+  it("bounds persisted and legacy formula/qualification detail through authenticated HTTP and invalidates a hidden tail change", async () => {
+    g2b.fetchNotices.mockResolvedValue(successful([NOTICE]));
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
+    await app.get(TenderIngestionService).collectAll(new Date());
+    const tender = await dataSource
+      .getRepository(Tender)
+      .findOneByOrFail({ sourceNoticeId: NOTICE.sourceNoticeId });
+    const bulk = "제공자본문".repeat(28000);
+    const enrichment = emptyTenderEnrichment();
+    enrichment.formulaVariables = [
+      {
+        key: "plannedPriceMethod",
+        value: `${bulk}A`,
+        evidence: { source: "G2B_API", operation: "fixture", field: "formula" },
+      },
+    ];
+    enrichAnalysis.mockResolvedValue(enrichment);
+    const auth = { Authorization: `Bearer ${adminToken}` };
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(202);
+    await app.get(TenderAnalysisService).processDue(new Date(), 1);
+    const stored = await dataSource
+      .getRepository(TenderAnalysis)
+      .findOneByOrFail({ tenderId: tender.id });
+    expect(stored.reviewSemanticDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(stored.priceAnalysis).length).toBeLessThan(3000);
+    const before = await request(app.getHttpServer())
+      .get(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(200);
+    expect(Buffer.byteLength(JSON.stringify(before.body))).toBeLessThan(30000);
+    expect(
+      before.body.evidence.some(
+        (value) => value.diagnosticCategory === "TRUNCATION",
+      ),
+    ).toBe(true);
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/review`)
+      .set(auth)
+      .send({ completed: true, note: "checked" })
+      .expect(201)
+      .expect(({ body }) => expect(body.reviewed).toBe(true));
+    enrichment.formulaVariables[0].value = `${bulk}B`;
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(202);
+    await app.get(TenderAnalysisService).processDue(new Date(), 1);
+    const after = await request(app.getHttpServer())
+      .get(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(200);
+    expect(after.body.reviewed).toBe(false);
+    expect(after.body.analysisFingerprint).not.toBe(
+      before.body.analysisFingerprint,
+    );
+    expect(after.body.priceAnalysis.formula.plannedPriceMethod).toBe(
+      before.body.priceAnalysis.formula.plannedPriceMethod,
+    );
+    expect(await dataSource.getRepository(TenderAnalysisReview).count()).toBe(
+      1,
+    );
+    await dataSource.getRepository(TenderAnalysis).update(stored.id, {
+      reviewSemanticDigest: null,
+      participationAnalysis: {
+        requirements: [{ id: "legacy", label: bulk, values: [bulk] }],
+        providerPayload: bulk,
+      },
+    });
+    await request(app.getHttpServer())
+      .get(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(Buffer.byteLength(JSON.stringify(body))).toBeLessThan(30000);
+        expect(JSON.stringify(body)).not.toContain(bulk);
+        expect(JSON.stringify(body)).not.toContain("providerPayload");
+      });
   });
 
   it("uses real TypeORM storage for mocked-adapter ingestion and authenticated queries", async () => {

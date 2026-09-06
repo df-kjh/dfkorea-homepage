@@ -1,3 +1,5 @@
+import { AddTenderReviewSemanticDigest1788699200000 } from "../../migrations/1788699200000-AddTenderReviewSemanticDigest";
+import { compactAnalysisEvidence } from "./tender-analysis-evidence";
 import { analysisFingerprint } from "./tender-analysis-queue";
 import { TenderRequirementParser } from "../domain/tender-requirement-parser";
 import { FixTenderReviewAdminIdentity1788699100000 } from "../../migrations/1788699100000-FixTenderReviewAdminIdentity";
@@ -345,6 +347,104 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     expect(after).toMatchObject({ reviewed: false, specificationScore: 100 });
     expect(after.analysisFingerprint).not.toBe(before.analysisFingerprint);
     expect(await db.getRepository(TenderAnalysisReview).count()).toBe(1);
+  });
+
+  it("persists a full semantic digest while bounding provider formula strings and legacy detail", async () => {
+    const bulk = "제공자본문".repeat(28000);
+    enrichment.formulaVariables = [
+      {
+        key: "plannedPriceMethod",
+        value: `예정가격 ${bulk} 끝조건A`,
+        evidence: { source: "G2B_API", operation: "fixture", field: "planned" },
+      },
+    ];
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const stored = await db
+      .getRepository(TenderAnalysis)
+      .findOneByOrFail({ tenderId: tender.id });
+    expect((stored as any).reviewSemanticDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(stored.priceAnalysis).length).toBeLessThan(3000);
+    expect(JSON.stringify(stored.priceAnalysis)).not.toContain(bulk);
+    expect(
+      stored.evidence.some(
+        (value) => value.diagnosticCategory === "TRUNCATION",
+      ),
+    ).toBe(true);
+    const reviewer = await db
+      .getRepository(Admin)
+      .save({ username: "bounded-reviewer", password: "unused" });
+    await service.saveReview(
+      tender.id,
+      { completed: true, note: "bounded" },
+      reviewer.id,
+    );
+    const before = await service.getAnalysis(tender.id);
+    enrichment.formulaVariables[0].value = `예정가격 ${bulk} 끝조건B`;
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const after = await service.getAnalysis(tender.id);
+    expect(after.reviewed).toBe(false);
+    expect(after.analysisFingerprint).not.toBe(before.analysisFingerprint);
+    expect((after.priceAnalysis.formula as any).plannedPriceMethod).toEqual(
+      (before.priceAnalysis.formula as any).plannedPriceMethod,
+    );
+    await db.getRepository(TenderAnalysis).update(stored.id, {
+      priceAnalysis: {
+        formula: { plannedPriceMethod: bulk, reservePriceMethod: bulk },
+        providerPayload: bulk,
+      },
+      participationAnalysis: {
+        requirements: [{ id: "legacy", label: bulk, values: [bulk] }],
+        evaluations: [],
+      },
+    });
+    const legacy = await service.getAnalysis(tender.id);
+    expect(Buffer.byteLength(JSON.stringify(legacy))).toBeLessThan(30000);
+    expect(JSON.stringify(legacy)).not.toContain(bulk);
+  });
+
+  it("retains review history but invalidates a changed undisplayed mandatory diagnostic", async () => {
+    const parsed = new TenderRequirementParser().parse(enrichment, []);
+    const diagnostic = (index: number) => ({
+      id: `unknown-${index}`,
+      kind: "UNSUPPORTED" as const,
+      source: "DOCUMENT" as const,
+      documentIdentity: "doc",
+      location: `p${String(index).padStart(3, "0")}`,
+      state: "UNKNOWN" as const,
+      snippet: `조건${String(index).padStart(3, "0")} 필수 제출하여야 한다`,
+    });
+    parsed.evidence.push(
+      ...Array.from({ length: 90 }, (_, index) => diagnostic(index)),
+    );
+    const parser = jest
+      .spyOn(TenderRequirementParser.prototype, "parse")
+      .mockReturnValue(parsed);
+    try {
+      await service.reanalyze(tender.id, now);
+      await service.processDue(now, 1);
+      const reviewer = await db
+        .getRepository(Admin)
+        .save({ username: "undisplayed-reviewer", password: "unused" });
+      await service.saveReview(
+        tender.id,
+        { completed: true, note: "all conditions checked" },
+        reviewer.id,
+      );
+      const before = await service.getAnalysis(tender.id);
+      parsed.evidence.at(-1)!.snippet =
+        "조건089 대체 인증 필수 제출하여야 한다";
+      await service.reanalyze(tender.id, now);
+      await service.processDue(now, 1);
+      const after = await service.getAnalysis(tender.id);
+      expect((after as any).evidence).toEqual((before as any).evidence);
+      expect(after.reviewed).toBe(false);
+      expect(after.analysisFingerprint).not.toBe(before.analysisFingerprint);
+      expect(await db.getRepository(TenderAnalysisReview).count()).toBe(1);
+    } finally {
+      parser.mockRestore();
+    }
   });
 
   it("cannot commit after a catalog lock wait outlasts its lease; a fresh worker can recover", async () => {
@@ -709,6 +809,32 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     });
     expect(await db.getRepository(TenderDocument).count()).toBe(0);
   });
+  it("adds the semantic digest without inventing legacy facts and reverses only that column", async () => {
+    await service.reanalyze(tender.id, now);
+    const runner = db.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.query(`SET LOCAL search_path TO "${schema}", public`);
+      const migration = new AddTenderReviewSemanticDigest1788699200000();
+      await migration.down(runner);
+      await migration.up(runner);
+      const [row] = await runner.query(
+        'SELECT "reviewSemanticDigest", status FROM tender_analyses WHERE "tenderId"=$1',
+        [tender.id],
+      );
+      expect(row).toEqual({ reviewSemanticDigest: null, status: "PENDING" });
+      await expect(
+        runner.query('UPDATE tender_analyses SET "reviewSemanticDigest"=$1', [
+          "a".repeat(65),
+        ]),
+      ).rejects.toThrow(/value too long/);
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+  });
+
   it("corrective migration applies to empty identities and refuses to discard a legacy UUID", async () => {
     const runner = db.createQueryRunner();
     await runner.connect();
@@ -1060,6 +1186,102 @@ describe("review fingerprint requirement semantics", () => {
       value.id = `new-id-${7 - index}`;
     });
     expect(analysisFingerprint(relabeled)).toBe(analysisFingerprint(manyRefs));
+  });
+
+  it("hashes mandatory diagnostics beyond both per-category and global display caps", () => {
+    const before = fixture();
+    before.evidence = Array.from({ length: 90 }, (_, index) => ({
+      id: `diagnostic-${index}`,
+      kind: "UNSUPPORTED",
+      source: "DOCUMENT",
+      documentIdentity: "doc",
+      location: `p${String(index).padStart(3, "0")}`,
+      state: "UNKNOWN",
+      snippet: `조건${String(index).padStart(3, "0")} 필수`,
+    }));
+    for (const index of [12, 89]) {
+      const after = structuredClone(before);
+      after.evidence[index].snippet =
+        `조건${String(index).padStart(3, "0")} 새로운 필수 인증`;
+      expect(analysisFingerprint(after)).not.toBe(analysisFingerprint(before));
+    }
+  });
+
+  it("reserves diagnostic categories before ordinary source citations exhaust the cap", () => {
+    const input = fixture();
+    input.requirements = Array.from({ length: 100 }, (_, index) => ({
+      key: `item-${index}`,
+      specifications: [
+        { id: `r-${index}`, kind: "POWER", evidenceIds: [`s-${index}`] },
+      ],
+    }));
+    input.evidence = Array.from({ length: 100 }, (_, index) => ({
+      id: `s-${index}`,
+      kind: "SOURCE",
+      source: "DOCUMENT",
+      documentIdentity: `doc-${index}`,
+      location: "p1",
+      snippet: "소비전력 30W 이하",
+    }));
+    input.evidence.push(
+      {
+        id: "unsupported",
+        kind: "UNSUPPORTED",
+        source: "DOCUMENT",
+        state: "UNKNOWN",
+        snippet: "추가 인증 필수",
+      },
+      {
+        id: "conflict",
+        kind: "CONFLICT",
+        source: "STRUCTURED",
+        state: "UNKNOWN",
+        snippet: "조건 충돌",
+        conflictField: "POWER",
+      },
+    );
+    input.errorCode = "ANALYSIS_SOURCE_FAILURE";
+    const evidence = compactAnalysisEvidence(input);
+    expect(evidence.some((value) => value.kind === "UNSUPPORTED")).toBe(true);
+    expect(evidence.some((value) => value.kind === "CONFLICT")).toBe(true);
+    expect(
+      evidence.some((value) => value.diagnosticCategory === "SOURCE_FAILURE"),
+    ).toBe(true);
+    expect(evidence.length).toBeLessThanOrEqual(80);
+    expect(Buffer.byteLength(JSON.stringify(evidence))).toBeLessThanOrEqual(
+      48 * 1024,
+    );
+  });
+
+  it("canonicalizes multi-item key sets before allocating citation buckets", () => {
+    const before = fixture();
+    before.requirements = [];
+    before.certificationAnalysis = {
+      requirements: Array.from({ length: 16 }, (_, index) => ({
+        id: `cert-${index}`,
+        code: `C${index}`,
+        itemKeys: index < 12 ? ["a"] : ["a", "b"],
+        evidenceIds: [`s-${index}`],
+        required: true,
+      })),
+    };
+    before.evidence = Array.from({ length: 16 }, (_, index) => ({
+      id: `s-${index}`,
+      kind: "SOURCE",
+      source: "DOCUMENT",
+      documentIdentity: "doc",
+      location: `p${index}`,
+      snippet: `인증 C${index} 필수`,
+    }));
+    const after = structuredClone(before);
+    (after.certificationAnalysis.requirements as any[]).forEach(
+      (value) =>
+        (value.itemKeys = [...value.itemKeys, ...value.itemKeys].reverse()),
+    );
+    expect(compactAnalysisEvidence(after)).toEqual(
+      compactAnalysisEvidence(before),
+    );
+    expect(analysisFingerprint(after)).toBe(analysisFingerprint(before));
   });
 
   it("preserves dimension and hierarchical region coordinate order", () => {

@@ -37,6 +37,9 @@ export class TenderAnalysis {
   @Column({ type: "varchar", length: 64, nullable: true })
   productCatalogFingerprint: string | null;
 
+  @Column({ type: "varchar", length: 64, nullable: true })
+  reviewSemanticDigest: string | null;
+
   @Column({ type: "varchar" })
   analyzerVersion: string;
 

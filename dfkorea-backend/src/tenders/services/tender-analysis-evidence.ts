@@ -1,5 +1,5 @@
 import { TenderAnalysis } from "../entities/tender-analysis.entity";
-import { canonicalJson } from "../domain/tender-requirement";
+import { canonicalJson, fingerprint } from "../domain/tender-requirement";
 
 export const TENDER_EVIDENCE_LIMITS = {
   snippetCharacters: 320,
@@ -7,10 +7,19 @@ export const TENDER_EVIDENCE_LIMITS = {
   perItem: 12,
   totalItems: 80,
   jsonBytes: 48 * 1024,
+  // Each category owns its quota before ordinary sources. Diagnostic entries
+  // have their own byte quota so one category cannot hide another category.
+  diagnosticQuotas: {
+    SOURCE_FAILURE: 4,
+    CONFLICT: 8,
+    UNSUPPORTED: 12,
+    TRUNCATION: 4,
+  },
+  diagnosticCategoryBytes: 6 * 1024,
 } as const;
 
 type RecordValue = Record<string, unknown>;
-type EvidenceInput = Partial<
+export type EvidenceInput = Partial<
   Pick<
     TenderAnalysis,
     | "requirements"
@@ -18,6 +27,8 @@ type EvidenceInput = Partial<
     | "participationAnalysis"
     | "priceAnalysis"
     | "evidence"
+    | "errorCode"
+    | "reviewSemanticDigest"
   >
 >;
 const record = (value: unknown): RecordValue =>
@@ -30,7 +41,7 @@ const strings = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
-const clean = (value: unknown): string =>
+export const cleanAnalysisString = (value: unknown): string =>
   typeof value === "string"
     ? value
         .replace(
@@ -41,7 +52,14 @@ const clean = (value: unknown): string =>
         .trim()
     : "";
 const bounded = (value: unknown, length: number): string =>
-  Array.from(clean(value)).slice(0, length).join("");
+  Array.from(cleanAnalysisString(value)).slice(0, length).join("");
+export const boundedAnalysisIdentity = (
+  value: unknown,
+  limit: number,
+): string => {
+  const text = cleanAnalysisString(value);
+  return Array.from(text).length > limit ? `sha256:${fingerprint(text)}` : text;
+};
 const stableSet = (values: unknown[]): unknown[] =>
   [...new Map(values.map((value) => [canonicalJson(value), value])).entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -62,7 +80,7 @@ const orderingValue = (value: unknown): unknown => {
         )
         .map(([key, child]) => [key, orderingValue(child)]),
     );
-  return typeof value === "string" ? clean(value) : value;
+  return typeof value === "string" ? cleanAnalysisString(value) : value;
 };
 const orderedRecords = (value: unknown): RecordValue[] =>
   records(value).sort((a, b) =>
@@ -74,7 +92,7 @@ const evidenceOrder = (value: RecordValue): string =>
   canonicalJson({
     ...record(orderingValue(value)),
     ...(value.kind === "UNSUPPORTED"
-      ? { condition: clean(value.snippet).replace(/\s+/g, "") }
+      ? { condition: cleanAnalysisString(value.snippet).replace(/\s+/g, "") }
       : {}),
   });
 
@@ -97,7 +115,7 @@ const requirementHints = (value: RecordValue): string[] =>
   ].filter((value) => value.length >= 2);
 
 const excerpt = (value: unknown, hints: string[]): string => {
-  const text = clean(value);
+  const text = cleanAnalysisString(value);
   // Search within the complete in-memory source so a condition at the end of
   // a large block remains citable. Never return the surrounding whole block.
   let index =
@@ -125,7 +143,7 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
   const itemCounts = new Map<string, number>();
   const select = (ids: string[], bucket: string, hints: string[]) => {
     for (const id of [...new Set(ids)]
-      .filter((id) => byId.has(id))
+      .filter((id) => byId.get(id)?.kind === "SOURCE")
       .sort((a, b) =>
         evidenceOrder(byId.get(a)!).localeCompare(evidenceOrder(byId.get(b)!)),
       )
@@ -160,9 +178,13 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
     ["participation", input.participationAnalysis],
   ] as const) {
     for (const requirement of orderedRecords(record(analysis).requirements)) {
+      // Shared requirements charge the lexicographically first canonical
+      // item exactly once; input order/duplicates cannot change the bucket.
       select(
         strings(requirement.evidenceIds),
-        strings(requirement.itemKeys)[0] ?? name,
+        [
+          ...new Set(strings(requirement.itemKeys).map(cleanAnalysisString)),
+        ].sort()[0] ?? name,
         requirementHints(requirement),
       );
     }
@@ -172,28 +194,42 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
     "formula",
     ["기초금액", "낙찰하한", "예정가격", "사정률"],
   );
-  // Unsupported/conflicting conditions are themselves meaningful requirements
-  // even when the parser could not produce a comparable numeric condition.
-  for (const value of [...byId.values()].sort((a, b) =>
-    evidenceOrder(a).localeCompare(evidenceOrder(b)),
-  )) {
-    if (value.kind === "UNSUPPORTED" || value.kind === "CONFLICT") {
-      select([String(value.id)], "diagnostics", []);
-    }
-  }
   const output: RecordValue[] = [];
-  for (const [id, { value, hints }] of selected) {
+  const diagnosticBytes = new Map<string, number>();
+  const diagnostics = analysisDiagnostics(input);
+  const diagnosticSelections = Object.entries(
+    TENDER_EVIDENCE_LIMITS.diagnosticQuotas,
+  ).flatMap(([category, limit]) =>
+    diagnostics
+      .filter((value) => value.diagnosticCategory === category)
+      .sort((a, b) => evidenceOrder(a).localeCompare(evidenceOrder(b)))
+      .slice(0, limit)
+      .map(
+        (value) =>
+          [String(value.id), { value, hints: [] as string[] }] as const,
+      ),
+  );
+  for (const [id, { value, hints }] of [...diagnosticSelections, ...selected]) {
+    if (output.some((value) => value.id === boundedAnalysisIdentity(id, 128)))
+      continue;
+    if (output.length >= TENDER_EVIDENCE_LIMITS.totalItems) break;
     if (
       !["SOURCE", "UNSUPPORTED", "CONFLICT"].includes(String(value.kind)) ||
-      !["STRUCTURED", "DOCUMENT"].includes(String(value.source))
+      !["STRUCTURED", "DOCUMENT", "ANALYSIS"].includes(String(value.source))
     )
       continue;
     const citation: RecordValue = {
-      id: bounded(id, 128),
+      id: boundedAnalysisIdentity(id, 128),
       kind: value.kind,
       source: value.source,
       state: value.state === "UNKNOWN" ? "UNKNOWN" : null,
       snippet: excerpt(value.snippet, hints),
+      ...(Object.prototype.hasOwnProperty.call(
+        TENDER_EVIDENCE_LIMITS.diagnosticQuotas,
+        String(value.diagnosticCategory),
+      )
+        ? { diagnosticCategory: value.diagnosticCategory }
+        : {}),
     };
     for (const [key, limit] of Object.entries({
       documentIdentity: 256,
@@ -204,41 +240,107 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
       conflictField: 128,
     })) {
       if (typeof value[key] === "string")
-        citation[key] = bounded(value[key], limit);
+        citation[key] =
+          key === "documentIdentity"
+            ? boundedAnalysisIdentity(value[key], limit)
+            : bounded(value[key], limit);
     }
-    const related = strings(value.relatedEvidenceIds)
+    const related = [...new Set(strings(value.relatedEvidenceIds))]
+      .sort()
       .slice(0, TENDER_EVIDENCE_LIMITS.perRequirement)
-      .map((id) => bounded(id, 128));
+      .map((id) => boundedAnalysisIdentity(id, 128));
     if (related.length) citation.relatedEvidenceIds = related;
+    if (value.diagnosticCategory) {
+      const category = String(value.diagnosticCategory);
+      const bytes =
+        (diagnosticBytes.get(category) ?? 0) +
+        Buffer.byteLength(JSON.stringify(citation));
+      if (bytes > TENDER_EVIDENCE_LIMITS.diagnosticCategoryBytes) continue;
+      diagnosticBytes.set(category, bytes);
+    }
     if (
       Buffer.byteLength(JSON.stringify([...output, citation]), "utf8") >
       TENDER_EVIDENCE_LIMITS.jsonBytes
     )
-      break;
+      continue;
     output.push(citation);
   }
   return output;
 }
 
-/** Canonical reviewed facts and their bounded source anchors. Parser IDs hash
- * raw snippets, so treating those IDs as facts would make cosmetic formatting
- * revoke reviews while failing to capture item/specification associations. */
-export function analysisReviewSemantics(input: EvidenceInput): unknown {
-  const evidence = compactAnalysisEvidence(input);
-  const anchor = (value: RecordValue): RecordValue => {
-    const {
-      id: _id,
-      snippet: _snippet,
-      relatedEvidenceIds: _related,
-      ...identity
-    } = value;
-    return value.kind === "UNSUPPORTED"
-      ? {
-          ...identity,
-          unparsedCondition: clean(value.snippet).replace(/\s+/g, ""),
-        }
-      : identity;
-  };
+/** Safe synthetic diagnostics contain no provider message/body. Full source
+ * failure details stay in the document status, never in analysis snippets. */
+function analysisDiagnostics(input: EvidenceInput): RecordValue[] {
+  const diagnostics: RecordValue[] = records(input.evidence).flatMap(
+    (value) => {
+      const category =
+        value.diagnosticCategory === "TRUNCATION"
+          ? "TRUNCATION"
+          : value.diagnosticCategory === "SOURCE_FAILURE"
+            ? "SOURCE_FAILURE"
+            : ["CONFLICT", "UNSUPPORTED"].includes(String(value.kind))
+              ? String(value.kind)
+              : null;
+      return category ? [{ ...value, diagnosticCategory: category }] : [];
+    },
+  );
+  if (
+    input.errorCode &&
+    !diagnostics.some((value) => value.diagnosticCategory === "SOURCE_FAILURE")
+  )
+    diagnostics.push({
+      id: "analysis-source-failure",
+      kind: "UNSUPPORTED",
+      source: "ANALYSIS",
+      state: "UNKNOWN",
+      diagnosticCategory: "SOURCE_FAILURE",
+      operation: "analysis",
+      field: "errorCode",
+      snippet: "분석 자료 처리에 실패했습니다. 문서 상태를 확인해야 합니다.",
+    });
+  return diagnostics;
+}
+
+/** Hash complete reviewed facts BEFORE display quotas. Each textual semantic
+ * field is reduced to a SHA-256 value in memory; no raw diagnostic text or
+ * provider blocks are persisted in this digest. All diagnostic records count,
+ * including those omitted from display. Source snippets are presentation only. */
+export function analysisReviewDigest(input: EvidenceInput): string {
+  const evidence = records(input.evidence);
+  const anchor = (value: RecordValue): RecordValue =>
+    Object.fromEntries(
+      [
+        "kind",
+        "source",
+        "state",
+        "documentIdentity",
+        "revision",
+        "location",
+        "operation",
+        "field",
+        "conflictField",
+        "diagnosticCategory",
+      ]
+        .filter((key) => value[key] !== undefined)
+        .map((key) => [
+          key,
+          typeof value[key] === "string"
+            ? fingerprint(cleanAnalysisString(value[key]))
+            : value[key],
+        ])
+        .concat(
+          ["UNSUPPORTED", "CONFLICT"].includes(String(value.kind))
+            ? [
+                [
+                  "conditionDigest",
+                  fingerprint(
+                    cleanAnalysisString(value.snippet).replace(/\s+/g, ""),
+                  ),
+                ],
+              ]
+            : [],
+        ),
+    );
   const evidenceById = new Map(
     evidence.map((value) => [String(value.id), anchor(value)]),
   );
@@ -268,8 +370,6 @@ export function analysisReviewSemantics(input: EvidenceInput): unknown {
       const values = value.map((item) =>
         semantic(item, "", {}, regionPath || key === "regionPaths"),
       );
-      // Dimension coordinates are ordered tuples; requirement sets, codes,
-      // regions and evidence references have no meaningful list order.
       return (key === "values" && parent.kind === "DIMENSIONS") ||
         (regionPath && ["values", "codes"].includes(key))
         ? values
@@ -286,13 +386,30 @@ export function analysisReviewSemantics(input: EvidenceInput): unknown {
             semantic(child, field, record(value), regionPath),
           ]),
       );
-    return typeof value === "string" ? clean(value) : value;
+    return typeof value === "string"
+      ? fingerprint(cleanAnalysisString(value))
+      : value;
   };
-  return {
+  return fingerprint({
+    version: "full-semantics-2",
     requirements: semantic(input.requirements),
     certifications: semantic(input.certificationAnalysis),
     participation: semantic(input.participationAnalysis),
     price: semantic(input.priceAnalysis),
-    evidence: stableSet(evidence.map(anchor)),
+    diagnostics: stableSet(
+      analysisDiagnostics(input).map((value) => ({
+        ...anchor(value),
+        related: semantic(value.relatedEvidenceIds, "relatedEvidenceIds"),
+      })),
+    ),
+    error: semantic(input.errorCode ?? null),
+  });
+}
+
+/** New rows retain the pre-projection digest. Legacy rows without it use all
+ * available stored facts until the analyzer-version sweep rebuilds them. */
+export function analysisReviewSemantics(input: EvidenceInput): unknown {
+  return {
+    semanticDigest: input.reviewSemanticDigest ?? analysisReviewDigest(input),
   };
 }

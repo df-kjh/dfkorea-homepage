@@ -1,4 +1,7 @@
-import { compactAnalysisEvidence } from "./tender-analysis-evidence";
+import {
+  boundedAnalysisDisplay,
+  compactAnalysisDetail,
+} from "./tender-analysis-detail";
 import { TenderAwardResult } from "../entities/tender-award-result.entity";
 import { monthlyAwardWindows } from "../domain/tender-award-window";
 import {
@@ -199,6 +202,7 @@ export class TenderAnalysisService {
       }),
     ]);
     const currentFingerprint = analysisFingerprint(row);
+    const detail = compactAnalysisDetail(row);
     return {
       id: row.id,
       tenderId,
@@ -207,13 +211,32 @@ export class TenderAnalysisService {
       comparableCount: row.comparableRequirementCount,
       satisfiedCount: row.satisfiedRequirementCount,
       unsatisfiedCount: row.unsatisfiedRequirementCount,
-      requirements: row.requirements,
-      certificationAnalysis: row.certificationAnalysis,
-      participationAnalysis: row.participationAnalysis,
-      priceAnalysis: row.priceAnalysis,
-      evidence: compactAnalysisEvidence(row),
-      errorCode: row.errorCode,
-      documents,
+      requirements: detail.requirements,
+      certificationAnalysis: detail.certificationAnalysis,
+      participationAnalysis: detail.participationAnalysis,
+      priceAnalysis: detail.priceAnalysis,
+      evidence: detail.evidence,
+      errorCode:
+        row.errorCode == null
+          ? null
+          : boundedAnalysisDisplay(row.errorCode, 128),
+      documents: documents.slice(0, 10).map((document) => ({
+        ...document,
+        sourceDocumentIdentity: boundedAnalysisDisplay(
+          document.sourceDocumentIdentity,
+          256,
+          true,
+        ),
+        displayName: boundedAnalysisDisplay(document.displayName),
+        format:
+          document.format == null
+            ? null
+            : boundedAnalysisDisplay(document.format, 32),
+        errorCode:
+          document.errorCode == null
+            ? null
+            : boundedAnalysisDisplay(document.errorCode, 128),
+      })),
       reviewed:
         finalStatuses.includes(row.status) &&
         review?.analysisFingerprint === currentFingerprint &&
@@ -386,8 +409,12 @@ export class TenderAnalysisService {
       if (!renewed) return;
       const document: Partial<TenderDocument> = {
         tenderId: tender.id,
-        sourceDocumentIdentity: reference.identity,
-        displayName: reference.displayName,
+        sourceDocumentIdentity: boundedAnalysisDisplay(
+          reference.identity,
+          256,
+          true,
+        ),
+        displayName: boundedAnalysisDisplay(reference.displayName),
         sourceUrl: reference.url,
         format: reference.formatHint,
         mimeType: null,
@@ -584,7 +611,7 @@ export class TenderAnalysisService {
         errorCode: "ANALYSIS_FAILED",
       };
     }
-    changes.evidence = compactAnalysisEvidence(changes);
+    changes = { ...changes, ...compactAnalysisDetail(changes) };
     await this.db
       .transaction(async (manager) => {
         // Match writer lock order (profile -> tender -> analysis). A brief table
