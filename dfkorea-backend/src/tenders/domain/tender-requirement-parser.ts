@@ -405,17 +405,55 @@ const parseEligibilityClause = (
     const nameMatches = [
       ...text.matchAll(/([가-힣A-Za-z]+(?:공사업|면허))(?:\s*면허)?/g),
     ];
-    // Consume every occurrence separately, including repeated names. Never
-    // consume the gap between a name and its code: it may contain another rule.
-    ranges.push(
-      ...[...licenseMatches, ...nameMatches].map((match) => ({
+    const occurrences = [
+      ...licenseMatches.map((match) => ({ match, kind: "CODE" as const })),
+      ...nameMatches.map((match) => ({ match, kind: "NAME" as const })),
+    ]
+      .map(({ match, kind }) => ({
+        kind,
+        value: match[1],
         start: match.index ?? 0,
         end: (match.index ?? 0) + match[0].length,
-      })),
-    );
-    const groups: Array<TextRange & { codes: string[] }> = [];
+      }))
+      .sort((left, right) => left.start - right.start);
+    const annotations: Array<TextRange & { occurrences: typeof occurrences }> =
+      [];
+    for (const occurrence of occurrences) {
+      if (occurrence.kind === "CODE") ranges.push(occurrence);
+      const previous = annotations[annotations.length - 1];
+      // Only adjacent annotation syntax can associate a name with a code.
+      // Obligation verbs, conjunctions, separators and substantive words end
+      // the annotation, leaving independent name-only requirements unconsumed.
+      if (
+        previous &&
+        /^[\s:：()[\]{}]*$/.test(text.slice(previous.end, occurrence.start))
+      ) {
+        previous.occurrences.push(occurrence);
+        // A name's optional trailing "면허" can overlap the code's prefix.
+        previous.end = Math.max(previous.end, occurrence.end);
+      } else {
+        annotations.push({ ...occurrence, occurrences: [occurrence] });
+      }
+    }
+    const nameByCodeStart = new Map<number, string>();
+    for (const annotation of annotations) {
+      const codes = annotation.occurrences.filter(
+        ({ kind }) => kind === "CODE",
+      );
+      const names = annotation.occurrences.filter(
+        ({ kind }) => kind === "NAME",
+      );
+      // Multiple adjacent names/codes do not establish an unambiguous pairing.
+      // Keep their names as UNKNOWN instead of guessing a code association.
+      if (codes.length === 1 && names.length === 1) {
+        nameByCodeStart.set(codes[0].start, names[0].value);
+        ranges.push(names[0]);
+      }
+    }
+    const groups: Array<{ codes: string[]; names: string[] }> = [];
     for (const [index, match] of licenseMatches.entries()) {
       const code = match[1].toUpperCase();
+      const name = nameByCodeStart.get(match.index ?? 0);
       const previous = licenseMatches[index - 1];
       const previousEnd = previous
         ? (previous.index ?? 0) + previous[0].length
@@ -423,29 +461,14 @@ const parseEligibilityClause = (
       const connector = previous ? text.slice(previousEnd, match.index) : "";
       if (previous && /(?:또는|혹은)/.test(connector)) {
         groups[groups.length - 1].codes.push(code);
+        if (name) groups[groups.length - 1].names.push(name);
       } else {
-        const conjunction = /(?:및|그리고)/.exec(connector);
-        // Group boundaries associate names only; they are not consumed ranges.
-        // Names after an explicit conjunction belong to the following group,
-        // whether that alternative writes its name before or after the code.
-        const start = previous
-          ? conjunction
-            ? previousEnd + conjunction.index + conjunction[0].length
-            : (match.index ?? 0)
-          : 0;
-        if (groups.length) groups[groups.length - 1].end = start;
-        groups.push({ codes: [code], start, end: text.length });
+        groups.push({ codes: [code], names: name ? [name] : [] });
       }
     }
     results.push(
-      ...groups.map(({ codes, start, end }) => {
-        const names = [
-          ...new Set(
-            nameMatches
-              .filter((match) => match.index >= start && match.index < end)
-              .map((match) => match[1]),
-          ),
-        ];
+      ...groups.map(({ codes, names: groupNames }) => {
+        const names = [...new Set(groupNames)];
         const name = names.length ? names.join(" 또는 ") : "업종·면허";
         return requirementId({
           kind: "LICENSE",

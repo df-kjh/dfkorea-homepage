@@ -1455,6 +1455,165 @@ describe("participation semantic range residuals", () => {
   });
 
   it.each([
+    "전기공사업 면허코드 1234 등록과 정보통신공사업 등록 필수",
+    "전기공사업 면허코드 1234 / 정보통신공사업 등록 필수",
+    "전기공사업 면허코드 1234 등록 (정보통신공사업 등록 필수)",
+    "전기공사업 면허코드 1234 등록 + 정보통신공사업 등록 필수",
+    "전기공사업 면허코드 1234 등록: 정보통신공사업 등록 필수",
+    "전기공사업 면허코드 1234 등록, 정보통신공사업 등록 필수",
+    "면허코드 1234 전기공사업 등록과 정보통신공사업 등록 필수",
+    "면허코드 1234 전기공사업 등록 / 정보통신공사업 등록 필수",
+    "정보통신공사업 등록과 전기공사업 면허코드 1234 등록 필수",
+    "정보통신공사업 등록 / 면허코드 1234 전기공사업 등록 필수",
+    "전기공사업 면허코드 1234 또는 정보통신공사업 등록 필수",
+  ])("keeps an unmatched license name as UNKNOWN: %s", (text) => {
+    const { parsed, result } = analyzeParticipation(text, {
+      licenses: [{ code: "1234", name: "전기공사업", expiresAt: null }],
+    });
+
+    expect(result.suitability).toBe(TenderSuitability.REVIEW);
+    expect(parsed.participationConditions).toEqual([
+      expect.objectContaining({
+        kind: "LICENSE",
+        codes: ["1234"],
+        values: ["전기공사업"],
+      }),
+    ]);
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.SATISFIED,
+    );
+    expect(parsed.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "UNSUPPORTED",
+          state: "UNKNOWN",
+          snippet: expect.stringContaining("정보통신공사업 등록"),
+        }),
+      ]),
+    );
+  });
+
+  it.each([
+    "전기공사업 면허코드 1234 등록과 전기공사업 등록 필수",
+    "면허코드 1234 전기공사업 등록 / 전기공사업 등록 필수",
+  ])(
+    "does not consume a separate repeated license-name occurrence: %s",
+    (text) => {
+      const { parsed, result } = analyzeParticipation(text, {
+        licenses: [{ code: "1234", name: "전기공사업", expiresAt: null }],
+      });
+
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: "UNSUPPORTED", state: "UNKNOWN" }),
+        ]),
+      );
+    },
+  );
+
+  it.each([
+    "전기공사업 면허코드 1234 또는 정보통신공사업 면허코드 5678 등록과 소방시설공사업 등록 필수",
+    "면허코드 1234 전기공사업 또는 면허코드 5678 정보통신공사업 등록 / 소방시설공사업 등록 필수",
+  ])(
+    "keeps a name-only requirement outside a satisfied explicit OR group: %s",
+    (text) => {
+      const { parsed, result } = analyzeParticipation(text, {
+        licenses: [{ code: "1234", name: "전기공사업", expiresAt: null }],
+      });
+
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+      expect(parsed.participationConditions).toEqual([
+        expect.objectContaining({
+          codes: ["1234", "5678"],
+          values: ["전기공사업", "정보통신공사업"],
+        }),
+      ]);
+      expect(result.participationConditions[0].state).toBe(
+        TenderRequirementState.SATISFIED,
+      );
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "UNSUPPORTED",
+            state: "UNKNOWN",
+            snippet: expect.stringContaining("소방시설공사업 등록 필수"),
+          }),
+        ]),
+      );
+    },
+  );
+
+  it.each([
+    "전기공사업 면허코드 1234 등록과 정보통신공사업 면허코드 5678 등록 필수",
+    "전기공사업 면허코드 1234 등록 / 정보통신공사업 면허코드 5678 등록 필수",
+    "면허코드 1234 전기공사업 등록과 면허코드 5678 정보통신공사업 등록 필수",
+    "전기공사업 면허코드 1234 등록; 정보통신공사업 면허코드 5678 등록 필수",
+  ])("associates each named AND condition with its own code: %s", (text) => {
+    const { parsed, result } = analyzeParticipation(text, {
+      licenses: [{ code: "1234", name: "전기공사업", expiresAt: null }],
+    });
+
+    expect(parsed.participationConditions).toHaveLength(2);
+    expect(parsed.participationConditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ codes: ["1234"], values: ["전기공사업"] }),
+        expect.objectContaining({
+          codes: ["5678"],
+          values: ["정보통신공사업"],
+        }),
+      ]),
+    );
+    expect(parsed.evidence.filter(({ state }) => state === "UNKNOWN")).toEqual(
+      [],
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it.each([
+    "전기공사업: 면허코드 1234 등록 필수",
+    "(면허코드: 1234) 전기공사업 면허 등록 필수",
+  ])("recognizes adjacent license annotations in either order: %s", (text) => {
+    const { parsed, result } = analyzeParticipation(text, {
+      licenses: [{ code: "1234", name: "전기공사업", expiresAt: null }],
+    });
+
+    expect(parsed.participationConditions).toEqual([
+      expect.objectContaining({ codes: ["1234"], values: ["전기공사업"] }),
+    ]);
+    expect(parsed.evidence.filter(({ state }) => state === "UNKNOWN")).toEqual(
+      [],
+    );
+    expect(result.suitability).toBe(TenderSuitability.RECOMMENDED);
+  });
+
+  it.each([
+    "전기공사업 내진 구조 필수 면허코드 1234 등록 필수",
+    "면허코드 1234 내진 구조 필수 전기공사업 등록 필수",
+  ])(
+    "keeps substantive gaps from establishing a code/name association: %s",
+    (text) => {
+      const { parsed, result } = analyzeParticipation(text, {
+        licenses: [{ code: "1234", name: "전기공사업", expiresAt: null }],
+      });
+
+      expect(parsed.participationConditions).toEqual([
+        expect.objectContaining({ codes: ["1234"], values: ["업종·면허"] }),
+      ]);
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "UNSUPPORTED",
+            state: "UNKNOWN",
+            snippet: expect.stringContaining("내진 구조 필수"),
+          }),
+        ]),
+      );
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+    },
+  );
+
+  it.each([
     "전기공사업 면허코드 1234 내진 구조 필수 또는 정보통신공사업 면허코드 5678 등록 필수",
     "전기공사업 면허코드 1234 또는 내진 구조 필수 정보통신공사업 면허코드 5678 등록 필수",
     "전기공사업 면허코드 1234 또는 정보통신공사업 내진 구조 필수 면허코드 5678 등록 필수",
