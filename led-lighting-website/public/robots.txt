@@ -1,8 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /admin/*
+Disallow: /tailwind-test
 
-Sitemap: https://www.dfkorealed.com/sitemap.xml
+Sitemap: https://dfkorealed.com/sitemap.xml
 
 # RSS Feed
 Allow: /rss.xml

@@ -12,8 +12,28 @@
       "destination": "https://dfkorea-production.up.railway.app/rss.xml"
     }
   ],
+  "headers": [
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/tailwind-test",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
   "env": {
-    "NUXT_PUBLIC_SITE_URL": "https://www.dfkorealed.com",
+    "NUXT_PUBLIC_SITE_URL": "https://dfkorealed.com",
     "VITE_APP_TITLE": "LED 조명 - 미래를 밝히는 빛"
   }
 }

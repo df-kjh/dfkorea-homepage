@@ -32,7 +32,7 @@ export default defineNuxtConfig({
       siteUrl:
         process.env.NUXT_PUBLIC_SITE_URL ||
         process.env.PUBLIC_SITE_URL ||
-        "https://www.dfkorealed.com",
+        "https://dfkorealed.com",
     },
   },
   app: {
@@ -64,32 +64,32 @@ export default defineNuxtConfig({
         { name: "author", content: "디에프코리아" },
         { name: "robots", content: "index, follow" },
         { property: "og:type", content: "website" },
-        { property: "og:url", content: "https://www.dfkorealed.com/" },
+        { property: "og:url", content: "https://dfkorealed.com/" },
         { property: "og:title", content: "(주)디에프코리아 - LED 조명 전문 기업" },
         {
           property: "og:description",
           content: "혁신적인 LED 조명 기술로 더 나은 빛을 제공하는 (주)디에프코리아",
         },
-        { property: "og:image", content: "https://www.dfkorealed.com/images/og-image.jpg" },
+        { property: "og:image", content: "https://dfkorealed.com/images/og-image.jpg" },
         { property: "og:site_name", content: "(주)디에프코리아" },
         { property: "og:locale", content: "ko_KR" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:url", content: "https://www.dfkorealed.com/" },
+        { name: "twitter:url", content: "https://dfkorealed.com/" },
         { name: "twitter:title", content: "(주)디에프코리아 - LED 조명 전문 기업" },
         {
           name: "twitter:description",
           content: "혁신적인 LED 조명 기술로 더 나은 빛을 제공하는 (주)디에프코리아",
         },
-        { name: "twitter:image", content: "https://www.dfkorealed.com/images/og-image.jpg" },
+        { name: "twitter:image", content: "https://dfkorealed.com/images/og-image.jpg" },
       ],
       link: [
         { rel: "icon", href: "/favicon.ico" },
-        { rel: "canonical", href: "https://www.dfkorealed.com/" },
+        { rel: "canonical", href: "https://dfkorealed.com/" },
         {
           rel: "alternate",
           type: "application/rss+xml",
           title: "(주)디에프코리아 RSS Feed",
-          href: "https://www.dfkorealed.com/rss.xml",
+          href: "https://dfkorealed.com/rss.xml",
         },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
@@ -109,8 +109,8 @@ export default defineNuxtConfig({
             "@context": "https://schema.org",
             "@type": "Organization",
             name: "디에프코리아",
-            url: "https://www.dfkorealed.com",
-            logo: "https://www.dfkorealed.com/images/logo.svg",
+            url: "https://dfkorealed.com",
+            logo: "https://dfkorealed.com/images/logo.svg",
             description: "혁신적인 LED 조명 기술로 더 나은 빛을 제공하는 전문 기업",
             address: {
               "@type": "PostalAddress",
@@ -135,6 +135,18 @@ export default defineNuxtConfig({
     prerender: {
       crawlLinks: true,
       routes: ["/", "/about", "/certificates", "/products", "/blog"],
+    },
+  },
+  routeRules: {
+    "/admin/**": {
+      headers: {
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    },
+    "/tailwind-test": {
+      headers: {
+        "X-Robots-Tag": "noindex, nofollow",
+      },
     },
   },
 });
