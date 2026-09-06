@@ -106,25 +106,25 @@ Run: `git commit -m "fix: expose detail links to crawlers"`
 - Consumes: `CertificatesService.findAll(): Promise<Certificate[]>`
 - Produces: one encoded `/certificates/:category` sitemap URL per unique certificate category
 
-- [ ] **Step 1: Write a failing sitemap test**
+- [x] **Step 1: Write a failing sitemap test**
 
 Construct `SeoController` with posts, products, certificates and config stubs. Assert the XML contains `https://dfkorealed.com/certificates/%EA%B3%A0%ED%9A%A8%EC%9C%A8` once and contains no `www.dfkorealed.com`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- seo/seo.controller.spec.ts --runInBand`
 Expected: FAIL because the controller does not consume certificates or emit category URLs.
 
-- [ ] **Step 3: Add certificate categories to the sitemap**
+- [x] **Step 3: Add certificate categories to the sitemap**
 
 Import `CertificatesModule`, inject `CertificatesService`, fetch its data with posts and products, normalize blank categories to `기타`, encode each unique category, and use the latest category update time for `<lastmod>`.
 
-- [ ] **Step 4: Run backend tests, typecheck, and build**
+- [x] **Step 4: Run backend tests, typecheck, and build**
 
 Run: `npm test -- --runInBand && npx tsc --noEmit && npm run build`
 Expected: all backend checks pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git commit -m "feat: add certificate pages to sitemap"`
 
