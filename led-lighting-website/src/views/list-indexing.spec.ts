@@ -163,9 +163,9 @@ describe('initial list discovery', () => {
       { ...post, id: 'post-next' },
     ],
   ] as const)(
-    'retains the initial cards and appends page two without a first-page refetch',
+    'retains unchanged initial cards through the first-page refresh and page-two append',
     async (view, initialPage, listApi, firstHref, nextHref, nextItem) => {
-      listApi.getPaginated.mockResolvedValue({
+      listApi.getPaginated.mockResolvedValueOnce({ data: initialPage }).mockResolvedValueOnce({
         data: { data: [nextItem], total: 2, page: 2, limit: 20, totalPages: 2 },
       })
       const wrapper = mount(view as Component, {
@@ -173,14 +173,14 @@ describe('initial list discovery', () => {
         global: { plugins: [await routerFor('/')], components: { NuxtLink: RouterLink } },
       })
       await flushPromises()
-      expect(listApi.getPaginated).not.toHaveBeenCalled()
+      expect(listApi.getPaginated.mock.calls[0]?.slice(0, 2)).toEqual([1, 20])
       const first = wrapper.get(`a[href="${firstHref}"]`).element
       intersections.at(-1)!(
         [{ isIntersecting: true } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       )
       await flushPromises()
-      expect(listApi.getPaginated.mock.calls[0]?.slice(0, 2)).toEqual([2, 20])
+      expect(listApi.getPaginated.mock.calls[1]?.slice(0, 2)).toEqual([2, 20])
       expect(wrapper.get(`a[href="${firstHref}"]`).element).toBe(first)
       expect(wrapper.find(`a[href="${nextHref}"]`).exists()).toBe(true)
       wrapper.unmount()

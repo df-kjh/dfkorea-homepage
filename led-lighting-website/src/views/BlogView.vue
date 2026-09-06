@@ -15,8 +15,20 @@
         @category-change="handleCategoryChange"
       />
 
+      <div
+        v-if="fetchError && !loading"
+        class="mx-6 md:mx-12 p-8 rounded-xl bg-red-50"
+        role="alert"
+      >
+        <p>게시글을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p>
+        <BaseButton class="mt-4" @click="fetchPosts()">다시 시도</BaseButton>
+      </div>
       <!-- Loading State -->
-      <LoadingSpinner v-if="loading" message="게시글 목록을 불러오는 중..." class="py-20" />
+      <LoadingSpinner
+        v-else-if="loading && !refreshingSeed"
+        message="게시글 목록을 불러오는 중..."
+        class="py-20"
+      />
 
       <!-- Empty State -->
       <EmptyState
@@ -34,8 +46,8 @@
           <LoadingSpinner message="게시글을 더 불러오는 중..." />
         </div>
 
-        <!-- Intersection Observer Target -->
-        <div v-if="hasMore" ref="observerTarget" class="h-4"></div>
+        <!-- Reobserve after page 1 refreshes, even if this sentinel stays in view. -->
+        <div v-if="hasMore && !loading" ref="observerTarget" class="h-4"></div>
       </template>
     </main>
   </div>
@@ -53,6 +65,7 @@ import BlogGrid from '@/components/blog/BlogGrid.vue'
 import CategoryFilter from '@/components/blog/CategoryFilter.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import BaseButton from '@/components/common/BaseButton.vue'
 
 const props = defineProps<{ initialPage?: PaginatedResponse<Post> | null }>()
 
@@ -60,6 +73,8 @@ const router = useRouter()
 const toast = useToast()
 const posts = ref<Post[]>(props.initialPage?.data ?? [])
 const loading = ref(false)
+const refreshingSeed = ref(false)
+const fetchError = ref(false)
 const loadingMore = ref(false)
 const currentPage = ref(props.initialPage?.page ?? 1)
 const pageSize = ref(props.initialPage?.limit ?? 20) // 한 번에 20개씩 로드
@@ -78,11 +93,18 @@ const filteredPosts = computed(() => {
 const displayedPosts = computed(() => filteredPosts.value)
 const hasMore = computed(() => posts.value.length < totalPosts.value)
 
-const fetchPosts = async (page: number = 1, append: boolean = false) => {
+const fetchPosts = async (
+  page: number = 1,
+  append: boolean = false,
+  preserveSeed: boolean = false,
+) => {
+  if (append && (loading.value || loadingMore.value || fetchError.value)) return
   if (append) {
     loadingMore.value = true
   } else {
     loading.value = true
+    refreshingSeed.value = preserveSeed
+    fetchError.value = false
   }
 
   try {
@@ -97,16 +119,19 @@ const fetchPosts = async (page: number = 1, append: boolean = false) => {
     totalPosts.value = data.total
     currentPage.value = data.page
   } catch (error) {
+    // A failed first-page refresh must not append live offsets to the old SSR seed.
+    if (!append) fetchError.value = true
     toast.error('게시글 목록을 불러오는데 실패했습니다')
     console.error('Failed to fetch posts:', error)
   } finally {
     loading.value = false
     loadingMore.value = false
+    refreshingSeed.value = false
   }
 }
 
 const loadMore = () => {
-  if (!loadingMore.value && hasMore.value) {
+  if (!loading.value && !loadingMore.value && !fetchError.value && hasMore.value) {
     fetchPosts(currentPage.value + 1, true)
   }
 }
@@ -114,7 +139,7 @@ const loadMore = () => {
 // 무한 스크롤 설정
 const { observerTarget } = useInfiniteScroll({
   onLoadMore: loadMore,
-  enabled: () => hasMore.value && !loading.value && !loadingMore.value,
+  enabled: () => hasMore.value && !loading.value && !loadingMore.value && !fetchError.value,
 })
 
 const handleCategoryChange = (category: string) => {
@@ -138,8 +163,9 @@ const viewPost = async (post: Post) => {
 }
 
 onMounted(() => {
-  // Nuxt transfers the SSR page in its payload; retain those cards during hydration.
-  if (!props.initialPage) void fetchPosts()
+  // Retain SSR cards while refreshing page 1, but block live offsets until its
+  // records and total replace the build snapshot (including an exhausted seed).
+  void fetchPosts(1, false, Boolean(props.initialPage))
 })
 </script>
 

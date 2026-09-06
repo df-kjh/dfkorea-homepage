@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 const pages = [
@@ -41,6 +41,48 @@ const pages = [
 
 const outputRoots = ['../.vercel/output/static', '../.output/public']
 const canonicalOrigin = 'https://dfkorealed.com'
+
+// Discoverable detail links must never make editable/deletable content a build snapshot.
+const detailRoute = /^\/?(products|blog)\/[^/]+\/?$/
+const detailArtifact =
+  /^(products|blog)\/(?:[^/]+\/(?:index\.html|_payload\.json)|(?!index\.html$)[^/]+\.html)$/
+try {
+  const config = JSON.parse(
+    await readFile(new URL('../.vercel/output/config.json', import.meta.url), 'utf8'),
+  )
+  const staticDetails = Object.entries(config.overrides ?? {}).filter(
+    ([file, override]) => detailArtifact.test(file) || detailRoute.test(override.path ?? ''),
+  )
+  if (staticDetails.length) {
+    throw new Error(
+      `Dynamic details must be request-rendered; found ${staticDetails.length} Vercel static overrides: ${staticDetails.map(([file]) => file).join(', ')}`,
+    )
+  }
+  for (const section of ['products', 'blog']) {
+    if (!config.routes?.some((route) => route.dest === `/${section}/[id]`)) {
+      throw new Error(`Vercel is missing the dynamic /${section}/:id route`)
+    }
+  }
+  console.log(
+    'Verified product/blog detail routes: zero Vercel static overrides and dynamic routes present.',
+  )
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error
+}
+
+for (const outputRoot of outputRoots) {
+  try {
+    const files = await readdir(new URL(outputRoot, import.meta.url), { recursive: true })
+    const staticDetails = files.filter((file) => detailArtifact.test(file))
+    if (staticDetails.length) {
+      throw new Error(
+        `Dynamic detail artifacts must not be static in ${outputRoot}: ${staticDetails.join(', ')}`,
+      )
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+}
 
 async function readGeneratedPage(outputPath) {
   for (const outputRoot of outputRoots) {
@@ -88,9 +130,12 @@ for (const page of pages) {
   if (page.path === '/products' || page.path === '/blog') {
     const detailAnchors = [...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].filter(([, href]) => {
       const url = new URL(href, canonicalOrigin)
-      return url.origin === canonicalOrigin
-        && new RegExp(`^${page.path}/[^/]+$`).test(url.pathname)
-        && !url.search && !url.hash
+      return (
+        url.origin === canonicalOrigin &&
+        new RegExp(`^${page.path}/[^/]+$`).test(url.pathname) &&
+        !url.search &&
+        !url.hash
+      )
     })
     if (detailAnchors.length === 0) {
       throw new Error(`${page.path} generated HTML has zero canonical detail anchors`)

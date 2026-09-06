@@ -40,7 +40,11 @@
         <QuoteButton class="mt-4" @click="fetchProducts()">다시 시도</QuoteButton>
       </div>
       <!-- Loading State -->
-      <LoadingSpinner v-else-if="loading" message="제품 목록을 불러오는 중..." class="py-20" />
+      <LoadingSpinner
+        v-else-if="loading && !refreshingSeed"
+        message="제품 목록을 불러오는 중..."
+        class="py-20"
+      />
 
       <!-- Empty State -->
       <EmptyState
@@ -65,7 +69,8 @@
             @click="fetchProducts(currentPage + 1, true)"
             >다시 시도</QuoteButton
           >
-          <div v-if="hasMore" ref="observerTarget" class="h-4"></div>
+          <!-- Reobserve after page 1 refreshes, even if this sentinel stays in view. -->
+          <div v-if="hasMore && !loading" ref="observerTarget" class="h-4"></div>
         </div>
       </template>
     </main>
@@ -96,6 +101,7 @@ const toast = useToast()
 const selectedCategory = ref('전체')
 const products = ref<Product[]>(props.initialPage?.data ?? [])
 const loading = ref(false)
+const refreshingSeed = ref(false)
 const loadingMore = ref(false)
 const currentPage = ref(props.initialPage?.page ?? 1)
 const pageSize = ref(props.initialPage?.limit ?? 20) // 한 번에 20개 제품 로드
@@ -151,7 +157,11 @@ const filteredProducts = computed(() => products.value)
 // 무한 스크롤로 더 로드할 수 있는지 확인
 const hasMore = computed(() => products.value.length < totalProducts.value)
 
-const fetchProducts = async (page: number = 1, append: boolean = false) => {
+const fetchProducts = async (
+  page: number = 1,
+  append: boolean = false,
+  preserveSeed: boolean = false,
+) => {
   if (append && (loading.value || loadingMore.value)) return
   const generation = ++requestGeneration
   fetchError.value = false
@@ -161,6 +171,7 @@ const fetchProducts = async (page: number = 1, append: boolean = false) => {
   } else {
     loadingMore.value = false
     loading.value = true
+    refreshingSeed.value = preserveSeed
   }
 
   try {
@@ -191,6 +202,7 @@ const fetchProducts = async (page: number = 1, append: boolean = false) => {
     if (generation === requestGeneration && !disposed) {
       loading.value = false
       loadingMore.value = false
+      refreshingSeed.value = false
     }
   }
 }
@@ -242,8 +254,9 @@ const viewProductDetail = (product: Product) => {
 
 onMounted(() => {
   void loadFilterOptions()
-  // Nuxt transfers the SSR page in its payload; retain those cards during hydration.
-  if (!props.initialPage) void fetchProducts()
+  // Retain SSR cards while refreshing page 1, but block live offsets until its
+  // records and total replace the build snapshot (including an exhausted seed).
+  void fetchProducts(1, false, Boolean(props.initialPage))
 })
 </script>
 

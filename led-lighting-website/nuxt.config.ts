@@ -133,7 +133,8 @@ export default defineNuxtConfig({
   },
   nitro: {
     prerender: {
-      crawlLinks: true,
+      // Keep editable product/post details request-rendered even when lists link to them.
+      crawlLinks: false,
       routes: ["/", "/about", "/certificates", "/products", "/blog"],
     },
   },
