@@ -184,7 +184,7 @@ git commit -m "feat: manage company tender qualifications"
 - `TenderEnrichment` contains `basisAmount`, `lowerLimitRate`, `lawKind`, `formulaVariables`, `regions`, `licenses`, `purchaseItems`, and `documents`; every fact carries `EvidenceRef`.
 - Produces: `TenderDocumentFetcher.fetch(document, signal): Promise<{ bytes: Uint8Array; detectedFormat: TenderDocumentFormat; sha256: string }>`.
 
-- [ ] **Step 1: Write failing official-fixture adapter tests**
+- [x] **Step 1: Write failing official-fixture adapter tests**
 
 Add complete recorded response shapes for G2B goods basis amount, license limits, participant regions, target products, and up to ten specification-document URLs. For K-apt, assert only same-notice links from the canonical `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=...` page are accepted.
 
@@ -196,35 +196,35 @@ expect(result).toEqual(expect.objectContaining({
 }))
 ```
 
-- [ ] **Step 2: Write failing fetch-security tests**
+- [x] **Step 2: Write failing fetch-security tests**
 
 Exercise the real redirect and stream boundary with a local HTTP test server. Assert rejection for HTTP, off-allowlist redirect, 20 MiB+1 byte, MIME/magic mismatch, timeout, excessive redirect count, and a URL not produced by the matching adapter.
 
-- [ ] **Step 3: Run and verify RED**
+- [x] **Step 3: Run and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/adapters/g2b-enrichment.adapter.spec.ts tenders/adapters/kapt-enrichment.adapter.spec.ts tenders/documents/tender-document-fetcher.spec.ts`
 
 Expected: FAIL on missing adapters/fetcher.
 
-- [ ] **Step 4: Implement G2B and K-apt enrichment adapters**
+- [x] **Step 4: Implement G2B and K-apt enrichment adapters**
 
 Reuse `PublicApiClient` pacing and safe error types. G2B operations are restricted to goods detail/basis/license/region/purchase-item data for one known notice. K-apt parses only direct attachment anchors from the canonical matching notice page, never login/CAPTCHA or arbitrary navigation. Each operation returns independent partial errors rather than dropping successful facts.
 
-- [ ] **Step 5: Implement the document fetch boundary**
+- [x] **Step 5: Implement the document fetch boundary**
 
 Permit HTTPS official G2B/K-apt hosts, disable automatic redirects, validate each manual redirect, stream with the 20 MiB limit, enforce 15 seconds, inspect magic bytes, and return bytes only to the caller. Sanitize errors to stable codes such as `DOCUMENT_OFF_ALLOWLIST`, `DOCUMENT_TOO_LARGE`, `DOCUMENT_FORMAT_MISMATCH`, and `DOCUMENT_TIMEOUT`.
 
-- [ ] **Step 6: Extend the existing relay allowlist without adding configuration**
+- [x] **Step 6: Extend the existing relay allowlist without adding configuration**
 
 Permit only the new G2B goods enrichment operations and the fixed official base paths required by this task. Keep HMAC, time window, no-service-key request body, redirect rejection, and response-body redaction intact.
 
-- [ ] **Step 7: Run backend and frontend relay tests and verify GREEN**
+- [x] **Step 7: Run backend and frontend relay tests and verify GREEN**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/adapters/g2b-enrichment.adapter.spec.ts tenders/adapters/kapt-enrichment.adapter.spec.ts tenders/documents/tender-document-fetcher.spec.ts`
 
 Run: `cd led-lighting-website && npm test -- src/server/utils/g2b-relay.spec.ts src/server/api/internal/g2b-relay.post.spec.ts`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add dfkorea-backend/src/tenders/domain/tender-enrichment.ts dfkorea-backend/src/tenders/adapters dfkorea-backend/src/tenders/documents dfkorea-backend/src/tenders/tenders.module.ts led-lighting-website/src/server/utils/g2b-relay.ts led-lighting-website/src/server/utils/g2b-relay.spec.ts led-lighting-website/src/server/api/internal/g2b-relay.post.spec.ts
