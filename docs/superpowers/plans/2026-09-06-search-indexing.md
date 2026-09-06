@@ -151,13 +151,15 @@ Run frontend tests, frontend typecheck, Vercel production build, backend tests, 
 
 The frontend suite (294 tests), typecheck, Vercel build, SEO-focused backend suite, backend typecheck, backend build, and whitespace checks pass. The backend full suite has one pre-existing documentation allow-list failure for `docs/superpowers/plans/2026-09-06-quote-deployment.md` (423 tests pass, 1 fails); this branch does not modify that file or test.
 
-- [ ] **Step 3: Merge and deploy**
+- [x] **Step 3: Merge and deploy**
 
 Fast-forward the approved commits to `main`, push `origin/main`, deploy the frontend to Vercel production, and confirm the Railway backend deployment reaches a healthy state.
 
-- [ ] **Step 4: Verify production**
+- [x] **Step 4: Verify production**
 
 Check `robots.txt`, sitemap status and counts, five static page heads, one product, one post, one certificate category, crawlable detail anchors, and noindex headers for admin and test routes.
+
+Production verification on 2026-09-06 passed against `https://dfkorealed.com`: Vercel deployment `dpl_ENk93rZhVAbeKbnc7xPQXXAogZyN` and Railway deployment `4bd96357-f2d8-4ce2-a3d8-08f63dd58aac` are ready. The sitemap contains 145 unique canonical URLs (5 static, 25 products, 111 posts, and 4 certificate categories); `/products` and `/blog` each expose 20 server-rendered detail anchors, RSS contains 50 items, and admin/test routes return `X-Robots-Tag: noindex, nofollow`.
 
 - [x] **Step 5: Commit documentation**
 
