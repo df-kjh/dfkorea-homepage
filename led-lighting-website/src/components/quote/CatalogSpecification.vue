@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import type { Product } from '@/types'
 import type { QuoteItem } from '@/types/quote'
 import QuoteField from '@/components/common/quote/QuoteField.vue'
 import QuoteButton from '@/components/common/quote/QuoteButton.vue'
 import { useQuoteDraft } from '@/composables/useQuoteDraft'
+import { revealQuoteElement } from './quote-focus'
+const heading = ref<HTMLElement | null>(null)
+defineExpose({ reveal: () => revealQuoteElement(heading.value) })
 const props = defineProps<{ product: Product }>()
 const emit = defineEmits<{ added: []; cancel: [] }>()
 const { add, uid } = useQuoteDraft()
@@ -34,8 +37,11 @@ function save() {
 </script>
 <template>
   <div class="q-specification">
-    <h4 class="q-subtitle">{{ product.name }} · 희망 사양</h4>
-    <p class="q-help">확정하지 않은 항목은 상담 후 결정할 수 있어요.</p>
+    <h4 ref="heading" tabindex="-1" class="q-subtitle">{{ product.name }} · 희망 사양</h4>
+    <p class="q-help">
+      아래 사양과 수량을 확인한 뒤 ‘견적 목록에 담기’를 눌러 주세요. 미정 항목은 상담 후 결정할 수
+      있어요.
+    </p>
     <div class="q-pair">
       <QuoteField label="소비전력"
         ><select v-model="selection.power">

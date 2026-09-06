@@ -6,6 +6,8 @@
 
 - 제품 목록에서 제품명·모델명 검색과 실제 카탈로그 기반 카테고리·소비전력·인증·색온도·옵션 필터를 제공한다. 같은 필터 안은 OR, 필터 사이는 AND로 전체 데이터를 필터링한 후 페이지를 나눈다.
 - 제품 목록과 견적 선택기는 공통 사양 필터를 사용한다. 선택 조건 제거, 검색 조건 초기화, 결과 수, 검색 실패 재시도를 지원하며 오래된 응답은 현재 검색 결과를 덮어쓰지 않는다.
+- 견적 선택기의 ‘사양 선택’을 누르면 희망 사양 제목에 포커스를 주고 견적 본문 내부에서 즉시 보이게 한다. 취소는 선택한 제품 버튼으로 돌아가며 사양 입력 중에는 요청 확인 단계로 넘어가지 않는다. 담기 완료 후 상태 안내와 품목 요약, ‘제품 더 선택하기’ 동작을 제공한다. 직접 입력 내용도 검색 복귀 시 유지한다.
+- 견적 ‘제품 더 보기’와 제품 페이지 무한 스크롤은 추가 요청 중 기존 결과 DOM을 유지한다. 하단에 로딩·오류·재시도만 표시하고 중복 추가 요청을 막는다. 실패 재시도는 다음 페이지를 다시 받아 기존 결과에 이어 붙이며, 필터 변경 전 응답은 무시한다. 견적 본문 및 제품 페이지의 자동 스크롤 앵커를 끄고 사용자 스크롤을 요청 시작 위치로 되돌리지 않는다.
 - 제품 상세의 `견적에 담기`는 해당 제품을 상담 후 결정 사양·수량 1개로 담고 기업 정보 단계에서 전역 견적 창을 연다. 같은 사양은 합산되며 견적 선택기에서는 소비전력·색온도·희망 옵션·필요한 인증을 선택해 별도 품목으로 담을 수 있다.
 
 - 2026-09-06 사용자 요청으로 로컬 검수 사진 171개(약 104.3MiB)를 삭제했다. 운영 R2 사진은 유지하며, 최종 소개글·공개 제품 데이터·검증·삭제 기록을 `output/PRODUCT-CONTENT-README.md`에 정리했다. 과거 검수 파일 경로는 이력으로만 남는다.
@@ -31,6 +33,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 사양 전환 및 추가 로딩 개선은 회귀 테스트·타입 검사와 로컬 PC·모바일 브라우저 검수를 통과했다. 운영 반영 여부는 별도 확인한다. 네트워크 실패 테스트는 모의 응답으로 검증하며 실제 국세청·메일 검증과 구분한다.
+
 - 제품의 전력·색온도·인증 배열은 실제 판매 가능한 모든 조합을 보증하지 않는다. 견적 선택 사양과 필요한 인증의 공급 가능 여부는 담당자 검토 대상이다.
 - 온라인 견적의 실제 사업자 확인·메일 첨부 수신 운영 검증은 설정과 승인된 검증 정보가 필요하며 [온라인 견적 문서](quote.md)에 한계를 기록한다.
 
@@ -46,6 +50,11 @@
 - `led-lighting-website/src/components/common/quote/ProductFilters.vue`
 - `led-lighting-website/src/components/quote/ProductPicker.vue`
 - `led-lighting-website/src/components/quote/CatalogSpecification.vue`
+- `led-lighting-website/src/components/quote/ProductStep.vue`
+- `led-lighting-website/src/components/quote/quote-focus.ts`
+- `led-lighting-website/src/components/quote/ProductPicker.spec.ts`
+- `led-lighting-website/src/views/ProductsView.spec.ts`
+- `led-lighting-website/src/views/ProductsView.infinite.spec.ts`
 - `led-lighting-website/src/composables/useQuoteDraft.ts`
 - `dfkorea-backend/src/products/products.controller.ts`
 - `dfkorea-backend/src/products/products.service.ts`

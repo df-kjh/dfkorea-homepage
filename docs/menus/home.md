@@ -4,8 +4,8 @@
 
 - 2026-09-06 온라인 견적 관련 변경을 운영 배포하고 실제 도메인에서 확인했다. 홈의 PC·모바일 견적 창과 제품명/소비전력 필터를 검증했다.
 
-- 공개 페이지 우하단에서 항상 보이는 `온라인 견적` 버튼과 홈 상담 문의 선택의 온라인 견적 버튼이 같은 3단계 견적 창을 연다. 맨 위로 버튼 위 12px 간격의 고정 위치를 사용하고 관리자 페이지에서는 숨긴다.
-- 견적 창은 데스크톱 440px 비모달 창과 모바일 하단 대화상자로 표시하며 본문 스크롤, 최소화 후 작성 유지, ESC·포커스 복귀·모바일 포커스 제한·동작 줄이기를 지원한다.
+- 공개 페이지 우하단에서 항상 보이는 `온라인 견적` 버튼과 홈 상담 문의 선택의 온라인 견적 버튼이 같은 3단계 견적 창을 연다. 맨 위로 버튼이 없으면 화면 우하단 기본 여백에, 나타나면 해당 버튼 위 12px 간격으로 배치하고 관리자 페이지에서는 숨긴다. 모바일은 접근 가능한 이름을 유지한 아이콘 버튼을 사용한다.
+- 견적 창은 PC에서 기본 80vw × 84dvh의 비모달 확대 창으로 표시하되 런처 위 가용 높이에 맞춰 제한한다. 헤더에서 440px로 축소할 수 있으며 창을 닫았다 열어도 선택 크기와 작성 내용을 유지한다. 실제 패널 너비가 760px 이상이면 기업/담당자, 제품 검색/사양·담은 목록, 직접입력, 요청 검토를 두 열로 배치한다. 모바일은 기존 하단 대화상자와 본문 스크롤, ESC·포커스 복귀·모바일 포커스 제한·동작 줄이기를 유지한다.
 - 기업 확인·제품 및 사진 선택·접수 확인·접수번호 성공 화면을 제공하고 실패 시 입력을 보존한다. 상세 흐름은 [온라인 견적 기능 현황](quote.md)에 기록한다.
 
 - HeroSection을 왼쪽 카피·CTA와 오른쪽 Three.js LED 전구 오브젝트의 2열 구성으로 표시한다.
@@ -30,6 +30,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 확대·축소, 사양 입력 전환, 추가 로딩과 런처 위치 개선은 회귀 테스트·타입 검사와 로컬 PC·모바일 브라우저 검수를 통과했다. 운영 반영 여부는 별도 확인한다. 메모리 내 작성 상태만 유지하며 새로고침 후 개인정보를 복원하지 않는다.
+
 - 견적 UI와 실제 API 연결 코드는 구현했지만 국세청 운영 상호 검증, NAVER WORKS 실제 수신, 사진 임시 보관·운영 보유기간 확인 전에는 외부 운영 연동 완료로 표시하지 않는다. 연결 불가 시 재시도와 기존 전화·이메일 문의를 안내한다.
 
 - 현재 전구는 브랜드 인상을 위한 추상화 모델이므로 실제 제품 외형과 내부 기판 구조가 다를 수 있다.
@@ -43,6 +45,9 @@
 - `led-lighting-website/src/components/home/CtaSection.vue`
 - `led-lighting-website/src/components/quote/QuoteLauncher.vue`
 - `led-lighting-website/src/components/quote/QuotePanel.vue`
+- `led-lighting-website/src/components/quote/quote.css`
+- `led-lighting-website/src/components/quote/QuoteLauncher.spec.ts`
+- `led-lighting-website/src/components/quote/QuotePanel.spec.ts`
 - `led-lighting-website/src/composables/useQuoteDraft.ts`
 - `docs/menus/quote.md`
 

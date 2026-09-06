@@ -18,11 +18,24 @@
 
       <div class="px-6 md:px-12 mb-8 max-w-3xl">
         <ProductFilters v-model="filters" :options="filterOptions" />
-        <div class="flex flex-wrap gap-3 items-center"><QuoteButton variant="link" @click="resetFilters">검색 조건 초기화</QuoteButton><span class="text-sm text-gray-600">검색 결과 {{ totalProducts }}개</span></div>
-        <p v-if="filterError" class="text-sm text-red-700">검색 조건을 불러오지 못했습니다. <QuoteButton variant="link" @click="loadFilterOptions">다시 시도</QuoteButton></p>
+        <div class="flex flex-wrap gap-3 items-center">
+          <QuoteButton variant="link" @click="resetFilters">검색 조건 초기화</QuoteButton
+          ><span class="text-sm text-gray-600">검색 결과 {{ totalProducts }}개</span>
+        </div>
+        <p v-if="filterError" class="text-sm text-red-700">
+          검색 조건을 불러오지 못했습니다.
+          <QuoteButton variant="link" @click="loadFilterOptions">다시 시도</QuoteButton>
+        </p>
       </div>
 
-      <div v-if="fetchError && !loading" class="mx-6 md:mx-12 p-8 rounded-xl bg-red-50 text-gray-800" role="alert"><p>제품을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p><QuoteButton class="mt-4" @click="fetchProducts()">다시 시도</QuoteButton></div>
+      <div
+        v-if="fetchError && !loading"
+        class="mx-6 md:mx-12 p-8 rounded-xl bg-red-50 text-gray-800"
+        role="alert"
+      >
+        <p>제품을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p>
+        <QuoteButton class="mt-4" @click="fetchProducts()">다시 시도</QuoteButton>
+      </div>
       <!-- Loading State -->
       <LoadingSpinner v-else-if="loading" message="제품 목록을 불러오는 중..." class="py-20" />
 
@@ -37,13 +50,20 @@
       <template v-else>
         <ProductGrid :products="filteredProducts" @product-click="viewProductDetail" />
 
-        <!-- Loading More Indicator -->
-        <div v-if="loadingMore" class="py-10 text-center">
-          <LoadingSpinner message="제품을 더 불러오는 중..." />
+        <!-- Keep the append footer's height stable across pending, failure and retry. -->
+        <div class="product-append-footer mx-6 md:mx-12" :aria-busy="loadingMore">
+          <p v-if="loadingMore" role="status">제품을 더 불러오는 중…</p>
+          <p v-else-if="appendError" role="alert" class="text-red-700">
+            다음 제품을 불러오지 못했습니다. 현재 목록은 유지됩니다.
+          </p>
+          <QuoteButton
+            v-if="appendError"
+            :disabled="loadingMore"
+            @click="fetchProducts(currentPage + 1, true)"
+            >다시 시도</QuoteButton
+          >
+          <div v-if="hasMore" ref="observerTarget" class="h-4"></div>
         </div>
-
-        <!-- Intersection Observer Target -->
-        <div v-if="hasMore" ref="observerTarget" class="h-4"></div>
       </template>
     </main>
   </div>
@@ -89,12 +109,38 @@ const totalProducts = ref(0)
 const searchQuery = ref('')
 const filters = ref(emptyFilters())
 const filterOptions = ref<ProductFilterOptions>({ categories: [], ...emptyFilters() })
-const fetchError = ref(false), filterError = ref(false)
-let requestGeneration = 0, disposed = false
-async function loadFilterOptions() { try { const { data } = await productsAPI.getFilterOptions(); if (!disposed) { filterOptions.value = data; filterError.value = false } } catch { if (!disposed) filterError.value = true } }
-function resetFilters() { searchQuery.value = ''; selectedCategory.value = '전체'; filters.value = emptyFilters() }
-watch(filters, () => { void fetchProducts() }, { deep: true })
-onBeforeUnmount(() => { disposed = true; requestGeneration++ })
+const fetchError = ref(false),
+  appendError = ref(false),
+  filterError = ref(false)
+let requestGeneration = 0,
+  disposed = false
+async function loadFilterOptions() {
+  try {
+    const { data } = await productsAPI.getFilterOptions()
+    if (!disposed) {
+      filterOptions.value = data
+      filterError.value = false
+    }
+  } catch {
+    if (!disposed) filterError.value = true
+  }
+}
+function resetFilters() {
+  searchQuery.value = ''
+  selectedCategory.value = '전체'
+  filters.value = emptyFilters()
+}
+watch(
+  filters,
+  () => {
+    void fetchProducts()
+  },
+  { deep: true },
+)
+onBeforeUnmount(() => {
+  disposed = true
+  requestGeneration++
+})
 
 // 카테고리 레이블 목록
 const categoryLabels = computed(() => ['전체', ...filterOptions.value.categories])
@@ -109,11 +155,14 @@ const filteredProducts = computed(() => products.value)
 const hasMore = computed(() => products.value.length < totalProducts.value)
 
 const fetchProducts = async (page: number = 1, append: boolean = false) => {
+  if (append && (loading.value || loadingMore.value)) return
   const generation = ++requestGeneration
   fetchError.value = false
+  appendError.value = false
   if (append) {
     loadingMore.value = true
   } else {
+    loadingMore.value = false
     loading.value = true
   }
 
@@ -137,24 +186,41 @@ const fetchProducts = async (page: number = 1, append: boolean = false) => {
     currentPage.value = data.page
   } catch (error) {
     if (generation !== requestGeneration || disposed) return
-    fetchError.value = true
+    if (append) appendError.value = true
+    else fetchError.value = true
     toast.error('제품 목록을 불러오는데 실패했습니다')
     console.error('Failed to fetch products:', error)
   } finally {
-    if (generation === requestGeneration && !disposed) { loading.value = false; loadingMore.value = false }
+    if (generation === requestGeneration && !disposed) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
 }
 
 const loadMore = () => {
-  if (!loading.value && !loadingMore.value && !fetchError.value && hasMore.value) {
-    fetchProducts(currentPage.value + 1, true)
+  if (
+    !loading.value &&
+    !loadingMore.value &&
+    !fetchError.value &&
+    !appendError.value &&
+    hasMore.value
+  ) {
+    // The observer must not wait on an obsolete generation after filters change.
+    // loading/loadingMore guard duplicate requests for the current generation.
+    void fetchProducts(currentPage.value + 1, true)
   }
 }
 
 // 무한 스크롤 설정
 const { observerTarget } = useInfiniteScroll({
   onLoadMore: loadMore,
-  enabled: () => hasMore.value && !fetchError.value && !loading.value && !loadingMore.value,
+  enabled: () =>
+    hasMore.value &&
+    !fetchError.value &&
+    !appendError.value &&
+    !loading.value &&
+    !loadingMore.value,
 })
 
 const handleSearch = (query: string) => {
@@ -184,7 +250,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.product-append-footer {
+  min-height: 180px;
+  padding-block: 24px;
+  color: #637083;
+  overflow-anchor: none;
+}
+.product-append-footer > p {
+  margin-bottom: 16px;
+}
 .products {
   width: 100%;
+  /* Appending changes only content below the existing grid; do not anchor to the loader. */
+  overflow-anchor: none;
 }
 </style>

@@ -11,6 +11,7 @@ const panel = ref<HTMLElement | null>(null),
   body = ref<HTMLElement | null>(null),
   productStep = ref<InstanceType<typeof ProductStep> | null>(null)
 const mobile = ref(false)
+const expanded = ref(true)
 let media: MediaQueryList | null = null
 let restoreBackground: (() => void) | null = null
 function syncBackground() {
@@ -150,6 +151,7 @@ onBeforeUnmount(() => {
       id="quote-panel"
       ref="panel"
       class="q-panel"
+      :class="{ 'q-panel--expanded': expanded && !mobile }"
       role="dialog"
       :aria-modal="mobile ? 'true' : undefined"
       aria-labelledby="quote-title"
@@ -163,6 +165,18 @@ onBeforeUnmount(() => {
           <h2 id="quote-title">온라인 견적</h2>
           <p>필요한 조명을 함께 찾아드릴게요</p>
         </div>
+        <QuoteButton
+          v-if="!mobile"
+          variant="link"
+          class="q-size-toggle"
+          :aria-label="expanded ? '견적 창 축소' : '견적 창 확대'"
+          :aria-pressed="expanded"
+          @click="expanded = !expanded"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">{{
+            expanded ? 'close_fullscreen' : 'open_in_full'
+          }}</span>
+        </QuoteButton>
         <QuoteButton variant="link" class="q-close" aria-label="견적 창 최소화" @click="close"
           >×</QuoteButton
         >
