@@ -1,11 +1,20 @@
 <template>
-  <BlogView />
+  <BlogView :initial-page="initialPage" />
 </template>
 
 <script setup lang="ts">
 import BlogView from "@/views/BlogView.vue";
 
-const siteUrl = useRuntimeConfig().public.siteUrl;
+import type { Post, PaginatedResponse } from "@/types";
+import { normalizeBaseUrl } from "@/utils/seo";
+
+const config = useRuntimeConfig();
+const siteUrl = config.public.siteUrl;
+const apiBaseUrl = normalizeBaseUrl(String(config.public.apiBaseUrl));
+const { data: initialPage } = await useFetch<PaginatedResponse<Post>>(`${apiBaseUrl}/posts`, {
+  key: "blog-initial-page",
+  query: { page: 1, limit: 20 },
+});
 const title = "회사 소식 | (주)디에프코리아 - LED 조명 업계 뉴스 및 정보";
 const description =
   "(주)디에프코리아의 최신 소식과 LED 조명 산업 동향을 확인하세요. 신제품 출시, 기술 혁신, 업계 트렌드 등 다양한 정보를 제공합니다.";

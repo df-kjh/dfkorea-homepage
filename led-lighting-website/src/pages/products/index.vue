@@ -1,11 +1,20 @@
 <template>
-  <ProductsView />
+  <ProductsView :initial-page="initialPage" />
 </template>
 
 <script setup lang="ts">
 import ProductsView from "@/views/ProductsView.vue";
 
-const siteUrl = useRuntimeConfig().public.siteUrl;
+import type { Product, PaginatedResponse } from "@/types";
+import { normalizeBaseUrl } from "@/utils/seo";
+
+const config = useRuntimeConfig();
+const siteUrl = config.public.siteUrl;
+const apiBaseUrl = normalizeBaseUrl(String(config.public.apiBaseUrl));
+const { data: initialPage } = await useFetch<PaginatedResponse<Product>>(`${apiBaseUrl}/products`, {
+  key: "products-initial-page",
+  query: { page: 1, limit: 20 },
+});
 const title = "제품 목록 | (주)디에프코리아 - 다양한 LED 조명 제품";
 const description =
   "(주)디에프코리아의 다양한 LED 조명 제품을 만나보세요. 산업용, 상업용, 가정용 LED 조명 솔루션을 제공합니다. 에너지 효율적이고 고품질의 LED 제품을 확인하세요.";

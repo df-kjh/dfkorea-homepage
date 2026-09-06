@@ -64,16 +64,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { certificatesAPI } from '@/api'
 import type { Certificate } from '@/types'
-import { useSEO } from '@/composables/useSEO'
-
-// SEO 설정
-useSEO({
-  title: '인증 현황 | (주)디에프코리아 - LED 조명 전문 기업',
-  description:
-    '(주)디에프코리아가 보유한 다양한 인증서와 품질 기준을 확인하세요. 국제 표준을 준수하는 LED 조명 전문 기업입니다.',
-  keywords: '(주)디에프코리아, 인증 현황, 품질 인증, LED 조명 인증, 국제 표준, 품질 관리',
-  ogType: 'website',
-})
+import { normalizeCertificateCategory } from '@/utils/certificate-category'
 
 const router = useRouter()
 const certificates = ref<Certificate[]>([])
@@ -84,7 +75,7 @@ const groupedCertificates = computed(() => {
   const groups: Record<string, Certificate[]> = {}
 
   certificates.value.forEach((cert) => {
-    const category = cert.category || '기타'
+    const category = normalizeCertificateCategory(cert.category)
     if (!groups[category]) {
       groups[category] = []
     }

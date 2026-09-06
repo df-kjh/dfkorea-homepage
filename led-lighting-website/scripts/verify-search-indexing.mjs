@@ -62,11 +62,11 @@ for (const page of pages) {
   const canonicalUrls = [...html.matchAll(/<link rel="canonical" href="([^"]+)">/g)].map(
     (match) => match[1],
   )
-  const nonCanonicalUrl = canonicalUrls.find((url) => !url.startsWith(canonicalOrigin))
+  const expectedCanonical = `${canonicalOrigin}${page.path === '/' ? '' : page.path}`
 
-  if (canonicalUrls.length === 0 || nonCanonicalUrl) {
+  if (canonicalUrls.length !== 1 || canonicalUrls[0] !== expectedCanonical) {
     throw new Error(
-      `${page.path} has a non-canonical URL: ${nonCanonicalUrl ?? 'missing'}`,
+      `${page.path} must have exactly one canonical ${expectedCanonical}; found ${JSON.stringify(canonicalUrls)}`,
     )
   }
 
@@ -83,6 +83,19 @@ for (const page of pages) {
 
   if (missingTags.length > 0) {
     throw new Error(`${page.path} is missing SEO tags:\n${missingTags.join('\n')}`)
+  }
+
+  if (page.path === '/products' || page.path === '/blog') {
+    const detailAnchors = [...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].filter(([, href]) => {
+      const url = new URL(href, canonicalOrigin)
+      return url.origin === canonicalOrigin
+        && new RegExp(`^${page.path}/[^/]+$`).test(url.pathname)
+        && !url.search && !url.hash
+    })
+    if (detailAnchors.length === 0) {
+      throw new Error(`${page.path} generated HTML has zero canonical detail anchors`)
+    }
+    console.log(`Verified ${page.path}: ${detailAnchors.length} server-rendered detail anchors.`)
   }
 }
 

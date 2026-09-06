@@ -45,34 +45,25 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
-import { useSEO } from '@/composables/useSEO'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { postsAPI } from '@/api'
-import type { Post } from '@/types'
+import type { Post, PaginatedResponse } from '@/types'
 import BlogHeader from '@/components/blog/BlogHeader.vue'
 import BlogGrid from '@/components/blog/BlogGrid.vue'
 import CategoryFilter from '@/components/blog/CategoryFilter.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
-// SEO 설정
-useSEO({
-  title: '회사 소식 | (주)디에프코리아 - LED 조명 업계 뉴스 및 정보',
-  description:
-    '(주)디에프코리아의 최신 소식과 LED 조명 산업 동향을 확인하세요. 신제품 출시, 기술 혁신, 업계 트렌드 등 다양한 정보를 제공합니다.',
-  keywords:
-    '회사 소식, LED 뉴스, 조명 산업, 제품 출시, 기술 혁신, LED 트렌드, (주)디에프코리아 뉴스',
-  ogType: 'website',
-})
+const props = defineProps<{ initialPage?: PaginatedResponse<Post> | null }>()
 
 const router = useRouter()
 const toast = useToast()
-const posts = ref<Post[]>([])
+const posts = ref<Post[]>(props.initialPage?.data ?? [])
 const loading = ref(false)
 const loadingMore = ref(false)
-const currentPage = ref(1)
-const pageSize = ref(20) // 한 번에 20개씩 로드
-const totalPosts = ref(0)
+const currentPage = ref(props.initialPage?.page ?? 1)
+const pageSize = ref(props.initialPage?.limit ?? 20) // 한 번에 20개씩 로드
+const totalPosts = ref(props.initialPage?.total ?? 0)
 const selectedCategory = ref('전체')
 
 const categories = ['전체', '회사소식', '제품소식', '기술정보', '산업동향']
@@ -147,7 +138,8 @@ const viewPost = async (post: Post) => {
 }
 
 onMounted(() => {
-  fetchPosts()
+  // Nuxt transfers the SSR page in its payload; retain those cards during hydration.
+  if (!props.initialPage) void fetchPosts()
 })
 </script>
 

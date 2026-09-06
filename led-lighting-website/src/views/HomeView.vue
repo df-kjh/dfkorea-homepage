@@ -37,7 +37,6 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
-import { useSEO } from '@/composables/useSEO'
 import { productsAPI } from '@/api'
 import type { Product } from '@/types'
 
@@ -52,16 +51,6 @@ import ProductCarousel from '@/components/home/ProductCarousel.vue'
 import CtaSection from '@/components/home/CtaSection.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-
-// SEO 설정
-useSEO({
-  title: '(주)디에프코리아 - LED 조명 전문 기업 | 혁신적인 조명 솔루션',
-  description:
-    '혁신적인 LED 조명 기술로 더 나은 빛을 제공하는 (주)디에프코리아. 고품질 LED 제품과 솔루션을 경험해보세요. 에너지 효율적이고 친환경적인 LED 조명 제품을 만나보세요.',
-  keywords:
-    'LED 조명, LED lighting, 조명, 산업용 조명, 상업용 조명, 에너지 절약, LED 제품, (주)디에프코리아, 친환경 조명, 디에프코리아',
-  ogType: 'website',
-})
 
 const router = useRouter()
 const toast = useToast()

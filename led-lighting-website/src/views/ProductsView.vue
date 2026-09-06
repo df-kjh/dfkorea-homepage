@@ -76,10 +76,9 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
-import { useSEO } from '@/composables/useSEO'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { productsAPI } from '@/api'
-import type { Product } from '@/types'
+import type { Product, PaginatedResponse } from '@/types'
 import type { ProductFilterOptions } from '@/types/quote'
 import { emptyFilters } from '@/composables/quote-draft'
 import ProductFilters from '@/components/common/quote/ProductFilters.vue'
@@ -90,25 +89,17 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import CategoryFilter from '@/components/blog/CategoryFilter.vue'
 
-// SEO 설정
-useSEO({
-  title: '제품 목록 | (주)디에프코리아 - 다양한 LED 조명 제품',
-  description:
-    '(주)디에프코리아의 다양한 LED 조명 제품을 만나보세요. 산업용, 상업용, 가정용 LED 조명 솔루션을 제공합니다. 에너지 효율적이고 고품질의 LED 제품을 확인하세요.',
-  keywords:
-    'LED 제품, LED 조명 제품, 산업용 LED, 상업용 LED, 가정용 조명, LED 솔루션, 에너지 절약 조명',
-  ogType: 'website',
-})
+const props = defineProps<{ initialPage?: PaginatedResponse<Product> | null }>()
 
 const router = useRouter()
 const toast = useToast()
 const selectedCategory = ref('전체')
-const products = ref<Product[]>([])
+const products = ref<Product[]>(props.initialPage?.data ?? [])
 const loading = ref(false)
 const loadingMore = ref(false)
-const currentPage = ref(1)
-const pageSize = ref(20) // 한 번에 20개 제품 로드
-const totalProducts = ref(0)
+const currentPage = ref(props.initialPage?.page ?? 1)
+const pageSize = ref(props.initialPage?.limit ?? 20) // 한 번에 20개 제품 로드
+const totalProducts = ref(props.initialPage?.total ?? 0)
 const searchQuery = ref('')
 const filters = ref(emptyFilters())
 const filterOptions = ref<ProductFilterOptions>({ categories: [], ...emptyFilters() })
@@ -251,7 +242,8 @@ const viewProductDetail = (product: Product) => {
 
 onMounted(() => {
   void loadFilterOptions()
-  fetchProducts()
+  // Nuxt transfers the SSR page in its payload; retain those cards during hydration.
+  if (!props.initialPage) void fetchProducts()
 })
 </script>
 

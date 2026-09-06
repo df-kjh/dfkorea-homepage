@@ -79,13 +79,14 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { certificatesAPI } from '@/api'
 import type { Certificate } from '@/types'
-import { useSEO } from '@/composables/useSEO'
+import { normalizeCertificateCategory } from '@/utils/certificate-category'
 import { useResponsive } from '@/composables/useResponsive'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import BaseSelectBox from '@/components/common/BaseSelectBox.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 
+const emit = defineEmits<{ select: [certificate: Certificate | null] }>()
 const router = useRouter()
 const route = useRoute()
 const { isMobile } = useResponsive()
@@ -94,9 +95,8 @@ const selectedCertificateId = ref<string | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-// URL에서 category 파라미터 가져오기 (디코딩)
-const categoryParam = route.params.id as string
-const categoryName = decodeURIComponent(categoryParam)
+// Vue Router already decodes params; decoding again would break names containing %.
+const categoryName = computed(() => normalizeCertificateCategory(String(route.params.id || '')))
 
 // 선택된 인증서 computed
 const selectedCertificate = computed(() => {
@@ -114,25 +114,8 @@ const certificateOptions = computed(() => {
   }))
 })
 
-// SEO 초기 설정
-const { setMeta } = useSEO({
-  title: `${categoryName} | 인증 현황 | (주)디에프코리아`,
-  description: `(주)디에프코리아 ${categoryName} 인증서 목록을 확인하세요.`,
-  keywords: `(주)디에프코리아, ${categoryName}, 인증서, 인증 현황`,
-  ogType: 'article',
-})
-
-// 선택된 인증서가 변경되면 SEO 업데이트
-watch(selectedCertificate, (newCertificate) => {
-  if (newCertificate) {
-    setMeta({
-      title: `${newCertificate.name} | ${categoryName} | (주)디에프코리아`,
-      description: `(주)디에프코리아 ${categoryName} - ${newCertificate.name} 인증서`,
-      keywords: `(주)디에프코리아, ${categoryName}, ${newCertificate.name}, 인증서`,
-      ogType: 'article',
-    })
-  }
-})
+// The page owns all head tags; selection changes content metadata without a URL write.
+watch(selectedCertificate, (certificate) => emit('select', certificate))
 
 const fetchCertificates = async () => {
   try {
@@ -141,8 +124,7 @@ const fetchCertificates = async () => {
     // 모든 인증서를 가져온 후 해당 category로 필터링
     const { data } = await certificatesAPI.getAll()
     certificates.value = data.filter((cert: Certificate) => {
-      const certCategory = cert.category || '기타'
-      return certCategory === categoryName
+      return normalizeCertificateCategory(cert.category) === categoryName.value
     })
 
     // 첫 번째 인증서를 기본으로 선택

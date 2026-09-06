@@ -3,6 +3,7 @@
 ## 구현 완료
 
 - 대표 도메인을 `https://dfkorealed.com`으로 통일했다. 홈의 canonical URL은 `https://dfkorealed.com`이며, 서버 렌더링 HTML에 고유 제목·설명, `index, follow`, Open Graph·Twitter URL과 canonical 링크를 포함한다.
+- 홈 메타데이터는 Nuxt 페이지가 단독 관리하며, 화면의 클라이언트 로딩이 canonical·Open Graph·Twitter URL을 쿼리·해시 또는 다른 접속 호스트로 덮어쓰지 않는다.
 - 홈 URL은 백엔드 동적 사이트맵의 정적 URL로 제공된다. `robots.txt`는 같은 도메인의 `/sitemap.xml`을 안내하며, Vercel은 이 요청을 백엔드 사이트맵으로 전달한다.
 - 제품·소식 목록 카드에는 검색로봇과 키보드가 따라갈 수 있는 상세 URL 앵커가 제공된다. 관리자 경로(`/admin/**`)와 개발용 `/tailwind-test`는 `noindex, nofollow` 헤더와 robots 규칙으로 수집 대상에서 제외한다.
 
@@ -50,6 +51,8 @@
 
 ## 관련 파일
 
+- `led-lighting-website/src/views/HomeView.vue`
+- `led-lighting-website/src/views/list-indexing.spec.ts`
 - `led-lighting-website/src/app.vue`
 - `led-lighting-website/src/pages/index.vue`
 - `led-lighting-website/nuxt.config.ts`
