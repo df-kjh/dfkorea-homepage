@@ -17,6 +17,7 @@ import {
   TenderRequirementEvaluation,
   TenderSpecificationRequirement,
   TenderSuitabilityResult,
+  TENDER_REGION_CODE_BY_NAME,
 } from "./tender-requirement";
 
 interface DecimalParts {
@@ -226,33 +227,12 @@ const matchesQualification = (
   return qualifications.some(
     (qualification) =>
       validOn(qualification, date) &&
-      (codes.has(qualification.code.trim().toUpperCase()) ||
-        names.some((name) =>
-          qualification.name.replace(/\s+/g, "").includes(name),
-        )),
+      (codes.size > 0
+        ? codes.has(qualification.code.trim().toUpperCase())
+        : names.some((name) =>
+            qualification.name.replace(/\s+/g, "").includes(name),
+          )),
   );
-};
-
-const REGION_CODES: Readonly<Record<string, string>> = {
-  서울특별시: "11",
-  부산광역시: "26",
-  대구광역시: "27",
-  인천광역시: "28",
-  광주광역시: "29",
-  대전광역시: "30",
-  울산광역시: "31",
-  세종특별자치시: "36",
-  경기도: "41",
-  충청북도: "43",
-  충청남도: "44",
-  전라북도: "45",
-  전북특별자치도: "45",
-  전라남도: "46",
-  경상북도: "47",
-  경상남도: "48",
-  제주특별자치도: "50",
-  강원도: "51",
-  강원특별자치도: "51",
 };
 
 const subtractYears = (date: Date, years: number): string => {
@@ -294,17 +274,23 @@ const evaluateParticipation = (
         profile.headquarters.sigungu,
         `${profile.headquarters.sido} ${profile.headquarters.sigungu}`,
       ]);
-      const regionCode = REGION_CODES[profile.headquarters.sido];
-      const matched =
-        condition.codes.includes(regionCode) ||
-        condition.values.some((required) =>
-          [...values].some(
-            (actual) =>
-              actual === required ||
-              actual.includes(required) ||
-              required.includes(actual),
-          ),
-        );
+      const regionCode = TENDER_REGION_CODE_BY_NAME[profile.headquarters.sido];
+      const matched = condition.regionPaths?.length
+        ? condition.regionPaths.some(
+            (path) =>
+              path.codes.every((code) => code === regionCode) &&
+              path.values.every((required) =>
+                [...values].some(
+                  (actual) => actual === required || actual.includes(required),
+                ),
+              ),
+          )
+        : condition.codes.includes(regionCode) ||
+          condition.values.some((required) =>
+            [...values].some(
+              (actual) => actual === required || actual.includes(required),
+            ),
+          );
       return matched
         ? TenderRequirementState.SATISFIED
         : TenderRequirementState.UNSATISFIED;
@@ -352,16 +338,20 @@ const evaluateParticipation = (
       const subjects = condition.values.map((value) =>
         value.replace(/\s+/g, ""),
       );
+      if (subjects.some((subject) => subject.includes("동종"))) {
+        return TenderRequirementState.UNKNOWN;
+      }
       const matching = profile.performanceRecords.filter((record) => {
-        const genericSubject = subjects.some((subject) =>
-          subject.includes("동종"),
-        );
         const itemName = record.itemName.replace(/\s+/g, "");
+        const from = record.from.slice(0, 10);
+        const to = record.to.slice(0, 10);
         return (
-          record.to.slice(0, 10) >= cutoff &&
-          (genericSubject ||
-            subjects.length === 0 ||
-            subjects.some((subject) => itemName.includes(subject)))
+          from <= to &&
+          from <= currentDate &&
+          to >= cutoff &&
+          to <= currentDate &&
+          subjects.length > 0 &&
+          subjects.some((subject) => itemName.includes(subject))
         );
       });
       return (compareDecimals(
@@ -439,6 +429,18 @@ export class TenderSuitabilityAnalyzer {
     const specificationResults: TenderRequirementEvaluation[] = [];
 
     for (const item of requirements.items) {
+      if (item.assignment === "UNASSIGNED") {
+        selectedByItem.set(item.key, null);
+        specificationResults.push(
+          ...item.specifications.map((requirement) => ({
+            requirementId: requirement.id,
+            state: TenderRequirementState.UNKNOWN,
+            required: requirement.required,
+            evidenceIds: requirement.evidenceIds,
+          })),
+        );
+        continue;
+      }
       const itemCertifications = requirements.certifications.filter(
         ({ itemKeys }) => itemKeys.length === 0 || itemKeys.includes(item.key),
       );
@@ -572,10 +574,7 @@ export class TenderSuitabilityAnalyzer {
     const weighted = specificationResults.reduce(
       (totals, result) => {
         if (result.state === TenderRequirementState.UNKNOWN) return totals;
-        const requirement = requirements.items
-          .flatMap(({ specifications }) => specifications)
-          .find(({ id }) => id === result.requirementId)!;
-        const weight = requirement.required ? 2 : 1;
+        const weight = result.required ? 2 : 1;
         totals.total += weight;
         if (result.state === TenderRequirementState.SATISFIED)
           totals.satisfied += weight;

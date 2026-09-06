@@ -34,6 +34,7 @@ export interface TenderSpecificationRequirement {
   unit: TenderSpecificationUnit;
   required: boolean;
   evidenceIds: string[];
+  sourcePriority?: TenderRequirementSourcePriority;
 }
 
 export interface TenderProcurementItemRequirements {
@@ -41,6 +42,7 @@ export interface TenderProcurementItemRequirements {
   classificationCode: string | null;
   specifications: TenderSpecificationRequirement[];
   evidenceIds: string[];
+  assignment?: "ASSIGNED" | "UNASSIGNED";
 }
 
 export interface TenderCertificationRequirement {
@@ -60,6 +62,11 @@ export type TenderParticipationKind =
   | "G2B_REGISTRATION"
   | "PERFORMANCE";
 
+export interface TenderRegionPath {
+  codes: string[];
+  values: string[];
+}
+
 export interface TenderParticipationRequirement {
   id: string;
   kind: TenderParticipationKind;
@@ -69,6 +76,7 @@ export interface TenderParticipationRequirement {
   required: boolean;
   sourcePriority: TenderRequirementSourcePriority;
   evidenceIds: string[];
+  regionPaths?: TenderRegionPath[];
   periodYears?: number;
   minimumAmount?: string;
 }
@@ -151,6 +159,28 @@ export interface TenderSuitabilityResult {
     products: string;
   };
 }
+
+export const TENDER_REGION_CODE_BY_NAME: Readonly<Record<string, string>> = {
+  서울특별시: "11",
+  부산광역시: "26",
+  대구광역시: "27",
+  인천광역시: "28",
+  광주광역시: "29",
+  대전광역시: "30",
+  울산광역시: "31",
+  세종특별자치시: "36",
+  경기도: "41",
+  충청북도: "43",
+  충청남도: "44",
+  전라북도: "45",
+  전북특별자치도: "45",
+  전라남도: "46",
+  경상북도: "47",
+  경상남도: "48",
+  제주특별자치도: "50",
+  강원도: "51",
+  강원특별자치도: "51",
+};
 
 const canonicalize = (value: unknown): unknown => {
   if (Array.isArray(value)) {

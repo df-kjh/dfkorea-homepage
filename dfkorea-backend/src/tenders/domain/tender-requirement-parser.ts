@@ -17,11 +17,57 @@ import {
   TenderSpecificationKind,
   TenderSpecificationRequirement,
   TenderSpecificationUnit,
+  TENDER_REGION_CODE_BY_NAME,
 } from "./tender-requirement";
 
 const DECIMAL = "([+-]?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?)";
 const OBLIGATION =
   /(?:필수|하여야|해야|요함|제출|보유|등록|제한|참가할\s*수|업체만|이상|이하|초과|미만)/;
+const NEGATED_OBLIGATION =
+  /(?:필수(?:가|는|은)?\s*(?:아니|아닙|아님)|요구하지\s*않|하지\s*않아도|불필요)/;
+
+const splitClauses = (text: string): string[] => {
+  const clauses: string[] = [];
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const decimalPoint =
+      character === "." &&
+      /\d/.test(text[index - 1] ?? "") &&
+      /\d/.test(text[index + 1] ?? "");
+    const thousandsSeparator =
+      character === "," &&
+      /\d/.test(text[index - 1] ?? "") &&
+      /\d/.test(text[index + 1] ?? "");
+    if (
+      character === "\n" ||
+      character === "。" ||
+      (character === "." && !decimalPoint) ||
+      (character === "," && !thousandsSeparator)
+    ) {
+      const clause = text.slice(start, index).trim();
+      if (clause) clauses.push(clause);
+      start = index + 1;
+    }
+  }
+  const tail = text.slice(start).trim();
+  if (tail) clauses.push(tail);
+  return clauses;
+};
+
+const splitRequirementSpans = (text: string): string[] =>
+  splitClauses(text).flatMap((clause) =>
+    clause
+      .split(/\s+(?:및|그리고)\s+|;/)
+      .map((span) => span.trim())
+      .filter(Boolean),
+  );
+
+const isNegatedObligation = (text: string): boolean =>
+  NEGATED_OBLIGATION.test(text);
+
+const isExplicitObligation = (text: string): boolean =>
+  OBLIGATION.test(text) && !isNegatedObligation(text);
 
 const comparatorOf = (word: string | undefined): TenderComparator => {
   switch (word) {
@@ -55,6 +101,7 @@ const makeSpecification = (
   comparator: TenderComparator,
   value: string | string[],
   required: boolean,
+  sourcePriority: "STRUCTURED" | "DOCUMENT",
 ): TenderSpecificationRequirement => {
   const normalized = {
     itemKey,
@@ -64,6 +111,7 @@ const makeSpecification = (
     ...(Array.isArray(value) ? { values: value } : { value }),
     required,
     evidenceIds: [evidenceId],
+    sourcePriority,
   };
   return { id: fingerprint(normalized), ...normalized };
 };
@@ -118,6 +166,7 @@ export const parseUnitSpecifications = (
   text: string,
   itemKey: string,
   evidenceId: string,
+  sourcePriority: "STRUCTURED" | "DOCUMENT" = "DOCUMENT",
 ): TenderSpecificationRequirement[] => {
   const results: Array<{
     index: number;
@@ -127,38 +176,46 @@ export const parseUnitSpecifications = (
     `(?:외형\\s*)?(?:치수|크기|규격)\\s*[:：]?\\s*${DECIMAL}\\s*[x×X＊*]\\s*${DECIMAL}\\s*[x×X＊*]\\s*${DECIMAL}\\s*(?:mm|밀리미터)\\s*(이상|이하|초과|미만)?`,
     "gi",
   );
-  for (const match of text.matchAll(dimensionPattern)) {
-    const comparator = comparatorOf(match[4]);
-    results.push({
-      index: match.index ?? 0,
-      requirement: makeSpecification(
-        itemKey,
-        evidenceId,
-        "DIMENSIONS",
-        "MM",
-        comparator,
-        [decimal(match[1]), decimal(match[2]), decimal(match[3])],
-        comparator !== "EQ" || OBLIGATION.test(match[0]),
-      ),
-    });
-  }
-  for (const rule of unitRules) {
-    rule.pattern.lastIndex = 0;
-    for (const match of text.matchAll(rule.pattern)) {
-      const comparator = comparatorOf(match[2]);
+  let clauseOffset = 0;
+  for (const clause of splitRequirementSpans(text)) {
+    const negated = isNegatedObligation(clause);
+    dimensionPattern.lastIndex = 0;
+    for (const match of clause.matchAll(dimensionPattern)) {
+      const comparator = comparatorOf(match[4]);
       results.push({
-        index: match.index ?? 0,
+        index: clauseOffset + (match.index ?? 0),
         requirement: makeSpecification(
           itemKey,
           evidenceId,
-          rule.kind,
-          rule.unit,
+          "DIMENSIONS",
+          "MM",
           comparator,
-          decimal(match[1]),
-          comparator !== "EQ" || OBLIGATION.test(match[0]),
+          [decimal(match[1]), decimal(match[2]), decimal(match[3])],
+          !negated && (comparator !== "EQ" || isExplicitObligation(clause)),
+          sourcePriority,
         ),
       });
     }
+    for (const rule of unitRules) {
+      rule.pattern.lastIndex = 0;
+      for (const match of clause.matchAll(rule.pattern)) {
+        const comparator = comparatorOf(match[2]);
+        results.push({
+          index: clauseOffset + (match.index ?? 0),
+          requirement: makeSpecification(
+            itemKey,
+            evidenceId,
+            rule.kind,
+            rule.unit,
+            comparator,
+            decimal(match[1]),
+            !negated && (comparator !== "EQ" || isExplicitObligation(clause)),
+            sourcePriority,
+          ),
+        });
+      }
+    }
+    clauseOffset += clause.length + 1;
   }
   return results
     .sort((left, right) =>
@@ -239,60 +296,53 @@ const regionNames = [
   "제주특별자치도",
 ];
 
-const REGION_CODES: Readonly<Record<string, string>> = {
-  서울특별시: "11",
-  부산광역시: "26",
-  대구광역시: "27",
-  인천광역시: "28",
-  광주광역시: "29",
-  대전광역시: "30",
-  울산광역시: "31",
-  세종특별자치시: "36",
-  경기도: "41",
-  충청북도: "43",
-  충청남도: "44",
-  전라북도: "45",
-  전북특별자치도: "45",
-  전라남도: "46",
-  경상북도: "47",
-  경상남도: "48",
-  제주특별자치도: "50",
-  강원도: "51",
-  강원특별자치도: "51",
-};
-
 export const parseEligibilityRequirements = (
   text: string,
   evidenceId: string,
 ): TenderParticipationRequirement[] =>
-  text
-    .split(/[.。\n]+/)
-    .map((clause) => clause.trim())
-    .filter(Boolean)
-    .flatMap((clause) => parseEligibilityClause(clause, evidenceId));
+  splitClauses(text).flatMap((clause) =>
+    parseEligibilityClause(clause, evidenceId),
+  );
 
 const parseEligibilityClause = (
   text: string,
   evidenceId: string,
 ): TenderParticipationRequirement[] => {
   const results: TenderParticipationRequirement[] = [];
-  const required = OBLIGATION.test(text);
+  const required = isExplicitObligation(text);
 
   if (
     required &&
     /(?:소재지|지역).*(?:업체|참가|제한)|(?:업체|참가).*지역/.test(text)
   ) {
-    const values = regionNames.filter((name) => text.includes(name));
-    const sigungu =
-      text.match(/[가-힣]+(?:시|군|구)(?=(?:인|에|\s|,|또는|및))/g) ?? [];
-    const all = [...new Set([...values, ...sigungu])];
+    const regionPaths = text
+      .split(/\s*또는\s*/)
+      .map((alternative) => {
+        const broadRegions = regionNames.filter((name) =>
+          alternative.includes(name),
+        );
+        const districts = (
+          alternative.match(
+            /[가-힣]+(?:시|군|구)(?=(?:인|에|\s|,|또는|및))/g,
+          ) ?? []
+        ).filter((name) => !regionNames.includes(name));
+        return {
+          codes: [],
+          values: [...new Set([...broadRegions, ...districts])],
+        };
+      })
+      .filter(({ values }) => values.length > 0);
+    const all = [...new Set(regionPaths.flatMap(({ values }) => values))];
     if (all.length) {
       results.push(
         requirementId({
           kind: "REGION",
-          label: all.join(" 또는 "),
+          label: regionPaths
+            .map(({ values }) => values.join(" "))
+            .join(" 또는 "),
           codes: [],
           values: all,
+          regionPaths,
           required: true,
           sourcePriority: "DOCUMENT",
           evidenceIds: [evidenceId],
@@ -301,17 +351,17 @@ const parseEligibilityClause = (
     }
   }
 
-  const licenseMatch = /(?:업종|면허)\s*코드\s*[:：]?\s*([A-Za-z0-9-]+)/i.exec(
-    text,
-  );
-  if (required && licenseMatch) {
+  const licenseCodes = [
+    ...text.matchAll(/(?:업종|면허)\s*코드\s*[:：]?\s*([A-Za-z0-9-]+)/gi),
+  ].map((match) => match[1].toUpperCase());
+  if (required && licenseCodes.length) {
     const name =
       /([가-힣A-Za-z]+(?:공사업|면허))/.exec(text)?.[1] ?? "업종·면허";
     results.push(
       requirementId({
         kind: "LICENSE",
         label: name,
-        codes: [licenseMatch[1].toUpperCase()],
+        codes: [...new Set(licenseCodes)].sort(),
         values: [name],
         required: true,
         sourcePriority: "DOCUMENT",
@@ -474,31 +524,32 @@ const mergeUnique = <T extends { id: string }>(values: T[]): T[] =>
     (left, right) => left.id.localeCompare(right.id),
   );
 
+const stableSemanticSort = <T>(values: T[]): T[] =>
+  [...values].sort((left, right) =>
+    JSON.stringify(left).localeCompare(JSON.stringify(right)),
+  );
+
 const certificationRequirements = (
   text: string,
   itemKeys: string[],
   sourceEvidenceId: string,
 ): TenderCertificationRequirement[] =>
-  text
-    .split(/[.。\n]+/)
-    .map((clause) => clause.trim())
-    .filter(Boolean)
-    .flatMap((clause) =>
-      CERTIFICATION_ALIASES.flatMap(({ code, name, pattern }) => {
-        pattern.lastIndex = 0;
-        const match = pattern.exec(clause);
-        if (!match) return [];
-        const required = OBLIGATION.test(clause);
-        const input = {
-          code,
-          name,
-          required,
-          itemKeys: [...itemKeys].sort(),
-          evidenceIds: [sourceEvidenceId],
-        };
-        return [{ id: fingerprint(input), ...input }];
-      }),
-    );
+  splitClauses(text).flatMap((clause) =>
+    CERTIFICATION_ALIASES.flatMap(({ code, name, pattern }) => {
+      pattern.lastIndex = 0;
+      const match = pattern.exec(clause);
+      if (!match) return [];
+      const required = isExplicitObligation(clause);
+      const input = {
+        code,
+        name,
+        required,
+        itemKeys: [...itemKeys].sort(),
+        evidenceIds: [sourceEvidenceId],
+      };
+      return [{ id: fingerprint(input), ...input }];
+    }),
+  );
 
 const structuredRegionCondition = (
   regions: TenderRegionRequirement[],
@@ -513,6 +564,10 @@ const structuredRegionCondition = (
     label: ordered.map(({ name }) => name).join(" 또는 "),
     codes: ordered.map(({ code }) => code),
     values: ordered.map(({ name }) => name),
+    regionPaths: ordered.map(({ code, name }) => ({
+      codes: [code],
+      values: [name],
+    })),
     required: ordered.some(({ required }) => required),
     sourcePriority: "STRUCTURED",
     evidenceIds: [...evidenceIds].sort(),
@@ -548,11 +603,35 @@ const structuredLicenseConditions = (
 
 const normalizedRegionTokens = (
   condition: TenderParticipationRequirement,
+): string[] => {
+  const paths = condition.regionPaths?.length
+    ? condition.regionPaths
+    : [{ codes: condition.codes, values: condition.values }];
+  return paths
+    .map(({ codes, values }) =>
+      (codes.length
+        ? codes
+        : values.map((value) => TENDER_REGION_CODE_BY_NAME[value] ?? value)
+      )
+        .sort()
+        .join("&"),
+    )
+    .sort();
+};
+
+const normalizedLicenseGroups = (
+  conditions: TenderParticipationRequirement[],
 ): string[] =>
-  (condition.codes.length
-    ? condition.codes
-    : condition.values.map((value) => REGION_CODES[value] ?? value)
-  ).sort();
+  conditions
+    .map((condition) =>
+      (condition.codes.length
+        ? condition.codes.map((code) => code.trim().toUpperCase())
+        : condition.values.map((value) => value.replace(/\s+/g, ""))
+      )
+        .sort()
+        .join("|"),
+    )
+    .sort();
 
 export class TenderRequirementParser {
   parse(
@@ -560,6 +639,7 @@ export class TenderRequirementParser {
     documents: TenderRequirementDocument[],
   ): ParsedTenderRequirements {
     const evidence: TenderRequirementEvidence[] = [];
+    const certifications: TenderCertificationRequirement[] = [];
     const orderedPurchaseItems = [...enrichment.purchaseItems].sort(
       (left, right) =>
         `${left.classificationCode}:${left.specification ?? ""}`.localeCompare(
@@ -574,6 +654,23 @@ export class TenderRequirementParser {
         );
         evidence.push(sourceEvidence);
         const key = `${item.classificationCode}:${index + 1}`;
+        if (item.specification) {
+          certifications.push(
+            ...certificationRequirements(
+              item.specification,
+              [key],
+              sourceEvidence.id,
+            ),
+          );
+          evidence.push(
+            ...this.unsupportedEvidence(
+              item.specification,
+              sourceEvidence,
+              key,
+              [key],
+            ),
+          );
+        }
         return {
           key,
           classificationCode: item.classificationCode,
@@ -582,18 +679,21 @@ export class TenderRequirementParser {
                 item.specification,
                 key,
                 sourceEvidence.id,
+                "STRUCTURED",
               )
             : [],
           evidenceIds: [sourceEvidence.id],
+          assignment: "ASSIGNED" as const,
         };
       },
     );
     const fallbackKey = "document:general";
     const targetItemKeys = items.length
-      ? items.map(({ key }) => key)
+      ? items.length === 1
+        ? [items[0].key]
+        : [fallbackKey]
       : [fallbackKey];
     const documentSpecifications: TenderSpecificationRequirement[] = [];
-    const certifications: TenderCertificationRequirement[] = [];
     const documentConditions: TenderParticipationRequirement[] = [];
     let documentBidFormula: TenderBidFormula = {};
 
@@ -634,43 +734,14 @@ export class TenderRequirementParser {
         const parsedFormula = parseBidFormulaText(text, sourceEvidence.id);
         documentBidFormula = { ...documentBidFormula, ...parsedFormula };
 
-        for (const clause of text
-          .split(/[.。\n]+/)
-          .map((value) => value.trim())
-          .filter(Boolean)) {
-          const parsedClause =
-            parseUnitSpecifications(clause, documentItemKey, sourceEvidence.id)
-              .length > 0 ||
-            certificationRequirements(clause, targetItemKeys, sourceEvidence.id)
-              .length > 0 ||
-            parseEligibilityRequirements(clause, sourceEvidence.id).length >
-              0 ||
-            Object.keys(parseBidFormulaText(clause, sourceEvidence.id)).length >
-              0;
-          const explicitlyNonBinding =
-            /(?:권장|선호|참고)/.test(clause) && !OBLIGATION.test(clause);
-          if (
-            (!parsedClause || explicitlyNonBinding) &&
-            /(?:인증|자격|업체|참가|실적|제품|사양|규격|권장|선호|필요)/.test(
-              clause,
-            )
-          ) {
-            const unsupportedInput: Omit<TenderRequirementEvidence, "id"> = {
-              kind: "UNSUPPORTED",
-              source: "DOCUMENT",
-              state: "UNKNOWN",
-              snippet: clause,
-              documentIdentity: document.identity,
-              revision: document.revision,
-              location: block.location,
-              relatedEvidenceIds: [sourceEvidence.id],
-            };
-            evidence.push({
-              id: evidenceId(unsupportedInput),
-              ...unsupportedInput,
-            });
-          }
-        }
+        evidence.push(
+          ...this.unsupportedEvidence(
+            text,
+            sourceEvidence,
+            documentItemKey,
+            targetItemKeys,
+          ),
+        );
       }
     }
 
@@ -685,6 +756,7 @@ export class TenderRequirementParser {
               documentSpecifications.flatMap(({ evidenceIds }) => evidenceIds),
             ),
           ],
+          assignment: "ASSIGNED",
         });
       } else if (items.length === 1) {
         items[0].specifications.push(...documentSpecifications);
@@ -698,6 +770,7 @@ export class TenderRequirementParser {
               documentSpecifications.flatMap(({ evidenceIds }) => evidenceIds),
             ),
           ],
+          assignment: "UNASSIGNED",
         });
       }
     }
@@ -755,7 +828,11 @@ export class TenderRequirementParser {
       const documentLicenses = participationConditions.filter(
         ({ kind }) => kind === "LICENSE",
       );
-      if (documentLicenses.length) {
+      if (
+        documentLicenses.length &&
+        fingerprint(normalizedLicenseGroups(documentLicenses)) !==
+          fingerprint(normalizedLicenseGroups(structuredLicenses))
+      ) {
         evidence.push(
           this.conflictEvidence(
             "LICENSE",
@@ -771,18 +848,25 @@ export class TenderRequirementParser {
     }
 
     const structuredFormula = this.structuredFormula(enrichment, evidence);
-    if (
-      structuredFormula.lowerLimitRate &&
-      documentBidFormula.lowerLimitRate &&
-      structuredFormula.lowerLimitRate !== documentBidFormula.lowerLimitRate
-    ) {
-      evidence.push(
-        this.conflictEvidence(
-          "LOWER_LIMIT_RATE",
-          structuredFormula.evidenceIds ?? [],
-          documentBidFormula.evidenceIds ?? [],
-        ),
-      );
+    const formulaConflictFields: Array<[keyof TenderBidFormula, string]> = [
+      ["lowerLimitRate", "LOWER_LIMIT_RATE"],
+      ["reservePriceMinimumRate", "RESERVE_PRICE_MINIMUM_RATE"],
+      ["reservePriceMaximumRate", "RESERVE_PRICE_MAXIMUM_RATE"],
+    ];
+    for (const [field, label] of formulaConflictFields) {
+      if (
+        structuredFormula[field] !== undefined &&
+        documentBidFormula[field] !== undefined &&
+        structuredFormula[field] !== documentBidFormula[field]
+      ) {
+        evidence.push(
+          this.conflictEvidence(
+            label,
+            structuredFormula.evidenceIds ?? [],
+            documentBidFormula.evidenceIds ?? [],
+          ),
+        );
+      }
     }
     const bidFormula = { ...documentBidFormula, ...structuredFormula };
     if (documentBidFormula.evidenceIds || structuredFormula.evidenceIds) {
@@ -796,7 +880,10 @@ export class TenderRequirementParser {
       items: items
         .map((item) => ({
           ...item,
-          specifications: mergeUnique(item.specifications),
+          specifications: this.reconcileSpecifications(
+            item.specifications,
+            evidence,
+          ),
           evidenceIds: [...new Set(item.evidenceIds)].sort(),
         }))
         .sort((left, right) => left.key.localeCompare(right.key)),
@@ -806,6 +893,110 @@ export class TenderRequirementParser {
       evidence: mergeUnique(evidence),
     };
     return { ...normalized, fingerprint: fingerprint(normalized) };
+  }
+
+  private unsupportedEvidence(
+    text: string,
+    sourceEvidence: TenderRequirementEvidence,
+    itemKey: string,
+    itemKeys: string[],
+  ): TenderRequirementEvidence[] {
+    return splitRequirementSpans(text).flatMap((span) => {
+      const hasKnownCertification = CERTIFICATION_ALIASES.some(
+        ({ pattern }) => {
+          pattern.lastIndex = 0;
+          return pattern.test(span);
+        },
+      );
+      const hasUnknownCertification =
+        /(?:인증|방폭)/.test(span) && !hasKnownCertification;
+      const parsed =
+        parseUnitSpecifications(span, itemKey, sourceEvidence.id).length > 0 ||
+        certificationRequirements(span, itemKeys, sourceEvidence.id).length >
+          0 ||
+        parseEligibilityRequirements(span, sourceEvidence.id).length > 0 ||
+        Object.keys(parseBidFormulaText(span, sourceEvidence.id)).length > 0;
+      const explicitlyNonBinding =
+        /(?:권장|선호|참고)/.test(span) && !isExplicitObligation(span);
+      const requirementBearing =
+        /(?:인증|방폭|자격|업체|참가|실적|제품|사양|규격|필수|하여야|해야|제출|등록|보유|제한|이상|이하|초과|미만|권장|선호|필요)/.test(
+          span,
+        );
+      if (
+        !requirementBearing ||
+        (parsed && !hasUnknownCertification && !explicitlyNonBinding)
+      ) {
+        return [];
+      }
+      const input: Omit<TenderRequirementEvidence, "id"> = {
+        kind: "UNSUPPORTED",
+        source: sourceEvidence.source,
+        state: "UNKNOWN",
+        snippet: span,
+        operation: sourceEvidence.operation,
+        field: sourceEvidence.field,
+        documentIdentity: sourceEvidence.documentIdentity,
+        revision: sourceEvidence.revision,
+        location: sourceEvidence.location,
+        relatedEvidenceIds: [sourceEvidence.id],
+      };
+      return [{ id: evidenceId(input), ...input }];
+    });
+  }
+
+  private reconcileSpecifications(
+    specifications: TenderSpecificationRequirement[],
+    evidence: TenderRequirementEvidence[],
+  ): TenderSpecificationRequirement[] {
+    const byKind = new Map<
+      TenderSpecificationKind,
+      TenderSpecificationRequirement[]
+    >();
+    for (const specification of specifications) {
+      byKind.set(specification.kind, [
+        ...(byKind.get(specification.kind) ?? []),
+        specification,
+      ]);
+    }
+    return mergeUnique(
+      [...byKind.entries()].flatMap(([kind, members]) => {
+        const structured = members.filter(
+          ({ sourcePriority }) => sourcePriority === "STRUCTURED",
+        );
+        const document = members.filter(
+          ({ sourcePriority }) => sourcePriority !== "STRUCTURED",
+        );
+        if (!structured.length || !document.length) return members;
+        const semantic = (requirement: TenderSpecificationRequirement) => ({
+          comparator: requirement.comparator,
+          value: requirement.value,
+          values: requirement.values,
+          unit: requirement.unit,
+          required: requirement.required,
+        });
+        if (
+          fingerprint(stableSemanticSort(structured.map(semantic))) !==
+          fingerprint(stableSemanticSort(document.map(semantic)))
+        ) {
+          evidence.push(
+            this.conflictEvidence(
+              `SPECIFICATION:${kind}`,
+              structured.flatMap(({ evidenceIds }) => evidenceIds),
+              document.flatMap(({ evidenceIds }) => evidenceIds),
+            ),
+          );
+        }
+        const documentEvidenceIds = document.flatMap(
+          ({ evidenceIds }) => evidenceIds,
+        );
+        return structured.map((requirement) => ({
+          ...requirement,
+          evidenceIds: [
+            ...new Set([...requirement.evidenceIds, ...documentEvidenceIds]),
+          ].sort(),
+        }));
+      }),
+    );
   }
 
   private structuredFormula(

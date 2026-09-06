@@ -1,12 +1,15 @@
 import { TenderCompanyProfileDto } from "../dto/tender-company-profile.dto";
+import { ExtractedDocument } from "../documents/tender-document-extraction.types";
 import {
   TenderRequirementState,
   TenderSuitability,
 } from "./tender-analysis.enums";
+import { emptyTenderEnrichment, TenderEnrichment } from "./tender-enrichment";
 import {
   ParsedTenderRequirements,
   TenderProductSnapshot,
 } from "./tender-requirement";
+import { TenderRequirementParser } from "./tender-requirement-parser";
 import { TenderSuitabilityAnalyzer } from "./tender-suitability-analyzer";
 
 const now = new Date("2026-09-07T12:00:00.000Z");
@@ -51,6 +54,44 @@ const product = (
   certifications: [],
   ...overrides,
 });
+
+const source = {
+  source: "G2B_API" as const,
+  operation: "getBidPblancListInfoThngPurchsObjPrdct",
+  field: "prdctSpecNm",
+};
+
+const extractedDocument = (
+  identity: string,
+  text: string,
+): ExtractedDocument & { identity: string; revision: string } => ({
+  identity,
+  revision: "00",
+  status: "EXTRACTED",
+  blocks: [{ kind: "text", ordinal: 0, location: "page:1", text }],
+  metadata: { pages: 1 },
+});
+
+const parseAndAnalyze = (
+  enrichment: TenderEnrichment,
+  documentTexts: string[],
+  company = profile(),
+  catalog: TenderProductSnapshot[] = [],
+) => {
+  const parsed = new TenderRequirementParser().parse(
+    enrichment,
+    documentTexts.map((text, index) => extractedDocument(`doc-${index}`, text)),
+  );
+  return {
+    parsed,
+    result: new TenderSuitabilityAnalyzer().analyze(
+      parsed,
+      company,
+      catalog,
+      now,
+    ),
+  };
+};
 
 const spec = (id: string, required: boolean, value: string) => ({
   id,
@@ -359,9 +400,9 @@ describe("TenderSuitabilityAnalyzer qualification rules", () => {
           {
             id: "performance:1",
             kind: "PERFORMANCE",
-            label: "동종 물품 실적",
+            label: "LED등기구 실적",
             codes: [],
-            values: ["동종 물품"],
+            values: ["LED등기구"],
             periodYears: 3,
             minimumAmount: "100000000",
             required: true,
@@ -402,9 +443,9 @@ describe("TenderSuitabilityAnalyzer qualification rules", () => {
           {
             id: "performance:decimal",
             kind: "PERFORMANCE",
-            label: "동종 물품 실적",
+            label: "LED 조명 실적",
             codes: [],
-            values: ["동종 물품"],
+            values: ["LED 조명"],
             periodYears: 3,
             minimumAmount: "2",
             required: true,
@@ -416,13 +457,13 @@ describe("TenderSuitabilityAnalyzer qualification rules", () => {
       profile({
         performanceRecords: [
           {
-            itemName: "동종 물품 A",
+            itemName: "LED 조명 A",
             from: "2025-01-01",
             to: "2026-01-01",
             amount: "0.6",
           },
           {
-            itemName: "동종 물품 B",
+            itemName: "LED 조명 B",
             from: "2025-01-01",
             to: "2026-01-01",
             amount: "0.6",
@@ -567,6 +608,413 @@ describe("TenderSuitabilityAnalyzer status and fingerprints", () => {
     expect(first.inputFingerprints).toEqual(second.inputFingerprints);
     expect(Object.values(first.inputFingerprints)).toEqual(
       expect.arrayContaining([expect.stringMatching(/^[a-f0-9]{64}$/)]),
+    );
+  });
+});
+
+describe("Tender requirement parsing and scoring regressions", () => {
+  it.each([
+    {
+      sourceKind: "structured",
+      enrichment: {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 이하 및 특수 방폭 인증 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      documents: [],
+      evidenceSource: "STRUCTURED",
+    },
+    {
+      sourceKind: "document",
+      enrichment: emptyTenderEnrichment(),
+      documents: ["소비전력 50W 이하 및 특수 방폭 인증 필수"],
+      evidenceSource: "DOCUMENT",
+    },
+  ])(
+    "keeps the unconsumed mandatory span UNKNOWN for $sourceKind prose",
+    ({ enrichment, documents, evidenceSource }) => {
+      const { parsed, result } = parseAndAnalyze(
+        enrichment,
+        documents,
+        profile(),
+        [product("catalog-1", { power: [50] })],
+      );
+
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "UNSUPPORTED",
+            source: evidenceSource,
+            state: "UNKNOWN",
+            snippet: expect.stringContaining("특수 방폭 인증 필수"),
+          }),
+        ]),
+      );
+      expect(result.specificationScore).toBe(100);
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+    },
+  );
+
+  it("preserves a province and district as one conjunctive region path", () => {
+    const { parsed, result } = parseAndAnalyze(
+      emptyTenderEnrichment(),
+      ["본점 소재지가 경기도 화성시인 업체만 참가할 수 있습니다."],
+      profile({ headquarters: { sido: "경기도", sigungu: "수원시" } }),
+    );
+
+    expect(parsed.participationConditions).toEqual([
+      expect.objectContaining({
+        kind: "REGION",
+        regionPaths: [
+          expect.objectContaining({ values: ["경기도", "화성시"] }),
+        ],
+      }),
+    ]);
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.UNSATISFIED,
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it("keeps explicit alternative region paths disjunctive", () => {
+    const { result } = parseAndAnalyze(
+      emptyTenderEnrichment(),
+      [
+        "본점 소재지가 경기도 화성시 또는 서울특별시인 업체만 참가할 수 있습니다.",
+      ],
+      profile({
+        headquarters: { sido: "서울특별시", sigungu: "종로구" },
+      }),
+    );
+
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.SATISFIED,
+    );
+  });
+
+  it("does not let a matching license name override an explicit code mismatch", () => {
+    const { result } = parseAndAnalyze(
+      emptyTenderEnrichment(),
+      ["업종코드 1234 전기공사업 면허 등록 필수."],
+      profile({
+        licenses: [{ code: "9999", name: "전기공사업", expiresAt: null }],
+      }),
+    );
+
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.UNSATISFIED,
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it("keeps generic same-kind performance equivalence UNKNOWN", () => {
+    const { result } = parseAndAnalyze(
+      emptyTenderEnrichment(),
+      ["최근 3년 이내 동종 물품 납품실적 1억원 이상 필수."],
+      profile({
+        performanceRecords: [
+          {
+            itemName: "사무용 가구",
+            from: "2025-01-01",
+            to: "2026-01-01",
+            amount: "999999999",
+          },
+        ],
+      }),
+    );
+
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.UNKNOWN,
+    );
+    expect(result.suitability).toBe(TenderSuitability.REVIEW);
+  });
+
+  it("ignores performance records outside the injected cutoff and current date", () => {
+    const { result } = parseAndAnalyze(
+      emptyTenderEnrichment(),
+      ["최근 3년 이내 LED 조명 납품실적 1억원 이상 필수."],
+      profile({
+        performanceRecords: [
+          {
+            itemName: "LED 조명",
+            from: "2023-01-01",
+            to: "2023-09-06",
+            amount: "1000000000",
+          },
+          {
+            itemName: "LED 조명",
+            from: "2026-09-08",
+            to: "2026-12-31",
+            amount: "1000000000",
+          },
+          {
+            itemName: "LED 조명",
+            from: "2025-01-01",
+            to: "2026-09-01",
+            amount: "99999999",
+          },
+        ],
+      }),
+    );
+
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.UNSATISFIED,
+    );
+  });
+
+  it.each([
+    { phrase: "1.5억원", amount: "150000000" },
+    { phrase: "1.25만원", amount: "12500" },
+  ])(
+    "preserves decimal Korean amount $phrase end to end",
+    ({ phrase, amount }) => {
+      const { parsed } = parseAndAnalyze(emptyTenderEnrichment(), [
+        `최근 3년 이내 LED 조명 납품실적 ${phrase} 이상 필수.`,
+      ]);
+
+      expect(parsed.participationConditions).toEqual([
+        expect.objectContaining({
+          kind: "PERFORMANCE",
+          minimumAmount: amount,
+        }),
+      ]);
+    },
+  );
+
+  it("applies an exact-value obligation after the unit", () => {
+    const { parsed } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      [],
+    );
+
+    expect(parsed.items[0].specifications[0]).toEqual(
+      expect.objectContaining({
+        comparator: "EQ",
+        value: "50",
+        required: true,
+      }),
+    );
+  });
+
+  it("does not turn a negated certification obligation into a requirement", () => {
+    const { parsed } = parseAndAnalyze(emptyTenderEnrichment(), [
+      "KS 인증은 필수가 아닙니다.",
+    ]);
+
+    expect(parsed.certifications).toEqual([
+      expect.objectContaining({ code: "KS", required: false }),
+    ]);
+  });
+
+  it("lets a structured specification supersede the same document field with conflict evidence", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      ["소비전력 40W 필수"],
+      profile(),
+      [product("catalog-1", { power: [50] })],
+    );
+
+    expect(parsed.items[0].specifications).toEqual([
+      expect.objectContaining({ kind: "POWER", value: "50" }),
+    ]);
+    expect(parsed.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "CONFLICT",
+          conflictField: "SPECIFICATION:POWER",
+          relatedEvidenceIds: expect.arrayContaining([
+            parsed.items[0].evidenceIds[0],
+            expect.any(String),
+          ]),
+        }),
+      ]),
+    );
+    expect(result.specificationScore).toBe(100);
+    expect(result.suitability).toBe(TenderSuitability.REVIEW);
+  });
+
+  it("detects structured reserve-bound conflicts beyond the lower-limit rate", () => {
+    const formulaEvidence = {
+      source: "G2B_API" as const,
+      operation: "getBidPblancListInfoThngBsisAmount",
+      field: "rsrvtnPrceRngBgnRate",
+    };
+    const { parsed } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        formulaVariables: [
+          {
+            key: "reservePriceMinimumRate",
+            value: "99",
+            evidence: formulaEvidence,
+          },
+          {
+            key: "reservePriceMaximumRate",
+            value: "101",
+            evidence: { ...formulaEvidence, field: "rsrvtnPrceRngEndRate" },
+          },
+        ],
+      },
+      ["예정가격 범위는 기초금액의 -2% 이상 +2% 이하입니다."],
+    );
+
+    expect(parsed.bidFormula).toEqual(
+      expect.objectContaining({
+        reservePriceMinimumRate: "99",
+        reservePriceMaximumRate: "101",
+      }),
+    );
+    expect(
+      parsed.evidence
+        .filter((item) => item.kind === "CONFLICT")
+        .map((item) => item.conflictField),
+    ).toEqual(
+      expect.arrayContaining([
+        "RESERVE_PRICE_MINIMUM_RATE",
+        "RESERVE_PRICE_MAXIMUM_RATE",
+      ]),
+    );
+  });
+
+  it("does not report a conflict for equivalent structured and document licenses", () => {
+    const { parsed } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        licenses: [
+          {
+            code: "1234",
+            name: "전기공사업",
+            group: "1",
+            required: true,
+            evidence: source,
+          },
+        ],
+      },
+      ["업종코드 1234 전기공사업 면허 등록 필수."],
+    );
+
+    expect(
+      parsed.evidence.some(
+        (item) => item.kind === "CONFLICT" && item.conflictField === "LICENSE",
+      ),
+    ).toBe(false);
+  });
+
+  it("canonicalizes equivalent structured and document license alternatives", () => {
+    const { parsed } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        licenses: [
+          {
+            code: "1234",
+            name: "면허 A",
+            group: "1",
+            required: true,
+            evidence: source,
+          },
+          {
+            code: "5678",
+            name: "면허 B",
+            group: "1",
+            required: true,
+            evidence: source,
+          },
+        ],
+      },
+      ["업종코드 1234 또는 업종코드 5678 등록 필수."],
+    );
+
+    expect(
+      parsed.evidence.some(
+        (item) => item.kind === "CONFLICT" && item.conflictField === "LICENSE",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps unassigned multi-item document requirements UNKNOWN", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "item-40",
+            name: "40W 등기구",
+            specification: "소비전력 40W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+          {
+            classificationCode: "item-60",
+            name: "60W 등기구",
+            specification: "소비전력 60W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      ["광효율 80lm/W 이상 필수"],
+      profile(),
+      [
+        product("40w", { power: [40] }),
+        product("60w", { power: [60] }),
+        product("unrelated", {
+          power: [20],
+          luminanceEfficiency: 80,
+        }),
+      ],
+    );
+
+    expect(parsed.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "document:general",
+          assignment: "UNASSIGNED",
+        }),
+      ]),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        specificationScore: 100,
+        satisfiedCount: 2,
+        unsatisfiedCount: 0,
+        unknownCount: 1,
+        totalCount: 3,
+        suitability: TenderSuitability.REVIEW,
+      }),
     );
   });
 });
