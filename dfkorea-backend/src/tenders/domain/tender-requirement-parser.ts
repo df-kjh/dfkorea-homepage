@@ -334,15 +334,23 @@ export const parseEligibilityRequirements = (
   text: string,
   evidenceId: string,
 ): TenderParticipationRequirement[] =>
-  splitClauses(text).flatMap((clause) =>
-    parseEligibilityClause(clause, evidenceId),
+  splitClauses(text).flatMap(
+    (clause) => parseEligibilityClause(clause, evidenceId).requirements,
   );
+
+interface EligibilityParseResult {
+  requirements: TenderParticipationRequirement[];
+  ranges: TextRange[];
+}
 
 const parseEligibilityClause = (
   text: string,
   evidenceId: string,
-): TenderParticipationRequirement[] => {
+): EligibilityParseResult => {
   const results: TenderParticipationRequirement[] = [];
+  const ranges: TextRange[] = [];
+  const consume = (pattern: RegExp) =>
+    ranges.push(...matchingRanges(text, pattern));
   const required = isExplicitObligation(text);
 
   if (
@@ -357,7 +365,7 @@ const parseEligibilityClause = (
         );
         const districts = (
           alternative.match(
-            /[가-힣]+(?:시|군|구)(?=(?:인|에|\s|,|또는|및))/g,
+            /[가-힣]+(?:시|군|구)(?=(?:인|에|\s|,|또는|및|$))/g,
           ) ?? []
         ).filter((name) => !regionNames.includes(name));
         return {
@@ -368,6 +376,11 @@ const parseEligibilityClause = (
       .filter(({ values }) => values.length > 0);
     const all = [...new Set(regionPaths.flatMap(({ values }) => values))];
     if (all.length) {
+      // Keep region names and their qualification grammar as separate ranges:
+      // an unrecognized condition between them must never disappear.
+      for (const name of all) consume(new RegExp(name, "g"));
+      consume(/(?:본점|본사)?\s*(?:소재지|지역)(?:가|는|은)?/g);
+      consume(/업체(?:만)?/g);
       results.push(
         requirementId({
           kind: "REGION",
@@ -389,8 +402,19 @@ const parseEligibilityClause = (
     ...text.matchAll(/(?:업종|면허)\s*코드\s*[:：]?\s*([A-Za-z0-9-]+)/gi),
   ];
   if (required && licenseMatches.length) {
-    const name =
-      /([가-힣A-Za-z]+(?:공사업|면허))/.exec(text)?.[1] ?? "업종·면허";
+    const nameMatch = /([가-힣A-Za-z]+(?:공사업|면허))(?:\s*면허)?/.exec(text);
+    const name = nameMatch?.[1] ?? "업종·면허";
+    if (nameMatch)
+      ranges.push({
+        start: nameMatch.index,
+        end: nameMatch.index + nameMatch[0].length,
+      });
+    ranges.push(
+      ...licenseMatches.map((match) => ({
+        start: match.index ?? 0,
+        end: (match.index ?? 0) + match[0].length,
+      })),
+    );
     const groups: string[][] = [];
     for (const [index, match] of licenseMatches.entries()) {
       const code = match[1].toUpperCase();
@@ -420,6 +444,7 @@ const parseEligibilityClause = (
   }
 
   if (required && /중소기업|소상공인/.test(text)) {
+    consume(/(?:중소기업|소상공인)(?:\s*확인서)?/g);
     const codes = [
       ...(text.includes("중소기업") ? ["SME"] : []),
       ...(text.includes("소상공인") ? ["SMALL_BUSINESS"] : []),
@@ -443,10 +468,14 @@ const parseEligibilityClause = (
   }
 
   const directMatch =
-    /(?:세부품명번호\s*[:：]?\s*)?(\d{8,10})?[^.\n]*직접생산확인(?:증명서)?/.exec(
+    /(?:(?:세부품명번호\s*[:：]?\s*)?(\d{8,10})\s*)?직접생산확인(?:증명서)?/.exec(
       text,
     );
   if (required && directMatch) {
+    ranges.push({
+      start: directMatch.index,
+      end: directMatch.index + directMatch[0].length,
+    });
     results.push(
       requirementId({
         kind: "DIRECT_PRODUCTION",
@@ -465,6 +494,7 @@ const parseEligibilityClause = (
     /나라장터|조달청/.test(text) &&
     /(?:경쟁입찰)?참가자격|조달업체|등록/.test(text)
   ) {
+    consume(/(?:나라장터|조달청)(?:\s*(?:(?:경쟁입찰)?참가자격|조달업체))?/g);
     results.push(
       requirementId({
         kind: "G2B_REGISTRATION",
@@ -483,6 +513,10 @@ const parseEligibilityClause = (
       text,
     );
   if (required && performanceMatch) {
+    ranges.push({
+      start: performanceMatch.index,
+      end: performanceMatch.index + performanceMatch[0].length,
+    });
     const subject =
       performanceMatch[2].replace(/납품\s*실적\s*$/, "").trim() || "동종 물품";
     results.push(
@@ -500,7 +534,7 @@ const parseEligibilityClause = (
     );
   }
 
-  return results;
+  return { requirements: results, ranges };
 };
 
 const addDecimal = (left: string, right: string): string => {
@@ -619,8 +653,20 @@ const certificationRequirements = (
     });
   });
 
-const unconsumedRecognizedText = (text: string): string | null => {
+// Extend only from a recognized semantic range through adjacent grammatical
+// tokens. Stop at the first substantive word, regardless of its connector.
+// This intentionally does not delete obligation words from arbitrary prose.
+const OBLIGATION_SUFFIX =
+  /^(?:\s*(?:필수(?:(?:가|는|은)?\s*(?:아니며|아닙니다|아니다|아님)|입니다|이다|임)?|참가할\s*수\s*있습니다|확인서|등록|보유|제출|제한|하여야|해야|요함|하지\s*않아도|요구하지\s*않(?:습니다|음)?|불필요|아니며|입니다|합니다|이다|이며|이고|하며|하되|임|함|은|는|이|가|을|를|인|에|의))*/;
+const GRAMMATICAL_GAP =
+  /^(?:\s|[,.;:!。()[\]{}\/＋+·]|및|그리고|또는|혹은|과|와)*$/;
+
+const unconsumedRecognizedText = (
+  text: string,
+  eligibilityRanges: TextRange[],
+): string | null => {
   const ranges = [
+    ...eligibilityRanges,
     ...matchingRanges(text, new RegExp(DIMENSION_PATTERN_SOURCE, "gi")),
     ...unitRules.flatMap(({ pattern }) => matchingRanges(text, pattern)),
     ...certificationMatches(text).map(({ index, length }) => ({
@@ -632,23 +678,23 @@ const unconsumedRecognizedText = (text: string): string | null => {
 
   const consumed = Array.from({ length: text.length }, () => false);
   for (const { start, end } of ranges) {
-    for (let index = start; index < end; index += 1) consumed[index] = true;
+    const suffix = OBLIGATION_SUFFIX.exec(text.slice(end))?.[0] ?? "";
+    for (let index = start; index < end + suffix.length; index += 1)
+      consumed[index] = true;
   }
-  return [...text]
-    .map((character, index) => (consumed[index] ? " " : character))
-    .join("")
-    .replace(
-      /(?:은|는)?\s*필수(?:(?:가|는|은)\s*(?:아니며|아닙니다|아니다|아님)|입니다|이다|임)?/g,
-      " ",
-    )
-    .replace(
-      /(?:필수|하여야|해야|요함|보유|등록|제출|제한|이며|이고|하며|하되|아니며|입니다|합니다|이다|임|함|및|그리고)/g,
-      " ",
-    )
-    .replace(/^\s*(?:과|와)\s*/, "")
-    .replace(/(?:^|\s)(?:은|는|이|가|을|를|인|에|의)(?=\s|$)/g, " ")
-    .replace(/[\s,.!。]+/g, "")
-    .trim();
+  // Evaluate each gap independently: joining gaps could accidentally turn two
+  // unrelated text fragments into a recognized grammatical word.
+  const residuals: string[] = [];
+  let gap = "";
+  for (let index = 0; index <= text.length; index += 1) {
+    if (index < text.length && !consumed[index]) {
+      gap += text[index];
+    } else if (gap) {
+      if (!GRAMMATICAL_GAP.test(gap)) residuals.push(gap);
+      gap = "";
+    }
+  }
+  return residuals.join(" ").trim();
 };
 
 const structuredRegionCondition = (
@@ -1003,13 +1049,14 @@ export class TenderRequirementParser {
     itemKeys: string[],
   ): TenderRequirementEvidence[] {
     return splitRequirementSpans(text).flatMap((span) => {
-      const unconsumedText = unconsumedRecognizedText(span);
+      const eligibility = parseEligibilityClause(span, sourceEvidence.id);
+      const unconsumedText = unconsumedRecognizedText(span, eligibility.ranges);
       const hasUnhandledRecognizedResidual = Boolean(unconsumedText);
       const parsed =
         parseUnitSpecifications(span, itemKey, sourceEvidence.id).length > 0 ||
         certificationRequirements(span, itemKeys, sourceEvidence.id).length >
           0 ||
-        parseEligibilityRequirements(span, sourceEvidence.id).length > 0 ||
+        eligibility.requirements.length > 0 ||
         Object.keys(parseBidFormulaText(span, sourceEvidence.id)).length > 0;
       const explicitlyNonBinding =
         /(?:권장|선호|참고)/.test(span) && !isExplicitObligation(span);

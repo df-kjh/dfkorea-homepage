@@ -1319,3 +1319,102 @@ describe("Tender requirement parsing and scoring regressions", () => {
     expect(result.suitability).toBe(TenderSuitability.RECOMMENDED);
   });
 });
+
+describe("participation semantic range residuals", () => {
+  const analyzeParticipation = (text: string) =>
+    parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      [text],
+      profile({
+        licenses: [
+          { code: "1234", name: "전기공사업", expiresAt: null },
+          { code: "5678", name: "면허 B", expiresAt: null },
+        ],
+        companyTypes: [{ code: "SME", name: "중소기업", expiresAt: null }],
+        directProduction: [
+          { code: "39112102", name: "LED 등기구", expiresAt: null },
+        ],
+        performanceRecords: [
+          {
+            itemName: "LED 조명",
+            from: "2025-01-01",
+            to: "2026-08-01",
+            amount: "100000000",
+          },
+        ],
+      }),
+      [product("catalog-1", { power: [50] })],
+    );
+
+  it.each([
+    "나라장터 등록과 내진 구조 필수",
+    "업종코드 1234 등록과 내진 구조 필수",
+    "나라장터 등록 / 내진 구조 필수",
+    "업종코드 1234 등록 + 내진 구조 필수",
+    "내진 구조 필수 (나라장터 등록 필수)",
+    "본점 소재지가 경기도 화성시인 업체만 참가할 수 있습니다 / 내진 구조 필수",
+    "중소기업 확인서 보유와 내진 구조 필수",
+    "세부품명번호 39112102 직접생산확인증명서 제출과 내진 구조 필수",
+    "최근 3년 이내 LED 조명 납품실적 1억원 이상과 내진 구조 필수",
+    "내진 구조 필수 / 세부품명번호 39112102 직접생산확인증명서 제출 필수",
+  ])(
+    "retains substantive text outside recognized eligibility ranges: %s",
+    (text) => {
+      const { parsed, result } = analyzeParticipation(text);
+      expect(parsed.participationConditions.length).toBeGreaterThan(0);
+      expect(
+        result.participationConditions.every(
+          ({ state }) => state === TenderRequirementState.SATISFIED,
+        ),
+      ).toBe(true);
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "UNSUPPORTED",
+            state: "UNKNOWN",
+            snippet: expect.stringContaining("내진 구조 필수"),
+          }),
+        ]),
+      );
+      expect(result.specificationScore).toBe(100);
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+    },
+  );
+
+  it.each([
+    "나라장터 등록 필수",
+    "나라장터 경쟁입찰참가자격 등록을 하여야 합니다",
+    "업종코드 1234 전기공사업 면허 등록 필수",
+    "업종코드 1234 및 업종코드 5678 등록 필수",
+    "업종코드 1234 또는 업종코드 9999 등록 필수",
+    "본점 소재지가 경기도 화성시 또는 서울특별시인 업체만 참가할 수 있습니다",
+    "중소기업 또는 소상공인 확인서를 보유해야 합니다",
+    "세부품명번호 39112102 직접생산확인증명서 제출 필수",
+    "최근 3년 이내 LED 조명 납품실적 1억원 이상 필수",
+    "나라장터 등록과 업종코드 1234 등록 필수",
+    "나라장터 등록 / 업종코드 1234 등록 필수",
+  ])(
+    "consumes supported eligibility and its obligation grammar only: %s",
+    (text) => {
+      const { parsed, result } = analyzeParticipation(text);
+      expect(parsed.participationConditions.length).toBeGreaterThan(0);
+      expect(
+        parsed.evidence.filter(({ state }) => state === "UNKNOWN"),
+      ).toEqual([]);
+      expect(result.unknownCount).toBe(0);
+      expect(result.suitability).toBe(TenderSuitability.RECOMMENDED);
+    },
+  );
+});
