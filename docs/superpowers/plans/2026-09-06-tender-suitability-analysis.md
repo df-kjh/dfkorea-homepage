@@ -499,45 +499,45 @@ git commit -m "feat: orchestrate tender suitability analysis"
 - Consumes: compact analysis summaries and detailed analysis/profile APIs from Task 7.
 - Produces: reusable badge, summary, requirement-table, price-analysis, and profile-modal components under the existing common/admin component hierarchy.
 
-- [ ] **Step 1: Write failing type/API and badge tests**
+- [x] **Step 1: Write failing type/API and badge tests**
 
 Assert API paths and payloads, Korean labels for all processing/suitability states, and visible text plus icon so color is never the sole signal.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd led-lighting-website && npm test -- src/api/tenders.spec.ts src/components/admin/tenders/TenderSuitabilityBadge.spec.ts`
 
-- [ ] **Step 3: Implement types, API client, and badge**
+- [x] **Step 3: Implement types, API client, and badge**
 
 Use decimal strings for money and explicit unions matching backend enums. Keep `Tender` backward-compatible by making `analysisSummary` nullable, not optional.
 
-- [ ] **Step 4: Write failing detail-layout tests**
+- [x] **Step 4: Write failing detail-layout tests**
 
 Mount the real detail modal. Assert the top summary renders before requirement evidence, `82%` is accompanied by counts, unknown items say `확인 필요`, statistics include period/sample/confidence, and no product name from the hidden matched snapshot appears. Add loading, partial, failed, stale, and no-profile states.
 
-- [ ] **Step 5: Implement the approved 1120px responsive detail layout**
+- [x] **Step 5: Implement the approved 1120px responsive detail layout**
 
 Use existing `BaseModal`, `BaseCard`, and `BaseButton`. Fetch analysis when the modal opens for a new tender; protect against out-of-order responses with a monotonically increasing request generation. Desktop uses summary cards plus left analysis/right price columns; mobile uses one column. `다시 분석`, `공식 원문`, and `검토 완료` remain keyboard accessible.
 
-- [ ] **Step 6: Write failing profile-modal and management tests**
+- [x] **Step 6: Write failing profile-modal and management tests**
 
 Assert repeated qualification rows, expiry validation, duplicate codes, full replacement payload, save failure preservation, stale request isolation, and a toolbar `회사 자격 설정` action. Test that list badges update after reanalysis without reloading the page.
 
-- [ ] **Step 7: Implement profile modal and list integration**
+- [x] **Step 7: Implement profile modal and list integration**
 
 Keep draft state local to the modal and update the parent only after a successful PUT. Display how many current analyses became stale and poll compact status only while recomputation is active. Stop polling on unmount or modal close.
 
-- [ ] **Step 8: Run frontend focused tests and verify GREEN**
+- [x] **Step 8: Run frontend focused tests and verify GREEN**
 
 Run: `cd led-lighting-website && npm test -- src/api/tenders.spec.ts src/components/admin/TenderManagement.spec.ts src/components/admin/tenders/TenderSuitabilityBadge.spec.ts src/components/admin/tenders/TenderAnalysisSummary.spec.ts src/components/admin/tenders/TenderCompanyProfileModal.spec.ts src/components/admin/tenders/TenderList.spec.ts src/components/admin/tenders/TenderDetailModal.spec.ts`
 
-- [ ] **Step 9: Run type-check and lint for changed frontend files**
+- [x] **Step 9: Run type-check and lint for changed frontend files**
 
 Run: `cd led-lighting-website && npm run type-check`
 
 Run: `cd led-lighting-website && npx eslint src/api/tenders.ts src/types/tender.ts src/components/admin/TenderManagement.vue src/components/admin/TenderManagement.spec.ts 'src/components/admin/tenders/Tender*.vue' 'src/components/admin/tenders/Tender*.spec.ts'`
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add led-lighting-website/src/types/tender.ts led-lighting-website/src/api/tenders.ts led-lighting-website/src/api/tenders.spec.ts led-lighting-website/src/components/admin/TenderManagement.vue led-lighting-website/src/components/admin/TenderManagement.spec.ts led-lighting-website/src/components/admin/tenders
