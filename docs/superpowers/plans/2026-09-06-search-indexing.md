@@ -141,13 +141,15 @@ Run: `git commit -m "feat: add certificate pages to sitemap"`
 **Interfaces:**
 - Produces: current SEO behavior, limitations, affected files, and monthly monitoring procedure
 
-- [ ] **Step 1: Update menu documentation**
+- [x] **Step 1: Update menu documentation**
 
 Record canonical URLs, server-rendered metadata, sitemap coverage, crawlable links, noindex exclusions, and the remaining Search Console/Search Advisor submission step.
 
-- [ ] **Step 2: Run final verification**
+- [x] **Step 2: Run final verification**
 
 Run frontend tests, frontend typecheck, Vercel production build, backend tests, backend typecheck, backend build, and `git diff --check`.
+
+The frontend suite (294 tests), typecheck, Vercel build, SEO-focused backend suite, backend typecheck, backend build, and whitespace checks pass. The backend full suite has one pre-existing documentation allow-list failure for `docs/superpowers/plans/2026-09-06-quote-deployment.md` (423 tests pass, 1 fails); this branch does not modify that file or test.
 
 - [ ] **Step 3: Merge and deploy**
 
@@ -157,6 +159,42 @@ Fast-forward the approved commits to `main`, push `origin/main`, deploy the fron
 
 Check `robots.txt`, sitemap status and counts, five static page heads, one product, one post, one certificate category, crawlable detail anchors, and noindex headers for admin and test routes.
 
-- [ ] **Step 5: Commit documentation**
+- [x] **Step 5: Commit documentation**
 
 Run: `git commit -m "docs: record search indexing strategy"`
+
+### Task 5: Keep detail pages live after adding SSR list links
+
+**Files:**
+- Modify: `led-lighting-website/nuxt.config.ts`
+- Modify: `led-lighting-website/src/views/ProductsView.vue`
+- Modify: `led-lighting-website/src/views/BlogView.vue`
+- Modify: `led-lighting-website/scripts/verify-search-indexing.mjs`
+- Test: `led-lighting-website/src/views/ProductsView.ssr.spec.ts`
+- Test: `led-lighting-website/src/views/BlogView.ssr.spec.ts`
+
+**Interfaces:**
+- Consumes: server-rendered first-page seeds created by Task 4
+- Produces: live request-rendered detail routes and a refreshed first page before client pagination continues
+
+- [x] **Step 1: Write failing artifact and seed-refresh tests**
+
+Assert that the Vercel build does not generate static overrides for `/products/:id` or `/blog/:id`, and that a view mounted with seeded data refreshes page 1 before loading page 2 from the refreshed page and total values.
+
+- [x] **Step 2: Run tests and current artifact verification**
+
+Run the focused SSR view specs and `node scripts/verify-search-indexing.mjs` against the current Vercel output.
+Expected: FAIL because the current build contains 20 static product details and 20 static blog details, while seeded views skip their first-page refresh.
+
+- [x] **Step 3: Disable detail crawling and synchronize initial seeds**
+
+Set Nitro prerender link crawling to false while retaining the explicitly listed public static pages. On client mount, refresh the first product or post page and replace the seed before subsequent infinite-scroll requests use the refreshed pagination state.
+
+- [x] **Step 4: Run full frontend verification**
+
+Run: `npm test && npm run type-check && NITRO_PRESET=vercel VITE_API_BASE_URL=https://dfkorea-production.up.railway.app npm run build && git diff --check origin/main...HEAD`
+Expected: all checks pass, generated list HTML keeps nonzero detail anchors, and no dynamic detail route is emitted as a static override.
+
+- [x] **Step 5: Commit**
+
+Run: `git commit -m "fix: keep indexed detail content live"`
