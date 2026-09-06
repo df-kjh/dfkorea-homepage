@@ -2,6 +2,10 @@
 
 ## 구현 완료
 
+- 대표 도메인은 `https://dfkorealed.com`이다. 제품 목록은 `https://dfkorealed.com/products` canonical과 전용 제목·설명·`index, follow`·Open Graph·Twitter 메타데이터를 서버 렌더링 HTML에 제공한다.
+- 제품 상세는 `https://dfkorealed.com/products/:id` canonical과 상세별 메타데이터를 서버 렌더링한다. 백엔드 동적 사이트맵은 제품 목록과 각 공개 제품 상세의 절대 canonical URL을 포함하며, 제품 변경 사항은 다음 사이트맵 응답에 반영된다.
+- 제품 카드는 실제 `href`를 가진 `/products/:id` NuxtLink 앵커를 렌더링한다. 검색로봇과 키보드 사용자는 목록 HTML에서 상세 페이지를 발견할 수 있고, 기존 목록의 클릭 동작도 유지한다.
+
 - 2026-09-06 견적 위젯 후속 개선을 `7a7d7d3`으로 운영 반영했다. Railway SUCCESS·Vercel READY 및 실제 홈페이지의 PC 기본 확대/축소, 모바일 아이콘 전용 런처와 페이지 위로 버튼에 따른 위치를 확인했다.
 
 - 2026-09-06 온라인 견적 관련 변경을 운영 배포하고 실제 도메인에서 확인했다. 홈의 PC·모바일 견적 창과 제품명/소비전력 필터를 검증했다.
@@ -37,6 +41,9 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 배포 후 Google Search Console과 네이버 서치어드바이저에 `https://dfkorealed.com/sitemap.xml`을 제출하고, 제품 목록과 대표 제품 상세의 URL 검사·재수집을 요청해야 한다.
+- 매월 Search Console과 서치어드바이저에서 제품 URL의 색인 제외 사유, 크롤링 오류, 중복 canonical, 구조화 데이터 오류를 확인한다. 사이트맵 제출은 발견과 수집을 돕지만 노출·순위를 보장하지 않으므로 제품 제목, 소개글, 내부 링크 품질을 계속 관리한다.
+
 - 사양 전환 및 추가 로딩 개선은 회귀 테스트·타입 검사와 로컬 PC·모바일 브라우저 검수를 통과했다. 운영 반영 여부는 별도 확인한다. 네트워크 실패 테스트는 모의 응답으로 검증하며 실제 국세청·메일 검증과 구분한다.
 
 - 제품의 전력·색온도·인증 배열은 실제 판매 가능한 모든 조합을 보증하지 않는다. 견적 선택 사양과 필요한 인증의 공급 가능 여부는 담당자 검토 대상이다.
@@ -50,6 +57,14 @@
 ## 관련 파일
 
 - `led-lighting-website/src/views/ProductsView.vue`
+- `led-lighting-website/src/pages/products/index.vue`
+- `led-lighting-website/src/pages/products/[id].vue`
+- `led-lighting-website/src/components/products/ProductCard.vue`
+- `led-lighting-website/src/components/products/ProductCard.spec.ts`
+- `led-lighting-website/nuxt.config.ts`
+- `led-lighting-website/public/robots.txt`
+- `dfkorea-backend/src/seo/seo.controller.ts`
+- `dfkorea-backend/src/seo/seo.module.ts`
 - `led-lighting-website/src/components/products/ProductsHeader.vue`
 - `led-lighting-website/src/components/products/ProductFilterPopover.vue`
 - `led-lighting-website/src/components/products/ProductFilterPopover.spec.ts`
@@ -83,6 +98,9 @@
 - `led-lighting-website/src/components/products/ProductDescription.vue`
 
 ## 갱신 규칙
+
+- 제품 목록·상세의 제목·설명·canonical, 카드 링크 또는 사이트맵 URL 생성 방식이 바뀌면 이 문서와 홈·소식·인증 문서를 함께 검토해 갱신한다.
+- 월간 색인 점검에서 제품 URL의 오류나 제외 사유가 확인되면 조치와 재검증 결과를 기록한다.
 
 - 검색 필터·페이지 처리·견적 담기 진입점 또는 선택 사양이 바뀌면 온라인 견적 문서와 함께 갱신한다.
 

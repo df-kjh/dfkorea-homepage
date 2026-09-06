@@ -5,6 +5,8 @@
 | 홈 | [home.md](home.md) |
 | 회사 소개 | [about.md](about.md) |
 | 제품 | [products.md](products.md) |
+| 소식 | [blog.md](blog.md) |
+| 인증 현황 | [certificates.md](certificates.md) |
 | 입찰 | [tenders.md](tenders.md) |
 | 온라인 견적 | [quote.md](quote.md) |
 

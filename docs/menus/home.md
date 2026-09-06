@@ -2,6 +2,10 @@
 
 ## 구현 완료
 
+- 대표 도메인을 `https://dfkorealed.com`으로 통일했다. 홈의 canonical URL은 `https://dfkorealed.com`이며, 서버 렌더링 HTML에 고유 제목·설명, `index, follow`, Open Graph·Twitter URL과 canonical 링크를 포함한다.
+- 홈 URL은 백엔드 동적 사이트맵의 정적 URL로 제공된다. `robots.txt`는 같은 도메인의 `/sitemap.xml`을 안내하며, Vercel은 이 요청을 백엔드 사이트맵으로 전달한다.
+- 제품·소식 목록 카드에는 검색로봇과 키보드가 따라갈 수 있는 상세 URL 앵커가 제공된다. 관리자 경로(`/admin/**`)와 개발용 `/tailwind-test`는 `noindex, nofollow` 헤더와 robots 규칙으로 수집 대상에서 제외한다.
+
 - 2026-09-06 견적 위젯 후속 개선을 `7a7d7d3`으로 운영 반영했다. Railway SUCCESS·Vercel READY 및 실제 홈페이지의 PC 기본 확대/축소, 모바일 아이콘 전용 런처와 페이지 위로 버튼에 따른 위치를 확인했다.
 
 - 2026-09-06 온라인 견적 관련 변경을 운영 배포하고 실제 도메인에서 확인했다. 홈의 PC·모바일 견적 창과 제품명/소비전력 필터를 검증했다.
@@ -32,6 +36,9 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 사이트맵 제출과 재수집 요청은 코드에 포함되지 않는다. 배포 후 Google Search Console과 네이버 서치어드바이저에 `https://dfkorealed.com/sitemap.xml`을 제출하고, 홈·제품 목록·소식 목록·대표 제품 상세·최신 소식 상세의 URL 검사를 요청해야 한다.
+- 매월 Search Console과 서치어드바이저에서 색인 제외 사유, 크롤링 오류, 중복 canonical, 구조화 데이터 오류를 확인한다. 사이트맵 제출은 발견과 수집을 돕지만 검색 결과 노출이나 순위를 보장하지 않으므로 제목·본문·내부 링크 품질도 함께 관리한다.
+
 - 확대·축소, 사양 입력 전환, 추가 로딩과 런처 위치 개선은 회귀 테스트·타입 검사와 로컬 PC·모바일 브라우저 검수를 통과했다. 운영 반영 여부는 별도 확인한다. 메모리 내 작성 상태만 유지하며 새로고침 후 개인정보를 복원하지 않는다.
 
 - 견적 UI와 실제 API 연결 코드는 구현했지만 국세청 운영 상호 검증, NAVER WORKS 실제 수신, 사진 임시 보관·운영 보유기간 확인 전에는 외부 운영 연동 완료로 표시하지 않는다. 연결 불가 시 재시도와 기존 전화·이메일 문의를 안내한다.
@@ -44,6 +51,12 @@
 ## 관련 파일
 
 - `led-lighting-website/src/app.vue`
+- `led-lighting-website/src/pages/index.vue`
+- `led-lighting-website/nuxt.config.ts`
+- `led-lighting-website/vercel.json`
+- `led-lighting-website/public/robots.txt`
+- `dfkorea-backend/src/seo/seo.controller.ts`
+- `dfkorea-backend/src/seo/seo.module.ts`
 - `led-lighting-website/src/components/home/CtaSection.vue`
 - `led-lighting-website/src/components/quote/QuoteLauncher.vue`
 - `led-lighting-website/src/components/quote/QuotePanel.vue`
@@ -63,6 +76,9 @@
 - `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.spec.ts`
 
 ## 갱신 규칙
+
+- 대표 도메인, 홈의 제목·설명·canonical, robots 정책, 사이트맵 또는 공개 목록 상세 링크가 바뀌면 영향을 받는 제품·소식·인증 메뉴 문서와 함께 갱신한다.
+- 월간 색인 점검에서 오류나 제외 사유가 확인되면 원인, 조치, 재검증 결과를 이 문서와 관련 메뉴 문서에 기록한다.
 
 - 홈 상담 문의 진입점과 공개 전역 견적 창의 동작·반응형·접수 상태가 바뀌면 온라인 견적 문서와 함께 갱신한다.
 
