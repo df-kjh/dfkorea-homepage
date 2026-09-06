@@ -43,44 +43,46 @@ const getCertificationIcons = (product: Product): string[] => {
 </script>
 
 <template>
-  <BaseCard :clickable="true" :hoverable="true" :body-style="{ padding: '0' }" @click="handleClick">
-    <!-- Product Image -->
-    <div
-      class="aspect-[4/3] rounded-t-3xl overflow-hidden bg-white border-b border-divider relative"
-    >
-      <img
-        :src="getFirstImageUrl(product.images)"
-        :alt="product.name"
-        class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-        loading="lazy"
-      />
-      <!-- Badges -->
-      <div class="absolute top-3 right-3 flex gap-2">
-        <ProductBadge v-if="product.isNew" type="new" />
-        <ProductBadge v-if="product.isFeatured" type="main" />
+  <NuxtLink :to="`/products/${product.id}`" class="block" @click.prevent="handleClick">
+    <BaseCard :clickable="true" :hoverable="true" :body-style="{ padding: '0' }">
+      <!-- Product Image -->
+      <div
+        class="aspect-[4/3] rounded-t-3xl overflow-hidden bg-white border-b border-divider relative"
+      >
+        <img
+          :src="getFirstImageUrl(product.images)"
+          :alt="product.name"
+          class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+          loading="lazy"
+        />
+        <!-- Badges -->
+        <div class="absolute top-3 right-3 flex gap-2">
+          <ProductBadge v-if="product.isNew" type="new" />
+          <ProductBadge v-if="product.isFeatured" type="main" />
+        </div>
       </div>
-    </div>
 
-    <!-- Product Info -->
-    <div class="flex flex-col gap-1 p-4">
-      <h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">{{ product.name }}</h3>
-      <p class="text-sm text-text-desc font-medium overflow-hidden whitespace-nowrap text-ellipsis">
-        {{ formatWithUnit(product.power, 'power') }} /
-        {{ formatWithUnit(product.colorTemp, 'colorTemp') }} /
-        {{ formatWithUnit(product.lifespan, 'lifespan') }}
-      </p>
+      <!-- Product Info -->
+      <div class="flex flex-col gap-1 p-4">
+        <h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">{{ product.name }}</h3>
+        <p class="text-sm text-text-desc font-medium overflow-hidden whitespace-nowrap text-ellipsis">
+          {{ formatWithUnit(product.power, 'power') }} /
+          {{ formatWithUnit(product.colorTemp, 'colorTemp') }} /
+          {{ formatWithUnit(product.lifespan, 'lifespan') }}
+        </p>
 
-      <!-- Certification Icons -->
-      <div class="flex gap-1 mt-2">
-        <span v-for="icon in getCertificationIcons(product)" :key="icon" class="w-6 h-6">
-          <img
-            :src="icon"
-            :alt="product.name + ' certification icon'"
-            class="w-full h-full object-contain"
-            loading="lazy"
-          />
-        </span>
+        <!-- Certification Icons -->
+        <div class="flex gap-1 mt-2">
+          <span v-for="icon in getCertificationIcons(product)" :key="icon" class="w-6 h-6">
+            <img
+              :src="icon"
+              :alt="product.name + ' certification icon'"
+              class="w-full h-full object-contain"
+              loading="lazy"
+            />
+          </span>
+        </div>
       </div>
-    </div>
-  </BaseCard>
+    </BaseCard>
+  </NuxtLink>
 </template>

@@ -36,55 +36,60 @@ const formatDate = (dateString: string) => {
 
 <template>
   <div class="px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-16">
-    <BaseCard
+    <NuxtLink
       v-for="post in posts"
       :key="post.id"
-      :clickable="true"
-      :hoverable="true"
-      :body-style="{ padding: '0' }"
-      class="group"
-      @click="handlePostClick(post)"
+      :to="`/blog/${post.id}`"
+      class="block"
+      @click.prevent="handlePostClick(post)"
     >
-      <!-- Post Image -->
-      <div class="aspect-[16/10] rounded-t-3xl overflow-hidden bg-surface">
-        <img
-          :src="getImageUrl(post.image)"
-          :alt="post.title"
-          class="w-full h-full object-cover transition-transform duration-500"
-        />
-      </div>
-
-      <!-- Post Meta & Content -->
-      <div class="flex flex-col gap-3 p-6">
-        <!-- Category & Date -->
-        <div class="flex items-center gap-3">
-          <span
-            :class="[
-              'px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider',
-              getCategoryStyle(post.category).bg,
-              getCategoryStyle(post.category).text,
-            ]"
-          >
-            {{ post.category }}
-          </span>
-          <time class="text-xs text-text-desc font-medium">
-            {{ formatDate(post.createdAt) }}
-          </time>
+      <BaseCard
+        :clickable="true"
+        :hoverable="true"
+        :body-style="{ padding: '0' }"
+        class="group"
+      >
+        <!-- Post Image -->
+        <div class="aspect-[16/10] rounded-t-3xl overflow-hidden bg-surface">
+          <img
+            :src="getImageUrl(post.image)"
+            :alt="post.title"
+            class="w-full h-full object-cover transition-transform duration-500"
+          />
         </div>
 
-        <!-- Title -->
-        <h3
-          class="text-2xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors"
-        >
-          {{ post.title }}
-        </h3>
+        <!-- Post Meta & Content -->
+        <div class="flex flex-col gap-3 p-6">
+          <!-- Category & Date -->
+          <div class="flex items-center gap-3">
+            <span
+              :class="[
+                'px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider',
+                getCategoryStyle(post.category).bg,
+                getCategoryStyle(post.category).text,
+              ]"
+            >
+              {{ post.category }}
+            </span>
+            <time class="text-xs text-text-desc font-medium">
+              {{ formatDate(post.createdAt) }}
+            </time>
+          </div>
 
-        <!-- Excerpt -->
-        <p class="text-[16px] text-text-sub leading-relaxed line-clamp-2">
-          {{ post.excerpt }}
-        </p>
-      </div>
-    </BaseCard>
+          <!-- Title -->
+          <h3
+            class="text-2xl font-bold text-text-main leading-tight group-hover:text-primary transition-colors"
+          >
+            {{ post.title }}
+          </h3>
+
+          <!-- Excerpt -->
+          <p class="text-[16px] text-text-sub leading-relaxed line-clamp-2">
+            {{ post.excerpt }}
+          </p>
+        </div>
+      </BaseCard>
+    </NuxtLink>
   </div>
 </template>
 
