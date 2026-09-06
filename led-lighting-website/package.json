@@ -10,7 +10,7 @@
   "scripts": {
     "postinstall": "nuxt prepare",
     "dev": "nuxt dev --port 5173",
-    "build": "nuxt build && node scripts/verify-g2b-relay-artifact.mjs",
+    "build": "nuxt build && node scripts/verify-g2b-relay-artifact.mjs && node scripts/verify-about-prerender-meta.mjs",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "build-only": "nuxt build",
