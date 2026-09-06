@@ -119,7 +119,7 @@ git commit -m "feat: add tender analysis data model"
 - Produces: `GET /tenders/company-profile` and `PUT /tenders/company-profile` under existing `JwtAuthGuard`.
 - Profile collections use `{ code: string; name: string; expiresAt: string | null }`; performance records use `{ itemName: string; from: string; to: string; amount: string }`.
 
-- [ ] **Step 1: Write failing DTO and service tests**
+- [x] **Step 1: Write failing DTO and service tests**
 
 Name the breaks: expired documents counted as valid, duplicate codes accepted, malformed business numbers accepted, and profile versions not incremented.
 
@@ -137,25 +137,25 @@ it('normalizes codes and increments the singleton profile version', async () => 
 })
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/dto/tender-company-profile.dto.spec.ts tenders/services/tender-company-profile.service.spec.ts tenders/tenders.controller.spec.ts`
 
 Expected: FAIL because profile DTO/service/routes are missing.
 
-- [ ] **Step 3: Implement validation and atomic singleton replacement**
+- [x] **Step 3: Implement validation and atomic singleton replacement**
 
 Use `@ValidateNested`, `@IsArray`, `@ArrayMaxSize(100)`, ISO date validation, decimal-string validation, trimmed nonempty names, normalized digits-only business number, and duplicate code/name rejection within each collection. Run replace in one transaction with row lock; version is previous+1. Preserve no historical profile payload beyond the current row.
 
-- [ ] **Step 4: Implement static routes before `GET :id`**
+- [x] **Step 4: Implement static routes before `GET :id`**
 
 Controller methods call only the service. Verify unauthenticated access remains rejected through the existing controller integration contract.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/dto/tender-company-profile.dto.spec.ts tenders/services/tender-company-profile.service.spec.ts tenders/tenders.controller.spec.ts`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add dfkorea-backend/src/tenders/dto/tender-company-profile.dto.ts dfkorea-backend/src/tenders/dto/tender-company-profile.dto.spec.ts dfkorea-backend/src/tenders/services/tender-company-profile.service.ts dfkorea-backend/src/tenders/services/tender-company-profile.service.spec.ts dfkorea-backend/src/tenders/tenders.controller.ts dfkorea-backend/src/tenders/tenders.controller.spec.ts dfkorea-backend/src/tenders/tenders.module.ts
