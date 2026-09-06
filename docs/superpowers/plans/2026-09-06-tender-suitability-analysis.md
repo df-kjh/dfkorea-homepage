@@ -437,35 +437,35 @@ git commit -m "feat: analyze historical tender bid prices"
 - Produces: `TenderAnalysisService.processDue(now, limit)`, `reanalyze(tenderId, now)`, `getAnalysis(tenderId)`, and `saveReview(tenderId, dto, adminId)`.
 - Produces: analysis/review/backfill routes from the design and compact list summary `{ status, suitability, specificationScore, unknownCount, analyzedAt }`.
 
-- [ ] **Step 1: Write failing orchestration tests**
+- [x] **Step 1: Write failing orchestration tests**
 
 Name the breaks: collection does not enqueue a changed fingerprint, stale worker overwrites a newer result, one broken document fails the whole analysis, profile/product updates are not detected, review remains current after fingerprint changes, and compact API accidentally exposes full extracted text. Add an authenticated application contract covering profile PUT → analysis queue → analysis GET → review POST, with complete repository/provider fixtures.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/services/tender-analysis.service.spec.ts tenders/services/tender-ingestion.service.spec.ts tenders/services/tender-query.service.spec.ts tenders/tenders.controller.spec.ts && npm run test:tender:contract`
 
-- [ ] **Step 3: Implement lease-based orchestration**
+- [x] **Step 3: Implement lease-based orchestration**
 
 Claim due analysis rows with `FOR UPDATE SKIP LOCKED`, a random claim token, and a five-minute lease. Fetch/extract each document independently, persist normalized blocks, parse requirements, load profile/products, compute fingerprints, suitability, and price, then update only when claim token and input fingerprint still match. Persist `PARTIAL` when at least one useful fact exists and any source failed.
 
-- [ ] **Step 4: Connect collection and scheduling**
+- [x] **Step 4: Connect collection and scheduling**
 
 After a relevant tender upsert, compare the content fingerprint and mark analysis pending only when changed. `refreshStaleAnalyses()` computes one deterministic fingerprint from sorted product IDs and `updatedAt` values, then marks analyses whose product fingerprint differs as pending; the scheduler runs this check before each hourly analysis sweep. Profile replacement marks current analyses pending in the same transaction. Add a minute task for small analysis batches, a nightly incremental award task, and a small backfill-resume task. Preserve existing collection/mail tasks and destroy every new cron task in `onModuleDestroy`.
 
-- [ ] **Step 5: Implement API DTOs and review semantics**
+- [x] **Step 5: Implement API DTOs and review semantics**
 
 `POST /tenders/:id/analysis` returns `202`-style current job state without waiting on document parsing. Review notes are 0..2000 trimmed characters. The authenticated admin identity and current analysis fingerprint are recorded. A fingerprint mismatch returns current data as `reviewed: false` while retaining the old review row.
 
-- [ ] **Step 6: Run focused tests and verify GREEN**
+- [x] **Step 6: Run focused tests and verify GREEN**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/services/tender-analysis.service.spec.ts tenders/services/tender-ingestion.service.spec.ts tenders/services/tender-scheduler.service.spec.ts tenders/services/tender-query.service.spec.ts tenders/tenders.controller.spec.ts`
 
-- [ ] **Step 7: Run tender contract tests**
+- [x] **Step 7: Run tender contract tests**
 
 Run: `cd dfkorea-backend && npm run test:tender:contract`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add dfkorea-backend/src/tenders/dto dfkorea-backend/src/tenders/services dfkorea-backend/src/tenders/tenders.controller.ts dfkorea-backend/src/tenders/tenders.controller.spec.ts dfkorea-backend/src/tenders/tenders.module.ts dfkorea-backend/test/tenders.contract-spec.ts dfkorea-backend/test/tender-app-integration.spec.ts
