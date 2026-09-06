@@ -9,6 +9,7 @@ export const TENDER_INTEGRATION_TABLES = [
   '"tender_mail_deliveries"',
   '"tender_recipients"',
   '"tender_subscriptions"',
+  '"tender_company_profiles"',
   '"tender_sync_runs"',
   '"tenders"',
 ] as const;

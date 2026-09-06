@@ -50,6 +50,42 @@ describe("ReplaceTenderCompanyProfileDto", () => {
     );
   });
 
+  it("rejects duplicate qualification names after normalization", async () => {
+    const dto = plainToInstance(
+      ReplaceTenderCompanyProfileDto,
+      profile({
+        licenses: [
+          { code: "0036", name: " 전기공사업 ", expiresAt: "2099-12-31" },
+          { code: "0037", name: "전기공사업", expiresAt: "2099-12-31" },
+        ],
+      }),
+    );
+
+    await expect(validate(dto)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: "licenses" }),
+      ]),
+    );
+  });
+
+  it.each([
+    {},
+    "qualification",
+    { code: null, name: "KS 인증", expiresAt: null },
+    { code: "KS", name: null, expiresAt: null },
+  ])("reports malformed nested qualifications without throwing: %p", async (entry) => {
+    const dto = plainToInstance(
+      ReplaceTenderCompanyProfileDto,
+      profile({ certifications: [entry] }),
+    );
+
+    await expect(validate(dto)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: "certifications" }),
+      ]),
+    );
+  });
+
   it("requires every qualification to explicitly declare its expiry state", async () => {
     const dto = plainToInstance(
       ReplaceTenderCompanyProfileDto,

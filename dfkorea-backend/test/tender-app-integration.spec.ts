@@ -224,7 +224,7 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .expect(400);
   });
 
-  it("persists only the latest authenticated company qualification profile", async () => {
+  it("serializes concurrent initial company qualification profile replacements", async () => {
     const profile = {
       companyName: "디에프코리아",
       businessNumber: "123-45-67890",
@@ -234,22 +234,26 @@ describe("Tender AppModule PostgreSQL integration", () => {
       certifications: [], performanceRecords: [],
     };
 
-    await request(app.getHttpServer())
-      .put("/tenders/company-profile")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send(profile)
-      .expect(200)
-      .expect(({ body }) => expect(body).toEqual(expect.objectContaining({
-        businessNumber: "1234567890", version: 1,
-      })));
-    await request(app.getHttpServer())
-      .put("/tenders/company-profile")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ ...profile, companyName: "디에프코리아 주식회사" })
-      .expect(200)
-      .expect(({ body }) => expect(body.version).toBe(2));
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .put("/tenders/company-profile")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send(profile)
+        .expect(200),
+      request(app.getHttpServer())
+        .put("/tenders/company-profile")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ ...profile, companyName: "디에프코리아 주식회사" })
+        .expect(200),
+    ]);
 
-    await expect(dataSource.getRepository(TenderCompanyProfile).count()).resolves.toBe(1);
+    expect([first.body.version, second.body.version].sort()).toEqual([1, 2]);
+    expect(first.body.businessNumber).toBe("1234567890");
+    expect(second.body.businessNumber).toBe("1234567890");
+
+    await expect(dataSource.getRepository(TenderCompanyProfile).find()).resolves.toEqual([
+      expect.objectContaining({ singletonKey: "company", version: 2 }),
+    ]);
   });
 
   it("keeps recipients isolated and makes exactly one due provider retry", async () => {

@@ -26,6 +26,23 @@ const trimText = ({ value }: { value: unknown }) =>
 const normalizeCode = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim().toUpperCase() : value;
 
+// ArrayUnique runs before nested constraints finish. Malformed collection
+// entries must therefore receive a unique inert identifier here, allowing
+// ValidateNested to return a normal 400 validation error instead of throwing.
+const qualificationIdentifier = (field: "code" | "name") =>
+  (qualification: unknown): string | Record<never, never> => {
+    if (typeof qualification !== "object" || qualification === null) {
+      return {};
+    }
+    const value = (qualification as Record<string, unknown>)[field];
+    if (typeof value !== "string") return {};
+    const normalized = value.trim();
+    return field === "code" ? normalized.toUpperCase() : normalized;
+  };
+
+const qualificationCodeIdentifier = qualificationIdentifier("code");
+const qualificationNameIdentifier = qualificationIdentifier("name");
+
 @ValidatorConstraint({ name: "notExpiredTenderQualification", async: false })
 class NotExpiredTenderQualificationConstraint
   implements ValidatorConstraintInterface
@@ -134,60 +151,40 @@ export class ReplaceTenderCompanyProfileDto {
 
   @IsArray()
   @ArrayMaxSize(100)
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.code.trim(),
-  )
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.name.trim(),
-  )
+  @ArrayUnique(qualificationCodeIdentifier)
+  @ArrayUnique(qualificationNameIdentifier)
   @ValidateNested({ each: true })
   @Type(() => TenderCompanyQualificationDto)
   supplyProducts: TenderCompanyQualificationDto[];
 
   @IsArray()
   @ArrayMaxSize(100)
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.code.trim(),
-  )
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.name.trim(),
-  )
+  @ArrayUnique(qualificationCodeIdentifier)
+  @ArrayUnique(qualificationNameIdentifier)
   @ValidateNested({ each: true })
   @Type(() => TenderCompanyQualificationDto)
   licenses: TenderCompanyQualificationDto[];
 
   @IsArray()
   @ArrayMaxSize(100)
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.code.trim(),
-  )
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.name.trim(),
-  )
+  @ArrayUnique(qualificationCodeIdentifier)
+  @ArrayUnique(qualificationNameIdentifier)
   @ValidateNested({ each: true })
   @Type(() => TenderCompanyQualificationDto)
   companyTypes: TenderCompanyQualificationDto[];
 
   @IsArray()
   @ArrayMaxSize(100)
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.code.trim(),
-  )
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.name.trim(),
-  )
+  @ArrayUnique(qualificationCodeIdentifier)
+  @ArrayUnique(qualificationNameIdentifier)
   @ValidateNested({ each: true })
   @Type(() => TenderCompanyQualificationDto)
   directProduction: TenderCompanyQualificationDto[];
 
   @IsArray()
   @ArrayMaxSize(100)
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.code.trim(),
-  )
-  @ArrayUnique((qualification: TenderCompanyQualificationDto) =>
-    qualification.name.trim(),
-  )
+  @ArrayUnique(qualificationCodeIdentifier)
+  @ArrayUnique(qualificationNameIdentifier)
   @ValidateNested({ each: true })
   @Type(() => TenderCompanyQualificationDto)
   certifications: TenderCompanyQualificationDto[];
