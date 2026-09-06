@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "desktop": {
+    "viewport": 1280,
+    "pageWidth": 1270,
+    "tableWidth": 814,
+    "wrapperWidth": 816,
+    "description": "new heading, introduction and table visually verified"
+  },
+  "mobile": {
+    "viewport": 390,
+    "pageWidth": 380,
+    "tableWidth": 298,
+    "wrapperWidth": 300,
+    "rows": 8,
+    "longModelNameTable": "PASS"
+  },
+  "cobTechnicalImages": {
+    "count": 5,
+    "allLoaded": true,
+    "pageOverflow": false
+  },
+  "viewportReset": true
+}
