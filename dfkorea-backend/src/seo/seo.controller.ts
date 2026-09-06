@@ -2,6 +2,7 @@ import { Controller, Get, Header } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PostsService } from "../posts/posts.service";
 import { ProductsService } from "../products/products.service";
+import { CertificatesService } from "../certificates/certificates.service";
 import { Post } from "../entities/post.entity";
 import { Product } from "../entities/product.entity";
 
@@ -14,10 +15,11 @@ export class SeoController {
     private readonly postsService: PostsService,
     private readonly productsService: ProductsService,
     private readonly configService: ConfigService,
+    private readonly certificatesService: CertificatesService,
   ) {
     this.siteUrl = (
       this.configService.get<string>("PUBLIC_SITE_URL") ||
-      "https://www.dfkorealed.com"
+      "https://dfkorealed.com"
     ).replace(/\/$/, "");
     this.assetBaseUrl = (
       this.configService.get<string>("PUBLIC_API_URL") ||
@@ -29,9 +31,10 @@ export class SeoController {
   @Get(["sitemap.xml", "seo/sitemap.xml"])
   @Header("Content-Type", "application/xml; charset=utf-8")
   async getSitemap(): Promise<string> {
-    const [posts, products] = await Promise.all([
+    const [posts, products, certificates] = await Promise.all([
       this.postsService.findAll(),
       this.productsService.findAll(),
+      this.certificatesService.findAll(),
     ]);
 
     const staticUrls = [
@@ -64,10 +67,35 @@ export class SeoController {
       ),
     );
 
+    const certificateLastModified = new Map<string, Date>();
+    certificates.forEach((certificate) => {
+      const category = certificate.category?.trim() || "기타";
+      const lastModified = certificate.updatedAt || certificate.createdAt;
+      const existingLastModified = certificateLastModified.get(category);
+
+      if (
+        !existingLastModified ||
+        new Date(lastModified).getTime() >
+          new Date(existingLastModified).getTime()
+      ) {
+        certificateLastModified.set(category, lastModified);
+      }
+    });
+
+    const certificateUrls = Array.from(certificateLastModified.entries()).map(
+      ([category, lastModified]) =>
+        this.urlEntry(
+          `/certificates/${encodeURIComponent(category)}`,
+          "monthly",
+          "0.7",
+          lastModified,
+        ),
+    );
+
     return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-${[...staticUrls, ...productUrls, ...postUrls].join("\n")}
+${[...staticUrls, ...productUrls, ...postUrls, ...certificateUrls].join("\n")}
 </urlset>`;
   }
 
