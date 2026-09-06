@@ -8,6 +8,8 @@ const props = defineProps<{
   evaluations?: TenderEvaluation[]
   specifications?: boolean
 }>()
+const requiredLabel = (required?: boolean | null) =>
+  required === true ? '필수' : required === false ? '참고' : '필수 여부 확인 필요'
 const states = { SATISFIED: '✓ 충족', UNSATISFIED: '× 미충족', UNKNOWN: '? 확인 필요' }
 const state = (id?: string | null) =>
   states[props.evaluations?.find((e) => id && e.requirementId === id)?.state ?? 'UNKNOWN']
@@ -40,10 +42,10 @@ const state = (id?: string | null) =>
             <tr v-for="(r, index) in requirements.slice(0, 80)" :key="r.id ?? index">
               <th scope="row">
                 {{ requirementLabel(r)
-                }}<small v-if="!specifications">{{ r.required ? '필수' : '참고' }}</small>
+                }}<small v-if="!specifications">{{ requiredLabel(r.required) }}</small>
               </th>
               <td>{{ requirementValue(r) }}</td>
-              <td>{{ specifications ? (r.required ? '필수' : '참고') : state(r.id) }}</td>
+              <td>{{ specifications ? requiredLabel(r.required) : state(r.id) }}</td>
             </tr>
           </tbody>
         </table>

@@ -26,6 +26,78 @@ describe('TenderAnalysisSummary', () => {
     })
     expect(wrapper.text()).toContain('0개 미충족 · 1개 확인 필요')
   })
+  it('labels evaluations whose requirement array was omitted as partial instead of reporting zero totals', () => {
+    const wrapper = mount(Summary, {
+      props: {
+        analysis: {
+          ...analysis,
+          certificationAnalysis: {
+            evaluations: [{ requirementId: 'kc', state: 'SATISFIED' }],
+          },
+        },
+      },
+    })
+    expect(wrapper.text()).toContain('전체 인증 수 확인 필요')
+    expect(wrapper.text()).toContain('표시된 일부 결과')
+    expect(wrapper.text()).toContain('1개 충족')
+    expect(wrapper.text()).not.toContain('0개 충족')
+  })
+  it('marks mixed requirement/evaluation ID mismatches as incomplete and preserves visible results', () => {
+    const wrapper = mount(Summary, {
+      props: {
+        analysis: {
+          ...analysis,
+          certificationAnalysis: {
+            requirements: [
+              { id: 'kc', name: 'KC' },
+              { id: 'missing', name: '고효율' },
+            ],
+            evaluations: [
+              { requirementId: 'kc', state: 'SATISFIED' },
+              { requirementId: 'orphan', state: 'UNSATISFIED' },
+            ],
+          },
+        },
+      },
+    })
+    expect(wrapper.text()).toContain('전체 인증 수 확인 필요')
+    expect(wrapper.text()).toContain('표시된 일부 결과')
+    expect(wrapper.text()).toContain('1개 충족')
+    expect(wrapper.text()).toContain('1개 미충족 · 1개 확인 필요')
+  })
+  it.each([
+    { certificationAnalysis: null },
+    { certificationAnalysis: { requirements: [], evaluations: null } },
+    {
+      certificationAnalysis: {
+        requirements: [{ id: 'kc' }],
+        evaluations: [{ requirementId: 'kc' }],
+      },
+    },
+    {
+      certificationAnalysis: {
+        requirements: [{ id: 'kc' }, { id: 'kc' }],
+        evaluations: [{ requirementId: 'kc', state: 'SATISFIED' as const }],
+      },
+    },
+    { evidence: [{ diagnosticCategory: 'TRUNCATION', field: 'normalizedDetail' }] },
+  ])('does not present omitted or truncated certification totals as complete: %j', (change) => {
+    const wrapper = mount(Summary, { props: { analysis: { ...analysis, ...change } } })
+    expect(wrapper.text()).toContain('전체 인증 수 확인 필요')
+    expect(wrapper.text()).toContain('표시된 일부 결과')
+  })
+  it('keeps a complete, matched certification set and an explicit empty set definitive', () => {
+    for (const certificationAnalysis of [
+      analysis.certificationAnalysis,
+      { requirements: [], evaluations: [] },
+    ]) {
+      const wrapper = mount(Summary, {
+        props: { analysis: { ...analysis, certificationAnalysis } },
+      })
+      expect(wrapper.text()).not.toContain('전체 인증 수 확인 필요')
+      expect(wrapper.text()).not.toContain('표시된 일부 결과')
+    }
+  })
   it('does not invent a percentage without comparable specifications', () => {
     const wrapper = mount(Summary, {
       props: { analysis: { ...analysis, specificationScore: null, comparableCount: 0 } },

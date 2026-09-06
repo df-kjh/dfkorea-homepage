@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import BaseCard from '@/components/common/BaseCard.vue'
 import TenderSuitabilityBadge from './TenderSuitabilityBadge.vue'
 import { analysisAmount } from '@/utils/tender-analysis-display'
-import type { TenderAnalysis } from '@/types'
+import type { TenderAnalysis, TenderRequirementState } from '@/types'
 const props = defineProps<{ analysis: TenderAnalysis }>()
 const count = computed(
   () =>
@@ -20,14 +20,40 @@ const coverageComplete = computed(
       (e) => e.diagnosticCategory === 'TRUNCATION' && e.field === 'normalizedDetail',
     ),
 )
-const certificates = computed(() =>
-  (props.analysis.certificationAnalysis?.requirements ?? []).map(
-    (requirement) =>
-      props.analysis.certificationAnalysis?.evaluations?.find(
-        (e) => requirement.id && e.requirementId === requirement.id,
-      ) ?? { state: 'UNKNOWN' },
-  ),
-)
+const certificateSummary = computed(() => {
+  const section = props.analysis.certificationAnalysis
+  const requirements = section?.requirements ?? []
+  const evaluations = section?.evaluations ?? []
+  const requirementIds = requirements.map((r) => r.id).filter((id): id is string => Boolean(id))
+  const evaluationIds = evaluations
+    .map((e) => e.requirementId)
+    .filter((id): id is string => Boolean(id))
+  const ids = new Set([...requirementIds, ...evaluationIds])
+  // The server budgets requirements and evaluations independently. Count the
+  // visible union as partial when either side lost identities, rows or states;
+  // an orphan evaluation must not disappear into a definitive zero total.
+  const results: TenderRequirementState[] = [...ids].map((id) => {
+    const matches = evaluations.filter((e) => e.requirementId === id)
+    return matches.length === 1 ? (matches[0]?.state ?? 'UNKNOWN') : 'UNKNOWN'
+  })
+  const unidentified =
+    requirements.length - requirementIds.length + evaluations.length - evaluationIds.length
+  for (let index = 0; index < unidentified; index++) results.push('UNKNOWN')
+  const complete =
+    Array.isArray(section?.requirements) &&
+    Array.isArray(section?.evaluations) &&
+    requirementIds.length === requirements.length &&
+    evaluationIds.length === evaluations.length &&
+    new Set(requirementIds).size === requirements.length &&
+    new Set(evaluationIds).size === evaluations.length &&
+    requirements.length === evaluations.length &&
+    requirementIds.every((id) => evaluationIds.includes(id)) &&
+    evaluations.every((e) => e.state != null) &&
+    !(props.analysis.evidence ?? []).some(
+      (e) => e.diagnosticCategory === 'TRUNCATION' && e.field === 'normalizedDetail',
+    )
+  return { complete, results }
+})
 </script>
 <template>
   <section class="analysis-summary" aria-label="적합성 분석 요약">
@@ -56,12 +82,15 @@ const certificates = computed(() =>
     >
     <BaseCard :hoverable="false"
       ><h5>요구 인증</h5>
-      <strong>{{ certificates.filter((c) => c.state === 'SATISFIED').length }}개 충족</strong>
+      <strong v-if="!certificateSummary.complete">전체 인증 수 확인 필요</strong>
+      <p v-if="!certificateSummary.complete">표시된 일부 결과 · 전체 조건은 원문 확인 필요</p>
+      <strong
+        >{{ certificateSummary.results.filter((state) => state === 'SATISFIED').length }}개
+        충족</strong
+      >
       <p>
-        {{ certificates.filter((c) => c.state === 'UNSATISFIED').length }}개 미충족 ·
-        {{
-          certificates.filter((c) => c.state !== 'SATISFIED' && c.state !== 'UNSATISFIED').length
-        }}개 확인 필요
+        {{ certificateSummary.results.filter((state) => state === 'UNSATISFIED').length }}개 미충족
+        · {{ certificateSummary.results.filter((state) => state === 'UNKNOWN').length }}개 확인 필요
       </p></BaseCard
     >
     <BaseCard :hoverable="false"
