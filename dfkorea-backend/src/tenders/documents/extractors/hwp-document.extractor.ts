@@ -1,3 +1,4 @@
+import { readBoundedCfb } from "./cfb-guard";
 import * as CFB from "cfb";
 import { XMLParser } from "fast-xml-parser";
 import {
@@ -6,7 +7,6 @@ import {
 } from "../tender-document-extraction.types";
 import {
   boundedInflate,
-  MAX_ENTRIES,
   MAX_EXPANDED_BYTES,
   validateXml,
 } from "./archive-guard";
@@ -173,13 +173,10 @@ export class HwpDocumentExtractor {
       bytes.subarray(0, 8).toString("hex") !== "d0cf11e0a1b11ae1"
     )
       throw corrupt();
-    const cfb = CFB.read(bytes, { type: "buffer" });
-    if (cfb.FileIndex.length > MAX_ENTRIES)
-      throw new TenderDocumentExtractionError("DOCUMENT_ARCHIVE_LIMIT");
-    const headerEntry = CFB.find(cfb, "/FileHeader");
-    if (!headerEntry?.content || headerEntry.content.length !== 256)
-      throw corrupt();
-    const header = Buffer.from(headerEntry.content),
+    const streams = readBoundedCfb(bytes);
+    const headerBytes = streams.get("FileHeader");
+    if (headerBytes?.length !== 256) throw corrupt();
+    const header = Buffer.from(headerBytes),
       info = hwp.parseFileHeader(header);
     if (info.flags.encrypted || info.flags.publicKeyEncrypted || info.flags.drm)
       throw new TenderDocumentExtractionError("DOCUMENT_ENCRYPTED");
@@ -194,17 +191,9 @@ export class HwpDocumentExtractor {
       textBytes = 0;
     const sectionNames: string[] = [];
     const sectionOffsets = new Map<string, number[][]>();
-    for (let index = 0; index < cfb.FileIndex.length; index++) {
-      const entry = cfb.FileIndex[index],
-        path = cfb.FullPaths[index].replace(/^[^/]+\//, "");
-      if (entry.type !== 2) continue;
-      if (
-        entry.size !== entry.content?.length ||
-        entry.size > MAX_EXPANDED_BYTES
-      )
-        throw corrupt();
+    for (const [path, content] of streams) {
       if (path !== "DocInfo" && !/^BodyText\/Section\d+$/.test(path)) continue;
-      const raw = Buffer.from(entry.content),
+      const raw = content,
         data = info.flags.compressed
           ? boundedInflate(raw, MAX_EXPANDED_BYTES - expanded)
           : raw;

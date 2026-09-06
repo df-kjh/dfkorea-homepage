@@ -52,4 +52,35 @@ describe("PDF compressed-stream preflight", () => {
       expect.objectContaining({ code: "DOCUMENT_UNSUPPORTED" }),
     );
   });
+  it.each(["/F /Fl", "/F [/FlateDecode]", "/#46 /FlateDecode"])(
+    "checks bounded alias %s before inflation",
+    (filter) => {
+      const original = readFileSync(
+        join(__dirname, "../fixtures/ratio-limit.pdf"),
+      );
+      const bytes = Buffer.from(
+        original.toString("latin1").replace("/Filter /FlateDecode", filter),
+        "latin1",
+      );
+      expect(() => guardPdfStreams(bytes)).toThrow(
+        expect.objectContaining({ code: "DOCUMENT_ARCHIVE_LIMIT" }),
+      );
+    },
+  );
+  it.each([
+    "/F [] /Filter /FlateDecode",
+    "/Filter [] /F /FlateDecode",
+    "/F [] /F [/Fl]",
+  ])("rejects conflicting filter declarations %s", (filter) => {
+    const original = readFileSync(
+      join(__dirname, "../fixtures/ratio-limit.pdf"),
+    );
+    const bytes = Buffer.from(
+      original.toString("latin1").replace("/Filter /FlateDecode", filter),
+      "latin1",
+    );
+    expect(() => guardPdfStreams(bytes)).toThrow(
+      expect.objectContaining({ code: "DOCUMENT_UNSUPPORTED" }),
+    );
+  });
 });

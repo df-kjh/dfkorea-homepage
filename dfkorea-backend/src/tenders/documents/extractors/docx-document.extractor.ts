@@ -11,11 +11,13 @@ interface Element {
 const plainText = (element: Element): string =>
   element.type === "text"
     ? (element.value ?? "")
-    : element.type === "break"
-      ? "\n"
-      : (element.children ?? [])
-          .map(plainText)
-          .join(element.type === "tableCell" ? "\n" : "");
+    : element.type === "tab"
+      ? "\t"
+      : element.type === "break"
+        ? "\n"
+        : (element.children ?? [])
+            .map(plainText)
+            .join(element.type === "tableCell" ? "\n" : "");
 export class DocxDocumentExtractor {
   async extract(
     bytes: Buffer,
@@ -35,6 +37,16 @@ export class DocxDocumentExtractor {
         externalFileAccess: false,
         includeEmbeddedStyleMap: false,
         transformDocument: (document: Element) => {
+          // Block conversion stops at paragraphs/tables. Inspect descendants
+          // separately because Mammoth nests images and noteReference in runs
+          // and hyperlinks, and this extractor intentionally omits note bodies.
+          const pending = [document];
+          while (pending.length) {
+            const element = pending.pop()!;
+            if (element.type === "image" || element.type === "noteReference")
+              context.partial();
+            pending.push(...(element.children ?? []));
+          }
           const visit = (element: Element) => {
             if (element.type === "paragraph")
               context.text(plainText(element), `body/paragraph:${++paragraph}`);
@@ -55,19 +67,8 @@ export class DocxDocumentExtractor {
               )
                 context.partial();
             } else {
-              if (
-                ["image", "footnoteReference", "endnoteReference"].includes(
-                  element.type,
-                )
-              )
-                context.partial();
               for (const child of element.children ?? []) visit(child);
             }
-            if (
-              element.type === "paragraph" &&
-              (element.children ?? []).some((child) => child.type === "image")
-            )
-              context.partial();
           };
           visit(document);
           // The typed blocks are collected from Mammoth's document transform hook;

@@ -74,6 +74,27 @@ describe("TenderDocumentTextExtractor", () => {
       );
     },
   );
+  it.each([
+    "review-footnote.docx",
+    "review-endnote.docx",
+    "review-nested-image.docx",
+  ])("marks omitted nested DOCX content partial in %s", async (name) => {
+    const result = await extractor.extract(fixture(name));
+    expect(result.status).toBe("PARTIAL");
+    expect(result.blocks[0]).toMatchObject({
+      kind: "text",
+      text: "소비전력 50W 이하",
+    });
+  });
+  it("preserves DOCX tab word boundaries in paragraphs and table cells", async () => {
+    const result = await extractor.extract(fixture("review-tabs.docx"));
+    expect(result.status).toBe("EXTRACTED");
+    expect(
+      result.blocks.map((block) =>
+        block.kind === "text" ? block.text : block.rows,
+      ),
+    ).toEqual(["소비전력 50W 이하", [["항목", "광효율 130 lm/W 이상"]]]);
+  });
   it("preserves HWP text on both sides of an inline table anchor", async () => {
     const result = await extractor.extract(fixture("inline.hwp"));
     expect(result.status).toBe("EXTRACTED");
@@ -135,7 +156,7 @@ describe("TenderDocumentTextExtractor", () => {
     const cfb = CFB.read(fixture("sample.hwp").bytes, { type: "buffer" });
     CFB.utils.cfb_add(
       cfb,
-      "BodyText/Section0",
+      "/BodyText/Section0",
       deflateRawSync(Buffer.alloc(11 * 1024 * 1024, 65)),
     );
     await expect(
@@ -149,7 +170,7 @@ describe("TenderDocumentTextExtractor", () => {
     const cfb = CFB.read(fixture("sample.hwp").bytes, { type: "buffer" });
     CFB.utils.cfb_add(
       cfb,
-      "BodyText/Section0",
+      "/BodyText/Section0",
       deflateRawSync(Buffer.from([66, 0, 240, 255])),
     );
     await expect(

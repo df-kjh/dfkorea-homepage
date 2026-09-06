@@ -73,6 +73,9 @@ export function guardPdfStreams(bytes: Buffer): void {
           String.fromCharCode(parseInt(hex, 16)),
         );
     }
+    // PDF.js accepts /F as the /Filter alias; canonicalize before duplicate
+    // checks so neither aliases nor conflicting declarations bypass preflight.
+    if (token === "/F") token = "/Filter";
     if (token === "/Encrypt")
       throw new TenderDocumentExtractionError("DOCUMENT_ENCRYPTED");
     if (token === "obj") {

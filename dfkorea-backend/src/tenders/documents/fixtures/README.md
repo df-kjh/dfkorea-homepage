@@ -19,3 +19,5 @@ They then contain a two-column table with rows `항목 / 기준`, `소비전력 
 - Limit fixtures exercise stored XML over 10 MiB, 4,097 extra ZIP entries, high compression ratio, and forged uncompressed sizes. The large stored fixture compresses well in Git and exists solely to exercise pre-decode rejection.
 
 PDF table detection is a conservative baseline/alignment heuristic, not layout reconstruction or OCR. Public production tender samples remain a deployment qualification step; these tests do not claim live document coverage.
+
+Review regressions are generated separately with `node src/tenders/documents/fixtures/generate-review.cjs`: real DOCX footnote/endnote parts and references, a PNG nested below a hyperlink/run, and tabs in a paragraph and table cell. CFB metadata-only mutations, a regular-stream fixture and a hand-built version-4 sector layout are constructed in `cfb-guard.spec.ts`; unsafe metadata probes are stopped before any eager library call and before stream allocations.
