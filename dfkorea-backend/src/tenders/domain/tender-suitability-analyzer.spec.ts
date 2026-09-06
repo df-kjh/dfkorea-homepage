@@ -1,0 +1,572 @@
+import { TenderCompanyProfileDto } from "../dto/tender-company-profile.dto";
+import {
+  TenderRequirementState,
+  TenderSuitability,
+} from "./tender-analysis.enums";
+import {
+  ParsedTenderRequirements,
+  TenderProductSnapshot,
+} from "./tender-requirement";
+import { TenderSuitabilityAnalyzer } from "./tender-suitability-analyzer";
+
+const now = new Date("2026-09-07T12:00:00.000Z");
+
+const profile = (
+  overrides: Partial<TenderCompanyProfileDto> = {},
+): TenderCompanyProfileDto => ({
+  companyName: "디에프코리아",
+  businessNumber: "1234567890",
+  headquarters: { sido: "경기도", sigungu: "화성시" },
+  g2bRegistered: true,
+  supplyProducts: [],
+  licenses: [],
+  companyTypes: [],
+  directProduction: [],
+  certifications: [],
+  performanceRecords: [],
+  version: 1,
+  ...overrides,
+});
+
+const requirements = (
+  overrides: Partial<ParsedTenderRequirements> = {},
+): ParsedTenderRequirements => ({
+  items: [],
+  certifications: [],
+  participationConditions: [],
+  bidFormula: {},
+  evidence: [],
+  fingerprint: "requirements-fixture",
+  ...overrides,
+});
+
+const product = (
+  id: string,
+  overrides: Partial<TenderProductSnapshot> = {},
+): TenderProductSnapshot => ({
+  id,
+  dimensions: "600 x 300 x 80 mm",
+  power: [],
+  colorTemp: [],
+  certifications: [],
+  ...overrides,
+});
+
+const spec = (id: string, required: boolean, value: string) => ({
+  id,
+  itemKey: "item:1",
+  kind: "POWER" as const,
+  comparator: "GTE" as const,
+  value,
+  unit: "W" as const,
+  required,
+  evidenceIds: [`evidence:${id}`],
+});
+
+describe("TenderSuitabilityAnalyzer specification scoring", () => {
+  it("weights required specifications by two and references by one", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        items: [
+          {
+            key: "item:1",
+            classificationCode: "39112102",
+            specifications: [
+              spec("required", true, "50"),
+              spec("reference", false, "100"),
+            ],
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile(),
+      [product("catalog-1", { power: [50] })],
+      now,
+    );
+
+    expect(result.specificationScore).toBe(67);
+    expect(result.satisfiedCount).toBe(1);
+    expect(result.unsatisfiedCount).toBe(1);
+    expect(result.unknownCount).toBe(0);
+    expect(result.totalCount).toBe(2);
+  });
+
+  it("honors inclusive and exclusive decimal boundaries without binary rounding drift", () => {
+    const boundaryRequirements = requirements({
+      items: [
+        {
+          key: "item:1",
+          classificationCode: "39112102",
+          specifications: [
+            { ...spec("gte", true, "49.5"), comparator: "GTE" as const },
+            { ...spec("gt", true, "49.5"), comparator: "GT" as const },
+            { ...spec("lte", true, "49.5"), comparator: "LTE" as const },
+            { ...spec("lt", true, "49.5"), comparator: "LT" as const },
+          ],
+          evidenceIds: [],
+        },
+      ],
+    });
+
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      boundaryRequirements,
+      profile(),
+      [product("catalog-1", { power: [49.5] })],
+      now,
+    );
+
+    expect(result.satisfiedCount).toBe(2);
+    expect(result.unsatisfiedCount).toBe(2);
+    expect(result.specificationScore).toBe(50);
+  });
+
+  it("does not combine wattage from one product with certification from another", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        items: [
+          {
+            key: "item:1",
+            classificationCode: "39112102",
+            specifications: [spec("power", true, "50")],
+            evidenceIds: [],
+          },
+        ],
+        certifications: [
+          {
+            id: "cert:ks",
+            code: "KS",
+            name: "KS 인증",
+            required: true,
+            itemKeys: ["item:1"],
+            evidenceIds: ["evidence:ks"],
+          },
+        ],
+      }),
+      profile(),
+      [
+        product("product-a", { power: [50] }),
+        product("product-b", { power: [20], certifications: ["KS"] }),
+      ],
+      now,
+    );
+
+    expect(result.satisfiedCount).toBe(1);
+    expect(result.certifications).toEqual([
+      expect.objectContaining({ state: TenderRequirementState.UNSATISFIED }),
+    ]);
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+    expect(JSON.stringify(result)).not.toMatch(/product-a|product-b/i);
+  });
+
+  it("selects a certified product when certification is the only item requirement", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        items: [
+          {
+            key: "item:1",
+            classificationCode: "39112102",
+            specifications: [],
+            evidenceIds: [],
+          },
+        ],
+        certifications: [
+          {
+            id: "cert:ks",
+            code: "KS",
+            name: "KS 인증",
+            required: true,
+            itemKeys: ["item:1"],
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile(),
+      [
+        product("a-uncertified", { certifications: ["AA"] }),
+        product("z-certified", { certifications: ["KS인증"] }),
+      ],
+      now,
+    );
+
+    expect(result.certifications[0].state).toBe(
+      TenderRequirementState.SATISFIED,
+    );
+  });
+
+  it("uses the injected date for a product certification recorded in the profile", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        items: [
+          {
+            key: "item:1",
+            classificationCode: "39112102",
+            specifications: [],
+            evidenceIds: [],
+          },
+        ],
+        certifications: [
+          {
+            id: "cert:ks",
+            code: "KS",
+            name: "KS 인증",
+            required: true,
+            itemKeys: ["item:1"],
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile({
+        certifications: [
+          { code: "KS", name: "KS 인증", expiresAt: "2026-09-06" },
+        ],
+      }),
+      [product("catalog-1", { certifications: ["KS"] })],
+      now,
+    );
+
+    expect(result.certifications[0].state).toBe(
+      TenderRequirementState.UNSATISFIED,
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it("returns a nullable score and exact unknown coverage when products lack comparable fields", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        items: [
+          {
+            key: "item:1",
+            classificationCode: "39112102",
+            specifications: [spec("power", true, "50")],
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile(),
+      [product("catalog-1")],
+      now,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        suitability: TenderSuitability.REVIEW,
+        specificationScore: null,
+        satisfiedCount: 0,
+        unsatisfiedCount: 0,
+        unknownCount: 1,
+        totalCount: 1,
+      }),
+    );
+  });
+});
+
+describe("TenderSuitabilityAnalyzer qualification rules", () => {
+  it("uses the injected date and treats expiry on that date as valid", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        participationConditions: [
+          {
+            id: "license:1",
+            kind: "LICENSE",
+            label: "전기공사업",
+            codes: ["0037"],
+            values: ["전기공사업"],
+            required: true,
+            sourcePriority: "STRUCTURED",
+            evidenceIds: ["evidence:license"],
+          },
+        ],
+      }),
+      profile({
+        licenses: [
+          { code: "0037", name: "전기공사업", expiresAt: "2026-09-07" },
+        ],
+      }),
+      [],
+      now,
+    );
+
+    expect(result.participationConditions).toEqual([
+      expect.objectContaining({ state: TenderRequirementState.SATISFIED }),
+    ]);
+  });
+
+  it("rejects an expired qualification and reports a hard failure", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        participationConditions: [
+          {
+            id: "direct:1",
+            kind: "DIRECT_PRODUCTION",
+            label: "직접생산확인",
+            codes: ["39112102"],
+            values: [],
+            required: true,
+            sourcePriority: "DOCUMENT",
+            evidenceIds: ["evidence:direct"],
+          },
+        ],
+      }),
+      profile({
+        directProduction: [
+          { code: "39112102", name: "LED등기구", expiresAt: "2026-09-06" },
+        ],
+      }),
+      [],
+      now,
+    );
+
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.UNSATISFIED,
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it("evaluates region, company type, G2B registration, and performance phrases", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        participationConditions: [
+          {
+            id: "region:1",
+            kind: "REGION",
+            label: "경기도 또는 서울특별시",
+            codes: ["41", "11"],
+            values: ["경기도", "서울특별시"],
+            required: true,
+            sourcePriority: "STRUCTURED",
+            evidenceIds: [],
+          },
+          {
+            id: "type:1",
+            kind: "COMPANY_TYPE",
+            label: "중소기업 또는 소상공인",
+            codes: ["SME", "SMALL_BUSINESS"],
+            values: [],
+            required: true,
+            sourcePriority: "DOCUMENT",
+            evidenceIds: [],
+          },
+          {
+            id: "g2b:1",
+            kind: "G2B_REGISTRATION",
+            label: "나라장터 등록",
+            codes: [],
+            values: [],
+            required: true,
+            sourcePriority: "DOCUMENT",
+            evidenceIds: [],
+          },
+          {
+            id: "performance:1",
+            kind: "PERFORMANCE",
+            label: "동종 물품 실적",
+            codes: [],
+            values: ["동종 물품"],
+            periodYears: 3,
+            minimumAmount: "100000000",
+            required: true,
+            sourcePriority: "DOCUMENT",
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile({
+        companyTypes: [
+          { code: "SME", name: "중소기업", expiresAt: "2027-01-01" },
+        ],
+        performanceRecords: [
+          {
+            itemName: "동종 물품 LED등기구",
+            from: "2025-01-01",
+            to: "2026-08-01",
+            amount: "100000000.00",
+          },
+        ],
+      }),
+      [],
+      now,
+    );
+
+    expect(result.participationConditions.map((item) => item.state)).toEqual([
+      TenderRequirementState.SATISFIED,
+      TenderRequirementState.SATISFIED,
+      TenderRequirementState.SATISFIED,
+      TenderRequirementState.SATISFIED,
+    ]);
+  });
+
+  it("retains decimal scale while totaling performance amounts", () => {
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        participationConditions: [
+          {
+            id: "performance:decimal",
+            kind: "PERFORMANCE",
+            label: "동종 물품 실적",
+            codes: [],
+            values: ["동종 물품"],
+            periodYears: 3,
+            minimumAmount: "2",
+            required: true,
+            sourcePriority: "DOCUMENT",
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile({
+        performanceRecords: [
+          {
+            itemName: "동종 물품 A",
+            from: "2025-01-01",
+            to: "2026-01-01",
+            amount: "0.6",
+          },
+          {
+            itemName: "동종 물품 B",
+            from: "2025-01-01",
+            to: "2026-01-01",
+            amount: "0.6",
+          },
+        ],
+      }),
+      [],
+      now,
+    );
+
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.UNSATISFIED,
+    );
+  });
+});
+
+describe("TenderSuitabilityAnalyzer status and fingerprints", () => {
+  it.each([
+    { score: 80, unknown: 0, hardFailure: false, want: "RECOMMENDED" },
+    { score: 80, unknown: 1, hardFailure: false, want: "REVIEW" },
+    { score: 50, unknown: 0, hardFailure: false, want: "REVIEW" },
+    { score: 49, unknown: 0, hardFailure: false, want: "DIFFICULT" },
+    { score: 100, unknown: 0, hardFailure: true, want: "DIFFICULT" },
+  ])(
+    "applies the documented status precedence: $want",
+    ({ score, unknown, hardFailure, want }) => {
+      const comparable = 100;
+      const passing = score;
+      const failing = comparable - passing;
+      const specifications = [
+        ...Array.from({ length: passing }, (_, index) =>
+          spec(`pass-${index}`, false, "1"),
+        ),
+        ...Array.from({ length: failing }, (_, index) =>
+          spec(`fail-${index}`, false, "2"),
+        ),
+        ...Array.from({ length: unknown }, (_, index) => ({
+          ...spec(`unknown-${index}`, false, "1"),
+          kind: "LUMINOUS_EFFICACY" as const,
+          unit: "LM_PER_W" as const,
+        })),
+      ];
+      const participationConditions = hardFailure
+        ? [
+            {
+              id: "hard-failure",
+              kind: "G2B_REGISTRATION" as const,
+              label: "나라장터 등록",
+              codes: [],
+              values: [],
+              required: true,
+              sourcePriority: "DOCUMENT" as const,
+              evidenceIds: [],
+            },
+          ]
+        : [];
+      const result = new TenderSuitabilityAnalyzer().analyze(
+        requirements({
+          items: [
+            {
+              key: "item:1",
+              classificationCode: "39112102",
+              specifications,
+              evidenceIds: [],
+            },
+          ],
+          participationConditions,
+        }),
+        profile({ g2bRegistered: !hardFailure }),
+        [product("catalog-1", { power: [1] })],
+        now,
+      );
+
+      expect(result.suitability).toBe(want);
+    },
+  );
+
+  it("uses the unrounded weighted ratio at the 80 percent boundary", () => {
+    const specifications = [
+      ...Array.from({ length: 35 }, (_, index) =>
+        spec(`pass-${index}`, false, "1"),
+      ),
+      ...Array.from({ length: 9 }, (_, index) =>
+        spec(`fail-${index}`, false, "2"),
+      ),
+    ];
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      requirements({
+        items: [
+          {
+            key: "item:1",
+            classificationCode: "39112102",
+            specifications,
+            evidenceIds: [],
+          },
+        ],
+      }),
+      profile(),
+      [product("catalog-1", { power: [1] })],
+      now,
+    );
+
+    expect(result.specificationScore).toBe(80);
+    expect(result.suitability).toBe(TenderSuitability.REVIEW);
+  });
+
+  it("keeps requirement, profile, and product fingerprints stable under input ordering", () => {
+    const analyzer = new TenderSuitabilityAnalyzer();
+    const input = requirements({
+      items: [
+        {
+          key: "item:1",
+          classificationCode: "39112102",
+          specifications: [spec("a", true, "50")],
+          evidenceIds: [],
+        },
+      ],
+    });
+    const first = analyzer.analyze(
+      input,
+      profile({
+        licenses: [
+          { code: "B", name: "B", expiresAt: null },
+          { code: "A", name: "A", expiresAt: null },
+        ],
+      }),
+      [product("b", { power: [50] }), product("a", { power: [50] })],
+      now,
+    );
+    const second = analyzer.analyze(
+      input,
+      profile({
+        licenses: [
+          { code: "A", name: "A", expiresAt: null },
+          { code: "B", name: "B", expiresAt: null },
+        ],
+      }),
+      [product("a", { power: [50] }), product("b", { power: [50] })],
+      now,
+    );
+
+    expect(first.inputFingerprints).toEqual(second.inputFingerprints);
+    expect(Object.values(first.inputFingerprints)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^[a-f0-9]{64}$/)]),
+    );
+  });
+});
