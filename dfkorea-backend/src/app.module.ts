@@ -24,6 +24,12 @@ import { TenderMailDelivery } from "./tenders/entities/tender-mail-delivery.enti
 import { TenderMailItem } from "./tenders/entities/tender-mail-item.entity";
 import { TenderDailyDispatch } from "./tenders/entities/tender-daily-dispatch.entity";
 import { TenderMailOAuthCredential } from "./tenders/entities/tender-mail-oauth-credential.entity";
+import { TenderCompanyProfile } from "./tenders/entities/tender-company-profile.entity";
+import { TenderDocument } from "./tenders/entities/tender-document.entity";
+import { TenderAnalysis } from "./tenders/entities/tender-analysis.entity";
+import { TenderAnalysisReview } from "./tenders/entities/tender-analysis-review.entity";
+import { TenderAwardResult } from "./tenders/entities/tender-award-result.entity";
+import { TenderAwardSyncRun } from "./tenders/entities/tender-award-sync-run.entity";
 import { TendersModule } from "./tenders/tenders.module";
 import { resolveDatabaseConnectionOptions } from "./config/production-environment";
 
@@ -49,6 +55,12 @@ export const createApplicationDatabaseOptions = (
     TenderMailItem,
     TenderDailyDispatch,
     TenderMailOAuthCredential,
+    TenderCompanyProfile,
+    TenderDocument,
+    TenderAnalysis,
+    TenderAnalysisReview,
+    TenderAwardResult,
+    TenderAwardSyncRun,
   ],
   // Shared and production databases are migration-only. Keep this false there;
   // synchronize remains available only for explicitly isolated local work.

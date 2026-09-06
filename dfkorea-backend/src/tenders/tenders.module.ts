@@ -22,6 +22,12 @@ import { TenderRecipient } from "./entities/tender-recipient.entity";
 import { TenderSubscription } from "./entities/tender-subscription.entity";
 import { TenderSyncRun } from "./entities/tender-sync-run.entity";
 import { TenderMailOAuthCredential } from "./entities/tender-mail-oauth-credential.entity";
+import { TenderCompanyProfile } from "./entities/tender-company-profile.entity";
+import { TenderDocument } from "./entities/tender-document.entity";
+import { TenderAnalysis } from "./entities/tender-analysis.entity";
+import { TenderAnalysisReview } from "./entities/tender-analysis-review.entity";
+import { TenderAwardResult } from "./entities/tender-award-result.entity";
+import { TenderAwardSyncRun } from "./entities/tender-award-sync-run.entity";
 import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
@@ -56,6 +62,12 @@ const createSafeRetryLogger = (context: string) => {
       TenderMailItem,
       TenderDailyDispatch,
       TenderMailOAuthCredential,
+      TenderCompanyProfile,
+      TenderDocument,
+      TenderAnalysis,
+      TenderAnalysisReview,
+      TenderAwardResult,
+      TenderAwardSyncRun,
     ]),
   ],
   controllers: [TendersController, TenderMailOAuthController],
@@ -70,8 +82,7 @@ const createSafeRetryLogger = (context: string) => {
           retryDelaysMs: [1_000, 3_000],
           onRetry: createSafeRetryLogger("G2bPublicApiClient"),
         });
-        const relayEnabled =
-          config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
         const relayClient = relayEnabled
           ? new PublicApiClient(
               createG2bRelayFetcher({

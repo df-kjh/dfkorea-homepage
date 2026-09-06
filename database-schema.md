@@ -160,6 +160,46 @@ Unique constraint: `UQ_tender_mail_oauth_credential_singleton_key` on (`singleto
 
 Index: `IDX_tender_daily_dispatch_status_lease` on (`status`, `leaseExpiresAt`). The unique KST (`businessDate`, `deliveryTime`) slot is the final replica idempotency boundary in addition to advisory lock `824002`. Changing the shared time on the same date creates another slot without deleting prior audit rows. A fresh `CLAIMED` lease is skipped; a stale claim can be atomically reclaimed and processes only recipients without an existing durable outcome for that slot.
 
+### Tender suitability analysis tables
+
+`1788699000000-CreateTenderAnalysisTables` adds the persistent inputs and compact outputs for tender suitability analysis. The source TypeORM discovery glob already includes `src/tenders/entities/*.entity.ts`; the Nest application also registers these entities explicitly for its runtime connection. The tables do not store source-document binary, provider award payloads, bidder names, bidder business numbers, or complete rankings.
+
+### `tender_company_profiles`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `singletonKey` | varchar(32) | Always one profile; `UQ_tender_company_profile_singleton_key` enforces this |
+| `companyName`, `businessNumber` | varchar | Company identity; the service normalizes the 10 digit business number |
+| `headquartersSido`, `headquartersSigungu`, `g2bRegistered` | varchar, varchar, boolean | Participant location and G2B registration state |
+| `supplyProducts`, `licenses`, `companyTypes`, `directProduction`, `certifications`, `performanceRecords` | jsonb | Normalized, validated profile collections only |
+| `version`, `createdAt`, `updatedAt` | integer, timestamptz | Replacement version and audit timestamps |
+
+### `tender_documents`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id`, `tenderId` | UUID | Primary key and FK to `tenders.id`, `ON DELETE CASCADE` |
+| `sourceDocumentIdentity` | varchar | Unique with `tenderId` through `UQ_tender_document_tender_identity` |
+| `displayName`, `sourceUrl`, `mimeType`, `format`, `contentHash` | varchar | Safe document metadata and a normalized content hash |
+| `status`, `errorCode`, `extractedAt` | varchar, varchar, timestamptz | Extraction state, safe failure code, and completion time |
+| `textBlocks`, `tableBlocks`, `extractionMetadata` | jsonb | Normalized extracted output; original bytes are never persisted |
+| `createdAt`, `updatedAt` | timestamptz | Audit timestamps |
+
+Index: `IDX_tender_document_tender_status` on (`tenderId`, `status`).
+
+### `tender_analyses` and `tender_analysis_reviews`
+
+`tender_analyses.tenderId` is a cascading FK to `tenders.id` and `UQ_tender_analysis_tender` retains one current analysis per tender. It stores the tender, document, company-profile, and product-catalog fingerprints; analyzer version; status/suitability; nullable numeric specification score; comparable/satisfied/unsatisfied/unknown counts; normalized requirements; certification, participation and compact price analyses; evidence; worker lease; safe error code; and audit timestamps. `IDX_tender_analysis_status_lease` on (`status`, `leaseExpiresAt`) supports recovery of interrupted work.
+
+`tender_analysis_reviews` stores immutable analysis fingerprint context, review status, 2,000-character internal note, reviewer admin ID, and timestamps. Its `tenderId` FK cascades on tender deletion. `analysisId` is nullable and uses `ON DELETE SET NULL`, preserving a historic review when a current analysis row is replaced.
+
+### `tender_award_results` and `tender_award_sync_runs`
+
+`tender_award_results` stores only the source, notice/revision, product classification/group, method, region, opening time, precision-safe numeric basis/expected/winning amounts and rates, final-award/failed-bid flags, and collection timestamps. `UQ_tender_award_result_identity` covers (`source`, `sourceNoticeId`, `revision`, `productClassification`, `openedAt`). The price-statistic indexes are `IDX_tender_award_result_opened_at` on `openedAt` and `IDX_tender_award_result_classification_method_region` on (`productClassification`, `awardMethod`, `region`).
+
+`tender_award_sync_runs` stores source and monthly/incremental period identity, resume cursor, status/counts, worker lease, safe error code, completion time, and audit timestamps. `UQ_tender_award_sync_run_source_period` prevents duplicate source-period processing; `IDX_tender_award_sync_run_status_lease` on (`status`, `leaseExpiresAt`) supports stale-job recovery.
+
 ## Update rule
 
 Whenever a migration changes this schema, update this root `database-schema.md` in the same change with affected tables, relationships, foreign-key deletion behavior, unique constraints, and indexes.
@@ -180,6 +220,7 @@ Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1
 - `1787820400000-AllowMultipleDailyDispatchTimes` replaces the date-only dispatch unique constraint with `UQ_tender_daily_dispatch_business_date_delivery_time`. It preserves every existing dispatch and allows a changed shared time to create another same-day slot. Rollback refuses to collapse multiple same-day audit rows instead of deleting history.
 - `1788135000000-AddTenderOpportunityType` is retained as an already-applied production migration. Its columns and index are legacy compatibility data and no longer control collection, display, or mail delivery; no destructive rollback is run.
 - `1788135100000-FixKaptSourceUrls` is a data-only, row-preserving correction. It changes only stale K-apt `sourceUrl` values from the known 404 `/web/bid/bidDetail.do` prefix to the canonical `/bid/bidDetail.do` prefix; it does not add or remove columns, delete rows, or alter tender and mail history. Rollback is intentionally a no-op so a valid URL is never restored to the broken route.
+- `1788699000000-CreateTenderAnalysisTables` adds company qualification, ephemeral-document extraction metadata, one current tender analysis, historic reviews, normalized award statistics, and restartable award-sync state. Its rollback drops only these six new tables in reverse foreign-key order.
 
 The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.
 
