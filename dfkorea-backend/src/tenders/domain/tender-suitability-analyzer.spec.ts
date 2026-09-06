@@ -1017,4 +1017,192 @@ describe("Tender requirement parsing and scoring regressions", () => {
       }),
     );
   });
+
+  it.each([
+    "소비전력 50W 이하이며 내진 구조 필수",
+    "소비전력 50W 이하 및 KS 인증과 방폭 인증 필수",
+  ])(
+    "keeps an unsupported mandatory residual UNKNOWN after recognized content: %s",
+    (text) => {
+      const { parsed, result } = parseAndAnalyze(
+        emptyTenderEnrichment(),
+        [text],
+        profile(),
+        [product("catalog-1", { power: [50], certifications: ["KS"] })],
+      );
+
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "UNSUPPORTED",
+            state: "UNKNOWN",
+            snippet: expect.stringMatching(/내진|방폭/),
+          }),
+        ]),
+      );
+      expect(result.specificationScore).toBe(100);
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+    },
+  );
+
+  it("binds certification obligation and negation to each certification phrase", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      ["KS 인증은 필수가 아니며 KC 인증 필수"],
+      profile(),
+      [product("catalog-1", { power: [50], certifications: ["KS"] })],
+    );
+
+    expect(parsed.certifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "KS", required: false }),
+        expect.objectContaining({ code: "KC", required: true }),
+      ]),
+    );
+    expect(
+      result.certifications.find(
+        ({ requirementId }) =>
+          requirementId ===
+          parsed.certifications.find(({ code }) => code === "KC")?.id,
+      )?.state,
+    ).toBe(TenderRequirementState.UNSATISFIED);
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it("keeps conjunctive license codes as separate required conditions", () => {
+    const { parsed, result } = parseAndAnalyze(
+      emptyTenderEnrichment(),
+      ["업종코드 1234 및 업종코드 5678 등록 필수"],
+      profile({
+        licenses: [{ code: "1234", name: "면허 A", expiresAt: null }],
+      }),
+    );
+
+    expect(
+      parsed.participationConditions
+        .filter(({ kind }) => kind === "LICENSE")
+        .map(({ codes }) => codes)
+        .sort(([left], [right]) => left.localeCompare(right)),
+    ).toEqual([["1234"], ["5678"]]);
+    expect(result.participationConditions.map(({ state }) => state)).toEqual(
+      expect.arrayContaining([
+        TenderRequirementState.SATISFIED,
+        TenderRequirementState.UNSATISFIED,
+      ]),
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it("matches an old structured province name through its canonical region code", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        regions: [
+          {
+            code: "51",
+            name: "강원도",
+            required: true,
+            evidence: source,
+          },
+        ],
+      },
+      [],
+      profile({
+        headquarters: { sido: "강원특별자치도", sigungu: "원주시" },
+      }),
+    );
+
+    expect(parsed.participationConditions).toEqual([
+      expect.objectContaining({
+        kind: "REGION",
+        regionPaths: [{ codes: ["51"], values: ["강원도"] }],
+      }),
+    ]);
+    expect(result.participationConditions[0].state).toBe(
+      TenderRequirementState.SATISFIED,
+    );
+  });
+
+  it("deduplicates repeated equivalent document specs before conflict comparison", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      ["소비전력 50W 필수", "소비전력 50.0W 필수"],
+      profile(),
+      [product("catalog-1", { power: [50] })],
+    );
+
+    expect(
+      parsed.evidence.some(
+        ({ kind, conflictField }) =>
+          kind === "CONFLICT" && conflictField === "SPECIFICATION:POWER",
+      ),
+    ).toBe(false);
+    expect(parsed.items[0].specifications).toEqual([
+      expect.objectContaining({
+        value: "50",
+        evidenceIds: expect.arrayContaining([
+          parsed.items[0].evidenceIds[0],
+          expect.any(String),
+        ]),
+      }),
+    ]);
+    expect(result.suitability).toBe(TenderSuitability.RECOMMENDED);
+  });
+
+  it("compares numerically equivalent structured and document reserve bounds", () => {
+    const formulaEvidence = {
+      source: "G2B_API" as const,
+      operation: "getBidPblancListInfoThngBsisAmount",
+      field: "rsrvtnPrceRngBgnRate",
+    };
+    const { parsed } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        formulaVariables: [
+          {
+            key: "reservePriceMinimumRate",
+            value: "98.0",
+            evidence: formulaEvidence,
+          },
+          {
+            key: "reservePriceMaximumRate",
+            value: "102.0",
+            evidence: { ...formulaEvidence, field: "rsrvtnPrceRngEndRate" },
+          },
+        ],
+      },
+      ["예정가격 범위는 기초금액의 -2% 이상 +2% 이하입니다."],
+    );
+
+    expect(
+      parsed.evidence.filter(
+        ({ kind, conflictField }) =>
+          kind === "CONFLICT" && conflictField?.startsWith("RESERVE_PRICE_"),
+      ),
+    ).toEqual([]);
+  });
 });

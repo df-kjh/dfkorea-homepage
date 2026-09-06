@@ -276,15 +276,21 @@ const evaluateParticipation = (
       ]);
       const regionCode = TENDER_REGION_CODE_BY_NAME[profile.headquarters.sido];
       const matched = condition.regionPaths?.length
-        ? condition.regionPaths.some(
-            (path) =>
+        ? condition.regionPaths.some((path) => {
+            const canonicalCodes = new Set(path.codes);
+            const geographicValues = path.values.filter((required) => {
+              const aliasCode = TENDER_REGION_CODE_BY_NAME[required];
+              return !aliasCode || !canonicalCodes.has(aliasCode);
+            });
+            return (
               path.codes.every((code) => code === regionCode) &&
-              path.values.every((required) =>
+              geographicValues.every((required) =>
                 [...values].some(
                   (actual) => actual === required || actual.includes(required),
                 ),
-              ),
-          )
+              )
+            );
+          })
         : condition.codes.includes(regionCode) ||
           condition.values.some((required) =>
             [...values].some(

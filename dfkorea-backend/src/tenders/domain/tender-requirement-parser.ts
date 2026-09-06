@@ -162,6 +162,24 @@ const unitRules: UnitRule[] = [
   },
 ];
 
+const DIMENSION_PATTERN_SOURCE =
+  `(?:외형\\s*)?(?:치수|크기|규격)\\s*[:：]?\\s*${DECIMAL}` +
+  `\\s*[x×X＊*]\\s*${DECIMAL}\\s*[x×X＊*]\\s*${DECIMAL}` +
+  `\\s*(?:mm|밀리미터)\\s*(이상|이하|초과|미만)?`;
+
+interface TextRange {
+  start: number;
+  end: number;
+}
+
+const matchingRanges = (text: string, pattern: RegExp): TextRange[] => {
+  const flags = [...new Set(`${pattern.flags}g`)].join("");
+  return [...text.matchAll(new RegExp(pattern.source, flags))].map((match) => ({
+    start: match.index ?? 0,
+    end: (match.index ?? 0) + match[0].length,
+  }));
+};
+
 export const parseUnitSpecifications = (
   text: string,
   itemKey: string,
@@ -172,10 +190,7 @@ export const parseUnitSpecifications = (
     index: number;
     requirement: TenderSpecificationRequirement;
   }> = [];
-  const dimensionPattern = new RegExp(
-    `(?:외형\\s*)?(?:치수|크기|규격)\\s*[:：]?\\s*${DECIMAL}\\s*[x×X＊*]\\s*${DECIMAL}\\s*[x×X＊*]\\s*${DECIMAL}\\s*(?:mm|밀리미터)\\s*(이상|이하|초과|미만)?`,
-    "gi",
-  );
+  const dimensionPattern = new RegExp(DIMENSION_PATTERN_SOURCE, "gi");
   let clauseOffset = 0;
   for (const clause of splitRequirementSpans(text)) {
     const negated = isNegatedObligation(clause);
@@ -245,6 +260,25 @@ const CERTIFICATION_ALIASES = [
     pattern: /(?:한국산업표준\s*\(\s*KS\s*\)|KS)(?:\s*인증)?/i,
   },
 ] as const;
+
+interface CertificationMatch {
+  code: (typeof CERTIFICATION_ALIASES)[number]["code"];
+  name: (typeof CERTIFICATION_ALIASES)[number]["name"];
+  index: number;
+  length: number;
+}
+
+const certificationMatches = (text: string): CertificationMatch[] =>
+  CERTIFICATION_ALIASES.flatMap(({ code, name, pattern }) =>
+    matchingRanges(text, pattern).map(({ start, end }) => ({
+      code,
+      name,
+      index: start,
+      length: end - start,
+    })),
+  ).sort(
+    (left, right) => left.index - right.index || right.length - left.length,
+  );
 
 export const normalizeCertificationAlias = (
   value: string,
@@ -351,22 +385,37 @@ const parseEligibilityClause = (
     }
   }
 
-  const licenseCodes = [
+  const licenseMatches = [
     ...text.matchAll(/(?:업종|면허)\s*코드\s*[:：]?\s*([A-Za-z0-9-]+)/gi),
-  ].map((match) => match[1].toUpperCase());
-  if (required && licenseCodes.length) {
+  ];
+  if (required && licenseMatches.length) {
     const name =
       /([가-힣A-Za-z]+(?:공사업|면허))/.exec(text)?.[1] ?? "업종·면허";
+    const groups: string[][] = [];
+    for (const [index, match] of licenseMatches.entries()) {
+      const code = match[1].toUpperCase();
+      const previous = licenseMatches[index - 1];
+      const connector = previous
+        ? text.slice((previous.index ?? 0) + previous[0].length, match.index)
+        : "";
+      if (previous && /(?:또는|혹은)/.test(connector)) {
+        groups[groups.length - 1].push(code);
+      } else {
+        groups.push([code]);
+      }
+    }
     results.push(
-      requirementId({
-        kind: "LICENSE",
-        label: name,
-        codes: [...new Set(licenseCodes)].sort(),
-        values: [name],
-        required: true,
-        sourcePriority: "DOCUMENT",
-        evidenceIds: [evidenceId],
-      }),
+      ...groups.map((codes) =>
+        requirementId({
+          kind: "LICENSE",
+          label: codes.length > 1 ? `${name} (${codes.join(" 또는 ")})` : name,
+          codes: [...new Set(codes)].sort(),
+          values: [name],
+          required: true,
+          sourcePriority: "DOCUMENT",
+          evidenceIds: [evidenceId],
+        }),
+      ),
     );
   }
 
@@ -524,8 +573,12 @@ const mergeUnique = <T extends { id: string }>(values: T[]): T[] =>
     (left, right) => left.id.localeCompare(right.id),
   );
 
-const stableSemanticSort = <T>(values: T[]): T[] =>
-  [...values].sort((left, right) =>
+const stableSemanticSet = <T>(values: T[]): T[] =>
+  [
+    ...new Map(
+      values.map((value) => [JSON.stringify(value), value] as const),
+    ).values(),
+  ].sort((left, right) =>
     JSON.stringify(left).localeCompare(JSON.stringify(right)),
   );
 
@@ -534,12 +587,12 @@ const certificationRequirements = (
   itemKeys: string[],
   sourceEvidenceId: string,
 ): TenderCertificationRequirement[] =>
-  splitClauses(text).flatMap((clause) =>
-    CERTIFICATION_ALIASES.flatMap(({ code, name, pattern }) => {
-      pattern.lastIndex = 0;
-      const match = pattern.exec(clause);
-      if (!match) return [];
-      const required = isExplicitObligation(clause);
+  splitClauses(text).flatMap((clause) => {
+    const matches = certificationMatches(clause);
+    return matches.map(({ code, name, index }, matchIndex) => {
+      const next = matches[matchIndex + 1];
+      const localContext = clause.slice(index, next?.index ?? clause.length);
+      const required = isExplicitObligation(localContext);
       const input = {
         code,
         name,
@@ -547,9 +600,40 @@ const certificationRequirements = (
         itemKeys: [...itemKeys].sort(),
         evidenceIds: [sourceEvidenceId],
       };
-      return [{ id: fingerprint(input), ...input }];
-    }),
-  );
+      return { id: fingerprint(input), ...input };
+    });
+  });
+
+const unconsumedRecognizedText = (text: string): string | null => {
+  const ranges = [
+    ...matchingRanges(text, new RegExp(DIMENSION_PATTERN_SOURCE, "gi")),
+    ...unitRules.flatMap(({ pattern }) => matchingRanges(text, pattern)),
+    ...certificationMatches(text).map(({ index, length }) => ({
+      start: index,
+      end: index + length,
+    })),
+  ];
+  if (!ranges.length) return null;
+
+  const consumed = Array.from({ length: text.length }, () => false);
+  for (const { start, end } of ranges) {
+    for (let index = start; index < end; index += 1) consumed[index] = true;
+  }
+  return [...text]
+    .map((character, index) => (consumed[index] ? " " : character))
+    .join("")
+    .replace(
+      /(?:은|는)?\s*필수(?:(?:가|는|은)\s*(?:아니며|아닙니다|아니다|아님)|입니다|이다|임)?/g,
+      " ",
+    )
+    .replace(
+      /(?:필수|하여야|해야|요함|이며|이고|아니며|입니다|이다|임|및|그리고)/g,
+      " ",
+    )
+    .replace(/^\s*(?:과|와)\s*/, "")
+    .replace(/[\s,.!。]+/g, "")
+    .trim();
+};
 
 const structuredRegionCondition = (
   regions: TenderRegionRequirement[],
@@ -857,7 +941,8 @@ export class TenderRequirementParser {
       if (
         structuredFormula[field] !== undefined &&
         documentBidFormula[field] !== undefined &&
-        structuredFormula[field] !== documentBidFormula[field]
+        decimal(String(structuredFormula[field])) !==
+          decimal(String(documentBidFormula[field]))
       ) {
         evidence.push(
           this.conflictEvidence(
@@ -902,14 +987,8 @@ export class TenderRequirementParser {
     itemKeys: string[],
   ): TenderRequirementEvidence[] {
     return splitRequirementSpans(text).flatMap((span) => {
-      const hasKnownCertification = CERTIFICATION_ALIASES.some(
-        ({ pattern }) => {
-          pattern.lastIndex = 0;
-          return pattern.test(span);
-        },
-      );
-      const hasUnknownCertification =
-        /(?:인증|방폭)/.test(span) && !hasKnownCertification;
+      const unconsumedText = unconsumedRecognizedText(span);
+      const hasUnhandledRecognizedResidual = Boolean(unconsumedText);
       const parsed =
         parseUnitSpecifications(span, itemKey, sourceEvidence.id).length > 0 ||
         certificationRequirements(span, itemKeys, sourceEvidence.id).length >
@@ -924,7 +1003,7 @@ export class TenderRequirementParser {
         );
       if (
         !requirementBearing ||
-        (parsed && !hasUnknownCertification && !explicitlyNonBinding)
+        (parsed && !hasUnhandledRecognizedResidual && !explicitlyNonBinding)
       ) {
         return [];
       }
@@ -975,8 +1054,8 @@ export class TenderRequirementParser {
           required: requirement.required,
         });
         if (
-          fingerprint(stableSemanticSort(structured.map(semantic))) !==
-          fingerprint(stableSemanticSort(document.map(semantic)))
+          fingerprint(stableSemanticSet(structured.map(semantic))) !==
+          fingerprint(stableSemanticSet(document.map(semantic)))
         ) {
           evidence.push(
             this.conflictEvidence(
