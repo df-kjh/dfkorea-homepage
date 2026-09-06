@@ -1,10 +1,25 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
-const aboutHtmlPath = fileURLToPath(
-  new URL('../.output/public/about/index.html', import.meta.url),
-)
-const html = await readFile(aboutHtmlPath, 'utf8')
+const outputCandidates = [
+  '../.vercel/output/static/about/index.html',
+  '../.output/public/about/index.html',
+]
+
+let html
+
+for (const outputPath of outputCandidates) {
+  try {
+    html = await readFile(fileURLToPath(new URL(outputPath, import.meta.url)), 'utf8')
+    break
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+}
+
+if (!html) {
+  throw new Error(`About prerender was not found in:\n${outputCandidates.join('\n')}`)
+}
 
 const title = '회사 소개 | (주)디에프코리아 - LED 조명 전문 기업'
 const description =
