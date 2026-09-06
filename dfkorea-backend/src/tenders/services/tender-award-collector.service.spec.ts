@@ -657,4 +657,207 @@ postgres("award collector PostgreSQL repository boundary", () => {
       ).errorCode,
     ).toBe("AMBIGUOUS_CLASS_IDENTITY");
   });
+  it.each(["offset", "page"])(
+    "never overwrites an existing persisted identity as colliding classes advance %s cursors",
+    async (mode) => {
+      await service.startBackfill(now);
+      const awards = db.getRepository(TenderAwardResult);
+      await awards.save({
+        ...award,
+        sourceNoticeId: "R26BK01000001",
+        winningAmount: "123.45",
+      });
+      let finalBody: any;
+      const adapter = actualAdapter((f) => {
+        finalBody = f.getScsbidListSttusThng.response.body;
+        for (const op of [
+          "getBidPblancListInfoThngPurchsObjPrdct",
+          "getOpengResultListInfoThngPreparPcDetail",
+          "getScsbidListSttusThng",
+        ]) {
+          const body = f[op].response.body;
+          body.items.push({
+            ...body.items[0],
+            bidClsfcNo: "2",
+            sucsfbidAmt: "999.99",
+          });
+          body.totalCount = "2";
+        }
+        if (mode === "page") {
+          finalBody.items = [finalBody.items[0]];
+          finalBody.totalCount = "101";
+        }
+      });
+      const collector = new TenderAwardCollectorService(db, adapter);
+      for (let tick = 0; tick < 2; tick++) {
+        if (mode === "page" && tick === 1) finalBody.items[0].bidClsfcNo = "2";
+        expect(await collector.collectIncremental(now)).toEqual({
+          processed: true,
+        });
+        expect(
+          await awards.findOneByOrFail({ sourceNoticeId: "R26BK01000001" }),
+        ).toMatchObject({ winningAmount: "123.45", isFinalAward: true });
+      }
+      const run = await db
+        .getRepository(TenderAwardSyncRun)
+        .findOneByOrFail({ periodStart: "2024-09-07" });
+      expect(run).toMatchObject({
+        cursor: null,
+        fetchedCount: 2,
+        storedCount: 0,
+        excludedCount: 2,
+        errorCode: "AMBIGUOUS_CLASS_IDENTITY",
+      });
+    },
+  );
+  it.each(["취소공고", "등록공고"])(
+    "preserves persisted data on incomplete %s details",
+    async (status) => {
+      await service.startBackfill(now);
+      const awards = db.getRepository(TenderAwardResult);
+      await awards.save({
+        ...award,
+        sourceNoticeId: "R26BK01000001",
+        winningAmount: "123.45",
+      });
+      const adapter = actualAdapter((f) => {
+        const body = f.getBidPblancListInfoThng.response.body;
+        body.totalCount = "2";
+        body.items[0].ntceKindNm = status;
+      });
+      await new TenderAwardCollectorService(db, adapter).collectIncremental(
+        now,
+      );
+      expect(
+        await awards.findOneByOrFail({ sourceNoticeId: "R26BK01000001" }),
+      ).toMatchObject({ winningAmount: "123.45", isFinalAward: true });
+      expect((await service.getStatus()).runs[0].errorCode).toBe(
+        "INCOMPLETE_AWARD_EVIDENCE",
+      );
+    },
+  );
+  it("retains review diagnostics across clean pages, failed claims and completion", async () => {
+    await service.startBackfill(now);
+    fetchWindow.mockResolvedValueOnce({
+      items: [],
+      invalidations: [],
+      diagnostics: ["AMBIGUOUS_CLASS_IDENTITY"],
+      nextCursor: "1:1",
+      fetchedCount: 1,
+      excludedCount: 1,
+    });
+    await service.collectIncremental(now);
+    await service.collectIncremental(now);
+    expect((await service.getStatus()).runs[0].errorCode).toBe(
+      "AMBIGUOUS_CLASS_IDENTITY",
+    );
+    fetchWindow.mockRejectedValueOnce(
+      new TenderSourceError(TenderSource.G2B, "HTTP_ERROR", 403),
+    );
+    await service.collectIncremental(now);
+    expect((await service.getStatus()).runs[0].errorCode).toBe(
+      "TERMINAL_HTTP_403|AMBIGUOUS_CLASS_IDENTITY",
+    );
+    expect(await service.collectIncremental(now)).toEqual({
+      processed: false,
+      reason: "TERMINAL_FAILURE",
+    });
+  });
+  it("retains an earlier review through a later clean final page after restart", async () => {
+    await service.startBackfill(now);
+    fetchWindow.mockResolvedValueOnce({
+      items: [],
+      diagnostics: ["AMBIGUOUS_CLASS_IDENTITY"],
+      nextCursor: "1:1",
+      fetchedCount: 1,
+      excludedCount: 1,
+    });
+    await service.collectIncremental(now);
+    fetchWindow.mockResolvedValueOnce({
+      items: [award],
+      nextCursor: null,
+      fetchedCount: 1,
+      excludedCount: 0,
+    });
+    const restarted = new TenderAwardCollectorService(db, {
+      fetchWindow,
+    } as unknown as G2bAwardAdapter);
+    await restarted.collectIncremental(now);
+    expect((await restarted.getStatus()).runs[0]).toMatchObject({
+      status: TenderAwardSyncStatus.SUCCEEDED,
+      errorCode: "AMBIGUOUS_CLASS_IDENTITY",
+      fetchedCount: 2,
+    });
+  });
+
+  it("explicitly acknowledges reviews without clearing a terminal failure or counters", async () => {
+    await service.startBackfill(now);
+    const repo = db.getRepository(TenderAwardSyncRun);
+    const run = await repo.findOneByOrFail({ periodStart: "2024-09-07" });
+    await repo.update(run.id, {
+      errorCode:
+        "TERMINAL_HTTP_403|AMBIGUOUS_CLASS_IDENTITY|INCOMPLETE_AWARD_EVIDENCE",
+      status: TenderAwardSyncStatus.FAILED,
+      cursor: "3:7",
+      fetchedCount: 207,
+    });
+    expect(await service.resetReconciliationDiagnostics(run.id)).toEqual({
+      cleared: true,
+    });
+    expect(await repo.findOneByOrFail({ id: run.id })).toMatchObject({
+      errorCode: "TERMINAL_HTTP_403",
+      status: TenderAwardSyncStatus.FAILED,
+      cursor: "3:7",
+      fetchedCount: 207,
+    });
+    expect(await service.collectIncremental(now)).toEqual({
+      processed: false,
+      reason: "TERMINAL_FAILURE",
+    });
+    expect(await service.resetReconciliationDiagnostics(run.id)).toEqual({
+      cleared: false,
+    });
+  });
+  it("retains review during an active claim and refuses operator reset until worker completion", async () => {
+    await service.startBackfill(now);
+    const repo = db.getRepository(TenderAwardSyncRun);
+    const run = await repo.findOneByOrFail({ periodStart: "2024-09-07" });
+    await repo.update(run.id, { errorCode: "AMBIGUOUS_CLASS_IDENTITY" });
+    let finish!: (page: AwardPage) => void;
+    let started!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    fetchWindow.mockImplementationOnce(() => {
+      started();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    const pending = service.collectIncremental(now);
+    await waiting;
+    try {
+      expect((await service.getStatus()).runs[0].errorCode).toBe(
+        "AMBIGUOUS_CLASS_IDENTITY",
+      );
+      expect(await service.resetReconciliationDiagnostics(run.id)).toEqual({
+        cleared: false,
+      });
+    } finally {
+      finish({
+        items: [],
+        nextCursor: null,
+        fetchedCount: 0,
+        excludedCount: 0,
+      });
+      await pending;
+    }
+    expect(await service.resetReconciliationDiagnostics(run.id)).toEqual({
+      cleared: true,
+    });
+    expect((await service.getStatus()).runs[0]).toMatchObject({
+      errorCode: null,
+      status: TenderAwardSyncStatus.SUCCEEDED,
+    });
+  });
 });

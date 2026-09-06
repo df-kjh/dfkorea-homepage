@@ -29,6 +29,7 @@ const setup = (
       async (identities) => (tracked ? identities : []),
     ),
     calls,
+    fixtures,
   };
 };
 describe("G2bAwardAdapter", () => {
@@ -274,4 +275,87 @@ describe("award authoritative reconciliation regressions", () => {
       expect(page.invalidations).toEqual([]);
     }
   });
+});
+
+describe("award evidence completeness and persisted identity regressions", () => {
+  it.each(["offset", "page"])(
+    "omits colliding classes across %s cursors",
+    async (mode) => {
+      const { adapter, calls, fixtures } = setup((f) => {
+        for (const op of [
+          "getBidPblancListInfoThngPurchsObjPrdct",
+          "getOpengResultListInfoThngPreparPcDetail",
+        ]) {
+          const body = f[op].response.body;
+          body.items.push({ ...body.items[0], bidClsfcNo: "2" });
+          body.totalCount = "2";
+        }
+        const body = f.getScsbidListSttusThng.response.body;
+        if (mode === "offset")
+          body.items.push({
+            ...body.items[0],
+            bidClsfcNo: "2",
+            sucsfbidAmt: "999.99",
+          });
+        body.totalCount = mode === "offset" ? "2" : "101";
+      });
+      const first = await adapter.fetchWindow(window, null);
+      expect(first.items).toEqual([]);
+      expect(first.invalidations).toEqual([]);
+      expect(first.diagnostics).toContain("AMBIGUOUS_CLASS_IDENTITY");
+      expect(first.nextCursor).toBe(mode === "offset" ? "1:1" : "2:0");
+      if (mode === "page")
+        fixtures.getScsbidListSttusThng.response.body.items[0].bidClsfcNo = "2";
+      const second = await adapter.fetchWindow(window, first.nextCursor);
+      expect(second.items).toEqual([]);
+      expect(second.invalidations).toEqual([]);
+      expect(second.diagnostics).toContain("AMBIGUOUS_CLASS_IDENTITY");
+      expect(calls).toHaveLength(8);
+    },
+  );
+  it("does not accept a visible final class absent from the allegedly complete purchase/price evidence", async () => {
+    const { adapter } = setup((f) => {
+      const body = f.getScsbidListSttusThng.response.body;
+      body.items.push({ ...body.items[0], bidClsfcNo: "2" });
+      body.totalCount = "2";
+    });
+    const page = await adapter.fetchWindow(window, null);
+    expect(page.items).toEqual([]);
+    expect(page.invalidations).toEqual([]);
+    expect(page.diagnostics).toContain("AMBIGUOUS_CLASS_IDENTITY");
+  });
+  it.each(["취소공고", "등록공고"])(
+    "rejects incomplete detail counts before %s reconciliation",
+    async (status) => {
+      const { adapter } = setup((f) => {
+        const body = f.getBidPblancListInfoThng.response.body;
+        body.totalCount = "2";
+        body.items[0].ntceKindNm = status;
+      }, true);
+      const page = await adapter.fetchWindow(window, null);
+      expect(page.items).toEqual([]);
+      expect(page.invalidations).toEqual([]);
+      expect(page.diagnostics).toContain("INCOMPLETE_AWARD_EVIDENCE");
+    },
+  );
+  it.each([
+    "getBidPblancListInfoThng",
+    "getBidPblancListInfoThngPurchsObjPrdct",
+    "getOpengResultListInfoThngPreparPcDetail",
+  ])(
+    "rejects identity-incomplete rows in %s before inferring uniqueness",
+    async (operation) => {
+      const { adapter } = setup((f) => {
+        const body = f[operation].response.body;
+        body.items.push({ ...body.items[0], bidNtceOrd: "" });
+        body.totalCount = "2";
+        if (operation === "getBidPblancListInfoThng")
+          body.items[0].ntceKindNm = "취소공고";
+      }, true);
+      const page = await adapter.fetchWindow(window, null);
+      expect(page.items).toEqual([]);
+      expect(page.invalidations).toEqual([]);
+      expect(page.diagnostics).toContain("INCOMPLETE_AWARD_EVIDENCE");
+    },
+  );
 });

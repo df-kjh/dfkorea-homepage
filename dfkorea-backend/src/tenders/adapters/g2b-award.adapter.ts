@@ -28,7 +28,9 @@ export type AwardInvalidation =
       openedAt: Date;
       retainedProductClassification: string | null;
     });
-export type AwardDiagnostic = "AMBIGUOUS_CLASS_IDENTITY";
+export type AwardDiagnostic =
+  | "AMBIGUOUS_CLASS_IDENTITY"
+  | "INCOMPLETE_AWARD_EVIDENCE";
 export interface AwardPage {
   invalidations?: AwardInvalidation[];
   diagnostics?: AwardDiagnostic[];
@@ -116,7 +118,7 @@ export class G2bAwardAdapter {
           ))
       )
         continue;
-      const normalized = await this.enrich(row);
+      const normalized = await this.enrich(row, page.items);
       if (normalized.item) items.push(normalized.item);
       invalidations.push(...normalized.invalidations);
       diagnostics.push(...normalized.diagnostics);
@@ -149,7 +151,10 @@ export class G2bAwardAdapter {
         }
       : null;
   }
-  private async enrich(final: Row): Promise<{
+  private async enrich(
+    final: Row,
+    observedFinals: Row[],
+  ): Promise<{
     item: NormalizedAward | null;
     invalidations: AwardInvalidation[];
     diagnostics: AwardDiagnostic[];
@@ -169,7 +174,10 @@ export class G2bAwardAdapter {
     const details = detailPage.items.filter((row) =>
       this.sameNotice(row, final),
     );
-    if (details.length !== 1 || detailPage.totalCount > 100) return result;
+    if (!this.completeEvidence(detailPage, final) || details.length !== 1) {
+      result.diagnostics.push("INCOMPLETE_AWARD_EVIDENCE");
+      return result;
+    }
     const detail = details[0];
     // Only explicit authoritative notice status invalidates an entire revision.
     // A missing final date, missing page or failed request is never cancellation.
@@ -205,11 +213,13 @@ export class G2bAwardAdapter {
       this.sameNotice(row, final),
     );
     if (
-      productPage.totalCount !== productPage.items.length ||
-      productPage.totalCount > 100 ||
+      !this.completeEvidence(productPage, final) ||
+      noticeProducts.length !== productPage.items.length ||
       noticeProducts.some((row) => !/^\d{1,10}$/.test(String(row.bidClsfcNo)))
-    )
+    ) {
+      result.diagnostics.push("INCOMPLETE_AWARD_EVIDENCE");
       return result;
+    }
     const products = noticeProducts.filter(
       (row) => String(row.bidClsfcNo) === String(final.bidClsfcNo),
     );
@@ -227,6 +237,18 @@ export class G2bAwardAdapter {
     )
       return result;
     const pricePage = await this.fetch(PRICE_OPERATION, identity, 1);
+    if (
+      !this.completeEvidence(pricePage, final) ||
+      pricePage.items.some(
+        (row) =>
+          this.sameNotice(row, final) &&
+          (!/^\d{1,10}$/.test(String(row.bidClsfcNo)) ||
+            !/^\d+$/.test(String(row.rbidNo))),
+      )
+    ) {
+      result.diagnostics.push("INCOMPLETE_AWARD_EVIDENCE");
+      return result;
+    }
     const prices = pricePage.items.filter(
       (row) =>
         this.sameNotice(row, final) &&
@@ -236,13 +258,45 @@ export class G2bAwardAdapter {
     const price = prices[0];
     if (
       !price ||
-      pricePage.totalCount !== pricePage.items.length ||
-      pricePage.totalCount > 100 ||
       prices.some(
         (row) => row.bssamt !== price.bssamt || row.plnprc !== price.plnprc,
       )
     )
       return result;
+    // The database key has no bidClsfcNo. Inspect the complete notice product
+    // map and all observed final/price lots before accepting even the first lot.
+    // This works across final-list offsets/pages because the bounded product and
+    // reserve-price responses cover the whole notice. Unknown lot mappings are
+    // also unsafe; never guess that an unmapped class belongs to another item.
+    const observedClasses = new Set(
+      [...observedFinals, ...pricePage.items]
+        .filter(
+          (row) =>
+            this.sameNotice(row, final) &&
+            String(row.rbidNo) === String(final.rbidNo),
+        )
+        .map((row) => String(row.bidClsfcNo)),
+    );
+    const classProducts = new Map<string, Set<string>>();
+    for (const product of noticeProducts) {
+      const bidClass = String(product.bidClsfcNo);
+      const codes = classProducts.get(bidClass) ?? new Set<string>();
+      codes.add(String(product.dtilPrdctClsfcNo));
+      classProducts.set(bidClass, codes);
+    }
+    const collidingClasses = [...classProducts.values()].filter((codes) =>
+      codes.has(classification),
+    );
+    if (
+      collidingClasses.length > 1 ||
+      [...observedClasses].some((bidClass) => {
+        const codes = classProducts.get(bidClass);
+        return !codes || codes.size !== 1 || !/^\d{10}$/.test([...codes][0]);
+      })
+    ) {
+      result.diagnostics.push("AMBIGUOUS_CLASS_IDENTITY");
+      return result;
+    }
     const basis = positiveDecimal(price.bssamt),
       expected = positiveDecimal(price.plnprc),
       winning = positiveDecimal(final.sucsfbidAmt);
@@ -292,6 +346,22 @@ export class G2bAwardAdapter {
       isFailedBid: false,
     };
     return result;
+  }
+  private completeEvidence(
+    page: { items: Row[]; totalCount: number },
+    final: Row,
+  ): boolean {
+    // Provider counts alone cannot establish uniqueness: every returned row
+    // must also have a complete notice/revision identity in the requested scope.
+    return (
+      page.totalCount === page.items.length &&
+      page.totalCount <= 100 &&
+      page.items.every(
+        (row) =>
+          this.noticeIdentity(row) !== null &&
+          row.bidNtceNo === final.bidNtceNo,
+      )
+    );
   }
   private persistedRate(value: TenderDecimal): string | null {
     const serialized = value.toString(6, true);

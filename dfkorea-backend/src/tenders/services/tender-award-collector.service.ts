@@ -13,6 +13,24 @@ import { classifyAwardFailure } from "../domain/tender-award-failure";
 import { TenderAwardSyncRun } from "../entities/tender-award-sync-run.entity";
 import { TenderAwardResult } from "../entities/tender-award-result.entity";
 import { TenderAwardSyncStatus } from "../domain/tender-analysis.enums";
+const REVIEW_CODES = [
+  "AMBIGUOUS_CLASS_IDENTITY",
+  "INCOMPLETE_AWARD_EVIDENCE",
+] as const;
+function reviewCodes(code: string | null): string[] {
+  return REVIEW_CODES.filter((review) => code?.split("|").includes(review));
+}
+function statusCode(
+  failure: string | null,
+  reviews: Iterable<string>,
+): string | null {
+  const retained = new Set(reviews);
+  return (
+    [failure, ...REVIEW_CODES.filter((review) => retained.has(review))]
+      .filter(Boolean)
+      .join("|") || null
+  );
+}
 const ORDINARY_COLLECTION_LOCK = 824001;
 const AWARD_CLAIM_LOCK = 824006;
 @Injectable()
@@ -76,8 +94,13 @@ export class TenderAwardCollectorService {
           // Fenced row lock and result upserts share a transaction with the cursor.
           // A crash cannot acknowledge data that rolled back; expired workers cannot
           // overwrite a successor's results, even after completing their HTTP call.
-          let reconciliationReview =
-            page.diagnostics?.includes("AMBIGUOUS_CLASS_IDENTITY") ?? false;
+          // A later clean page says nothing about an earlier unresolved notice.
+          // Retain bounded review codes across claims, retries and completion;
+          // only an explicit operator reset acknowledges this unresolved scope.
+          const reviews = new Set([
+            ...reviewCodes(owned.errorCode),
+            ...(page.diagnostics ?? []),
+          ]);
           for (const invalidation of page.invalidations ?? []) {
             const update = manager
               .getRepository(TenderAwardResult)
@@ -113,7 +136,7 @@ export class TenderAwardCollectorService {
               // response cannot assign an old class if multiple active product
               // identities remain. Do not invalidate unrelated historical lots.
               if (activeIdentities.length > 1) {
-                reconciliationReview = true;
+                reviews.add("AMBIGUOUS_CLASS_IDENTITY");
                 continue;
               }
               update.andWhere('"openedAt" = :openedAt', {
@@ -146,7 +169,7 @@ export class TenderAwardCollectorService {
               : TenderAwardSyncStatus.SUCCEEDED,
             leaseToken: null,
             leaseExpiresAt: null,
-            errorCode: reconciliationReview ? "AMBIGUOUS_CLASS_IDENTITY" : null,
+            errorCode: statusCode(null, reviews),
             finishedAt: page.nextCursor ? null : new Date(),
           });
           return true;
@@ -164,7 +187,7 @@ export class TenderAwardCollectorService {
           .update()
           .set({
             status: TenderAwardSyncStatus.FAILED,
-            errorCode: failure.code,
+            errorCode: statusCode(failure.code, reviewCodes(run.errorCode)),
             leaseToken: null,
             leaseExpiresAt: failure.terminal
               ? null
@@ -192,7 +215,8 @@ export class TenderAwardCollectorService {
     }
   }
   /** Explicit operator/service resume after correcting a provider subscription
-   * or configuration. Preserves cursor, counters, completed windows and data. */
+   * or configuration. This explicit reset also acknowledges its review codes;
+   * preserves cursor, counters, completed windows and data. */
   async resumeTerminalFailures(): Promise<{ resumedCount: number }> {
     return this.dataSource.transaction(async (manager) => {
       await manager.query("SELECT pg_advisory_xact_lock($1)", [
@@ -218,6 +242,35 @@ export class TenderAwardCollectorService {
         )
         .execute();
       return { resumedCount: result.affected ?? 0 };
+    });
+  }
+  /** Explicit internal operator acknowledgement after reviewing unresolved
+   * evidence. Never resets a live worker or clears a provider failure/cooldown.
+   * No public API is registered here; callers must authorize the operator. */
+  async resetReconciliationDiagnostics(
+    runId: string,
+  ): Promise<{ cleared: boolean }> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query("SELECT pg_advisory_xact_lock($1)", [
+        AWARD_CLAIM_LOCK,
+      ]);
+      const repo = manager.getRepository(TenderAwardSyncRun);
+      const run = await repo
+        .createQueryBuilder("run")
+        .setLock("pessimistic_write")
+        .where(
+          "run.id = :id AND run.source = 'G2B' AND run.leaseToken IS NULL",
+          { id: runId },
+        )
+        .getOne();
+      if (!run || !reviewCodes(run.errorCode).length) return { cleared: false };
+      const failure =
+        run.errorCode
+          ?.split("|")
+          .find((code) => !REVIEW_CODES.some((review) => review === code)) ??
+        null;
+      await repo.update(run.id, { errorCode: failure });
+      return { cleared: true };
     });
   }
   async getStatus() {
@@ -316,7 +369,6 @@ export class TenderAwardCollectorService {
         leaseToken,
         leaseExpiresAt: () => "CURRENT_TIMESTAMP + INTERVAL '5 minutes'",
         status: TenderAwardSyncStatus.RUNNING,
-        errorCode: null,
       });
       return { ...run, leaseToken };
     });
