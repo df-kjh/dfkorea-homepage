@@ -379,35 +379,35 @@ git commit -m "feat: score tender suitability with evidence"
 - Produces: `TenderAwardCollectorService.startBackfill(now)`, `collectIncremental(now)`, and `getStatus()`.
 - Produces: `TenderPriceAnalyzer.analyze(requirements, awards): TenderPriceAnalysis`.
 
-- [ ] **Step 1: Write failing award adapter tests with full provider fixtures**
+- [x] **Step 1: Write failing award adapter tests with full provider fixtures**
 
 Assert mapping for final G2B goods results, decimal-string precision, cancellation/rebid/failure exclusion, page cursors, and absence of bidder identity in returned normalized data.
 
-- [ ] **Step 2: Write failing collector lease and resume tests**
+- [x] **Step 2: Write failing collector lease and resume tests**
 
 Use a real repository/service boundary where possible. Assert monthly windows cover exactly `[now-2 years, now]`, cursor commits only after result upserts, duplicate identities update without duplicate rows, and a second replica cannot claim the same window.
 
-- [ ] **Step 3: Run and verify RED**
+- [x] **Step 3: Run and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/adapters/g2b-award.adapter.spec.ts tenders/services/tender-award-collector.service.spec.ts`
 
-- [ ] **Step 4: Implement adapter and collector**
+- [x] **Step 4: Implement adapter and collector**
 
 Reuse the same `PUBLIC_DATA_SERVICE_KEY`, pacing, safe retry classification, and relay fallback pattern. Filter LED-related goods before persistence and store only the schema from Task 1. Process one monthly page budget per scheduled tick so ordinary tender collection retains capacity.
 
-- [ ] **Step 5: Write price-statistic tests and verify RED**
+- [x] **Step 5: Write price-statistic tests and verify RED**
 
 Hand-calculate fixtures for `basis=100000000`, historical adjustment median `0.9982`, and winning-rate median `0.8886`; expect `88700052` before display rounding. Test IQR outliers and sample boundaries 14/15/29/30/99/100. Test matching fallback order and reject mixed unit/total contracts.
 
-- [ ] **Step 6: Implement price analysis**
+- [x] **Step 6: Implement price analysis**
 
 Use decimal arithmetic rather than JS float for money. Produce official range only when all variables are available; missing A-value or special formula produces `FORMULA_REVIEW_REQUIRED`. Statistics return median, P25/P75, sample count, matching level, period, and confidence.
 
-- [ ] **Step 7: Run and verify GREEN**
+- [x] **Step 7: Run and verify GREEN**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/adapters/g2b-award.adapter.spec.ts tenders/services/tender-award-collector.service.spec.ts tenders/domain/tender-price-analyzer.spec.ts`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add dfkorea-backend/src/tenders/adapters/g2b-award.adapter.ts dfkorea-backend/src/tenders/adapters/g2b-award.adapter.spec.ts dfkorea-backend/src/tenders/services/tender-award-collector.service.ts dfkorea-backend/src/tenders/services/tender-award-collector.service.spec.ts dfkorea-backend/src/tenders/domain/tender-price-analyzer.ts dfkorea-backend/src/tenders/domain/tender-price-analyzer.spec.ts dfkorea-backend/src/tenders/tenders.module.ts
