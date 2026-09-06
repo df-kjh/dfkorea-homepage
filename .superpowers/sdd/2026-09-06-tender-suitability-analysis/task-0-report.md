@@ -41,7 +41,7 @@ Tests:       39 skipped, 424 passed, 463 total
 
 ## Commit hash
 
-Recorded in the task completion result after this report is committed.
+Implementation baseline repair: `0edc322abd51fdc3fd7b6c970291fad5456fdfb9` (`fix: archive quote deployment record`).
 
 ## Self-review
 
@@ -54,3 +54,7 @@ Recorded in the task completion result after this report is committed.
 ## Concerns
 
 The full backend suite emitted three expected `TenderIngestionService` warning logs for simulated HTTP 503 retry scenarios. Jest completed successfully with no failed suites or tests.
+
+## Fix round 1
+
+The implementation commit hash is now recorded explicitly after review identified that the original report deferred it to the task completion result.
