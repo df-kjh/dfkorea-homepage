@@ -572,6 +572,84 @@ describe("verified G2B production pricing context", () => {
       serviceKey: "fixture",
     }).enrich(tender, new AbortController().signal);
   };
+  const priceFor = (result: Awaited<ReturnType<typeof enriched>>) =>
+    new TenderPriceAnalyzer().analyze(
+      {
+        ...new TenderRequirementParser().parse(result, []),
+        pricingContext: {
+          contractKind: "UNKNOWN",
+          currency: "UNKNOWN",
+          formulaKind: "UNKNOWN",
+          ...result.pricingContext,
+          source: "G2B",
+          now: new Date(),
+        },
+      },
+      [],
+    );
+  const wraps = [
+    [" ", ""],
+    ["\n", ""],
+    ["\r\n", ""],
+    [", ", ""],
+    [" (", ")"],
+    [" [", "]"],
+    [" {", "}"],
+    [" · ", ""],
+    ["（", "）"],
+    ["\n[", "]\n"],
+  ];
+  it.each(wraps)(
+    "retains pricing qualifiers across %j ... %j",
+    async (open, close) => {
+      for (const qualifier of [
+        "미확정",
+        "미 확정",
+        "여부",
+        "확인 필요",
+        "가능",
+        "예정",
+        "검토",
+        "조건부",
+        "적용할 경우",
+        "미적용 아님",
+        "A값 적용",
+      ]) {
+        for (const declaration of ["A값 미적용", "총액입찰", "원화 KRW"]) {
+          const facts = ["총액입찰", "원화 KRW", "A값 미적용"].map((fact) =>
+            fact === declaration ? `${fact}${open}${qualifier}${close}` : fact,
+          );
+          const result = await enriched({
+            bidNtceNm: `LED 구매 (${facts.join(", ")})`,
+          });
+          expect({
+            title: facts.join(", "),
+            status: priceFor(result).official.status,
+          }).toEqual({
+            title: facts.join(", "),
+            status: "FORMULA_REVIEW_REQUIRED",
+          });
+          expect(result.pricingContext).toBeUndefined();
+        }
+      }
+    },
+  );
+  it.each(wraps)(
+    "accepts confirmed declarations across %j ... %j",
+    async (open, close) => {
+      for (const noA of ["A값 미적용", "A 값 미적용 대상"]) {
+        const title = `LED 구매 ${["총액입찰", "원화 KRW", noA].map((fact) => `${open}${fact}${close}`).join(", ")}`;
+        const result = await enriched({ bidNtceNm: title });
+        expect(priceFor(result).official.status).toBe("AVAILABLE");
+      }
+    },
+  );
+  it("withholds oversized declaration context instead of inspecting a truncated prefix", async () => {
+    const result = await enriched({
+      bidNtceNm: `LED 구매 (총액입찰, 원화 KRW, A값 미적용)${" ".repeat(4096)}미확정`,
+    });
+    expect(priceFor(result).official.status).toBe("FORMULA_REVIEW_REQUIRED");
+  });
   it("emits supported total KRW context only with explicit official facts", async () => {
     expect((await enriched()).pricingContext).toMatchObject({
       contractKind: "TOTAL",

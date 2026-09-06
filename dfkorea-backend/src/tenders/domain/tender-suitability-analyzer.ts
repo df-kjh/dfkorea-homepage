@@ -409,6 +409,12 @@ interface ProductEvaluation {
   unknown: number;
 }
 
+const candidateHasUnknown = (candidate: ProductEvaluation): boolean =>
+  candidate.unknown > 0 ||
+  candidate.certifications.some(
+    ({ state }) => state === TenderRequirementState.UNKNOWN,
+  );
+
 const rankCandidate = (
   candidate: Omit<ProductEvaluation, "exactScore" | "suitability">,
 ): ProductEvaluation => {
@@ -531,19 +537,12 @@ export class TenderSuitabilityAnalyzer {
   ): TenderSuitabilityResult {
     const currentDate = koreanCalendarDate(now);
     const selectedByItem = new Map<string, ProductEvaluation | null>();
-    const specificationResults: TenderRequirementEvaluation[] = [];
+    const candidatesByItem = new Map<string, ProductEvaluation[]>();
 
     for (const item of requirements.items) {
       if (item.assignment === "UNASSIGNED") {
         selectedByItem.set(item.key, null);
-        specificationResults.push(
-          ...item.specifications.map((requirement) => ({
-            requirementId: requirement.id,
-            state: TenderRequirementState.UNKNOWN,
-            required: requirement.required,
-            evidenceIds: requirement.evidenceIds,
-          })),
-        );
+        candidatesByItem.set(item.key, []);
         continue;
       }
       const itemCertifications = requirements.certifications.filter(
@@ -630,50 +629,33 @@ export class TenderSuitabilityAnalyzer {
             canonicalJson(right.product),
           ),
       );
-      const selected = candidates[0] ?? null;
-      selectedByItem.set(item.key, selected);
-      specificationResults.push(
-        ...(selected?.specifications ??
-          item.specifications.map((requirement) => ({
-            requirementId: requirement.id,
-            state: TenderRequirementState.UNKNOWN,
-            required: requirement.required,
-            evidenceIds: requirement.evidenceIds,
-          }))),
-      );
+      selectedByItem.set(item.key, candidates[0] ?? null);
+      // Retain only representatives needed by the outcome proof. Each row is
+      // evaluated once; keeping every product for every item is unnecessary.
+      candidatesByItem.set(item.key, [
+        ...new Set(
+          [
+            candidates[0],
+            candidates.find(
+              (candidate) =>
+                candidate.mandatoryCertificationRank === 0 &&
+                !candidateHasUnknown(candidate),
+            ),
+            candidates.find(
+              (candidate) => candidate.mandatoryCertificationRank < 2,
+            ),
+            candidates.find(
+              (candidate) =>
+                candidate.mandatoryCertificationRank < 2 &&
+                candidateHasUnknown(candidate),
+            ),
+          ].filter(
+            (candidate): candidate is ProductEvaluation =>
+              candidate !== undefined,
+          ),
+        ),
+      ]);
     }
-
-    const certificationResults = requirements.certifications.map(
-      (requirement) => {
-        const itemKeys = requirement.itemKeys.length
-          ? requirement.itemKeys
-          : [...selectedByItem.keys()];
-        const states = itemKeys.map((itemKey) => {
-          const selected = selectedByItem.get(itemKey);
-          return selected
-            ? evaluateCertificationForProduct(
-                requirement,
-                selected.product,
-                profile,
-                currentDate,
-              )
-            : TenderRequirementState.UNKNOWN;
-        });
-        const state = states.includes(TenderRequirementState.UNSATISFIED)
-          ? TenderRequirementState.UNSATISFIED
-          : states.length &&
-              states.every((item) => item === TenderRequirementState.SATISFIED)
-            ? TenderRequirementState.SATISFIED
-            : TenderRequirementState.UNKNOWN;
-        return {
-          requirementId: requirement.id,
-          state,
-          required: requirement.required,
-          evidenceIds: requirement.evidenceIds,
-        };
-      },
-    );
-
     const participationResults = requirements.participationConditions.map(
       (condition) => ({
         requirementId: condition.id,
@@ -681,6 +663,130 @@ export class TenderSuitabilityAnalyzer {
         required: condition.required,
         evidenceIds: condition.evidenceIds,
       }),
+    );
+    const summarize = (selection: Map<string, ProductEvaluation | null>) =>
+      this.summarizeSelection(requirements, selection, participationResults);
+    const plans: Map<string, ProductEvaluation | null>[] = [];
+    const fullyKnown = new Map<string, ProductEvaluation | null>();
+    const withoutHardFailure = new Map<string, ProductEvaluation | null>();
+    for (const [key, candidates] of candidatesByItem) {
+      const known = candidates.find(
+        (candidate) =>
+          candidate.mandatoryCertificationRank === 0 &&
+          !candidateHasUnknown(candidate),
+      );
+      if (known) fullyKnown.set(key, known);
+      const noHardFailure = candidates.find(
+        (candidate) => candidate.mandatoryCertificationRank < 2,
+      );
+      if (noHardFailure || !candidates.length)
+        withoutHardFailure.set(key, noHardFailure ?? null);
+    }
+    // With no UNKNOWN, each item's weighted denominator is fixed. Its best
+    // coherent known candidate therefore maximizes the whole-tender raw score.
+    // This plan proves whether a >=80 recommendation exists; a locally REVIEW
+    // item (e.g. 50%) must not be replaced before aggregating the other items.
+    if (fullyKnown.size === candidatesByItem.size) plans.push(fullyKnown);
+    if (withoutHardFailure.size === candidatesByItem.size) {
+      plans.push(withoutHardFailure);
+      // A known low-score item combination may be DIFFICULT while another
+      // coherent combination is REVIEW due to missing evidence. Force one
+      // uncertain candidate if local ranking happened to hide all of them.
+      // Only one replacement is needed to establish UNKNOWN. No combinations
+      // of the candidate matrix are enumerated.
+      if (
+        ![...withoutHardFailure.values()].some(
+          (candidate) => !candidate || candidateHasUnknown(candidate),
+        )
+      ) {
+        for (const [key, candidates] of [...candidatesByItem].sort(
+          ([left], [right]) => left.localeCompare(right),
+        )) {
+          const uncertain = candidates.find(
+            (candidate) =>
+              candidate.mandatoryCertificationRank < 2 &&
+              candidateHasUnknown(candidate),
+          );
+          if (uncertain) {
+            const reviewPlan = new Map(withoutHardFailure);
+            reviewPlan.set(key, uncertain);
+            plans.push(reviewPlan);
+            break;
+          }
+        }
+      }
+    }
+    plans.push(selectedByItem);
+    // Prefer complete evidence for status ties by evaluating the fully known
+    // plan first. Status always belongs to the entire tender, never one item.
+    const result = plans
+      .map(summarize)
+      .reduce((best, candidate) =>
+        suitabilityRank[candidate.suitability] <
+        suitabilityRank[best.suitability]
+          ? candidate
+          : best,
+      );
+    return {
+      ...result,
+      inputFingerprints: resultFingerprintInputs(
+        requirements,
+        profile,
+        products,
+      ),
+    };
+  }
+
+  private summarizeSelection(
+    requirements: ParsedTenderRequirements,
+    selectedByItem: Map<string, ProductEvaluation | null>,
+    participationResults: TenderRequirementEvaluation[],
+  ): Omit<TenderSuitabilityResult, "inputFingerprints"> {
+    const specificationResults = requirements.items.flatMap(
+      (item) =>
+        selectedByItem.get(item.key)?.specifications ??
+        item.specifications.map((requirement) => ({
+          requirementId: requirement.id,
+          state: TenderRequirementState.UNKNOWN,
+          required: requirement.required,
+          evidenceIds: requirement.evidenceIds,
+        })),
+    );
+    const certificationResults = requirements.certifications.map(
+      (requirement) => {
+        const itemKeys = requirement.itemKeys.length
+          ? requirement.itemKeys
+          : [...selectedByItem.keys()];
+        const states = itemKeys.map((itemKey) => {
+          const selected = selectedByItem.get(itemKey);
+          return (
+            selected?.certifications.find(
+              ({ requirementId }) => requirementId === requirement.id,
+            )?.state ?? TenderRequirementState.UNKNOWN
+          );
+        });
+        // A mandatory failure still decides DIFFICULT. For a reference
+        // certification, another item's absence must not hide missing evidence
+        // that makes the coherent whole-tender selection require review.
+        const state =
+          !requirement.required &&
+          states.includes(TenderRequirementState.UNKNOWN)
+            ? TenderRequirementState.UNKNOWN
+            : states.includes(TenderRequirementState.UNSATISFIED)
+              ? TenderRequirementState.UNSATISFIED
+              : states.length &&
+                  states.every(
+                    (item) => item === TenderRequirementState.SATISFIED,
+                  )
+                ? TenderRequirementState.SATISFIED
+                : TenderRequirementState.UNKNOWN;
+        return {
+          requirementId: requirement.id,
+          state,
+          required: requirement.required,
+          evidenceIds: requirement.evidenceIds,
+        };
+      },
     );
 
     const satisfiedCount = specificationResults.filter(
@@ -720,6 +826,9 @@ export class TenderSuitabilityAnalyzer {
         required && state === TenderRequirementState.UNSATISFIED,
     );
     const hasUnknown =
+      [...selectedByItem.values()].some(
+        (candidate) => !candidate || candidateHasUnknown(candidate),
+      ) ||
       unknownCount > 0 ||
       qualificationResults.some(
         ({ state }) => state === TenderRequirementState.UNKNOWN,
@@ -741,11 +850,6 @@ export class TenderSuitabilityAnalyzer {
       certifications: certificationResults,
       participationConditions: participationResults,
       evidence: requirements.evidence,
-      inputFingerprints: resultFingerprintInputs(
-        requirements,
-        profile,
-        products,
-      ),
     };
   }
 }

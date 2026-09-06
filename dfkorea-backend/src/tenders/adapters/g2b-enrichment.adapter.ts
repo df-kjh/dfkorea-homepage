@@ -242,34 +242,41 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
   }
 
   private hasAffirmativePricingDeclarations(title: string): boolean {
-    // A keyword inside a question, conditional or denial is not a fact. Keep
-    // this intentionally narrow: each title clause mentioning a pricing fact
-    // must be a complete affirmative declaration, including repeated mentions.
-    // Unknown grammar stays unpriced instead of guessing the provider's intent.
+    // The whole bounded title is the declaration context. Never truncate it or
+    // split it into punctuation-delimited proof fragments: a wrapped qualifier
+    // still qualifies the adjacent declaration. Unknown tail grammar is unsafe.
+    if (title.length > 2048) return false;
+    const normalized = title.normalize("NFKC");
+    if (/[?？]/.test(normalized)) return false;
+    const context = normalized.replace(
+      /[\s()[\]{}.,;:·/「」『』〈〉《》【】〔〕]+/g,
+      "",
+    );
     if (
-      /여부|가능|확인|검토|필요|예정|조건|경우|(?:라|이)면|불가|아니|아님|않|제외|변경/i.test(
-        title,
+      /여부|확인|미확정|미정|잠정|추후|가정|가능|예정|검토|필요|조건|경우|(?:라|이)면|불가|아니|아님|않|제외|변경/i.test(
+        context,
       )
     )
       return false;
-    const clauses = title
-      .split(/[()[\]{};,，；·\n]/)
-      .map((value) => value.trim());
+    const start = context.search(/총액|원화|KRW|A값/i);
+    if (start < 0) return false;
     const declarations = [
-      { mentions: /총액/, affirmative: /^총액(?:입찰)?(?:\s*(?:방식|대상))?$/ },
-      {
-        mentions: /원화|\bKRW\b/i,
-        affirmative: /^(?:원화(?:\s*KRW)?|KRW)(?:\s*(?:결제|입찰))?$/i,
-      },
-      { mentions: /A\s*값/i, affirmative: /^A\s*값\s*미적용(?:\s*대상)?$/i },
+      /^총액(?:입찰)?(?:방식|대상)?/i,
+      /^(?:원화(?:KRW)?|KRW)(?:결제|입찰)?/i,
+      /^A값미적용(?:대상)?/i,
     ];
-    return declarations.every(({ mentions, affirmative }) => {
-      const matching = clauses.filter((clause) => mentions.test(clause));
-      return (
-        matching.length > 0 &&
-        matching.every((clause) => affirmative.test(clause))
+    const found = new Set<number>();
+    let remaining = context.slice(start);
+    while (remaining) {
+      const index = declarations.findIndex((pattern) =>
+        pattern.test(remaining),
       );
-    });
+      if (index < 0) return false;
+      const declaration = declarations[index].exec(remaining)![0];
+      found.add(index);
+      remaining = remaining.slice(declaration.length);
+    }
+    return found.size === declarations.length;
   }
 
   private fetchOperation(

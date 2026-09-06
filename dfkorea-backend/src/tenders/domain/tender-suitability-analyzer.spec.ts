@@ -1871,6 +1871,264 @@ describe("certification-aware coherent candidate selection", () => {
   });
 });
 
+describe("whole-tender coherent candidate selection", () => {
+  const input = (counts: number[], passesOnFirst: number) =>
+    requirements({
+      items: counts.map((count, itemIndex) => ({
+        key: `item:${itemIndex + 1}`,
+        classificationCode: "39112102",
+        evidenceIds: [],
+        specifications: Array.from({ length: count }, (_, index) => ({
+          ...spec(`spec-${itemIndex}-${index}`, true, "40"),
+          itemKey: `item:${itemIndex + 1}`,
+          ...(itemIndex === 0 && index >= passesOnFirst
+            ? { kind: "CRI" as const, value: "80" }
+            : {}),
+        })),
+      })),
+      certifications: [
+        {
+          id: "ks",
+          code: "KS",
+          name: "KS",
+          required: true,
+          itemKeys: [],
+          evidenceIds: [],
+        },
+      ],
+    });
+  const known = product("private-known", {
+    power: [40],
+    colorRendering: "70",
+    certifications: ["KS"],
+  });
+  const unknownSpec = product("private-unknown-spec", {
+    power: [40],
+    certifications: ["KS"],
+  });
+  const unknownCert = product("private-unknown-cert", {
+    power: [40],
+    colorRendering: "90",
+    certifications: undefined,
+  });
+  const failedCert = product("private-failed-cert", {
+    power: [40],
+    colorRendering: "90",
+    certifications: [],
+  });
+  const run = (
+    parsed: ParsedTenderRequirements,
+    catalog: TenderProductSnapshot[],
+  ) => new TenderSuitabilityAnalyzer().analyze(parsed, profile(), catalog, now);
+  it("preserves aggregate 80% when one item is known 50% and the other is known 100%", () => {
+    const parsed = input([2, 3], 1);
+    expect(run(parsed, [known])).toMatchObject({
+      suitability: "RECOMMENDED",
+      specificationScore: 80,
+      unknownCount: 0,
+    });
+    for (const catalog of [
+      [known, unknownSpec],
+      [unknownSpec, known],
+    ]) {
+      const result = run(parsed, catalog);
+      expect(result).toMatchObject({
+        suitability: "RECOMMENDED",
+        specificationScore: 80,
+        unknownCount: 0,
+        satisfiedCount: 4,
+        unsatisfiedCount: 1,
+      });
+      expect(JSON.stringify(result)).not.toContain("private-");
+    }
+  });
+  it.each([
+    [2, 79],
+    [2, 80],
+    [3, 79],
+    [3, 80],
+  ])(
+    "retains strongest status for %i items at aggregate %i",
+    (itemCount, score) => {
+      const parsed = input(
+        itemCount === 2 ? [50, 50] : [50, 25, 25],
+        score - 50,
+      );
+      for (const extra of [
+        [unknownSpec],
+        [unknownCert],
+        [failedCert],
+        [unknownSpec, unknownCert, failedCert],
+      ]) {
+        const catalog = [known, ...extra];
+        const result = run(parsed, catalog);
+        expect(result.suitability).toBe(
+          score === 80 ? "RECOMMENDED" : "REVIEW",
+        );
+        expect(result).toEqual(run(parsed, [...catalog].reverse()));
+        if (score === 80)
+          expect(result).toMatchObject({
+            specificationScore: 80,
+            unknownCount: 0,
+          });
+      }
+    },
+  );
+  it("chooses an available whole-tender REVIEW even when local recommendations would retain DIFFICULT", () => {
+    const parsed = input([1, 4], 1);
+    parsed.items[1].specifications = parsed.items[1].specifications.map(
+      (requirement) => ({ ...requirement, kind: "CRI", value: "80" }),
+    );
+    const uncertain = product("private-uncertain", {
+      power: [],
+      colorRendering: "70",
+      certifications: ["KS"],
+    });
+    expect(run(parsed, [known]).suitability).toBe("DIFFICULT");
+    const result = run(parsed, [known, uncertain]);
+    expect(result.suitability).toBe("REVIEW");
+    expect(result).toEqual(run(parsed, [uncertain, known]));
+  });
+  it("preserves unknown optional certification evidence across different selected products", () => {
+    const parsed = input([4, 1], 4);
+    parsed.certifications[0].required = false;
+    parsed.items[1].specifications[0] = {
+      ...parsed.items[1].specifications[0],
+      kind: "CRI",
+      value: "80",
+    };
+    const unknown = product("private-unknown", {
+      power: [40],
+      certifications: undefined,
+    });
+    const absent = product("private-absent", {
+      power: [10],
+      colorRendering: "90",
+      certifications: [],
+    });
+    expect(run(parsed, [unknown, absent])).toMatchObject({
+      suitability: "REVIEW",
+      specificationScore: 100,
+      certifications: [{ state: "UNKNOWN" }],
+    });
+  });
+  it("keeps an unassigned item unknown even when it has no comparable specifications", () => {
+    const parsed = input([2, 3], 1);
+    parsed.items.push({
+      key: "unassigned",
+      classificationCode: null,
+      specifications: [],
+      evidenceIds: [],
+      assignment: "UNASSIGNED",
+    });
+    parsed.certifications = [];
+    expect(run(parsed, [known]).suitability).toBe("REVIEW");
+    expect(run(parsed, [known, unknownSpec]).suitability).toBe("REVIEW");
+  });
+  it.each([
+    [2, 79],
+    [2, 80],
+    [3, 79],
+    [3, 80],
+  ])(
+    "matches exhaustive strongest-status proof for %i items at %i without mixing snapshots",
+    (itemCount, score) => {
+      const counts = itemCount === 2 ? [50, 50] : [50, 25, 25];
+      const parsed = input(counts, score - 50);
+      const pool = [
+        known,
+        unknownSpec,
+        unknownCert,
+        failedCert,
+        product("private-fails", {
+          power: [10],
+          colorRendering: "70",
+          certifications: ["KS"],
+        }),
+      ];
+      // The tiny oracle enumerates actual whole-product selections only. The
+      // production planner must achieve its strongest class without enumeration.
+      const oracle = (catalog: TenderProductSnapshot[]) => {
+        let best = 2;
+        const visit = (
+          item: number,
+          passed: number,
+          failed: number,
+          unknown: boolean,
+          hard: boolean,
+        ) => {
+          if (item === counts.length) {
+            const raw =
+              passed + failed ? (passed / (passed + failed)) * 100 : null;
+            const grade = hard
+              ? 2
+              : unknown || raw === null
+                ? 1
+                : raw >= 80
+                  ? 0
+                  : raw >= 50
+                    ? 1
+                    : 2;
+            best = Math.min(best, grade);
+            return;
+          }
+          for (const candidate of catalog) {
+            const power = candidate.power.length
+              ? candidate.power.some((value) => value >= 40)
+              : null;
+            const cri =
+              candidate.colorRendering === undefined
+                ? null
+                : Number(candidate.colorRendering) >= 80;
+            const cert =
+              candidate.certifications === undefined
+                ? null
+                : candidate.certifications.includes("KS");
+            const powerCount = item === 0 ? score - 50 : counts[item];
+            const criCount = counts[item] - powerCount;
+            visit(
+              item + 1,
+              passed + (power ? powerCount : 0) + (cri ? criCount : 0),
+              failed +
+                (power === false ? powerCount : 0) +
+                (cri === false ? criCount : 0),
+              unknown ||
+                cert === null ||
+                (power === null && powerCount > 0) ||
+                (cri === null && criCount > 0),
+              hard || cert === false,
+            );
+          }
+        };
+        visit(0, 0, 0, false, false);
+        return ["RECOMMENDED", "REVIEW", "DIFFICULT"][best];
+      };
+      for (let mask = 1; mask < 1 << pool.length; mask++) {
+        const catalog = pool.filter((_candidate, index) => mask & (1 << index));
+        const result = run(parsed, catalog);
+        expect(result.suitability).toBe(oracle(catalog));
+        expect(result).toEqual(run(parsed, [...catalog].reverse()));
+      }
+    },
+  );
+  it("never combines a product's passing specs with another product's certifications across items", () => {
+    const parsed = input([2, 3], 1);
+    const certifiedFailure = product("private-certified-failure", {
+      power: [10],
+      colorRendering: "70",
+      certifications: ["KS"],
+    });
+    const result = run(parsed, [certifiedFailure, failedCert]);
+    expect(result).toMatchObject({
+      suitability: "DIFFICULT",
+      specificationScore: 0,
+      satisfiedCount: 0,
+      certifications: [{ state: "SATISFIED" }],
+    });
+    expect(result).toEqual(run(parsed, [failedCert, certifiedFailure]));
+  });
+});
+
 describe("Korean calendar qualification expiry", () => {
   it.each(["LICENSE", "COMPANY_TYPE", "DIRECT_PRODUCTION"] as const)(
     "expires %s at midnight KST",
