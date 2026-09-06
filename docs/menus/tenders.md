@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 입찰 첨부문서 추출의 독립 백엔드 어댑터를 구현했다. HWP 5.x/HWPX/PDF/DOCX/XLSX를 메모리에서 읽어 순번·쪽/섹션/sheet 위치가 있는 문단·표 블록으로 변환한다. 암호화, 손상, OCR 필요, 미지원, 크기·압축·시간 제한은 안전한 오류 코드로 반환하며 원본·파서 오류 본문을 저장하거나 로그에 남기지 않는다. 아직 실제 분석 작업·관리자 화면에는 연결하지 않았다.
+
 - 관리자 좌측 메뉴의 `입찰 공고` 탭에서 등록일 기준 월간 공고를 조회한다.
 - 캘린더는 이전·다음 달 날짜를 포함한 7열 × 6주, 총 42개 셀을 항상 표시한다.
 - 월간 전체·💡 직접 관련·⚡ 잠재 관련 건수와 일자별 건수를 표시하고, 날짜를 선택하면 해당 날짜의 목록을 페이지 단위로 조회한다.
@@ -35,6 +37,10 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 문서 추출은 직접 생성한 유효 형식 fixture와 내부 손상·제한 계약으로 검증했다. 운영 공고의 공개 문서 표본을 검증하기 전에는 분석 파이프라인에 활성화하지 않는다. PDF 표는 텍스트 기준선과 반복된 열 정렬을 이용한 추정이며 OCR·복잡한 다단 편집·병합 셀의 시각 배치를 재구성하지 않는다. 이미지 전용 PDF는 `DOCUMENT_OCR_REQUIRED`, 일부 빈/이미지 쪽은 `PARTIAL`이다.
+- 추출기는 20 MiB 입력, 10 MiB 출력 텍스트, 15초 worker 종료, ZIP/CFB entry 4,096개, 전체 압축 해제 40 MiB와 100:1 압축비 제한을 적용한다. XML은 문자열·AST를 만들기 전 원본 XML 합계도 10 MiB로 제한하며 DTD/사용자 entity를 거부하므로 큰 서식 정보가 있는 문서는 텍스트가 작아도 제한될 수 있다. PDF는 직접 stream length와 단일 Flate 필터를 사전 검증하며 간접 길이·복합/미지원 필터는 `DOCUMENT_UNSUPPORTED`로 남긴다.
+- HWP의 본문 밖 머리말·각주·도형, 중첩 표 및 DOCX의 복잡한 병합·비텍스트 구성은 완전한 해석 범위가 아니다. XLSX는 계산을 실행하지 않고 저장된 formula 결과와 표시 형식을 사용하며 결과 cache가 없으면 `PARTIAL`이다. 숨김 sheet는 metadata에 명시하고 내용도 근거에 포함한다.
+
 - 나라장터·K-apt는 공식 응답 fixture와 어댑터 계약 테스트만 통과했다. 공공데이터포털에서 승인된 실운영 키로 실제 응답을 받은 검증은 아직 하지 않았다.
 - K-apt canonical 상세 경로는 실공고 표본에서 HTTP 200 응답을 확인했지만, 공고별 게시 종료·삭제와 외부 사이트의 향후 경로 변경까지 애플리케이션이 보장할 수는 없다. 배포 후 운영 공고 표본의 `공식 원문 열기`를 주기적으로 확인해야 한다.
 - 한전은 LINK API의 승인 계정·실제 OpenAPI 매뉴얼이 없어 기록 계약 fixture만 사용한다. `KEPCO_TENDER_ENABLED=false`가 기본이며, 실제 base URL·인증 파라미터·필드 매핑 검증 전에는 활성화하면 안 된다.
@@ -47,6 +53,11 @@
 - 이미 운영 DB에 적용된 `opportunityType`·`opportunityReasons` 컬럼은 기존 데이터와 마이그레이션 이력을 보호하기 위해 삭제하지 않는다. 현재 애플리케이션은 이 레거시 컬럼을 조회·메일 대상 제한에 사용하지 않는다.
 
 ## 관련 파일
+
+- `dfkorea-backend/src/tenders/documents/tender-document-extractor.ts`
+- `dfkorea-backend/src/tenders/documents/tender-document-extraction.worker.ts`
+- `dfkorea-backend/src/tenders/documents/extractors/`
+- `dfkorea-backend/src/tenders/documents/fixtures/`
 
 - `led-lighting-website/src/views/admin/AdminDashboard.vue`
 - `led-lighting-website/src/components/admin/TenderManagement.vue`
