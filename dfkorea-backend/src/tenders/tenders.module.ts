@@ -12,8 +12,17 @@ import { G2bTenderAdapter } from "./adapters/g2b-tender.adapter";
 import { createG2bRelayFetcher } from "./adapters/g2b-relay.fetcher";
 import { KaptTenderAdapter } from "./adapters/kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./adapters/kepco-tender.adapter";
+import { G2bEnrichmentAdapter } from "./adapters/g2b-enrichment.adapter";
+import { KaptEnrichmentAdapter } from "./adapters/kapt-enrichment.adapter";
 import { TenderClassifier } from "./domain/tender-classifier";
 import { TENDER_SOURCE_ADAPTERS } from "./domain/tender-source.adapter";
+import {
+  G2B_TENDER_ENRICHMENT_ADAPTER,
+  KAPT_TENDER_ENRICHMENT_ADAPTER,
+  TENDER_DOCUMENT_FETCHER,
+  TENDER_ENRICHMENT_ADAPTERS,
+} from "./domain/tender-enrichment";
+import { TenderDocumentFetcher } from "./documents/tender-document-fetcher";
 import { Tender } from "./entities/tender.entity";
 import { TenderMailDelivery } from "./entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "./entities/tender-mail-item.entity";
@@ -134,6 +143,35 @@ const createSafeRetryLogger = (context: string) => {
       inject: [G2B_TENDER_ADAPTER, KAPT_TENDER_ADAPTER, KEPCO_TENDER_ADAPTER],
       useFactory: (g2b, kapt, kepco) => [g2b, kapt, kepco],
     },
+    {
+      provide: G2B_TENDER_ENRICHMENT_ADAPTER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        new G2bEnrichmentAdapter(
+          new PublicApiClient(undefined, {
+            minimumRequestIntervalMs: 1_100,
+            retryDelaysMs: [1_000, 3_000],
+            onRetry: createSafeRetryLogger("G2bEnrichmentPublicApiClient"),
+          }),
+          {
+            baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
+            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+          },
+        ),
+    },
+    {
+      provide: KAPT_TENDER_ENRICHMENT_ADAPTER,
+      useFactory: () => new KaptEnrichmentAdapter(),
+    },
+    {
+      provide: TENDER_ENRICHMENT_ADAPTERS,
+      inject: [G2B_TENDER_ENRICHMENT_ADAPTER, KAPT_TENDER_ENRICHMENT_ADAPTER],
+      useFactory: (g2b, kapt) => [g2b, kapt],
+    },
+    {
+      provide: TENDER_DOCUMENT_FETCHER,
+      useFactory: () => new TenderDocumentFetcher(),
+    },
     TenderIngestionService,
     TenderMailRenderer,
     NaverWorksTokenCipher,
@@ -157,6 +195,10 @@ const createSafeRetryLogger = (context: string) => {
     TenderQueryService,
     TenderSubscriptionService,
     TenderCompanyProfileService,
+    G2B_TENDER_ENRICHMENT_ADAPTER,
+    KAPT_TENDER_ENRICHMENT_ADAPTER,
+    TENDER_ENRICHMENT_ADAPTERS,
+    TENDER_DOCUMENT_FETCHER,
   ],
 })
 export class TendersModule {}

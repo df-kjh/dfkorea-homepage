@@ -1,25 +1,67 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-export const G2B_RELAY_OPERATIONS = ['getBidPblancListInfoThng'] as const
+export const G2B_RELAY_OPERATIONS = [
+  'getBidPblancListInfoThng',
+  'getBidPblancListInfoThngBsisAmount',
+  'getBidPblancListInfoLicenseLimit',
+  'getBidPblancListInfoPrtcptPsblRgn',
+  'getBidPblancListInfoThngPurchsObjPrdct',
+] as const
 
 export type G2bRelayOperation = (typeof G2B_RELAY_OPERATIONS)[number]
 
-export interface G2bRelayRequest {
-  operation: G2bRelayOperation
-  query: {
-    type: 'json'
-    inqryDiv: '1'
-    inqryBgnDt: string
-    inqryEndDt: string
-    pageNo: string
-    numOfRows: '100'
-  }
+interface G2bListQuery {
+  type: 'json'
+  inqryDiv: '1'
+  inqryBgnDt: string
+  inqryEndDt: string
+  pageNo: string
+  numOfRows: '100'
 }
 
+interface G2bEnrichmentQuery {
+  type: 'json'
+  inqryDiv: '2'
+  bidNtceNo: string
+  pageNo: '1'
+  numOfRows: '100'
+}
+
+interface G2bRevisionEnrichmentQuery extends G2bEnrichmentQuery {
+  bidNtceOrd: string
+}
+
+export type G2bRelayRequest =
+  | { operation: 'getBidPblancListInfoThng'; query: G2bListQuery }
+  | {
+      operation: G2bRelayOperation
+      query: G2bEnrichmentQuery | G2bRevisionEnrichmentQuery
+    }
+
 const PAYLOAD_KEYS = ['operation', 'query'] as const
-const QUERY_KEYS = ['type', 'inqryDiv', 'inqryBgnDt', 'inqryEndDt', 'pageNo', 'numOfRows'] as const
+const LIST_QUERY_KEYS = [
+  'type',
+  'inqryDiv',
+  'inqryBgnDt',
+  'inqryEndDt',
+  'pageNo',
+  'numOfRows',
+] as const
+const ENRICHMENT_QUERY_KEYS = ['type', 'inqryDiv', 'bidNtceNo', 'pageNo', 'numOfRows'] as const
+const REVISION_ENRICHMENT_QUERY_KEYS = [...ENRICHMENT_QUERY_KEYS, 'bidNtceOrd'] as const
+const ENRICHMENT_OPERATIONS_WITHOUT_REVISION = new Set<G2bRelayOperation>([
+  'getBidPblancListInfoThng',
+  'getBidPblancListInfoThngBsisAmount',
+])
+const ENRICHMENT_OPERATIONS_WITH_REVISION = new Set<G2bRelayOperation>([
+  'getBidPblancListInfoLicenseLimit',
+  'getBidPblancListInfoPrtcptPsblRgn',
+  'getBidPblancListInfoThngPurchsObjPrdct',
+])
 const TWELVE_DIGIT_DATE = /^\d{12}$/
 const VALID_PAGE = /^(?:[1-9]|[1-9]\d|100)$/
+const VALID_NOTICE_NUMBER = /^[A-Za-z0-9-]{1,40}$/
+const VALID_NOTICE_REVISION = /^\d{3}$/
 const LOWERCASE_SHA256_HEX = /^[0-9a-f]{64}$/
 const SIGNATURE_WINDOW_MS = 5 * 60 * 1000
 const OFFICIAL_G2B_HOST = 'apis.data.go.kr'
@@ -34,6 +76,8 @@ export type RelayPayloadRejectionReason =
   | 'begin_date'
   | 'end_date'
   | 'date_order'
+  | 'notice_number'
+  | 'notice_revision'
   | 'page_no'
   | 'row_count'
 
@@ -189,31 +233,73 @@ export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
   }
 
   const query = value.query
-  if (!hasExactOwnKeys(query, QUERY_KEYS)) {
+  const isListQuery =
+    value.operation === 'getBidPblancListInfoThng' && hasExactOwnKeys(query, LIST_QUERY_KEYS)
+  const isEnrichmentQuery =
+    ENRICHMENT_OPERATIONS_WITHOUT_REVISION.has(value.operation) &&
+    hasExactOwnKeys(query, ENRICHMENT_QUERY_KEYS)
+  const isRevisionEnrichmentQuery =
+    ENRICHMENT_OPERATIONS_WITH_REVISION.has(value.operation) &&
+    hasExactOwnKeys(query, REVISION_ENRICHMENT_QUERY_KEYS)
+  if (!isListQuery && !isEnrichmentQuery && !isRevisionEnrichmentQuery) {
     return rejectPayload('query_keys')
   }
-
   if (query.type !== 'json') return rejectPayload('type')
-  if (query.inqryDiv !== '1') return rejectPayload('inquiry_division')
-  if (typeof query.inqryBgnDt !== 'string' || !TWELVE_DIGIT_DATE.test(query.inqryBgnDt)) {
-    return rejectPayload('begin_date')
-  }
-  if (typeof query.inqryEndDt !== 'string' || !TWELVE_DIGIT_DATE.test(query.inqryEndDt)) {
-    return rejectPayload('end_date')
-  }
-  if (query.inqryBgnDt > query.inqryEndDt) return rejectPayload('date_order')
-  if (typeof query.pageNo !== 'string' || !VALID_PAGE.test(query.pageNo)) {
-    return rejectPayload('page_no')
-  }
-  if (query.numOfRows !== '100') return rejectPayload('row_count')
 
+  if (isListQuery) {
+    if (query.inqryDiv !== '1') return rejectPayload('inquiry_division')
+    if (typeof query.inqryBgnDt !== 'string' || !TWELVE_DIGIT_DATE.test(query.inqryBgnDt)) {
+      return rejectPayload('begin_date')
+    }
+    if (typeof query.inqryEndDt !== 'string' || !TWELVE_DIGIT_DATE.test(query.inqryEndDt)) {
+      return rejectPayload('end_date')
+    }
+    if (query.inqryBgnDt > query.inqryEndDt) return rejectPayload('date_order')
+    if (typeof query.pageNo !== 'string' || !VALID_PAGE.test(query.pageNo)) {
+      return rejectPayload('page_no')
+    }
+    if (query.numOfRows !== '100') return rejectPayload('row_count')
+    return {
+      operation: 'getBidPblancListInfoThng',
+      query: {
+        type: query.type,
+        inqryDiv: query.inqryDiv,
+        inqryBgnDt: query.inqryBgnDt,
+        inqryEndDt: query.inqryEndDt,
+        pageNo: query.pageNo,
+        numOfRows: query.numOfRows,
+      },
+    }
+  }
+
+  if (query.inqryDiv !== '2') return rejectPayload('inquiry_division')
+  if (typeof query.bidNtceNo !== 'string' || !VALID_NOTICE_NUMBER.test(query.bidNtceNo)) {
+    return rejectPayload('notice_number')
+  }
+  if (query.pageNo !== '1') return rejectPayload('page_no')
+  if (query.numOfRows !== '100') return rejectPayload('row_count')
+  if (isRevisionEnrichmentQuery) {
+    if (typeof query.bidNtceOrd !== 'string' || !VALID_NOTICE_REVISION.test(query.bidNtceOrd)) {
+      return rejectPayload('notice_revision')
+    }
+    return {
+      operation: value.operation,
+      query: {
+        type: query.type,
+        inqryDiv: query.inqryDiv,
+        bidNtceNo: query.bidNtceNo,
+        bidNtceOrd: query.bidNtceOrd,
+        pageNo: query.pageNo,
+        numOfRows: query.numOfRows,
+      },
+    }
+  }
   return {
     operation: value.operation,
     query: {
       type: query.type,
       inqryDiv: query.inqryDiv,
-      inqryBgnDt: query.inqryBgnDt,
-      inqryEndDt: query.inqryEndDt,
+      bidNtceNo: query.bidNtceNo,
       pageNo: query.pageNo,
       numOfRows: query.numOfRows,
     },
@@ -276,8 +362,7 @@ export const buildG2bProviderUrl = ({
       normalizedBaseUrl.host !== OFFICIAL_G2B_HOST ||
       normalizedBaseUrl.username !== '' ||
       normalizedBaseUrl.password !== '' ||
-      (pathname !== OFFICIAL_G2B_PATH_PREFIX &&
-        !pathname.startsWith(`${OFFICIAL_G2B_PATH_PREFIX}/`))
+      pathname !== OFFICIAL_G2B_PATH_PREFIX
     ) {
       throw new Error()
     }
@@ -289,8 +374,8 @@ export const buildG2bProviderUrl = ({
   normalizedBaseUrl.pathname = `${normalizedBaseUrl.pathname.replace(/\/+$/, '')}/`
 
   const url = new URL(request.operation, normalizedBaseUrl)
-  for (const field of QUERY_KEYS) {
-    url.searchParams.set(field, request.query[field])
+  for (const [field, value] of Object.entries(request.query)) {
+    url.searchParams.set(field, value)
   }
   url.searchParams.set('serviceKey', serviceKey)
 

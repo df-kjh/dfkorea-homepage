@@ -20,6 +20,32 @@ const validPayload = {
   },
 } as const
 
+const enrichmentOperations = [
+  'getBidPblancListInfoThng',
+  'getBidPblancListInfoThngBsisAmount',
+  'getBidPblancListInfoLicenseLimit',
+  'getBidPblancListInfoPrtcptPsblRgn',
+  'getBidPblancListInfoThngPurchsObjPrdct',
+] as const
+
+const enrichmentOperationsWithRevision = new Set([
+  'getBidPblancListInfoLicenseLimit',
+  'getBidPblancListInfoPrtcptPsblRgn',
+  'getBidPblancListInfoThngPurchsObjPrdct',
+])
+
+const enrichmentPayload = (operation: (typeof enrichmentOperations)[number]) => {
+  const query: Record<string, string> = {
+    type: 'json',
+    inqryDiv: '2',
+    bidNtceNo: 'R26BK01000001',
+    pageNo: '1',
+    numOfRows: '100',
+  }
+  if (enrichmentOperationsWithRevision.has(operation)) query.bidNtceOrd = '000'
+  return { operation, query }
+}
+
 const body = JSON.stringify(validPayload)
 const timestamp = '1788222791000'
 const nowMs = 1788222791000
@@ -29,8 +55,47 @@ const sign = (timestampValue: string, bodyValue: string) =>
   createHmac('sha256', secret).update(`${timestampValue}.${bodyValue}`).digest('hex')
 
 describe('validateRelayPayload', () => {
-  it('accepts only the G2B goods operation', () => {
+  it('keeps accepting the bounded G2B goods-list operation', () => {
     expect(validateRelayPayload(validPayload).operation).toBe('getBidPblancListInfoThng')
+  })
+
+  it.each(enrichmentOperations)(
+    'accepts the bounded goods enrichment operation %s',
+    (operation) => {
+      expect(validateRelayPayload(enrichmentPayload(operation))).toEqual(
+        enrichmentPayload(operation),
+      )
+    },
+  )
+
+  it.each([
+    ['a service-key field', { serviceKey: 'client-key' }],
+    ['a date-window field', { inqryBgnDt: '202609010000' }],
+    ['a notice-revision field unsupported by the basis operation', { bidNtceOrd: '000' }],
+    ['an unknown field', { arbitrary: 'value' }],
+  ])('rejects enrichment payload with %s', (_label, queryExtension) => {
+    const candidate = enrichmentPayload('getBidPblancListInfoThngBsisAmount')
+    expect(() =>
+      validateRelayPayload({
+        ...candidate,
+        query: { ...candidate.query, ...queryExtension },
+      }),
+    ).toThrow()
+  })
+
+  it.each([
+    ['inquiry division', { inqryDiv: '1' }],
+    ['notice number', { bidNtceNo: '' }],
+    ['notice revision', { bidNtceOrd: '0000' }],
+    ['page number', { pageNo: '2' }],
+  ])('rejects enrichment payload with invalid %s', (_label, queryReplacement) => {
+    const candidate = enrichmentPayload('getBidPblancListInfoLicenseLimit')
+    expect(() =>
+      validateRelayPayload({
+        ...candidate,
+        query: { ...candidate.query, ...queryReplacement },
+      }),
+    ).toThrow()
   })
 
   it.each([
@@ -195,6 +260,30 @@ describe('buildG2bProviderUrl', () => {
     expect(url.searchParams.has('extra')).toBe(false)
   })
 
+  it('builds a goods enrichment URL with only the fixed notice query and Vercel key', () => {
+    const request = validateRelayPayload(
+      enrichmentPayload('getBidPblancListInfoThngPurchsObjPrdct'),
+    )
+    const url = buildG2bProviderUrl({
+      baseUrl: 'https://apis.data.go.kr/1230000/ad/BidPublicInfoService',
+      serviceKey: 'vercel-key',
+      request,
+    })
+
+    expect(url.pathname).toBe(
+      '/1230000/ad/BidPublicInfoService/getBidPblancListInfoThngPurchsObjPrdct',
+    )
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      type: 'json',
+      inqryDiv: '2',
+      bidNtceNo: 'R26BK01000001',
+      bidNtceOrd: '000',
+      pageNo: '1',
+      numOfRows: '100',
+      serviceKey: 'vercel-key',
+    })
+  })
+
   it.each([
     ['a non-HTTPS provider base', 'http://apis.data.go.kr/1230000/ad/BidPublicInfoService'],
     [
@@ -206,6 +295,10 @@ describe('buildG2bProviderUrl', () => {
       'https://apis.data.go.kr.example.test/1230000/ad/BidPublicInfoService',
     ],
     ['a different provider path', 'https://apis.data.go.kr/1230000/ad/AnotherService'],
+    [
+      'an appended provider path',
+      'https://apis.data.go.kr/1230000/ad/BidPublicInfoService/unapproved',
+    ],
   ])('rejects %s with a generic error', (_description, baseUrl) => {
     let rejected: unknown
     try {
