@@ -21,6 +21,7 @@ import {
   KAPT_TENDER_ENRICHMENT_ADAPTER,
   TENDER_DOCUMENT_FETCHER,
   TENDER_ENRICHMENT_ADAPTERS,
+  toSafeProviderResultCode,
 } from "./domain/tender-enrichment";
 import { TenderDocumentFetcher } from "./documents/tender-document-fetcher";
 import { Tender } from "./entities/tender.entity";
@@ -57,7 +58,7 @@ const createSafeRetryLogger = (context: string) => {
   const logger = new Logger(context);
   return (event: PublicApiRetryEvent) =>
     logger.warn(
-      `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${event.providerResultCode ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
+      `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${toSafeProviderResultCode(event.providerResultCode) ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
     );
 };
 
@@ -146,8 +147,25 @@ const createSafeRetryLogger = (context: string) => {
     {
       provide: G2B_TENDER_ENRICHMENT_ADAPTER,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) =>
-        new G2bEnrichmentAdapter(
+      useFactory: (config: ConfigService) => {
+        const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const relayClient = relayEnabled
+          ? new PublicApiClient(
+              createG2bRelayFetcher({
+                relayUrl: config.get<string>("G2B_RELAY_URL") ?? "",
+                sharedSecret:
+                  config.get<string>("G2B_RELAY_SHARED_SECRET") ?? "",
+              }),
+              {
+                minimumRequestIntervalMs: 1_500,
+                retryDelaysMs: [1_000, 3_000],
+                onRetry: createSafeRetryLogger(
+                  "G2bEnrichmentRelayPublicApiClient",
+                ),
+              },
+            )
+          : undefined;
+        return new G2bEnrichmentAdapter(
           new PublicApiClient(undefined, {
             minimumRequestIntervalMs: 1_100,
             retryDelaysMs: [1_000, 3_000],
@@ -156,8 +174,11 @@ const createSafeRetryLogger = (context: string) => {
           {
             baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
             serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+            relayEnabled,
           },
-        ),
+          relayClient,
+        );
+      },
     },
     {
       provide: KAPT_TENDER_ENRICHMENT_ADAPTER,

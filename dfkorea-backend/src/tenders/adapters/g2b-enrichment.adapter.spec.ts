@@ -8,6 +8,8 @@ import {
 } from "./public-api-client";
 import { NormalizedTender } from "../domain/normalized-tender";
 import { ProcurementType, TenderSource } from "../domain/tender.enums";
+import { G2B_TENDER_ENRICHMENT_ADAPTER } from "../domain/tender-enrichment";
+import { TendersModule } from "../tenders.module";
 
 const fixture = JSON.parse(
   readFileSync(join(__dirname, "fixtures/g2b-enrichment.json"), "utf8"),
@@ -100,6 +102,21 @@ describe("G2bEnrichmentAdapter", () => {
           {
             code: "1468",
             name: "전기공사업",
+            group: "1",
+            required: true,
+            evidence: expect.any(Object),
+          },
+          {
+            code: "0037",
+            name: "소방시설공사업",
+            group: "1",
+            required: true,
+            evidence: expect.any(Object),
+          },
+          {
+            code: "0036",
+            name: "정보통신공사업",
+            group: "2",
             required: true,
             evidence: expect.any(Object),
           },
@@ -114,10 +131,10 @@ describe("G2bEnrichmentAdapter", () => {
             evidence: expect.any(Object),
           }),
         ],
-        documents: [
+        documents: expect.arrayContaining([
           expect.objectContaining({ formatHint: "HWP", source: "G2B_API" }),
           expect.objectContaining({ formatHint: "XLSX", source: "G2B_API" }),
-        ],
+        ]),
         failures: [],
       }),
     );
@@ -125,6 +142,11 @@ describe("G2bEnrichmentAdapter", () => {
       source: "G2B_API",
       operation: "getBidPblancListInfoPrtcptPsblRgn",
       field: "prtcptPsblRgnNm",
+    });
+    expect(result.documents).toHaveLength(10);
+    expect(result.documents[9]).toMatchObject({
+      identity: "G2B:R26BK01000001:000:10",
+      evidence: { field: "ntceSpecDocUrl10" },
     });
     expect(fetcher).toHaveBeenCalledTimes(5);
     for (const [urlText, init] of fetcher.mock.calls) {
@@ -185,6 +207,117 @@ describe("G2bEnrichmentAdapter", () => {
         attempts: 3,
       },
     ]);
+  });
+
+  it("redacts arbitrary provider result text at the enrichment output boundary", async () => {
+    const maliciousProviderText =
+      "https://provider.example/error?serviceKey=secret-key-material";
+    const { client } = createClient((request) => {
+      if (request.operation === "getBidPblancListInfoThngBsisAmount") {
+        return Promise.reject(
+          new TenderSourceError(
+            TenderSource.G2B,
+            "PROVIDER_RESULT_ERROR",
+            200,
+            undefined,
+            request.operation,
+            1,
+            maliciousProviderText,
+            1,
+          ),
+        );
+      }
+      return Promise.resolve(rowsFor(request.operation));
+    });
+
+    const result = await new G2bEnrichmentAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    }).enrich(tender, new AbortController().signal);
+
+    expect(result.failures[0]?.providerResultCode).toBe(
+      "PROVIDER_CODE_REPORTED",
+    );
+    expect(JSON.stringify(result)).not.toContain(maliciousProviderText);
+    expect(JSON.stringify(result)).not.toContain("secret-key-material");
+  });
+
+  it("uses the established relay policy when a direct enrichment response has no provider envelope", async () => {
+    const direct = createClient((request) =>
+      request.operation === "getBidPblancListInfoThngBsisAmount"
+        ? Promise.reject(
+            new TenderSourceError(
+              TenderSource.G2B,
+              "PROVIDER_RESULT_ERROR",
+              200,
+              undefined,
+              request.operation,
+              1,
+              null,
+              1,
+            ),
+          )
+        : Promise.resolve(rowsFor(request.operation)),
+    );
+    const relay = createClient((request) =>
+      Promise.resolve(rowsFor(request.operation)),
+    );
+    const AdapterWithRelay = G2bEnrichmentAdapter as unknown as new (
+      client: TenderApiClient,
+      config: {
+        baseUrl: string;
+        serviceKey: string;
+        relayEnabled: boolean;
+      },
+      relayClient: TenderApiClient,
+    ) => G2bEnrichmentAdapter;
+    const adapter = new AdapterWithRelay(
+      direct.client,
+      {
+        baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+        serviceKey: "test-key",
+        relayEnabled: true,
+      },
+      relay.client,
+    );
+
+    const result = await adapter.enrich(tender, new AbortController().signal);
+
+    expect(result.basisAmount?.value).toBe("100000000");
+    expect(result.failures).toEqual([]);
+    expect(relay.getAllPages).toHaveBeenCalledTimes(1);
+    expect(relay.getAllPages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: "getBidPblancListInfoThngBsisAmount",
+      }),
+    );
+  });
+
+  it("constructs the module enrichment adapter with a relay client only when enabled", () => {
+    const providers = Reflect.getMetadata("providers", TendersModule) as Array<{
+      provide?: symbol;
+      useFactory?: (config: {
+        get(key: string): string | undefined;
+      }) => unknown;
+    }>;
+    const provider = providers.find(
+      (candidate) => candidate.provide === G2B_TENDER_ENRICHMENT_ADAPTER,
+    );
+    const values: Record<string, string> = {
+      G2B_RELAY_ENABLED: "true",
+      G2B_RELAY_URL: "https://dfkorealed.com/api/internal/g2b-relay",
+      G2B_RELAY_SHARED_SECRET: "relay-test-secret-with-at-least-32-bytes",
+      G2B_TENDER_API_BASE_URL:
+        "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      PUBLIC_DATA_SERVICE_KEY: "test-key",
+    };
+
+    const adapter = provider?.useFactory?.({ get: (key) => values[key] });
+
+    expect(adapter).toBeInstanceOf(G2bEnrichmentAdapter);
+    expect(
+      (adapter as { relayClient?: TenderApiClient }).relayClient,
+    ).toBeDefined();
   });
 
   it("rejects a non-G2B or non-goods tender without provider access", async () => {

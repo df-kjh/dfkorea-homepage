@@ -40,6 +40,7 @@ export interface TenderRegionRequirement {
 export interface TenderLicenseRequirement {
   code: string;
   name: string;
+  group: string | null;
   required: boolean;
   evidence: EvidenceRef;
 }
@@ -63,6 +64,23 @@ export interface TenderDocumentReference {
   revision: string;
   evidence: EvidenceRef;
 }
+
+const issuedTenderDocumentReferences = new WeakSet<TenderDocumentReference>();
+
+export const issueTenderDocumentReference = (
+  reference: TenderDocumentReference,
+): TenderDocumentReference => {
+  const issued = Object.freeze({
+    ...reference,
+    evidence: Object.freeze({ ...reference.evidence }),
+  });
+  issuedTenderDocumentReferences.add(issued);
+  return issued;
+};
+
+export const isIssuedTenderDocumentReference = (
+  reference: TenderDocumentReference,
+): boolean => issuedTenderDocumentReferences.has(reference);
 
 export interface TenderEnrichmentOperationFailure {
   operation: string;
@@ -116,6 +134,13 @@ export const emptyTenderEnrichment = (): TenderEnrichment => ({
   documents: [],
   failures: [],
 });
+
+export const toSafeProviderResultCode = (
+  providerResultCode: string | null | undefined,
+): string | null =>
+  providerResultCode === null || providerResultCode === undefined
+    ? null
+    : "PROVIDER_CODE_REPORTED";
 
 export class TenderEnrichmentError extends Error {
   constructor(readonly code: string) {

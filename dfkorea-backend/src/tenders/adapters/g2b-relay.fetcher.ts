@@ -8,13 +8,43 @@ export interface G2bRelayFetcherConfig {
   now?: () => number;
 }
 
-const G2B_OPERATIONS = new Set(["getBidPblancListInfoThng"]);
+const G2B_OPERATIONS = new Set([
+  "getBidPblancListInfoThng",
+  "getBidPblancListInfoThngBsisAmount",
+  "getBidPblancListInfoLicenseLimit",
+  "getBidPblancListInfoPrtcptPsblRgn",
+  "getBidPblancListInfoThngPurchsObjPrdct",
+]);
+const ENRICHMENT_OPERATIONS_WITHOUT_REVISION = new Set([
+  "getBidPblancListInfoThng",
+  "getBidPblancListInfoThngBsisAmount",
+]);
+const ENRICHMENT_OPERATIONS_WITH_REVISION = new Set([
+  "getBidPblancListInfoLicenseLimit",
+  "getBidPblancListInfoPrtcptPsblRgn",
+  "getBidPblancListInfoThngPurchsObjPrdct",
+]);
 
-const QUERY_FIELDS = [
+const LIST_QUERY_FIELDS = [
   "type",
   "inqryDiv",
   "inqryBgnDt",
   "inqryEndDt",
+  "pageNo",
+  "numOfRows",
+] as const;
+const ENRICHMENT_QUERY_FIELDS = [
+  "type",
+  "inqryDiv",
+  "bidNtceNo",
+  "pageNo",
+  "numOfRows",
+] as const;
+const REVISION_ENRICHMENT_QUERY_FIELDS = [
+  "type",
+  "inqryDiv",
+  "bidNtceNo",
+  "bidNtceOrd",
   "pageNo",
   "numOfRows",
 ] as const;
@@ -50,9 +80,32 @@ const readOperation = (url: URL): string => {
   return operation;
 };
 
-const readQuery = (url: URL): Record<(typeof QUERY_FIELDS)[number], string> => {
-  const query = {} as Record<(typeof QUERY_FIELDS)[number], string>;
-  for (const field of QUERY_FIELDS) {
+const readQuery = (url: URL, operation: string): Record<string, string> => {
+  const inquiryDivision = url.searchParams.get("inqryDiv");
+  const queryFields: readonly string[] =
+    operation === "getBidPblancListInfoThng" && inquiryDivision === "1"
+      ? LIST_QUERY_FIELDS
+      : ENRICHMENT_OPERATIONS_WITHOUT_REVISION.has(operation) &&
+          inquiryDivision === "2"
+        ? ENRICHMENT_QUERY_FIELDS
+        : ENRICHMENT_OPERATIONS_WITH_REVISION.has(operation) &&
+            inquiryDivision === "2"
+          ? REVISION_ENRICHMENT_QUERY_FIELDS
+          : [];
+  if (queryFields.length === 0) throw configurationError();
+  const expectedKeys = new Set([...queryFields, "serviceKey"]);
+  const actualKeys = [...url.searchParams.keys()];
+  if (
+    actualKeys.length !== expectedKeys.size ||
+    actualKeys.some((field) => !expectedKeys.has(field))
+  ) {
+    throw configurationError();
+  }
+  if (url.searchParams.getAll("serviceKey").length !== 1) {
+    throw configurationError();
+  }
+  const query: Record<string, string> = {};
+  for (const field of queryFields) {
     const values = url.searchParams.getAll(field);
     if (values.length !== 1) {
       throw configurationError();
@@ -76,9 +129,10 @@ export function createG2bRelayFetcher(
       throw configurationError();
     }
 
+    const operation = readOperation(providerUrl);
     const body = JSON.stringify({
-      operation: readOperation(providerUrl),
-      query: readQuery(providerUrl),
+      operation,
+      query: readQuery(providerUrl, operation),
     });
     const timestamp = String((config.now ?? Date.now)());
     const signature = createHmac("sha256", config.sharedSecret)

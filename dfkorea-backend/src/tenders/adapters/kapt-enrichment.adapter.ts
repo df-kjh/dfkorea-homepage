@@ -1,6 +1,7 @@
 import { NormalizedTender } from "../domain/normalized-tender";
 import {
   emptyTenderEnrichment,
+  issueTenderDocumentReference,
   TenderDocumentFormat,
   TenderDocumentReference,
   TenderEnrichment,
@@ -174,21 +175,23 @@ export class KaptEnrichmentAdapter implements TenderEnrichmentAdapter {
         url.hash = "";
         const fileSequence =
           url.searchParams.get("fileSeq") ?? String(documents.length + 1);
-        documents.push({
-          identity: `KAPT:${tender.sourceNoticeId}:${tender.revision}:${fileSequence}`,
-          url: url.toString(),
-          displayName,
-          formatHint:
-            formatFromName(displayName) ?? formatFromName(url.pathname),
-          source: "KAPT_PAGE",
-          sourceNoticeId: tender.sourceNoticeId,
-          revision: tender.revision,
-          evidence: {
+        documents.push(
+          issueTenderDocumentReference({
+            identity: `KAPT:${tender.sourceNoticeId}:${tender.revision}:${fileSequence}`,
+            url: url.toString(),
+            displayName,
+            formatHint:
+              formatFromName(displayName) ?? formatFromName(url.pathname),
             source: "KAPT_PAGE",
-            operation: "KAPT_NOTICE_DOCUMENTS",
-            field: `attachment:${fileSequence}`,
-          },
-        });
+            sourceNoticeId: tender.sourceNoticeId,
+            revision: tender.revision,
+            evidence: {
+              source: "KAPT_PAGE",
+              operation: "KAPT_NOTICE_DOCUMENTS",
+              field: `attachment:${fileSequence}`,
+            },
+          }),
+        );
       } catch {
         continue;
       }

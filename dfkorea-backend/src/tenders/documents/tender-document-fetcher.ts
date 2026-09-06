@@ -4,6 +4,7 @@ import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import { Readable } from "node:stream";
 import {
+  isIssuedTenderDocumentReference,
   TenderDocumentFetcherContract,
   TenderDocumentFetchResult,
   TenderDocumentFormat,
@@ -13,8 +14,10 @@ import {
 const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
+const MAX_CONTAINER_ENTRIES = 4_096;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const G2B_HOSTS = new Set(["g2b.go.kr", "www.g2b.go.kr", "apis.data.go.kr"]);
+const G2B_DOCUMENT_PATH = "/pt/file/download.do";
 const KAPT_HOSTS = new Set(["k-apt.go.kr", "www.k-apt.go.kr"]);
 
 export type TenderDocumentFetchErrorCode =
@@ -68,25 +71,44 @@ const defaultFetcher: Fetcher = (urlText, init, validatedAddress) =>
         headers: { accept: "*/*" },
         signal: init.signal ?? undefined,
         servername: url.hostname,
-        lookup: (_hostname, _options, callback) => {
-          callback(null, validatedAddress, isIP(validatedAddress));
+        lookup: (_hostname, options, callback) => {
+          const family = isIP(validatedAddress);
+          if (typeof options === "object" && options.all) {
+            (
+              callback as unknown as (
+                error: null,
+                addresses: Array<{ address: string; family: number }>,
+              ) => void
+            )(null, [{ address: validatedAddress, family }]);
+            return;
+          }
+          callback(null, validatedAddress, family);
         },
       },
       (incoming) => {
-        const headers = new Headers();
-        for (const [name, value] of Object.entries(incoming.headers)) {
-          if (Array.isArray(value)) {
-            for (const item of value) headers.append(name, item);
-          } else if (value !== undefined) {
-            headers.set(name, value);
+        try {
+          const headers = new Headers();
+          for (const [name, value] of Object.entries(incoming.headers)) {
+            if (Array.isArray(value)) {
+              for (const item of value) headers.append(name, item);
+            } else if (value !== undefined) {
+              headers.set(name, value);
+            }
           }
+          resolve(
+            new Response(
+              Readable.toWeb(incoming) as ReadableStream<Uint8Array>,
+              {
+                status: incoming.statusCode ?? 502,
+                headers,
+              },
+            ),
+          );
+        } catch (error) {
+          incoming.once("error", () => undefined);
+          incoming.resume();
+          reject(error);
         }
-        resolve(
-          new Response(Readable.toWeb(incoming) as ReadableStream<Uint8Array>, {
-            status: incoming.statusCode ?? 502,
-            headers,
-          }),
-        );
       },
     );
     request.once("error", reject);
@@ -198,6 +220,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
     try {
       const url = new URL(value);
       if (
+        !isIssuedTenderDocumentReference(document) ||
         url.protocol !== "https:" ||
         url.username ||
         url.password ||
@@ -209,6 +232,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
       if (document.source === "G2B_API") {
         if (
           !G2B_HOSTS.has(url.hostname) ||
+          url.pathname !== G2B_DOCUMENT_PATH ||
           document.evidence.source !== "G2B_API" ||
           document.evidence.operation !== "getBidPblancListInfoThng" ||
           !/^ntceSpecDocUrl(?:[1-9]|10)$/.test(document.evidence.field) ||
@@ -218,13 +242,14 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         ) {
           throw offAllowlist();
         }
-        const noticeNumberValues = [
-          ...url.searchParams.getAll("bidNtceNo"),
-          ...url.searchParams.getAll("bidno"),
-        ];
-        if (noticeNumberValues.length > 1) throw offAllowlist();
-        const urlNoticeId = noticeNumberValues[0];
-        if (urlNoticeId && urlNoticeId !== document.sourceNoticeId) {
+        const noticeNumberValues = url.searchParams.getAll("bidNtceNo");
+        const revisionValues = url.searchParams.getAll("bidNtceOrd");
+        if (
+          noticeNumberValues.length !== 1 ||
+          noticeNumberValues[0] !== document.sourceNoticeId ||
+          revisionValues.length !== 1 ||
+          revisionValues[0] !== document.revision
+        ) {
           throw offAllowlist();
         }
       } else if (document.source === "KAPT_PAGE") {
@@ -361,20 +386,341 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
     if (
       this.startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
     ) {
-      return "HWP";
+      if (this.isHwpCompoundFile(bytes)) return "HWP";
+      throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");
     }
     if (this.startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) {
-      const containerText = Buffer.from(bytes).toString("latin1");
+      const entries = this.readZipEntries(bytes);
       if (
-        containerText.includes("Contents/") ||
-        containerText.includes("application/hwp+zip")
+        entries.has("META-INF/container.xml") &&
+        entries.has("Contents/content.hpf") &&
+        [...entries].some((entry) => /^Contents\/section\d+\.xml$/.test(entry))
       ) {
         return "HWPX";
       }
-      if (containerText.includes("word/")) return "DOCX";
-      if (containerText.includes("xl/")) return "XLSX";
+      if (
+        entries.has("[Content_Types].xml") &&
+        entries.has("word/document.xml")
+      ) {
+        return "DOCX";
+      }
+      if (
+        entries.has("[Content_Types].xml") &&
+        entries.has("xl/workbook.xml")
+      ) {
+        return "XLSX";
+      }
     }
     throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");
+  }
+
+  private readZipEntries(bytes: Uint8Array): Set<string> {
+    // Detection walks the bounded central directory and matching local headers
+    // without inflating content. Task 4 owns decompression and archive-bomb limits.
+    try {
+      const buffer = Buffer.from(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength,
+      );
+      const minimumEndOffset = Math.max(0, buffer.length - 65_557);
+      let endOffset = -1;
+      for (
+        let offset = buffer.length - 22;
+        offset >= minimumEndOffset;
+        offset -= 1
+      ) {
+        if (buffer.readUInt32LE(offset) === 0x06054b50) {
+          endOffset = offset;
+          break;
+        }
+      }
+      if (endOffset < 0) throw new Error();
+      const commentLength = buffer.readUInt16LE(endOffset + 20);
+      if (endOffset + 22 + commentLength !== buffer.length) throw new Error();
+      if (
+        buffer.readUInt16LE(endOffset + 4) !== 0 ||
+        buffer.readUInt16LE(endOffset + 6) !== 0
+      ) {
+        throw new Error();
+      }
+      const diskEntries = buffer.readUInt16LE(endOffset + 8);
+      const entryCount = buffer.readUInt16LE(endOffset + 10);
+      const centralSize = buffer.readUInt32LE(endOffset + 12);
+      const centralOffset = buffer.readUInt32LE(endOffset + 16);
+      if (
+        entryCount === 0 ||
+        entryCount !== diskEntries ||
+        entryCount > MAX_CONTAINER_ENTRIES ||
+        centralOffset + centralSize !== endOffset
+      ) {
+        throw new Error();
+      }
+
+      const entries = new Set<string>();
+      let offset = centralOffset;
+      for (let index = 0; index < entryCount; index += 1) {
+        if (buffer.readUInt32LE(offset) !== 0x02014b50) throw new Error();
+        const compressedSize = buffer.readUInt32LE(offset + 20);
+        const nameLength = buffer.readUInt16LE(offset + 28);
+        const extraLength = buffer.readUInt16LE(offset + 30);
+        const entryCommentLength = buffer.readUInt16LE(offset + 32);
+        const localOffset = buffer.readUInt32LE(offset + 42);
+        const nextOffset =
+          offset + 46 + nameLength + extraLength + entryCommentLength;
+        if (nameLength === 0 || nextOffset > endOffset) throw new Error();
+        const name = buffer.toString(
+          "utf8",
+          offset + 46,
+          offset + 46 + nameLength,
+        );
+        if (!name || name.includes("\0") || entries.has(name))
+          throw new Error();
+
+        if (buffer.readUInt32LE(localOffset) !== 0x04034b50) throw new Error();
+        const localNameLength = buffer.readUInt16LE(localOffset + 26);
+        const localExtraLength = buffer.readUInt16LE(localOffset + 28);
+        const localDataOffset =
+          localOffset + 30 + localNameLength + localExtraLength;
+        if (
+          localDataOffset + compressedSize > centralOffset ||
+          buffer.toString(
+            "utf8",
+            localOffset + 30,
+            localOffset + 30 + localNameLength,
+          ) !== name
+        ) {
+          throw new Error();
+        }
+        entries.add(name);
+        offset = nextOffset;
+      }
+      if (offset !== endOffset) throw new Error();
+      return entries;
+    } catch {
+      throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");
+    }
+  }
+
+  private isHwpCompoundFile(bytes: Uint8Array): boolean {
+    // A generic OLE signature is insufficient for HWP. Read only the bounded CFB
+    // allocation metadata needed to locate the root-level FileHeader stream.
+    try {
+      const buffer = Buffer.from(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength,
+      );
+      if (
+        buffer.length < 512 ||
+        buffer.readUInt16LE(28) !== 0xfffe ||
+        buffer.readUInt16LE(32) !== 6
+      ) {
+        return false;
+      }
+      const majorVersion = buffer.readUInt16LE(26);
+      const sectorShift = buffer.readUInt16LE(30);
+      if (
+        (majorVersion !== 3 && majorVersion !== 4) ||
+        sectorShift !== (majorVersion === 3 ? 9 : 12)
+      ) {
+        return false;
+      }
+      const sectorSize = 2 ** sectorShift;
+      const miniSectorSize = 2 ** buffer.readUInt16LE(32);
+      const sectorBase = majorVersion === 3 ? 512 : sectorSize;
+      const totalSectors = Math.floor(
+        (buffer.length - sectorBase) / sectorSize,
+      );
+      if (
+        totalSectors <= 0 ||
+        sectorBase + totalSectors * sectorSize !== buffer.length
+      ) {
+        return false;
+      }
+      const sector = (id: number): Buffer => {
+        if (!Number.isInteger(id) || id < 0 || id >= totalSectors)
+          throw new Error();
+        const offset = sectorBase + id * sectorSize;
+        return buffer.subarray(offset, offset + sectorSize);
+      };
+
+      const fatSectorCount = buffer.readUInt32LE(44);
+      if (fatSectorCount === 0 || fatSectorCount > totalSectors) return false;
+      const fatSectorIds: number[] = [];
+      for (
+        let offset = 76;
+        offset < 512 && fatSectorIds.length < fatSectorCount;
+        offset += 4
+      ) {
+        const id = buffer.readUInt32LE(offset);
+        if (id !== 0xffffffff) fatSectorIds.push(id);
+      }
+      let difatSector = buffer.readUInt32LE(68);
+      const difatSectorCount = buffer.readUInt32LE(72);
+      const seenDifat = new Set<number>();
+      for (let index = 0; index < difatSectorCount; index += 1) {
+        if (seenDifat.has(difatSector)) throw new Error();
+        seenDifat.add(difatSector);
+        const current = sector(difatSector);
+        for (let offset = 0; offset < sectorSize - 4; offset += 4) {
+          const id = current.readUInt32LE(offset);
+          if (id !== 0xffffffff && fatSectorIds.length < fatSectorCount) {
+            fatSectorIds.push(id);
+          }
+        }
+        difatSector = current.readUInt32LE(sectorSize - 4);
+      }
+      if (fatSectorIds.length !== fatSectorCount) return false;
+      const fat = fatSectorIds.flatMap((id) => {
+        const current = sector(id);
+        const entries: number[] = [];
+        for (let offset = 0; offset < sectorSize; offset += 4) {
+          entries.push(current.readUInt32LE(offset));
+        }
+        return entries;
+      });
+      const readChain = (
+        start: number,
+        table: number[],
+        maximumLength = totalSectors,
+        maximumIndex = totalSectors,
+      ): number[] => {
+        const chain: number[] = [];
+        const seen = new Set<number>();
+        let current = start;
+        while (current !== 0xfffffffe) {
+          if (
+            current < 0 ||
+            current >= table.length ||
+            current >= maximumIndex ||
+            seen.has(current) ||
+            chain.length >= maximumLength
+          ) {
+            throw new Error();
+          }
+          seen.add(current);
+          chain.push(current);
+          current = table[current]!;
+        }
+        return chain;
+      };
+      const readRegularChain = (start: number): Buffer =>
+        Buffer.concat(readChain(start, fat).map(sector));
+
+      const directoryBytes = readRegularChain(buffer.readUInt32LE(48));
+      const directoryEntries: Array<{
+        name: string;
+        type: number;
+        left: number;
+        right: number;
+        child: number;
+        start: number;
+        size: number;
+      } | null> = [];
+      for (
+        let offset = 0;
+        offset + 128 <= directoryBytes.length;
+        offset += 128
+      ) {
+        const nameLength = directoryBytes.readUInt16LE(offset + 64);
+        const type = directoryBytes.readUInt8(offset + 66);
+        if (type === 0) {
+          directoryEntries.push(null);
+          continue;
+        }
+        if (nameLength < 2 || nameLength > 64 || nameLength % 2 !== 0) {
+          throw new Error();
+        }
+        const name = directoryBytes
+          .toString("utf16le", offset, offset + nameLength - 2)
+          .replace(/\0.*$/, "");
+        const sizeBig = directoryBytes.readBigUInt64LE(offset + 120);
+        if (sizeBig > BigInt(MAX_DOCUMENT_BYTES)) throw new Error();
+        directoryEntries.push({
+          name,
+          type,
+          left: directoryBytes.readUInt32LE(offset + 68),
+          right: directoryBytes.readUInt32LE(offset + 72),
+          child: directoryBytes.readUInt32LE(offset + 76),
+          start: directoryBytes.readUInt32LE(offset + 116),
+          size: Number(sizeBig),
+        });
+      }
+      const rootEntry = directoryEntries.find(
+        (entry) => entry?.type === 5 && entry.name === "Root Entry",
+      );
+      if (!rootEntry) return false;
+      const reachable = new Set<number>();
+      const visitDirectoryTree = (id: number): void => {
+        if (id === 0xffffffff) return;
+        if (id < 0 || id >= directoryEntries.length || reachable.has(id)) {
+          throw new Error();
+        }
+        reachable.add(id);
+        const entry = directoryEntries[id];
+        if (!entry) throw new Error();
+        visitDirectoryTree(entry.left);
+        visitDirectoryTree(entry.right);
+      };
+      visitDirectoryTree(rootEntry.child);
+      const fileHeaderEntry = [...reachable]
+        .map((id) => directoryEntries[id])
+        .find((entry) => entry?.type === 2 && entry.name === "FileHeader");
+      if (!rootEntry || !fileHeaderEntry || fileHeaderEntry.size === 0)
+        return false;
+
+      let fileHeader: Buffer;
+      const miniCutoff = buffer.readUInt32LE(56);
+      if (fileHeaderEntry.size < miniCutoff) {
+        const miniFatSectorCount = buffer.readUInt32LE(64);
+        if (miniFatSectorCount === 0 || miniFatSectorCount > totalSectors)
+          return false;
+        const miniFatChain = readChain(buffer.readUInt32LE(60), fat);
+        if (miniFatChain.length !== miniFatSectorCount) return false;
+        const miniFatBytes = Buffer.concat(miniFatChain.map(sector));
+        const miniFat: number[] = [];
+        for (
+          let offset = 0;
+          offset + 4 <= miniFatBytes.length &&
+          miniFat.length < miniFatSectorCount * (sectorSize / 4);
+          offset += 4
+        ) {
+          miniFat.push(miniFatBytes.readUInt32LE(offset));
+        }
+        const rootMiniStreamBytes = readRegularChain(rootEntry.start);
+        if (rootMiniStreamBytes.length < rootEntry.size) throw new Error();
+        const rootMiniStream = rootMiniStreamBytes.subarray(0, rootEntry.size);
+        const maximumMiniSectors = Math.floor(
+          rootMiniStream.length / miniSectorSize,
+        );
+        const miniChain = readChain(
+          fileHeaderEntry.start,
+          miniFat,
+          maximumMiniSectors,
+          maximumMiniSectors,
+        );
+        const fileHeaderBytes = Buffer.concat(
+          miniChain.map((id) => {
+            const offset = id * miniSectorSize;
+            if (offset + miniSectorSize > rootMiniStream.length)
+              throw new Error();
+            return rootMiniStream.subarray(offset, offset + miniSectorSize);
+          }),
+        );
+        if (fileHeaderBytes.length < fileHeaderEntry.size) throw new Error();
+        fileHeader = fileHeaderBytes.subarray(0, fileHeaderEntry.size);
+      } else {
+        const fileHeaderBytes = readRegularChain(fileHeaderEntry.start);
+        if (fileHeaderBytes.length < fileHeaderEntry.size) throw new Error();
+        fileHeader = fileHeaderBytes.subarray(0, fileHeaderEntry.size);
+      }
+      return (
+        fileHeader.subarray(0, 17).toString("ascii") === "HWP Document File"
+      );
+    } catch {
+      return false;
+    }
   }
 
   private startsWith(bytes: Uint8Array, signature: number[]): boolean {

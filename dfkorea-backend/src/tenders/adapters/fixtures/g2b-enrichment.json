@@ -3,44 +3,53 @@
     "response": {
       "header": { "resultCode": "00", "resultMsg": "NORMAL_SERVICE" },
       "body": {
-        "items": [{
-          "bidNtceNo": "R26BK01000001",
-          "bidNtceOrd": "000",
-          "bidNtceNm": "LED 실내조명 구매",
-          "ntceInsttCd": "1230000",
-          "ntceInsttNm": "조달청",
-          "dminsttCd": "7000000",
-          "dminsttNm": "경기도교육청",
-          "cntrctCnclsMthdNm": "제한경쟁",
-          "sucsfbidMthdCd": "10",
-          "sucsfbidMthdNm": "적격심사",
-          "sucsfbidLwltRate": "88.000",
-          "rsrvtnPrceReMkngMthdNm": "복수예비가격",
-          "prearngPrceDcsnMthdNm": "복수예비가격",
-          "ntceSpecFileNm1": "LED조명 규격서.hwp",
-          "ntceSpecDocUrl1": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=1",
-          "ntceSpecFileNm2": "LED조명 내역서.xlsx",
-          "ntceSpecDocUrl2": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=2",
-          "ntceSpecFileNm3": "",
-          "ntceSpecDocUrl3": "",
-          "ntceSpecFileNm4": "",
-          "ntceSpecDocUrl4": "",
-          "ntceSpecFileNm5": "",
-          "ntceSpecDocUrl5": "",
-          "ntceSpecFileNm6": "",
-          "ntceSpecDocUrl6": "",
-          "ntceSpecFileNm7": "",
-          "ntceSpecDocUrl7": "",
-          "ntceSpecFileNm8": "",
-          "ntceSpecDocUrl8": "",
-          "ntceSpecFileNm9": "",
-          "ntceSpecDocUrl9": "",
-          "ntceSpecFileNm10": "",
-          "ntceSpecDocUrl10": ""
-        }],
+        "items": [
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "999",
+            "sucsfbidLwltRate": "1.000",
+            "ntceSpecFileNm1": "다른 차수.hwp",
+            "ntceSpecDocUrl1": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=999&fileSeq=1"
+          },
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "bidNtceNm": "LED 실내조명 구매",
+            "ntceInsttCd": "1230000",
+            "ntceInsttNm": "조달청",
+            "dminsttCd": "7000000",
+            "dminsttNm": "경기도교육청",
+            "cntrctCnclsMthdNm": "제한경쟁",
+            "sucsfbidMthdCd": "10",
+            "sucsfbidMthdNm": "적격심사",
+            "sucsfbidLwltRate": "88.000",
+            "rsrvtnPrceReMkngMthdNm": "복수예비가격",
+            "prearngPrceDcsnMthdNm": "복수예비가격",
+            "ntceSpecFileNm1": "LED조명 규격서.hwp",
+            "ntceSpecDocUrl1": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=1",
+            "ntceSpecFileNm2": "LED조명 내역서.xlsx",
+            "ntceSpecDocUrl2": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=2",
+            "ntceSpecFileNm3": "시방서.pdf",
+            "ntceSpecDocUrl3": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=3",
+            "ntceSpecFileNm4": "납품조건.docx",
+            "ntceSpecDocUrl4": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=4",
+            "ntceSpecFileNm5": "수량표.xlsx",
+            "ntceSpecDocUrl5": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=5",
+            "ntceSpecFileNm6": "규격보충.hwpx",
+            "ntceSpecDocUrl6": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=6",
+            "ntceSpecFileNm7": "인증목록.pdf",
+            "ntceSpecDocUrl7": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=7",
+            "ntceSpecFileNm8": "설치도면.hwp",
+            "ntceSpecDocUrl8": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=8",
+            "ntceSpecFileNm9": "검사기준.pdf",
+            "ntceSpecDocUrl9": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=9",
+            "ntceSpecFileNm10": "계약특수조건.docx",
+            "ntceSpecDocUrl10": "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=10"
+          }
+        ],
         "pageNo": 1,
         "numOfRows": 100,
-        "totalCount": 1
+        "totalCount": 2
       }
     }
   },
@@ -48,18 +57,25 @@
     "response": {
       "header": { "resultCode": "00", "resultMsg": "NORMAL_SERVICE" },
       "body": {
-        "items": [{
-          "bidNtceNo": "R26BK01000001",
-          "bidNtceOrd": "000",
-          "bssamt": "100000000",
-          "bssamtOpenDt": "202609061000",
-          "rsrvtnPrceRngBgnRate": "-3",
-          "rsrvtnPrceRngEndRate": "3",
-          "evlBssAmt": "100000000"
-        }],
+        "items": [
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "999",
+            "bssamt": "999"
+          },
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "bssamt": "100000000",
+            "bssamtOpenDt": "202609061000",
+            "rsrvtnPrceRngBgnRate": "-3",
+            "rsrvtnPrceRngEndRate": "3",
+            "evlBssAmt": "100000000"
+          }
+        ],
         "pageNo": 1,
         "numOfRows": 100,
-        "totalCount": 1
+        "totalCount": 2
       }
     }
   },
@@ -67,16 +83,43 @@
     "response": {
       "header": { "resultCode": "00", "resultMsg": "NORMAL_SERVICE" },
       "body": {
-        "items": [{
-          "bidNtceNo": "R26BK01000001",
-          "bidNtceOrd": "000",
-          "lmtGrpNo": "1",
-          "lcnsLmtNm": "전기공사업",
-          "permsnIndstrytyList": "1468"
-        }],
+        "items": [
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "lmtGrpNo": "1",
+            "lmtSno": "1",
+            "lcnsLmtNm": "전기공사업",
+            "permsnIndstrytyList": "1468"
+          },
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "lmtGrpNo": "1",
+            "lmtSno": "2",
+            "lcnsLmtNm": "소방시설공사업",
+            "permsnIndstrytyList": "0037"
+          },
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "lmtGrpNo": "2",
+            "lmtSno": "1",
+            "lcnsLmtNm": "정보통신공사업",
+            "permsnIndstrytyList": "0036"
+          },
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "999",
+            "lmtGrpNo": "3",
+            "lmtSno": "1",
+            "lcnsLmtNm": "다른 차수 면허",
+            "permsnIndstrytyList": "9999"
+          }
+        ],
         "pageNo": 1,
         "numOfRows": 100,
-        "totalCount": 1
+        "totalCount": 4
       }
     }
   },
@@ -84,11 +127,13 @@
     "response": {
       "header": { "resultCode": "00", "resultMsg": "NORMAL_SERVICE" },
       "body": {
-        "items": [{
-          "bidNtceNo": "R26BK01000001",
-          "bidNtceOrd": "000",
-          "prtcptPsblRgnNm": "경기도"
-        }],
+        "items": [
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "prtcptPsblRgnNm": "경기도"
+          }
+        ],
         "pageNo": 1,
         "numOfRows": 100,
         "totalCount": 1
@@ -99,15 +144,17 @@
     "response": {
       "header": { "resultCode": "00", "resultMsg": "NORMAL_SERVICE" },
       "body": {
-        "items": [{
-          "bidNtceNo": "R26BK01000001",
-          "bidNtceOrd": "000",
-          "prdctClsfcNo": "39111515",
-          "prdctClsfcNoNm": "LED실내조명등",
-          "prdctSpecNm": "40W, 5700K",
-          "qty": "100",
-          "unit": "개"
-        }],
+        "items": [
+          {
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "prdctClsfcNo": "39111515",
+            "prdctClsfcNoNm": "LED실내조명등",
+            "prdctSpecNm": "40W, 5700K",
+            "qty": "100",
+            "unit": "개"
+          }
+        ],
         "pageNo": 1,
         "numOfRows": 100,
         "totalCount": 1

@@ -1,47 +1,201 @@
-import { createServer, Server } from "node:http";
+import { EventEmitter } from "node:events";
+import {
+  createServer,
+  IncomingHttpHeaders,
+  IncomingMessage,
+  Server,
+} from "node:http";
+import { request as httpsRequest } from "node:https";
 import { AddressInfo } from "node:net";
+import { Readable } from "node:stream";
 import {
   TenderDocumentFetchError,
   TenderDocumentFetcher,
 } from "./tender-document-fetcher";
-import { TenderDocumentReference } from "../domain/tender-enrichment";
+import {
+  issueTenderDocumentReference,
+  TenderDocumentReference,
+} from "../domain/tender-enrichment";
+
+jest.mock("node:https", () => ({ request: jest.fn() }));
+
+const httpsRequestMock = httpsRequest as jest.MockedFunction<
+  typeof httpsRequest
+>;
+
+interface MockClientRequest extends EventEmitter {
+  end(): void;
+}
+
+const incomingResponse = (statusCode: number): IncomingMessage => {
+  const incoming = Readable.from([]) as IncomingMessage;
+  incoming.statusCode = statusCode;
+  incoming.headers = {} as IncomingHttpHeaders;
+  return incoming;
+};
 
 const pdfBytes = Buffer.from("%PDF-1.7\nfixture");
 const hwpBytes = Buffer.from([
   0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00,
 ]);
 
+const createStoredZip = (entryNames: string[]): Buffer => {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
+  for (const entryName of entryNames) {
+    const name = Buffer.from(entryName, "utf8");
+    const local = Buffer.alloc(30 + name.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(name.length, 26);
+    name.copy(local, 30);
+    localParts.push(local);
+
+    const central = Buffer.alloc(46 + name.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(localOffset, 42);
+    name.copy(central, 46);
+    centralParts.push(central);
+    localOffset += local.length;
+  }
+  const central = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entryNames.length, 8);
+  end.writeUInt16LE(entryNames.length, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(localOffset, 16);
+  return Buffer.concat([...localParts, central, end]);
+};
+
+const createHwpCompoundFile = (): Buffer => {
+  const file = Buffer.alloc(512 * 5);
+  Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).copy(file, 0);
+  file.writeUInt16LE(0x003e, 24);
+  file.writeUInt16LE(3, 26);
+  file.writeUInt16LE(0xfffe, 28);
+  file.writeUInt16LE(9, 30);
+  file.writeUInt16LE(6, 32);
+  file.writeUInt32LE(1, 44);
+  file.writeUInt32LE(1, 48);
+  file.writeUInt32LE(4096, 56);
+  file.writeUInt32LE(2, 60);
+  file.writeUInt32LE(1, 64);
+  file.writeUInt32LE(0xfffffffe, 68);
+  for (let offset = 76; offset < 512; offset += 4) {
+    file.writeUInt32LE(0xffffffff, offset);
+  }
+  file.writeUInt32LE(0, 76);
+
+  const fatOffset = 512;
+  for (let offset = fatOffset; offset < fatOffset + 512; offset += 4) {
+    file.writeUInt32LE(0xffffffff, offset);
+  }
+  file.writeUInt32LE(0xfffffffd, fatOffset);
+  file.writeUInt32LE(0xfffffffe, fatOffset + 4);
+  file.writeUInt32LE(0xfffffffe, fatOffset + 8);
+  file.writeUInt32LE(0xfffffffe, fatOffset + 12);
+
+  const writeDirectoryEntry = (
+    offset: number,
+    name: string,
+    type: number,
+    startSector: number,
+    size: number,
+  ) => {
+    const encodedName = Buffer.from(`${name}\0`, "utf16le");
+    encodedName.copy(file, offset);
+    file.writeUInt16LE(encodedName.length, offset + 64);
+    file.writeUInt8(type, offset + 66);
+    file.writeUInt8(1, offset + 67);
+    file.writeUInt32LE(0xffffffff, offset + 68);
+    file.writeUInt32LE(0xffffffff, offset + 72);
+    file.writeUInt32LE(0xffffffff, offset + 76);
+    file.writeUInt32LE(startSector, offset + 116);
+    file.writeUInt32LE(size, offset + 120);
+  };
+  writeDirectoryEntry(1024, "Root Entry", 5, 3, 512);
+  writeDirectoryEntry(1152, "FileHeader", 2, 0, 32);
+  file.writeUInt32LE(1, 1024 + 76);
+
+  for (let offset = 1536; offset < 2048; offset += 4) {
+    file.writeUInt32LE(0xffffffff, offset);
+  }
+  file.writeUInt32LE(0xfffffffe, 1536);
+  Buffer.from("HWP Document File", "ascii").copy(file, 2048);
+  return file;
+};
+
+const createTruncatedHwpCompoundFile = (): Buffer => {
+  const file = createHwpCompoundFile();
+  file.writeUInt32LE(128, 1152 + 120);
+  return file;
+};
+
+const g2bDocumentUrl = (
+  fixture: string,
+  extra: Record<string, string> = {},
+) => {
+  const url = new URL("https://www.g2b.go.kr/pt/file/download.do");
+  url.searchParams.set("bidNtceNo", "R26BK01000001");
+  url.searchParams.set("bidNtceOrd", "000");
+  url.searchParams.set("fileSeq", "1");
+  url.searchParams.set("fixture", fixture);
+  for (const [name, value] of Object.entries(extra)) {
+    url.searchParams.set(name, value);
+  }
+  return url.toString();
+};
+
 const document = (
   overrides: Partial<TenderDocumentReference> = {},
-): TenderDocumentReference => ({
-  identity: "G2B:R26BK01000001:000:1",
-  url: "https://www.g2b.go.kr/document.pdf",
-  displayName: "규격서.pdf",
-  formatHint: "PDF",
-  source: "G2B_API",
-  sourceNoticeId: "R26BK01000001",
-  revision: "000",
-  evidence: {
+): TenderDocumentReference =>
+  issueTenderDocumentReference({
+    identity: "G2B:R26BK01000001:000:1",
+    url: g2bDocumentUrl("document"),
+    displayName: "규격서.pdf",
+    formatHint: "PDF",
     source: "G2B_API",
-    operation: "getBidPblancListInfoThng",
-    field: "ntceSpecDocUrl1",
-  },
-  ...overrides,
-});
+    sourceNoticeId: "R26BK01000001",
+    revision: "000",
+    evidence: {
+      source: "G2B_API",
+      operation: "getBidPblancListInfoThng",
+      field: "ntceSpecDocUrl1",
+    },
+    ...overrides,
+  });
 
 describe("TenderDocumentFetcher", () => {
   let server: Server;
   let origin: string;
 
+  afterEach(() => {
+    httpsRequestMock.mockReset();
+  });
+
   beforeAll(async () => {
     server = createServer((request, response) => {
       const url = new URL(request.url || "/", "http://local.test");
-      if (url.pathname === "/document.pdf") {
+      const fixture =
+        url.pathname === "/pt/file/download.do"
+          ? url.searchParams.get("fixture")
+          : null;
+      if (url.pathname === "/document.pdf" || fixture === "document") {
         response.writeHead(200, { "content-type": "application/pdf" });
         response.end(pdfBytes);
         return;
       }
-      if (url.pathname === "/oversized.pdf") {
+      if (url.pathname === "/manufactured.pdf") {
+        response.writeHead(200, { "content-type": "application/pdf" });
+        response.end(pdfBytes);
+        return;
+      }
+      if (url.pathname === "/oversized.pdf" || fixture === "oversized") {
         response.writeHead(200, { "content-type": "application/pdf" });
         response.write(
           Buffer.concat([
@@ -52,12 +206,12 @@ describe("TenderDocumentFetcher", () => {
         response.end(Buffer.from([0]));
         return;
       }
-      if (url.pathname === "/mismatch.pdf") {
+      if (url.pathname === "/mismatch.pdf" || fixture === "mismatch") {
         response.writeHead(200, { "content-type": "application/pdf" });
         response.end(hwpBytes);
         return;
       }
-      if (url.pathname === "/slow.pdf") {
+      if (url.pathname === "/slow.pdf" || fixture === "slow") {
         setTimeout(() => {
           if (!response.destroyed) {
             response.writeHead(200, { "content-type": "application/pdf" });
@@ -66,20 +220,22 @@ describe("TenderDocumentFetcher", () => {
         }, 250);
         return;
       }
-      if (url.pathname === "/offsite.pdf") {
+      if (url.pathname === "/offsite.pdf" || fixture === "offsite") {
         response.writeHead(302, {
           location: "https://evil.example/document.pdf",
         });
         response.end();
         return;
       }
-      if (url.pathname === "/redirect.pdf") {
+      if (url.pathname === "/redirect.pdf" || fixture === "redirect") {
         const count = Number(url.searchParams.get("count") || "0");
         response.writeHead(302, {
           location:
             count >= 5
-              ? "https://www.g2b.go.kr/document.pdf"
-              : `https://www.g2b.go.kr/redirect.pdf?count=${count + 1}`,
+              ? g2bDocumentUrl("document")
+              : g2bDocumentUrl("redirect", {
+                  count: String(count + 1),
+                }),
         });
         response.end();
         return;
@@ -113,6 +269,84 @@ describe("TenderDocumentFetcher", () => {
         );
       },
     });
+
+  it("returns an address array when Node production transport requests lookup all mode", async () => {
+    let transportOptions: Record<string, unknown> | undefined;
+    const request = new EventEmitter() as MockClientRequest;
+    request.end = () => request.emit("error", new Error("transport probe"));
+    httpsRequestMock.mockImplementationOnce(((
+      _url: URL,
+      options: Record<string, unknown>,
+    ) => {
+      transportOptions = options;
+      return request;
+    }) as never);
+    const fetcher = new TenderDocumentFetcher({
+      resolveHost: async () => ["8.8.8.8"],
+    });
+
+    await expect(
+      fetcher.fetch(document(), new AbortController().signal),
+    ).rejects.toMatchObject({ code: "DOCUMENT_NETWORK_ERROR" });
+
+    const lookup = transportOptions?.lookup as (
+      hostname: string,
+      options: { all: boolean },
+      callback: (...args: unknown[]) => void,
+    ) => void;
+    let lookupResult: unknown[] = [];
+    lookup("www.g2b.go.kr", { all: true }, (...args) => {
+      lookupResult = args;
+    });
+    expect(lookupResult).toEqual([null, [{ address: "8.8.8.8", family: 4 }]]);
+    lookup("www.g2b.go.kr", { all: false }, (...args) => {
+      lookupResult = args;
+    });
+    expect(lookupResult).toEqual([null, "8.8.8.8", 4]);
+  });
+
+  it.each([204, 205, 304])(
+    "maps body-forbidden HTTPS status %s to a stable error without escaping the callback",
+    async (statusCode) => {
+      let onResponse: ((incoming: IncomingMessage) => void) | undefined;
+      let markTransportReady: (() => void) | undefined;
+      const transportReady = new Promise<void>((resolve) => {
+        markTransportReady = resolve;
+      });
+      const request = new EventEmitter() as MockClientRequest;
+      request.end = () => undefined;
+      httpsRequestMock.mockImplementationOnce(((
+        _url: URL,
+        _options: Record<string, unknown>,
+        callback: (incoming: IncomingMessage) => void,
+      ) => {
+        onResponse = callback;
+        markTransportReady?.();
+        return request;
+      }) as never);
+      const fetcher = new TenderDocumentFetcher({
+        resolveHost: async () => ["8.8.8.8"],
+      });
+
+      const rejected = fetcher
+        .fetch(document(), new AbortController().signal)
+        .catch((error) => error);
+      await transportReady;
+      let escaped: unknown;
+      try {
+        onResponse?.(incomingResponse(statusCode));
+      } catch (error) {
+        escaped = error;
+      } finally {
+        request.emit("error", new Error("settle transport probe"));
+      }
+
+      await expect(rejected).resolves.toMatchObject({
+        code: "DOCUMENT_NETWORK_ERROR",
+      });
+      expect(escaped).toBeUndefined();
+    },
+  );
 
   it("streams a validated official document and returns only bytes, detected format, and sha256", async () => {
     const result = await createFetcher().fetch(
@@ -157,6 +391,54 @@ describe("TenderDocumentFetcher", () => {
   });
 
   it.each([
+    ["a missing notice binding", "https://www.g2b.go.kr/document.pdf"],
+    [
+      "a mismatched revision",
+      "https://www.g2b.go.kr/document.pdf?bidNtceNo=R26BK01000001&bidNtceOrd=999",
+    ],
+    [
+      "a manufactured official-host path",
+      "https://www.g2b.go.kr/manufactured.pdf?bidNtceNo=R26BK01000001&bidNtceOrd=000",
+    ],
+  ])(
+    "rejects %s even when its reference metadata looks valid",
+    async (_label, url) => {
+      await expect(
+        createFetcher().fetch(document({ url }), new AbortController().signal),
+      ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
+    },
+  );
+
+  it("rejects a cloned document reference that was not issued by an adapter", async () => {
+    const manufactured = { ...document() };
+
+    await expect(
+      createFetcher().fetch(manufactured, new AbortController().signal),
+    ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
+  });
+
+  it("rejects manufactured K-apt metadata even with a canonical-looking URL", async () => {
+    const manufactured: TenderDocumentReference = {
+      identity: "KAPT:202609060001:1:1",
+      url: "https://www.k-apt.go.kr/bid/fileDownload.do?bidNum=202609060001&fileSeq=1",
+      displayName: "공고문.pdf",
+      formatHint: "PDF",
+      source: "KAPT_PAGE",
+      sourceNoticeId: "202609060001",
+      revision: "1",
+      evidence: {
+        source: "KAPT_PAGE",
+        operation: "KAPT_NOTICE_DOCUMENTS",
+        field: "attachment:1",
+      },
+    };
+
+    await expect(
+      createFetcher().fetch(manufactured, new AbortController().signal),
+    ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
+  });
+
+  it.each([
     "127.0.0.1",
     "10.0.0.2",
     "169.254.169.254",
@@ -187,7 +469,7 @@ describe("TenderDocumentFetcher", () => {
   it("validates every manual redirect before following it", async () => {
     await expect(
       createFetcher().fetch(
-        document({ url: "https://www.g2b.go.kr/offsite.pdf" }),
+        document({ url: g2bDocumentUrl("offsite") }),
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
@@ -196,7 +478,7 @@ describe("TenderDocumentFetcher", () => {
   it("stops the response stream at 20 MiB plus one byte", async () => {
     await expect(
       createFetcher().fetch(
-        document({ url: "https://www.g2b.go.kr/oversized.pdf" }),
+        document({ url: g2bDocumentUrl("oversized") }),
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ code: "DOCUMENT_TOO_LARGE" });
@@ -205,16 +487,86 @@ describe("TenderDocumentFetcher", () => {
   it("rejects MIME, magic-byte, and declared-format disagreement", async () => {
     await expect(
       createFetcher().fetch(
-        document({ url: "https://www.g2b.go.kr/mismatch.pdf" }),
+        document({ url: g2bDocumentUrl("mismatch") }),
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ code: "DOCUMENT_FORMAT_MISMATCH" });
   });
 
+  const fetchStaticDocument = (
+    bytes: Uint8Array,
+    formatHint: TenderDocumentReference["formatHint"],
+    contentType: string,
+  ) =>
+    new TenderDocumentFetcher({
+      resolveHost: async () => ["8.8.8.8"],
+      fetcher: async () =>
+        new Response(bytes, {
+          status: 200,
+          headers: { "content-type": contentType },
+        }),
+    }).fetch(
+      document({ formatHint, displayName: `fixture.${formatHint}` }),
+      new AbortController().signal,
+    );
+
+  it.each([
+    ["signature-only OLE", hwpBytes, "HWP" as const, "application/x-hwp"],
+    [
+      "marker-only ZIP",
+      Buffer.from("PK\u0003\u0004word/document.xml", "latin1"),
+      "DOCX" as const,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+    [
+      "truncated HWP FileHeader stream",
+      createTruncatedHwpCompoundFile(),
+      "HWP" as const,
+      "application/x-hwp",
+    ],
+  ])("rejects a corrupt %s container", async (_label, bytes, hint, mime) => {
+    await expect(fetchStaticDocument(bytes, hint, mime)).rejects.toMatchObject({
+      code: "DOCUMENT_FORMAT_MISMATCH",
+    });
+  });
+
+  it.each([
+    ["HWP", createHwpCompoundFile(), "application/x-hwp"],
+    [
+      "HWPX",
+      createStoredZip([
+        "mimetype",
+        "META-INF/container.xml",
+        "Contents/content.hpf",
+        "Contents/section0.xml",
+      ]),
+      "application/hwp+zip",
+    ],
+    [
+      "DOCX",
+      createStoredZip(["[Content_Types].xml", "word/document.xml"]),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+    [
+      "XLSX",
+      createStoredZip(["[Content_Types].xml", "xl/workbook.xml"]),
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ],
+  ] as const)(
+    "accepts a structurally valid representative %s container",
+    async (format, bytes, mime) => {
+      await expect(
+        fetchStaticDocument(bytes, format, mime),
+      ).resolves.toMatchObject({
+        detectedFormat: format,
+      });
+    },
+  );
+
   it("aborts the entire fetch boundary on timeout", async () => {
     await expect(
       createFetcher({ timeoutMs: 30 }).fetch(
-        document({ url: "https://www.g2b.go.kr/slow.pdf" }),
+        document({ url: g2bDocumentUrl("slow") }),
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ code: "DOCUMENT_TIMEOUT" });
@@ -238,7 +590,7 @@ describe("TenderDocumentFetcher", () => {
   it("rejects excessive redirect count", async () => {
     await expect(
       createFetcher().fetch(
-        document({ url: "https://www.g2b.go.kr/redirect.pdf?count=0" }),
+        document({ url: g2bDocumentUrl("redirect", { count: "0" }) }),
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ code: "DOCUMENT_REDIRECT_LIMIT" });

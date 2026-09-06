@@ -2,12 +2,14 @@ import { NormalizedTender } from "../domain/normalized-tender";
 import {
   emptyTenderEnrichment,
   EvidenceRef,
+  issueTenderDocumentReference,
   TenderDocumentFormat,
   TenderEnrichment,
   TenderEnrichmentAdapter,
   TenderEnrichmentError,
   TenderEnrichmentOperationFailure,
   TenderLawKind,
+  toSafeProviderResultCode,
 } from "../domain/tender-enrichment";
 import { ProcurementType, TenderSource } from "../domain/tender.enums";
 import {
@@ -19,6 +21,7 @@ import {
 export interface G2bEnrichmentAdapterConfig {
   baseUrl: string;
   serviceKey: string;
+  relayEnabled?: boolean;
 }
 
 const OPERATIONS = [
@@ -59,6 +62,13 @@ const REGION_CODES: Readonly<Record<string, string>> = {
   강원특별자치도: "51",
 };
 
+const G2B_DOCUMENT_HOSTS = new Set([
+  "g2b.go.kr",
+  "www.g2b.go.kr",
+  "apis.data.go.kr",
+]);
+const G2B_DOCUMENT_PATH = "/pt/file/download.do";
+
 const evidence = (operation: Operation, field: string): EvidenceRef => ({
   source: "G2B_API",
   operation,
@@ -89,6 +99,7 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
   constructor(
     private readonly client: TenderApiClient,
     private readonly config: G2bEnrichmentAdapterConfig,
+    private readonly relayClient?: TenderApiClient,
   ) {}
 
   async enrich(
@@ -106,27 +117,28 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
     const failures: TenderEnrichmentOperationFailure[] = [];
     for (const operation of OPERATIONS) {
       try {
-        const query: Record<string, string> = {
-          serviceKey: this.config.serviceKey,
-          type: "json",
-          inqryDiv: "2",
-          bidNtceNo: tender.sourceNoticeId,
-        };
-        if (OPERATIONS_WITH_REVISION.has(operation)) {
-          query.bidNtceOrd = tender.revision;
-        }
         rows.set(
           operation,
-          await this.client.getAllPages({
-            source: TenderSource.G2B,
-            baseUrl: this.config.baseUrl,
-            operation,
-            query,
-            signal,
-          }),
+          await this.fetchOperation(this.client, operation, tender, signal),
         );
       } catch (error) {
-        failures.push(this.toFailure(operation, error));
+        if (!this.shouldUseRelay(error)) {
+          failures.push(this.toFailure(operation, error));
+          continue;
+        }
+        try {
+          rows.set(
+            operation,
+            await this.fetchOperation(
+              this.relayClient!,
+              operation,
+              tender,
+              signal,
+            ),
+          );
+        } catch (relayError) {
+          failures.push(this.toFailure(operation, relayError));
+        }
       }
     }
 
@@ -160,6 +172,41 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
       result,
     );
     return result;
+  }
+
+  private fetchOperation(
+    client: TenderApiClient,
+    operation: Operation,
+    tender: NormalizedTender,
+    signal: AbortSignal,
+  ): Promise<Record<string, unknown>[]> {
+    const query: Record<string, string> = {
+      serviceKey: this.config.serviceKey,
+      type: "json",
+      inqryDiv: "2",
+      bidNtceNo: tender.sourceNoticeId,
+    };
+    if (OPERATIONS_WITH_REVISION.has(operation)) {
+      query.bidNtceOrd = tender.revision;
+    }
+    return client.getAllPages({
+      source: TenderSource.G2B,
+      baseUrl: this.config.baseUrl,
+      operation,
+      query,
+      signal,
+    });
+  }
+
+  private shouldUseRelay(error: unknown): error is TenderSourceError {
+    return (
+      this.config.relayEnabled === true &&
+      this.relayClient !== undefined &&
+      error instanceof TenderSourceError &&
+      error.code === "PROVIDER_RESULT_ERROR" &&
+      error.status === 200 &&
+      error.providerResultCode === null
+    );
   }
 
   private readDetail(
@@ -208,16 +255,53 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
       if (!url) continue;
       const displayName =
         toNullableText(row[`ntceSpecFileNm${index}`]) ?? `첨부문서 ${index}`;
-      result.documents.push({
-        identity: `G2B:${tender.sourceNoticeId}:${tender.revision}:${index}`,
+      const document = this.createDocumentReference(
         url,
         displayName,
-        formatHint: formatFromName(displayName) ?? formatFromName(url),
+        index,
+        tender,
+        operation,
+      );
+      if (document) result.documents.push(document);
+    }
+  }
+
+  private createDocumentReference(
+    value: string,
+    displayName: string,
+    index: number,
+    tender: NormalizedTender,
+    operation: "getBidPblancListInfoThng",
+  ) {
+    try {
+      const url = new URL(value);
+      if (
+        url.protocol !== "https:" ||
+        url.username ||
+        url.password ||
+        url.port ||
+        url.hash ||
+        !G2B_DOCUMENT_HOSTS.has(url.hostname) ||
+        url.pathname !== G2B_DOCUMENT_PATH ||
+        url.searchParams.getAll("bidNtceNo").length !== 1 ||
+        url.searchParams.get("bidNtceNo") !== tender.sourceNoticeId ||
+        url.searchParams.getAll("bidNtceOrd").length !== 1 ||
+        url.searchParams.get("bidNtceOrd") !== tender.revision
+      ) {
+        return null;
+      }
+      return issueTenderDocumentReference({
+        identity: `G2B:${tender.sourceNoticeId}:${tender.revision}:${index}`,
+        url: url.toString(),
+        displayName,
+        formatHint: formatFromName(displayName) ?? formatFromName(value),
         source: "G2B_API",
         sourceNoticeId: tender.sourceNoticeId,
         revision: tender.revision,
         evidence: evidence(operation, `ntceSpecDocUrl${index}`),
       });
+    } catch {
+      return null;
     }
   }
 
@@ -278,6 +362,7 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
             {
               code,
               name,
+              group: toNullableText(row.lmtGrpNo),
               required: true,
               evidence: evidence(
                 operation,
@@ -355,7 +440,7 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
         operation,
         errorCode: error.code,
         pageNo: error.pageNo,
-        providerResultCode: error.providerResultCode,
+        providerResultCode: toSafeProviderResultCode(error.providerResultCode),
         httpStatus: error.status,
         attempts: error.attempts,
       };
