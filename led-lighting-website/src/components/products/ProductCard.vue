@@ -44,7 +44,7 @@ const getCertificationIcons = (product: Product): string[] => {
 
 <template>
   <NuxtLink v-slot="{ href }" custom :to="`/products/${product.id}`">
-    <a :href="href" class="block" @click.prevent="handleClick">
+    <a :href="href ?? `/products/${product.id}`" class="block" @click.prevent="handleClick">
       <BaseCard :clickable="true" :hoverable="true" :body-style="{ padding: '0' }">
         <!-- Product Image -->
         <div

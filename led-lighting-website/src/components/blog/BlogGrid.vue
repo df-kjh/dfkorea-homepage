@@ -43,7 +43,7 @@ const formatDate = (dateString: string) => {
       custom
       :to="`/blog/${post.id}`"
     >
-      <a :href="href" class="block" @click.prevent="handlePostClick(post)">
+      <a :href="href ?? `/blog/${post.id}`" class="block" @click.prevent="handlePostClick(post)">
         <BaseCard
           :clickable="true"
           :hoverable="true"
