@@ -40,25 +40,25 @@
 - Consumes: `runtimeConfig.public.siteUrl: string`
 - Produces: server-rendered `<title>`, description, robots and canonical tags for each public static route
 
-- [ ] **Step 1: Write the failing build verifier**
+- [x] **Step 1: Write the failing build verifier**
 
 Create a script that reads generated `/`, `/about`, `/products`, `/blog`, and `/certificates` HTML and asserts that every canonical starts with `https://dfkorealed.com`, no `www.dfkorealed.com` remains, and each page has its own expected title and description.
 
-- [ ] **Step 2: Run the verifier against the current build**
+- [x] **Step 2: Run the verifier against the current build**
 
 Run: `node scripts/verify-search-indexing.mjs`
 Expected: FAIL because current generated files contain `https://www.dfkorealed.com` canonical URLs and shared metadata.
 
-- [ ] **Step 3: Implement one canonical source and SSR metadata**
+- [x] **Step 3: Implement one canonical source and SSR metadata**
 
 Set `NUXT_PUBLIC_SITE_URL` and all default absolute URLs to `https://dfkorealed.com`. Add `useSeoMeta` and `useHead` to page wrappers, with route-derived metadata for `/certificates/[id]`. Add route headers for `/admin/**` and `/tailwind-test`, and add those paths to robots.txt disallow rules.
 
-- [ ] **Step 4: Build and verify**
+- [x] **Step 4: Build and verify**
 
 Run: `VITE_API_BASE_URL=https://dfkorea-production.up.railway.app npm run build`
 Expected: PASS including `Verified search indexing metadata.`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git commit -m "fix: canonicalize public search metadata"`
 
@@ -160,4 +160,3 @@ Check `robots.txt`, sitemap status and counts, five static page heads, one produ
 - [ ] **Step 5: Commit documentation**
 
 Run: `git commit -m "docs: record search indexing strategy"`
-
