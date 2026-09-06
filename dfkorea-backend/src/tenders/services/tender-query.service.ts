@@ -1,3 +1,4 @@
+import { TenderAnalysisService } from "./tender-analysis.service";
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, SelectQueryBuilder } from "typeorm";
@@ -19,6 +20,7 @@ export class TenderQueryService {
   constructor(
     @InjectRepository(Tender)
     private readonly tenderRepository: Repository<Tender>,
+    private readonly analysisService: TenderAnalysisService,
   ) {}
 
   async getCalendar(
@@ -27,7 +29,7 @@ export class TenderQueryService {
   ): Promise<TenderCalendarDayDto[]> {
     const { start, end } = this.getKstMonthBounds(month);
     const localRegisteredDate =
-      "(tender.registeredAt AT TIME ZONE 'Asia/Seoul')::date";
+      "((tender.registeredAt AT TIME ZONE 'Asia/Seoul')::date)::text";
     const builder = this.tenderRepository
       .createQueryBuilder("tender")
       .select(localRegisteredDate, "date")
@@ -95,8 +97,14 @@ export class TenderQueryService {
       .take(pageSize)
       .getManyAndCount();
 
+    const analyses = await this.analysisService.getSummaries(
+      tenders.map((tender) => tender.id),
+    );
     return {
-      data: tenders.map((tender) => this.toSafeDto(tender)),
+      data: tenders.map((tender) => ({
+        ...this.toSafeDto(tender),
+        analysis: analyses.get(tender.id) ?? null,
+      })),
       total,
       page,
       pageSize,

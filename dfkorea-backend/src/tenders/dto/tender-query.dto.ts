@@ -1,3 +1,4 @@
+import { TenderAnalysisSummaryDto } from "./tender-analysis.dto";
 import { Type } from "class-transformer";
 import {
   IsDateString,
@@ -78,6 +79,7 @@ export interface TenderCalendarDayDto {
 }
 
 export interface TenderSummaryDto {
+  analysis?: TenderAnalysisSummaryDto | null;
   id: string;
   source: TenderSource;
   sourceNoticeId: string;

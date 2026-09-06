@@ -26,6 +26,8 @@ describe("TendersController", () => {
     subscription as never,
     ingestion as never,
     companyProfile as never,
+    {} as never,
+    {} as never,
   );
 
   beforeEach(() => {

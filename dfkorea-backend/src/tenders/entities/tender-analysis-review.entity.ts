@@ -30,8 +30,8 @@ export class TenderAnalysisReview {
   @Column({ type: "varchar", length: 2000, nullable: true })
   note: string | null;
 
-  @Column({ type: "uuid", nullable: true })
-  reviewerAdminId: string | null;
+  @Column({ type: "integer", nullable: true })
+  reviewerAdminId: number | null;
 
   @Column({ type: "timestamptz", nullable: true })
   reviewedAt: Date | null;

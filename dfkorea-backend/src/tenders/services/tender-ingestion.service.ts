@@ -1,3 +1,4 @@
+import { queueTenderAnalysis } from "./tender-analysis-queue";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, QueryRunner, Repository } from "typeorm";
@@ -331,6 +332,15 @@ export class TenderIngestionService {
         conflictPaths: ["source", "sourceNoticeId", "revision"],
       });
 
+      const persisted = await repository.find({
+        where: tenders.map(({ source, sourceNoticeId, revision }) => ({
+          source,
+          sourceNoticeId,
+          revision,
+        })),
+      });
+      for (const tender of persisted)
+        await queueTenderAnalysis(manager, tender);
       return { createdCount: tenders.length - updatedCount, updatedCount };
     });
   }

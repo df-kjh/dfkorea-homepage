@@ -1,3 +1,7 @@
+import { TenderAnalysisService } from "./services/tender-analysis.service";
+import { TenderDocumentTextExtractor } from "./documents/tender-document-extractor";
+import { Product } from "../entities/product.entity";
+import { Admin } from "../entities/admin.entity";
 import { DataSource } from "typeorm";
 import { G2bAwardAdapter } from "./adapters/g2b-award.adapter";
 import { TenderAwardCollectorService } from "./services/tender-award-collector.service";
@@ -70,6 +74,8 @@ const createSafeRetryLogger = (context: string) => {
   imports: [
     TypeOrmModule.forFeature([
       Tender,
+      Product,
+      Admin,
       TenderSubscription,
       TenderRecipient,
       TenderSyncRun,
@@ -87,6 +93,11 @@ const createSafeRetryLogger = (context: string) => {
   ],
   controllers: [TendersController, TenderMailOAuthController],
   providers: [
+    TenderAnalysisService,
+    {
+      provide: TenderDocumentTextExtractor,
+      useFactory: () => new TenderDocumentTextExtractor(),
+    },
     TenderAwardCollectorService,
     TenderPriceAnalyzer,
     {
@@ -251,6 +262,7 @@ const createSafeRetryLogger = (context: string) => {
     TenderCompanyProfileService,
   ],
   exports: [
+    TenderAnalysisService,
     G2bAwardAdapter,
     TenderAwardCollectorService,
     TenderPriceAnalyzer,

@@ -192,7 +192,11 @@ Index: `IDX_tender_document_tender_status` on (`tenderId`, `status`).
 
 `tender_analyses.tenderId` is a cascading FK to `tenders.id` and `UQ_tender_analysis_tender` retains one current analysis per tender. It stores the tender, document, company-profile, and product-catalog fingerprints; analyzer version; status/suitability; nullable numeric specification score; comparable/satisfied/unsatisfied/unknown counts; normalized requirements; certification, participation and compact price analyses; evidence; worker lease; safe error code; and audit timestamps. `IDX_tender_analysis_status_lease` on (`status`, `leaseExpiresAt`) supports recovery of interrupted work.
 
-`tender_analysis_reviews` stores immutable analysis fingerprint context, review status, 2,000-character internal note, reviewer admin ID, and timestamps. Its `tenderId` FK cascades on tender deletion. `analysisId` is nullable and uses `ON DELETE SET NULL`, preserving a historic review when a current analysis row is replaced.
+`tender_analysis_reviews` stores immutable analysis fingerprint context, review status, 2,000-character internal note, nullable integer `reviewerAdminId` matching the existing `admins.id`, and timestamps. Its `tenderId` FK cascades on tender deletion. `analysisId` is nullable and uses `ON DELETE SET NULL`, preserving a historic review when a current analysis row is replaced.
+
+The corrective migration `1788699100000-FixTenderReviewAdminIdentity` changes the unreleased review UUID identity column to integer. Both up and down acquire an exclusive table lock and refuse non-null identities before conversion; existing reviews must never be silently erased or assigned an invented admin. No admin FK is added, so a historic numeric reviewer reference survives later admin removal.
+
+Analysis queue changes clear the claim token and lease. Profile replacement/version increment invalidates current analyses in the same transaction. Product fingerprints use the sorted global ID/updatedAt set. Final document replacement and analysis writes occur only after token/lease/current-input checks in one transaction. Review history remains immutable when a current analysis changes.
 
 ### `tender_award_results` and `tender_award_sync_runs`
 

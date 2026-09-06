@@ -27,7 +27,10 @@ describe("TenderQueryService broad tender rollback", () => {
     const repository = {
       createQueryBuilder: jest.fn().mockReturnValue(builder),
     };
-    const service = new TenderQueryService(repository as never);
+    const service = new TenderQueryService(
+      repository as never,
+      { getSummaries: jest.fn(async () => new Map()) } as never,
+    );
 
     await service.getCalendar("2026-09");
 

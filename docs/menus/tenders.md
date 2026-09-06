@@ -2,10 +2,19 @@
 
 ## 구현 완료
 
+- 관련 공고 저장과 같은 트랜잭션에서 분석을 큐에 넣는다. 내용 fingerprint가 같은 재수집은 완료·검토 상태를 유지하고, 제목·조건·첨부를 포함한 공급자 내용 또는 분석기 버전 변경은 `PENDING`으로 전환한다. 수집 시각·분류 점수는 fingerprint에서 제외한다.
+- 분석 작업은 PostgreSQL `FOR UPDATE SKIP LOCKED`, 임의 점유 token, 5분 lease로 하나씩 점유한다. 각 문서 전에 유효한 점유만 갱신하고, 최종 저장 시 token·lease·공고 fingerprint·프로필 버전·전체 제품 ID/updatedAt fingerprint를 다시 확인한다. 문서 저장도 같은 최종 트랜잭션 안에서 처리하여 이전 작업자가 새 결과를 덮어쓰지 못한다.
+- 첨부는 문서별로 독립 처리하며 정규화된 문단/표, hash와 안전한 오류 코드만 보존한다. 유용한 사실이 있고 일부 출처가 실패하면 `PARTIAL`, 아무 사실도 확보하지 못한 출처 실패는 `FAILED`다. 동일 실패의 재분석이 완료 상태로 바뀌지 않으며 원본 bytes와 공급자 payload는 분석·문서 테이블에 저장하지 않는다.
+- 관리자 JWT 아래 `GET/PUT /tenders/company-profile`, `GET /tenders/:id/analysis`, `POST /tenders/:id/analysis`, `POST /tenders/:id/review`, `POST /tenders/award-results/backfill`, `GET /tenders/award-results/status`를 연결했다. 분석 POST와 백필 POST는 명시적인 HTTP 202로 현재 작업 상태를 반환하며 문서 해석이나 공급자 수집을 기다리지 않는다.
+- 회사 프로필 전체 교체는 version 증가와 모든 현재 분석의 대기 전환을 같은 트랜잭션에서 반영한다. 매시 전체 제품의 ID·updatedAt을 정렬한 fingerprint를 한 번 계산하여 제품 추가·수정·삭제 또는 분석기 버전 변경을 감지하고 일치하지 않는 분석을 대기 상태로 바꾼다.
+- 리뷰는 `completed` boolean과 앞뒤 공백을 제거한 0~2000자 `note`를 받는다. 서버가 인증된 username으로 실제 정수 Admin ID를 조회하고 현재 분석 fingerprint와 함께 이력을 저장한다. 대기/처리/실패 상태에서는 리뷰 저장을 409로 거부한다. 입력 fingerprint 또는 재계산된 자격/가격 결과가 달라지면 기존 리뷰 행을 유지하고 현재 결과는 `reviewed: false`다.
+- 목록의 `analysis`는 `{ status, suitability, specificationScore, unknownCount, analyzedAt }` 또는 null만 제공한다. 분석 상세는 조건·판정·근거 snippet과 문서별 상태를 제공하며 전체 추출 text/table block·점유 token·사내 제품명은 응답에 포함하지 않는다. comparable/satisfied/unsatisfied 수는 사양 기준이며 unknownCount는 사양·자격·미해석 근거·프로필 미설정·출처 실패 확인 항목을 포함한다.
+- cron은 모두 `Asia/Seoul`, `noOverlap: true`를 적용한다. 기존 매시 정각 공고 수집과 매분 정각 메일/재시도를 유지하고, 매시 02분 10초 fingerprint 갱신 후 최대 5건 분석, 매분 20초 최대 2건 분석, 매일 02:15 낙찰 증분 수집, 매시 05~50분 중 5분 간격의 30초에 낙찰 백필/증분 1페이지 재개를 실행한다. 종료 시 7개 작업 모두 stop/destroy한다. 낙찰 작업은 일반 수집 advisory lock을 공유하며 정각을 피한다.
+
 - 낙찰 이력 수집·가격 분석 기반 서비스: 공식 물품 최종낙찰 목록과 예비가격·물품 공고를 연결하며 금액을 decimal string으로 보존한다. 최근 2년의 KST 월별 구간과 DB lease/cursor로 중단 후 재개하며, 완료된 연속 구간의 마지막 날짜부터 7일을 겹쳐 누락 기간을 월별로 보충한다. 일반 수집 lock이 사용 중이면 건너뛴다. 한 tick에 목록 1페이지와 LED 후보 1건의 상세 조회만 처리한다.
 - 투찰 가격 계산은 명시된 총액·통화·산식 정보를 요구하며 BigInt 유리수 연산으로 계산한다. 통계는 최근 2년·동일 방식의 유효 결과에 IQR 제거, 세부품명/지역 → 세부품명 → LED 제품군 순서의 fallback, 15/30/100건 신뢰도 경계를 적용한다.
 
-- 입찰 첨부문서 추출의 독립 백엔드 어댑터를 구현했다. HWP 5.x/HWPX/PDF/DOCX/XLSX를 메모리에서 읽어 순번·쪽/섹션/sheet 위치가 있는 문단·표 블록으로 변환한다. 암호화, 손상, OCR 필요, 미지원, 크기·압축·시간 제한은 안전한 오류 코드로 반환하며 원본·파서 오류 본문을 저장하거나 로그에 남기지 않는다. 아직 실제 분석 작업·관리자 화면에는 연결하지 않았다.
+- 입찰 첨부문서 추출의 독립 백엔드 어댑터를 구현했다. HWP 5.x/HWPX/PDF/DOCX/XLSX를 메모리에서 읽어 순번·쪽/섹션/sheet 위치가 있는 문단·표 블록으로 변환한다. 암호화, 손상, OCR 필요, 미지원, 크기·압축·시간 제한은 안전한 오류 코드로 반환하며 원본·파서 오류 본문을 저장하거나 로그에 남기지 않는다. 실제 분석 작업에는 연결했으며 관리자 분석 화면은 후속 작업이다.
 
 - 관리자 좌측 메뉴의 `입찰 공고` 탭에서 등록일 기준 월간 공고를 조회한다.
 - 캘린더는 이전·다음 달 날짜를 포함한 7열 × 6주, 총 42개 셀을 항상 표시한다.
@@ -42,7 +51,12 @@
 
 ## 부족하거나 개선이 필요한 기능
 
-- 낙찰 수집 서비스의 관리자 시작 API·cron 연결과 가격 UI는 후속 작업이다. 공식 Swagger 필드 전체를 포함한 익명 fixture와 독립 로컬 PostgreSQL로 검증했으며, 승인된 운영 key로 응답 검증은 아직 하지 않았다.
+- 현재 실제 enrichment 어댑터는 검증된 총액/단가·통화·표준/특수산식 메타데이터를 제공하지 않는다. 오케스트레이션은 이를 `UNKNOWN`으로 전달하여 가격을 `FORMULA_REVIEW_REQUIRED`/`INCOMPARABLE_CONTRACT`로 보류한다. 향후 정규화된 `pricingContext`가 명시적으로 제공되면 최근 2년 유효 낙찰 이력을 연결하는 경로는 구현·fixture 검증했다. K-apt 또는 금액/법령 이름만으로 G2B 산식을 추정하지 않는다.
+- 회사 프로필이 없으면 회사 자격을 미보유로 단정하지 않고 UNKNOWN으로 표시한다. 제품 DB에 없는 IP 등급·조달 분류의 추정 매핑은 하지 않으며 현재 등록된 수치·인증만 사용한다. 개별 제품명·매칭 목록은 제공하지 않는다.
+- 한 분석은 최대 10개 첨부를 처리하며 초과 문서는 출처 확인 필요로 남겨 PARTIAL/FAILED 상태에 반영한다. 실패 작업은 수동 재분석 또는 입력 변경으로 다시 실행한다. 제품 변경 감지는 매시, 기존 공고의 자동 큐 생성은 재수집 시 반영된다. 개찰 이력 갱신 자체나 날짜 경과에 따른 자격 만료는 별도 자동 재분석 트리거가 없으므로 최신 검토 시 수동 재분석이 필요하다.
+- `1788699100000-FixTenderReviewAdminIdentity`는 미출시 분석 스키마의 reviewerAdminId UUID를 기존 Admin.id에 맞는 integer로 보정한다. 기존 값이 하나라도 있으면 up/down 모두 중단하여 이력을 버리지 않는다. 운영 적용 전 리뷰가 없는 스키마라는 전제를 확인해야 한다.
+
+- 분석 상세·회사 자격·리뷰·가격 관리자 UI는 후속 작업이다. 낙찰 시작/상태 API와 cron은 연결했다. 공식 Swagger 필드 전체를 포함한 익명 fixture와 독립 로컬 PostgreSQL로 검증했으며, 승인된 운영 key로 응답 검증은 아직 하지 않았다.
 - 최종 목록에서 관측된 기존 공고는 제목이 LED에서 다른 품목으로 바뀌어도 DB의 공고 식별자를 기준으로 재확인한다. 같은 공고·차수의 명시적인 취소/유찰/재입찰은 과거 이력을 무효화하고, 단일 품목 재분류는 결과 upsert·cursor와 동일한 lease 검증 transaction에서 반영한다. 누락 응답·요청 실패·모호한 join은 무효화 근거로 쓰지 않는다.
 - 저장 스키마에 `bidClsfcNo`가 없어 여러 입찰 분류/기존 품목이 함께 있으면 과거 품목과 현재 분류를 추측해 연결하지 않는다. 같은 저장 키로 합쳐지는 서로 다른 분류는 페이지·offset에 관계없이 저장에서 제외하며 기존 금액을 덮어쓰지 않는다. 관련 없는 이력을 유지하고 `AMBIGUOUS_CLASS_IDENTITY` 진단을 노출하므로 통계 활용 전 검토가 필요하다. 물품 join은 공고·차수·입찰분류와 제공된 재입찰 번호가 일치해야 한다.
 - 상세·물품·예비가격 응답은 전체 건수와 반환 건수, 모든 공고·차수 식별자가 완전해야 취소/단일 품목 조정에 사용한다. 불완전하면 `INCOMPLETE_AWARD_EVIDENCE`를 남기고 기존 이력을 무효화하지 않는다. 검토 진단은 후속 정상 페이지·재시작·완료·일시 오류에도 유지된다. 운영 검토 후 내부 `resetReconciliationDiagnostics(runId)`로 명시적으로 해제하며 실행 중인 lease와 공급자 실패 상태는 해제하지 않는다. `resumeTerminalFailures()`는 인증/설정 수정 후 실패 및 해당 검토 진단을 명시적으로 재설정한다. 공개 운영 API는 후속 작업이다.
@@ -50,7 +64,7 @@
 - 공식 낙찰/물품 응답에 단가·총액 구분 필드가 없으므로 동일 공고 제목에 `총액`이 명시되고 국내 입찰이며 단일 LED 품목인 경우만 저장한다. 명시가 없는 많은 정상 결과도 보수적으로 제외한다. 현재 수집 이력은 지역이 null이므로 세부품명+방식 단계부터 비교하며 지역별 근거 연계는 후속 개선이다.
 - 백필 기간은 DB date와 provider 분 단위 조회에 맞춘 KST 양끝 날짜 포함 구간이다. 현재 날짜의 증분 결과는 다음 수집의 연속 완료 watermark와 7일 겹침 구간에서 다시 확인한다. 수집 중단이나 백필 지연이 7일을 넘더라도 중간 날짜를 건너뛰지 않는다. 목록 page+offset 재개는 provider 목록 순서가 안정적인 범위에서 동작하며 변경 중인 당일 목록은 다음 겹침 수집으로 보완한다.
 
-- 문서 추출은 직접 생성한 유효 형식 fixture와 내부 손상·제한 계약으로 검증했다. 운영 공고의 공개 문서 표본을 검증하기 전에는 분석 파이프라인에 활성화하지 않는다. PDF 표는 텍스트 기준선과 반복된 열 정렬을 이용한 추정이며 OCR·복잡한 다단 편집·병합 셀의 시각 배치를 재구성하지 않는다. 이미지 전용 PDF는 `DOCUMENT_OCR_REQUIRED`, 일부 빈/이미지 쪽은 `PARTIAL`이다.
+- 문서 추출은 직접 생성한 유효 형식 fixture와 내부 손상·제한 계약으로 검증했다. 분석 파이프라인은 연결했지만 운영 공고의 공개 문서 표본 검증은 아직 수행하지 않았다. PDF 표는 텍스트 기준선과 반복된 열 정렬을 이용한 추정이며 OCR·복잡한 다단 편집·병합 셀의 시각 배치를 재구성하지 않는다. 이미지 전용 PDF는 `DOCUMENT_OCR_REQUIRED`, 일부 빈/이미지 쪽은 `PARTIAL`이다.
 - 추출기는 20 MiB 입력, 10 MiB 출력 텍스트, 15초 worker 종료, ZIP/CFB entry 4,096개, 전체 압축 해제 40 MiB와 100:1 압축비 제한을 적용한다. HWP 원본 CFB는 외부 파서로 읽지 않고 제한된 리더가 헤더·DIFAT/FAT/miniFAT·디렉터리와 모든 도달 가능한 스트림의 순환·중첩·선언/실제 체인 크기를 먼저 검증한다. 스트림 메모리는 전체 검증이 끝난 뒤 할당하며 외부 HWP 파서에는 다시 작성한 비압축 컨테이너만 전달한다. XML은 문자열·AST를 만들기 전 원본 XML 합계도 10 MiB로 제한하며 DTD/사용자 entity를 거부하므로 큰 서식 정보가 있는 문서는 텍스트가 작아도 제한될 수 있다. PDF는 직접 stream length와 단일 Flate 필터(`/F` 별칭 포함)를 사전 검증하고 중복·충돌하는 필터 선언을 거부하며 간접 길이·복합/미지원 필터는 `DOCUMENT_UNSUPPORTED`로 남긴다.
 - HWP의 본문 밖 머리말·각주·도형, 중첩 표 및 DOCX의 복잡한 병합·비텍스트 구성은 완전한 해석 범위가 아니다. DOCX는 각주·미주 참조와 run·hyperlink 아래의 이미지도 검사하여 생략한 내용이 있으면 `PARTIAL`로 표시하고 문단·표 셀의 탭 단어 경계는 보존한다. XLSX는 계산을 실행하지 않고 저장된 formula 결과와 표시 형식을 사용하며 결과 cache가 없으면 `PARTIAL`이다. 숨김 sheet는 metadata에 명시하고 내용도 근거에 포함한다.
 
@@ -66,6 +80,14 @@
 - 이미 운영 DB에 적용된 `opportunityType`·`opportunityReasons` 컬럼은 기존 데이터와 마이그레이션 이력을 보호하기 위해 삭제하지 않는다. 현재 애플리케이션은 이 레거시 컬럼을 조회·메일 대상 제한에 사용하지 않는다.
 
 ## 관련 파일
+
+- `dfkorea-backend/src/tenders/services/tender-analysis.service.ts`
+- `dfkorea-backend/src/tenders/services/tender-analysis-queue.ts`
+- `dfkorea-backend/src/tenders/dto/tender-analysis.dto.ts`
+- `dfkorea-backend/src/tenders/services/tender-company-profile.service.ts`
+- `dfkorea-backend/src/tenders/services/tender-scheduler.service.ts`
+- `dfkorea-backend/src/migrations/1788699100000-FixTenderReviewAdminIdentity.ts`
+- `dfkorea-backend/test/tender-app-integration.spec.ts`
 
 - `dfkorea-backend/src/tenders/adapters/g2b-award.adapter.ts`
 - `dfkorea-backend/src/tenders/services/tender-award-collector.service.ts`

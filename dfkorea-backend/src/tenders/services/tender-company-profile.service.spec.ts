@@ -3,6 +3,8 @@ import { TenderCompanyProfileService } from "./tender-company-profile.service";
 
 const createInsertBuilder = () => {
   const builder = {
+    update: jest.fn(),
+    set: jest.fn(),
     insert: jest.fn(),
     values: jest.fn(),
     orIgnore: jest.fn(),
@@ -19,7 +21,9 @@ const profile = (overrides: Record<string, unknown> = {}) => ({
   businessNumber: "123-45-67890",
   headquarters: { sido: "경기도", sigungu: "화성시" },
   g2bRegistered: true,
-  supplyProducts: [{ code: "39112102", name: "LED보안등기구", expiresAt: null }],
+  supplyProducts: [
+    { code: "39112102", name: "LED보안등기구", expiresAt: null },
+  ],
   licenses: [],
   companyTypes: [],
   directProduction: [],
@@ -88,10 +92,12 @@ describe("TenderCompanyProfileService", () => {
 
     const saved = await service.replace(profile({ companyName: "새 회사명" }));
 
-    expect(saved).toEqual(expect.objectContaining({
-      companyName: "새 회사명",
-      version: 5,
-    }));
+    expect(saved).toEqual(
+      expect.objectContaining({
+        companyName: "새 회사명",
+        version: 5,
+      }),
+    );
     expect(repository.save).toHaveBeenCalledWith(
       expect.objectContaining({ id: "profile-id", singletonKey: "company" }),
     );

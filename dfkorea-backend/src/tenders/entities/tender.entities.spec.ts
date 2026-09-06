@@ -161,3 +161,12 @@ describe("tender entity metadata", () => {
     );
   });
 });
+
+it("stores the authenticated integer Admin identity in reviews", () => {
+  const column = getMetadataArgsStorage().columns.find(
+    (column) =>
+      column.target === TenderAnalysisReview &&
+      column.propertyName === "reviewerAdminId",
+  );
+  expect(column.options.type).toBe("integer");
+});

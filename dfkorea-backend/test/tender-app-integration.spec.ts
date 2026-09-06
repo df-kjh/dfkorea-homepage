@@ -1,3 +1,16 @@
+import { SchedulerService } from "../src/scheduler/scheduler.service";
+import { QuoteWorkerService } from "../src/quotes/quote-worker.service";
+import { TenderAnalysisService } from "../src/tenders/services/tender-analysis.service";
+import { TenderSchedulerService } from "../src/tenders/services/tender-scheduler.service";
+import { TenderAnalysis } from "../src/tenders/entities/tender-analysis.entity";
+import { TenderAnalysisReview } from "../src/tenders/entities/tender-analysis-review.entity";
+import {
+  G2B_TENDER_ENRICHMENT_ADAPTER,
+  KAPT_TENDER_ENRICHMENT_ADAPTER,
+  TENDER_DOCUMENT_FETCHER,
+  emptyTenderEnrichment,
+} from "../src/tenders/domain/tender-enrichment";
+import { G2bAwardAdapter } from "../src/tenders/adapters/g2b-award.adapter";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as bcrypt from "bcrypt";
@@ -107,12 +120,37 @@ describe("Tender AppModule PostgreSQL integration", () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(SchedulerService)
+      .useValue({})
+      .overrideProvider(QuoteWorkerService)
+      .useValue({})
       .overrideProvider(G2B_TENDER_ADAPTER)
       .useValue(g2b)
       .overrideProvider(KAPT_TENDER_ADAPTER)
       .useValue(kapt)
       .overrideProvider(KEPCO_TENDER_ADAPTER)
       .useValue(kepco)
+      .overrideProvider(G2B_TENDER_ENRICHMENT_ADAPTER)
+      .useValue({ enrich: async () => emptyTenderEnrichment() })
+      .overrideProvider(KAPT_TENDER_ENRICHMENT_ADAPTER)
+      .useValue({ enrich: async () => emptyTenderEnrichment() })
+      .overrideProvider(TENDER_DOCUMENT_FETCHER)
+      .useValue({
+        fetch: async () => {
+          throw new Error("Unexpected document fetch");
+        },
+      })
+      .overrideProvider(G2bAwardAdapter)
+      .useValue({
+        fetchWindow: async () => ({
+          items: [],
+          invalidations: [],
+          fetchedCount: 0,
+          excludedCount: 0,
+          nextCursor: null,
+          reviewCodes: [],
+        }),
+      })
       .overrideProvider(TENDER_MAIL_TRANSPORT)
       .useValue(transport)
       .compile();
@@ -127,6 +165,7 @@ describe("Tender AppModule PostgreSQL integration", () => {
     );
     await app.init();
     dataSource = app.get(DataSource);
+    app.get(TenderSchedulerService).onModuleDestroy();
 
     await clearTenderIntegrationTables(dataSource);
     await dataSource.getRepository(Admin).upsert(
@@ -154,6 +193,110 @@ describe("Tender AppModule PostgreSQL integration", () => {
     await closeTenderIntegrationResources(dataSource, async () => {
       if (app) await app.close();
     });
+  });
+
+  it("authenticates profile PUT, transactional queue, analysis GET and review POST with the actual admin identity", async () => {
+    g2b.fetchNotices.mockResolvedValue(successful([NOTICE]));
+    kapt.fetchNotices.mockResolvedValue(successful());
+    kepco.fetchNotices.mockResolvedValue(successful());
+    await app.get(TenderIngestionService).collectAll(new Date());
+    const tender = await dataSource
+      .getRepository(Tender)
+      .findOneByOrFail({ sourceNoticeId: NOTICE.sourceNoticeId });
+    const auth = { Authorization: `Bearer ${adminToken}` };
+    await request(app.getHttpServer())
+      .put("/tenders/company-profile")
+      .set(auth)
+      .send({
+        companyName: "test",
+        businessNumber: "1234567890",
+        headquarters: { sido: "경기도", sigungu: "화성시" },
+        g2bRegistered: true,
+        supplyProducts: [],
+        licenses: [],
+        companyTypes: [],
+        directProduction: [],
+        certifications: [],
+        performanceRecords: [],
+      })
+      .expect(200);
+    expect(
+      await dataSource
+        .getRepository(TenderAnalysis)
+        .findOneByOrFail({ tenderId: tender.id }),
+    ).toMatchObject({ status: "PENDING" });
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(202)
+      .expect(({ body }) => expect(body.status).toBe("PENDING"));
+    await app.get(TenderAnalysisService).processDue(new Date(), 1);
+    const analysis = await request(app.getHttpServer())
+      .get(`/tenders/${tender.id}/analysis`)
+      .set(auth)
+      .expect(200);
+    expect(analysis.body).toMatchObject({
+      status: "COMPLETED",
+      reviewed: false,
+    });
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/review`)
+      .set(auth)
+      .send({ completed: true, note: "  checked  " })
+      .expect(201)
+      .expect(({ body }) => expect(body.reviewed).toBe(true));
+    await app.get(TenderIngestionService).collectAll(new Date());
+    expect(
+      await app.get(TenderAnalysisService).getAnalysis(tender.id),
+    ).toMatchObject({ status: "COMPLETED", reviewed: true });
+    const admin = await dataSource
+      .getRepository(Admin)
+      .findOneByOrFail({ username: "admin" });
+    expect(
+      await dataSource
+        .getRepository(TenderAnalysisReview)
+        .findOneByOrFail({ tenderId: tender.id }),
+    ).toMatchObject({
+      reviewerAdminId: admin.id,
+      note: "checked",
+      analysisFingerprint: analysis.body.analysisFingerprint,
+    });
+    await request(app.getHttpServer())
+      .get("/tenders")
+      .set(auth)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(Object.keys(body.data[0].analysis).sort()).toEqual([
+          "analyzedAt",
+          "specificationScore",
+          "status",
+          "suitability",
+          "unknownCount",
+        ]);
+        expect(JSON.stringify(body)).not.toMatch(
+          /textBlocks|tableBlocks|processingToken/,
+        );
+      });
+    g2b.fetchNotices.mockResolvedValue(
+      successful([
+        { ...NOTICE, rawData: { changedSpecification: "fixture change" } },
+      ]),
+    );
+    await app.get(TenderIngestionService).collectAll(new Date());
+    expect(
+      await app.get(TenderAnalysisService).getAnalysis(tender.id),
+    ).toMatchObject({ status: "PENDING", reviewed: false });
+    expect(await dataSource.getRepository(TenderAnalysisReview).count()).toBe(
+      1,
+    );
+    await request(app.getHttpServer())
+      .post("/tenders/award-results/backfill")
+      .set(auth)
+      .expect(202);
+    await request(app.getHttpServer())
+      .get("/tenders/award-results/status")
+      .set(auth)
+      .expect(200);
   });
 
   it("uses real TypeORM storage for mocked-adapter ingestion and authenticated queries", async () => {
@@ -211,12 +354,22 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send(payload)
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual(payload));
+      .expect(({ body }) =>
+        expect(body).toEqual({
+          ...payload,
+          recipients: [...payload.recipients].sort(),
+        }),
+      );
     await request(app.getHttpServer())
       .get("/tenders/subscription")
       .set("Authorization", `Bearer ${adminToken}`)
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual(payload));
+      .expect(({ body }) =>
+        expect(body).toEqual({
+          ...payload,
+          recipients: [...payload.recipients].sort(),
+        }),
+      );
     await request(app.getHttpServer())
       .put("/tenders/subscription")
       .set("Authorization", `Bearer ${adminToken}`)
@@ -230,8 +383,12 @@ describe("Tender AppModule PostgreSQL integration", () => {
       businessNumber: "123-45-67890",
       headquarters: { sido: "경기도", sigungu: "화성시" },
       g2bRegistered: true,
-      supplyProducts: [], licenses: [], companyTypes: [], directProduction: [],
-      certifications: [], performanceRecords: [],
+      supplyProducts: [],
+      licenses: [],
+      companyTypes: [],
+      directProduction: [],
+      certifications: [],
+      performanceRecords: [],
     };
 
     const [first, second] = await Promise.all([
@@ -251,7 +408,9 @@ describe("Tender AppModule PostgreSQL integration", () => {
     expect(first.body.businessNumber).toBe("1234567890");
     expect(second.body.businessNumber).toBe("1234567890");
 
-    await expect(dataSource.getRepository(TenderCompanyProfile).find()).resolves.toEqual([
+    await expect(
+      dataSource.getRepository(TenderCompanyProfile).find(),
+    ).resolves.toEqual([
       expect.objectContaining({ singletonKey: "company", version: 2 }),
     ]);
   });

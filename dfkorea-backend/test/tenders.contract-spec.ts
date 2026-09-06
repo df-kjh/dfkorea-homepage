@@ -1,3 +1,5 @@
+import { TenderAnalysisService } from "../src/tenders/services/tender-analysis.service";
+import { TenderAwardCollectorService } from "../src/tenders/services/tender-award-collector.service";
 import {
   ExecutionContext,
   INestApplication,
@@ -117,13 +119,31 @@ describe("Tender admin HTTP contract", () => {
       businessNumber: "1234567890",
       headquarters: { sido: "경기도", sigungu: "화성시" },
       g2bRegistered: true,
-      supplyProducts: [], licenses: [], companyTypes: [], directProduction: [],
-      certifications: [], performanceRecords: [], version: 1,
+      supplyProducts: [],
+      licenses: [],
+      companyTypes: [],
+      directProduction: [],
+      certifications: [],
+      performanceRecords: [],
+      version: 1,
     });
 
     const module = await Test.createTestingModule({
       controllers: [TendersController],
       providers: [
+        {
+          provide: TenderAnalysisService,
+          useValue: {
+            reanalyze: async () => ({ status: "PENDING" }),
+            getAnalysis: async () => ({ status: "PENDING", reviewed: false }),
+            resolveAdminId: async () => "1",
+            saveReview: jest.fn(),
+          },
+        },
+        {
+          provide: TenderAwardCollectorService,
+          useValue: { startBackfill: jest.fn(), getStatus: jest.fn() },
+        },
         { provide: TenderQueryService, useValue: query },
         { provide: TenderSubscriptionService, useValue: subscription },
         { provide: TenderIngestionService, useValue: ingestion },
@@ -163,6 +183,21 @@ describe("Tender admin HTTP contract", () => {
     }
   });
 
+  it("queues analysis with an explicit 202 and accepts only authenticated bounded review input", async () => {
+    await request(app!.getHttpServer())
+      .post(`/tenders/${TENDER_ID}/analysis`)
+      .expect(401);
+    await request(app!.getHttpServer())
+      .post(`/tenders/${TENDER_ID}/analysis`)
+      .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
+      .expect(202);
+    await request(app!.getHttpServer())
+      .post(`/tenders/${TENDER_ID}/review`)
+      .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
+      .send({ completed: true, note: "a".repeat(2001) })
+      .expect(400);
+  });
+
   it("rejects an unauthenticated calendar request", async () => {
     await request(app!.getHttpServer())
       .get("/tenders/calendar?month=2026-08")
@@ -189,8 +224,12 @@ describe("Tender admin HTTP contract", () => {
       businessNumber: "123-45-67890",
       headquarters: { sido: "경기도", sigungu: "화성시" },
       g2bRegistered: true,
-      supplyProducts: [], licenses: [], companyTypes: [], directProduction: [],
-      certifications: [], performanceRecords: [],
+      supplyProducts: [],
+      licenses: [],
+      companyTypes: [],
+      directProduction: [],
+      certifications: [],
+      performanceRecords: [],
     };
 
     await request(app!.getHttpServer())

@@ -1,3 +1,5 @@
+import { TenderAnalysisService } from "./tender-analysis.service";
+import { TenderAwardCollectorService } from "./tender-award-collector.service";
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { schedule, ScheduledTask } from "node-cron";
 import { TenderIngestionService } from "./tender-ingestion.service";
@@ -8,6 +10,7 @@ export const TENDER_COLLECTION_TIMEZONE = "Asia/Seoul";
 
 @Injectable()
 export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
+  private analysisTasks: ScheduledTask[] = [];
   private collectionTask: ScheduledTask | undefined;
   private dailyMailTask: ScheduledTask | undefined;
   private retryTask: ScheduledTask | undefined;
@@ -15,6 +18,8 @@ export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly ingestionService: TenderIngestionService,
     private readonly mailService: TenderMailService,
+    private readonly analysis: TenderAnalysisService,
+    private readonly awards: TenderAwardCollectorService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -41,9 +46,42 @@ export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
       async () => this.mailService.retryDue(new Date()),
       { timezone: TENDER_COLLECTION_TIMEZONE, noOverlap: true },
     );
+    const options = { timezone: TENDER_COLLECTION_TIMEZONE, noOverlap: true };
+    this.analysisTasks = [
+      schedule(
+        "10 2 * * * *",
+        async () => {
+          await this.analysis.refreshStaleAnalyses();
+          await this.analysis.processDue(new Date(), 5);
+        },
+        options,
+      ),
+      schedule(
+        "20 * * * * *",
+        async () => this.analysis.processDue(new Date(), 2),
+        options,
+      ),
+      // Award ticks share the collector's advisory lock. Leave the top of hour
+      // clear for normal notices, and resume only one bounded provider page.
+      schedule(
+        "0 15 2 * * *",
+        async () => this.awards.collectIncremental(new Date()),
+        options,
+      ),
+      schedule(
+        "30 5-50/5 * * * *",
+        async () => this.awards.collectIncremental(new Date()),
+        options,
+      ),
+    ];
   }
 
   onModuleDestroy(): void {
+    for (const task of this.analysisTasks) {
+      task.stop();
+      task.destroy();
+    }
+    this.analysisTasks = [];
     this.collectionTask?.stop();
     this.collectionTask?.destroy();
     this.collectionTask = undefined;

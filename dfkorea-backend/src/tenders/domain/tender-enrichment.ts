@@ -1,3 +1,4 @@
+import type { TenderPricingContext } from "./tender-price-analyzer";
 import { NormalizedTender } from "./normalized-tender";
 
 export const TENDER_ENRICHMENT_ADAPTERS = Symbol("TENDER_ENRICHMENT_ADAPTERS");
@@ -92,6 +93,8 @@ export interface TenderEnrichmentOperationFailure {
 }
 
 export interface TenderEnrichment {
+  /** Verified adapter metadata only; never inferred from source or amount presence. */
+  pricingContext?: Omit<TenderPricingContext, "source" | "now">;
   basisAmount: TenderEvidenceValue<string> | null;
   lowerLimitRate: TenderEvidenceValue<string> | null;
   lawKind: TenderEvidenceValue<TenderLawKind> | null;

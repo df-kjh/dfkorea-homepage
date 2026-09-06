@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from "@nestjs/common";
+import { TenderAnalysis } from "../entities/tender-analysis.entity";
+import { pendingAnalysis } from "./tender-analysis-queue";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { InjectDataSource } from "@nestjs/typeorm";
@@ -76,6 +82,12 @@ export class TenderCompanyProfileService {
         ...this.toPersistenceFields(profile),
         version: current.version + 1,
       });
+      await manager
+        .getRepository(TenderAnalysis)
+        .createQueryBuilder()
+        .update()
+        .set({ ...pendingAnalysis, companyProfileFingerprint: null })
+        .execute();
       return this.toDto(saved);
     });
   }
