@@ -1,0 +1,222 @@
+{
+  "getScsbidListSttusThng": {
+    "response": {
+      "header": {
+        "resultCode": "00",
+        "resultMsg": "NORMAL_SERVICE"
+      },
+      "body": {
+        "items": [
+          {
+            "fnlSucsfCorpOfcl": "fixture officer",
+            "bidNtceOrd": "000",
+            "bidClsfcNo": "1",
+            "rbidNo": "000",
+            "ntceDivCd": "1",
+            "bidNtceNm": "LED 실내조명 구매 (총액)",
+            "prtcptCnum": "17",
+            "bidwinnrNm": "fixture company",
+            "bidwinnrBizno": "0000000000",
+            "bidwinnrCeoNm": "fixture person",
+            "bidwinnrAdrs": "fixture address",
+            "bidwinnrTelNo": "000-0000-0000",
+            "sucsfbidAmt": "88700052.00",
+            "sucsfbidRate": "88.860",
+            "rlOpengDt": "2026-09-01 10:00:00",
+            "dminsttCd": "7000000",
+            "dminsttNm": "fixture agency",
+            "rgstDt": "2026-09-02 10:00:00",
+            "bidNtceNo": "R26BK01000001",
+            "fnlSucsfDate": "2026-09-02"
+          }
+        ],
+        "numOfRows": "100",
+        "pageNo": "1",
+        "totalCount": "1"
+      }
+    }
+  },
+  "getOpengResultListInfoThngPreparPcDetail": {
+    "response": {
+      "header": {
+        "resultCode": "00",
+        "resultMsg": "NORMAL_SERVICE"
+      },
+      "body": {
+        "items": [
+          {
+            "inptDt": "",
+            "PrearngPrcePurcnstcst": "",
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "bidClsfcNo": "1",
+            "rbidNo": "000",
+            "bidNtceNm": "",
+            "plnprc": "99820000.00",
+            "bssamt": "100000000.00",
+            "totRsrvtnPrceNum": "1",
+            "compnoRsrvtnPrceSno": "1",
+            "bsisPlnprc": "",
+            "drwtYn": "",
+            "drwtNum": "",
+            "bidwinrSlctnAplBssCntnts": "",
+            "rlOpengDt": "2026-09-01 10:00:00",
+            "bssamtBssUpNum": "",
+            "compnoRsrvtnPrceMkngDt": ""
+          }
+        ],
+        "numOfRows": "100",
+        "pageNo": "1",
+        "totalCount": "1"
+      }
+    }
+  },
+  "getBidPblancListInfoThng": {
+    "response": {
+      "header": {
+        "resultCode": "00",
+        "resultMsg": "NORMAL_SERVICE"
+      },
+      "body": {
+        "items": [
+          {
+            "ntceSpecDocUrl5": "",
+            "intrbidYn": "N",
+            "ntceSpecDocUrl7": "",
+            "bidGrntymnyPaymntYn": "",
+            "crdtrNm": "",
+            "dtilPrdctClsfcNo": "3911210201",
+            "dtilPrdctClsfcNoNm": "LED실내조명등",
+            "prdctSpecNm": "",
+            "prdctQty": "",
+            "prdctUnit": "",
+            "prdctUprc": "",
+            "dlvrTmlmtDt": "",
+            "dlvrDaynum": "",
+            "dlvryCndtnNm": "",
+            "purchsObjPrdctList": "",
+            "untyNtceNo": "",
+            "cmmnSpldmdMethdCd": "",
+            "cmmnSpldmdMethdNm": "",
+            "stdNtceDocUrl": "",
+            "brffcBidprcPermsnYn": "",
+            "dsgntCmptYn": "",
+            "rsrvtnPrceReMkngMthdNm": "",
+            "arsltApplDocRcptMthdNm": "",
+            "arsltApplDocRcptDt": "",
+            "orderPlanUntyNo": "",
+            "sucsfbidLwltRate": "",
+            "ntceSpecDocUrl9": "",
+            "ntceSpecDocUrl10": "",
+            "ntceSpecFileNm1": "",
+            "bidMethdNm": "",
+            "cntrctCnclsMthdNm": "",
+            "ntceInsttOfclNm": "",
+            "ntceInsttOfclTelNo": "",
+            "ntceInsttOfclEmailAdrs": "",
+            "exctvNm": "",
+            "bidQlfctRgstDt": "",
+            "cmmnSpldmdAgrmntRcptdocMethd": "",
+            "cmmnSpldmdAgrmntClseDt": "",
+            "cmmnSpldmdCorpRgnLmtYn": "",
+            "bidBeginDt": "",
+            "bidClseDt": "",
+            "opengDt": "",
+            "ntceSpecDocUrl1": "",
+            "ntceSpecDocUrl2": "",
+            "ntceSpecDocUrl6": "",
+            "rgstDt": "",
+            "dminsttCd": "",
+            "dminsttNm": "",
+            "ntceInsttCd": "",
+            "ntceInsttNm": "",
+            "chgNtceRsn": "",
+            "rbidOpengDt": "",
+            "VAT": "",
+            "bfSpecRgstNo": "",
+            "infoBizYn": "",
+            "sucsfbidMthdCd": "",
+            "sucsfbidMthdNm": "적격심사",
+            "chgDt": "",
+            "dminsttOfclEmailAdrs": "",
+            "indstrytyLmtYn": "",
+            "ntceSpecFileNm2": "",
+            "ntceSpecFileNm3": "",
+            "ntceSpecFileNm4": "",
+            "ntceSpecFileNm5": "",
+            "ntceSpecFileNm6": "",
+            "ntceSpecFileNm7": "",
+            "ntceSpecFileNm8": "",
+            "ntceSpecFileNm9": "",
+            "ntceSpecFileNm10": "",
+            "rbidPermsnYn": "",
+            "prdctClsfcLmtYn": "",
+            "mnfctYn": "",
+            "prearngPrceDcsnMthdNm": "",
+            "totPrdprcNum": "",
+            "drwtPrdprcNum": "",
+            "asignBdgtAmt": "",
+            "presmptPrce": "",
+            "opengPlce": "",
+            "bidNtceDtlUrl": "",
+            "bidNtceUrl": "",
+            "bidPrtcptFeePaymntYn": "",
+            "bidPrtcptFee": "",
+            "ntceSpecDocUrl3": "",
+            "ntceSpecDocUrl4": "",
+            "bidNtceDt": "",
+            "reNtceYn": "",
+            "rgstTyNm": "",
+            "ntceKindNm": "등록공고",
+            "bidNtceNm": "LED 실내조명 구매 (총액)",
+            "indutyVAT": "",
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "ntceSpecDocUrl8": "",
+            "refNo": "",
+            "bidWgrnteeRcptClseDt": ""
+          }
+        ],
+        "numOfRows": "100",
+        "pageNo": "1",
+        "totalCount": "1"
+      }
+    }
+  },
+  "getBidPblancListInfoThngPurchsObjPrdct": {
+    "response": {
+      "header": {
+        "resultCode": "00",
+        "resultMsg": "NORMAL_SERVICE"
+      },
+      "body": {
+        "items": [
+          {
+            "dlvryCndtnNm": "",
+            "ntceNticeDt": "",
+            "bidNtceNo": "R26BK01000001",
+            "bidNtceOrd": "000",
+            "bidClsfcNo": "1",
+            "prdctSno": "1",
+            "dminsttCd": "",
+            "dminsttNm": "",
+            "prdctClsfcNo": "",
+            "prdctClsfcNoNm": "",
+            "dtilPrdctClsfcNo": "3911210201",
+            "dtilPrdctClsfcNoNm": "LED실내조명등",
+            "prdctSpecNm": "",
+            "qty": "",
+            "unit": "",
+            "uprc": "",
+            "dlvrTmlmtDt": "",
+            "dlvrDaynum": "",
+            "dlvrPlce": ""
+          }
+        ],
+        "numOfRows": "100",
+        "pageNo": "1",
+        "totalCount": "1"
+      }
+    }
+  }
+}

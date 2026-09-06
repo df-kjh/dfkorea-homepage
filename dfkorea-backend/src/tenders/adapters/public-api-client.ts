@@ -119,6 +119,17 @@ export class PublicApiClient implements TenderApiClient {
     this.onRetry = options.onRetry;
   }
 
+  /** A caller-owned cursor may resume beyond the getAllPages safety cap. */
+  async getPage<T extends Record<string, unknown>>(
+    request: PublicApiRequest,
+    pageNo: number,
+  ): Promise<{ items: T[]; totalCount: number }> {
+    if (!Number.isSafeInteger(pageNo) || pageNo < 1 || pageNo > 1000000) {
+      throw new TenderSourceError(request.source, "CONFIGURATION_ERROR");
+    }
+    return this.fetchPageWithRetry<T>(request, pageNo);
+  }
+
   async getAllPages<T extends Record<string, unknown>>(
     request: PublicApiRequest,
   ): Promise<T[]> {

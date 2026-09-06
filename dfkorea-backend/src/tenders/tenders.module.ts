@@ -1,3 +1,11 @@
+import { TenderAnalysisService } from "./services/tender-analysis.service";
+import { TenderDocumentTextExtractor } from "./documents/tender-document-extractor";
+import { Product } from "../entities/product.entity";
+import { Admin } from "../entities/admin.entity";
+import { DataSource } from "typeorm";
+import { G2bAwardAdapter } from "./adapters/g2b-award.adapter";
+import { TenderAwardCollectorService } from "./services/tender-award-collector.service";
+import { TenderPriceAnalyzer } from "./domain/tender-price-analyzer";
 import { Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -12,8 +20,18 @@ import { G2bTenderAdapter } from "./adapters/g2b-tender.adapter";
 import { createG2bRelayFetcher } from "./adapters/g2b-relay.fetcher";
 import { KaptTenderAdapter } from "./adapters/kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./adapters/kepco-tender.adapter";
+import { G2bEnrichmentAdapter } from "./adapters/g2b-enrichment.adapter";
+import { KaptEnrichmentAdapter } from "./adapters/kapt-enrichment.adapter";
 import { TenderClassifier } from "./domain/tender-classifier";
 import { TENDER_SOURCE_ADAPTERS } from "./domain/tender-source.adapter";
+import {
+  G2B_TENDER_ENRICHMENT_ADAPTER,
+  KAPT_TENDER_ENRICHMENT_ADAPTER,
+  TENDER_DOCUMENT_FETCHER,
+  TENDER_ENRICHMENT_ADAPTERS,
+  toSafeProviderResultCode,
+} from "./domain/tender-enrichment";
+import { TenderDocumentFetcher } from "./documents/tender-document-fetcher";
 import { Tender } from "./entities/tender.entity";
 import { TenderMailDelivery } from "./entities/tender-mail-delivery.entity";
 import { TenderMailItem } from "./entities/tender-mail-item.entity";
@@ -22,10 +40,17 @@ import { TenderRecipient } from "./entities/tender-recipient.entity";
 import { TenderSubscription } from "./entities/tender-subscription.entity";
 import { TenderSyncRun } from "./entities/tender-sync-run.entity";
 import { TenderMailOAuthCredential } from "./entities/tender-mail-oauth-credential.entity";
+import { TenderCompanyProfile } from "./entities/tender-company-profile.entity";
+import { TenderDocument } from "./entities/tender-document.entity";
+import { TenderAnalysis } from "./entities/tender-analysis.entity";
+import { TenderAnalysisReview } from "./entities/tender-analysis-review.entity";
+import { TenderAwardResult } from "./entities/tender-award-result.entity";
+import { TenderAwardSyncRun } from "./entities/tender-award-sync-run.entity";
 import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
+import { TenderCompanyProfileService } from "./services/tender-company-profile.service";
 import { TenderMailRenderer } from "./mail/tender-mail-renderer";
 import {
   TENDER_MAIL_TRANSPORT,
@@ -41,7 +66,7 @@ const createSafeRetryLogger = (context: string) => {
   const logger = new Logger(context);
   return (event: PublicApiRetryEvent) =>
     logger.warn(
-      `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${event.providerResultCode ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
+      `source=${event.source}; errorCode=${event.errorCode}; operation=${event.operation}; page=${event.pageNo}; providerCode=${toSafeProviderResultCode(event.providerResultCode) ?? "none"}; httpStatus=${event.httpStatus ?? "none"}; attempt=${event.attempt}`,
     );
 };
 
@@ -49,6 +74,8 @@ const createSafeRetryLogger = (context: string) => {
   imports: [
     TypeOrmModule.forFeature([
       Tender,
+      Product,
+      Admin,
       TenderSubscription,
       TenderRecipient,
       TenderSyncRun,
@@ -56,10 +83,58 @@ const createSafeRetryLogger = (context: string) => {
       TenderMailItem,
       TenderDailyDispatch,
       TenderMailOAuthCredential,
+      TenderCompanyProfile,
+      TenderDocument,
+      TenderAnalysis,
+      TenderAnalysisReview,
+      TenderAwardResult,
+      TenderAwardSyncRun,
     ]),
   ],
   controllers: [TendersController, TenderMailOAuthController],
   providers: [
+    TenderAnalysisService,
+    {
+      provide: TenderDocumentTextExtractor,
+      useFactory: () => new TenderDocumentTextExtractor(),
+    },
+    TenderAwardCollectorService,
+    TenderPriceAnalyzer,
+    {
+      provide: G2bAwardAdapter,
+      inject: [ConfigService, DataSource],
+      useFactory: (config: ConfigService, dataSource: DataSource) => {
+        const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const options = {
+          minimumRequestIntervalMs: 1_500,
+          retryDelaysMs: [1_000, 3_000],
+          onRetry: createSafeRetryLogger("G2bAwardPublicApiClient"),
+        };
+        return new G2bAwardAdapter(
+          new PublicApiClient(undefined, options),
+          {
+            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+            baseUrl: config.get<string>("G2B_AWARD_API_BASE_URL"),
+            relayEnabled,
+          },
+          relayEnabled
+            ? new PublicApiClient(
+                createG2bRelayFetcher({
+                  relayUrl: config.get<string>("G2B_RELAY_URL") ?? "",
+                  sharedSecret:
+                    config.get<string>("G2B_RELAY_SHARED_SECRET") ?? "",
+                }),
+                options,
+              )
+            : undefined,
+          (identities) =>
+            dataSource.getRepository(TenderAwardResult).find({
+              where: identities,
+              select: { source: true, sourceNoticeId: true, revision: true },
+            }),
+        );
+      },
+    },
     TenderClassifier,
     {
       provide: G2B_TENDER_ADAPTER,
@@ -70,8 +145,7 @@ const createSafeRetryLogger = (context: string) => {
           retryDelaysMs: [1_000, 3_000],
           onRetry: createSafeRetryLogger("G2bPublicApiClient"),
         });
-        const relayEnabled =
-          config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
         const relayClient = relayEnabled
           ? new PublicApiClient(
               createG2bRelayFetcher({
@@ -122,6 +196,55 @@ const createSafeRetryLogger = (context: string) => {
       inject: [G2B_TENDER_ADAPTER, KAPT_TENDER_ADAPTER, KEPCO_TENDER_ADAPTER],
       useFactory: (g2b, kapt, kepco) => [g2b, kapt, kepco],
     },
+    {
+      provide: G2B_TENDER_ENRICHMENT_ADAPTER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const relayClient = relayEnabled
+          ? new PublicApiClient(
+              createG2bRelayFetcher({
+                relayUrl: config.get<string>("G2B_RELAY_URL") ?? "",
+                sharedSecret:
+                  config.get<string>("G2B_RELAY_SHARED_SECRET") ?? "",
+              }),
+              {
+                minimumRequestIntervalMs: 1_500,
+                retryDelaysMs: [1_000, 3_000],
+                onRetry: createSafeRetryLogger(
+                  "G2bEnrichmentRelayPublicApiClient",
+                ),
+              },
+            )
+          : undefined;
+        return new G2bEnrichmentAdapter(
+          new PublicApiClient(undefined, {
+            minimumRequestIntervalMs: 1_100,
+            retryDelaysMs: [1_000, 3_000],
+            onRetry: createSafeRetryLogger("G2bEnrichmentPublicApiClient"),
+          }),
+          {
+            baseUrl: config.get<string>("G2B_TENDER_API_BASE_URL") ?? "",
+            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+            relayEnabled,
+          },
+          relayClient,
+        );
+      },
+    },
+    {
+      provide: KAPT_TENDER_ENRICHMENT_ADAPTER,
+      useFactory: () => new KaptEnrichmentAdapter(),
+    },
+    {
+      provide: TENDER_ENRICHMENT_ADAPTERS,
+      inject: [G2B_TENDER_ENRICHMENT_ADAPTER, KAPT_TENDER_ENRICHMENT_ADAPTER],
+      useFactory: (g2b, kapt) => [g2b, kapt],
+    },
+    {
+      provide: TENDER_DOCUMENT_FETCHER,
+      useFactory: () => new TenderDocumentFetcher(),
+    },
     TenderIngestionService,
     TenderMailRenderer,
     NaverWorksTokenCipher,
@@ -136,13 +259,23 @@ const createSafeRetryLogger = (context: string) => {
     TenderSchedulerService,
     TenderQueryService,
     TenderSubscriptionService,
+    TenderCompanyProfileService,
   ],
   exports: [
+    TenderAnalysisService,
+    G2bAwardAdapter,
+    TenderAwardCollectorService,
+    TenderPriceAnalyzer,
     NaverWorksOAuthService,
     TenderIngestionService,
     TenderSchedulerService,
     TenderQueryService,
     TenderSubscriptionService,
+    TenderCompanyProfileService,
+    G2B_TENDER_ENRICHMENT_ADAPTER,
+    KAPT_TENDER_ENRICHMENT_ADAPTER,
+    TENDER_ENRICHMENT_ADAPTERS,
+    TENDER_DOCUMENT_FETCHER,
   ],
 })
 export class TendersModule {}

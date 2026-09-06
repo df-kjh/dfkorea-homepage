@@ -1,4 +1,10 @@
-# 온라인 견적 운영 배포 계획
+# ARCHIVED / IMPLEMENTATION COMPLETE / NON-OPERATIONAL — 구현 완료·비운영 기록
+
+> **경고 / WARNING:** 이 문서는 완료된 구현의 역사 기록일 뿐입니다. 아래 command, code block, checkbox 또는 checklist를 실행하거나 현재 작업 지시로 사용하지 마세요. 모든 항목은 완료 당시의 historical snapshot이며 현재 운영 절차가 아닙니다. / Historical record only. Do not execute or follow any command, code block, checkbox, or checklist below.
+>
+> 현재 운영의 단일 기준은 루트 [`DEPLOYMENT.md`](../../../DEPLOYMENT.md), 현재 스키마의 기준은 [`database-schema.md`](../../../database-schema.md), 메뉴 기능·제약의 기준은 [`docs/menus/tenders.md`](../../menus/tenders.md)입니다.
+
+# 온라인 견적 운영 반영 완료 기록
 
 **목표:** 현재 운영3b332da에 견적 기능만 더해 Railway/Vercel 배포. 사용자가 명시적으로 배포를 승인했다.
 **범위:** 기존 배포 제품 프레임/표/설명 보존. 미배포 AI/관리자 변경 제외. 별도 견적 환경변수 없이 기존 JWT/CORS/NAVER/NTS 활용. 실제 외부 메일 테스트는 별도 명시 승인 없이 보내지 않는다.

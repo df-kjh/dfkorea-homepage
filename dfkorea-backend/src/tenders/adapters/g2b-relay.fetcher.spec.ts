@@ -33,6 +33,7 @@ describe("createG2bRelayFetcher", () => {
     expect(response).toBe(providerResponse);
     expect(fetcher).toHaveBeenCalledWith(relayUrl, {
       method: "POST",
+      redirect: "error",
       headers: {
         "content-type": "application/json",
         "x-dfkorea-timestamp": String(timestamp),
@@ -43,6 +44,83 @@ describe("createG2bRelayFetcher", () => {
     });
     expect(expectedBody).not.toContain("production-key");
     expect(expectedBody).not.toContain("serviceKey");
+  });
+
+  it.each([
+    ["getBidPblancListInfoThng", false],
+    ["getBidPblancListInfoThngBsisAmount", false],
+    ["getBidPblancListInfoLicenseLimit", true],
+    ["getBidPblancListInfoPrtcptPsblRgn", true],
+    ["getBidPblancListInfoThngPurchsObjPrdct", true],
+  ] as const)(
+    "serializes the exact one-notice enrichment query for %s",
+    async (operation, withRevision) => {
+      const fetcher = jest.fn().mockResolvedValue(new Response("{}"));
+      const relayFetcher = createG2bRelayFetcher(
+        { relayUrl, sharedSecret, now: () => timestamp },
+        fetcher as typeof fetch,
+      );
+      const url = new URL(
+        `https://apis.data.go.kr/1230000/ad/BidPublicInfoService/${operation}`,
+      );
+      url.searchParams.set("serviceKey", "production-key");
+      url.searchParams.set("type", "json");
+      url.searchParams.set("inqryDiv", "2");
+      url.searchParams.set("bidNtceNo", "R26BK01000001");
+      if (withRevision) url.searchParams.set("bidNtceOrd", "000");
+      url.searchParams.set("pageNo", "1");
+      url.searchParams.set("numOfRows", "100");
+
+      await relayFetcher(url);
+
+      const body = String(fetcher.mock.calls[0]?.[1]?.body);
+      expect(JSON.parse(body)).toEqual({
+        operation,
+        query: {
+          type: "json",
+          inqryDiv: "2",
+          bidNtceNo: "R26BK01000001",
+          ...(withRevision ? { bidNtceOrd: "000" } : {}),
+          pageNo: "1",
+          numOfRows: "100",
+        },
+      });
+      expect(body).not.toContain("production-key");
+      expect(body).not.toContain("serviceKey");
+    },
+  );
+
+  it.each([
+    [
+      "a basis revision",
+      "getBidPblancListInfoThngBsisAmount",
+      "&bidNtceOrd=000",
+    ],
+    [
+      "an arbitrary field",
+      "getBidPblancListInfoThngBsisAmount",
+      "&extra=value",
+    ],
+    [
+      "a duplicate notice",
+      "getBidPblancListInfoThngBsisAmount",
+      "&bidNtceNo=OTHER",
+    ],
+  ])("rejects %s before relay access", async (_label, operation, suffix) => {
+    const fetcher = jest.fn();
+    const relayFetcher = createG2bRelayFetcher(
+      { relayUrl, sharedSecret, now: () => timestamp },
+      fetcher as typeof fetch,
+    );
+    const enrichmentUrl =
+      `https://apis.data.go.kr/1230000/ad/BidPublicInfoService/${operation}` +
+      "?serviceKey=production-key&type=json&inqryDiv=2&bidNtceNo=R26BK01000001" +
+      `&pageNo=1&numOfRows=100${suffix}`;
+
+    await expect(relayFetcher(enrichmentUrl)).rejects.toMatchObject({
+      code: "CONFIGURATION_ERROR",
+    });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -67,6 +145,10 @@ describe("createG2bRelayFetcher", () => {
         "getBidPblancListInfoThng",
         "getBidPblancListInfoServc",
       ),
+    ],
+    [
+      "an award operation reserved for Task 6",
+      providerUrl.replace("getBidPblancListInfoThng", "getScsbidListSttusThng"),
     ],
     ["a duplicate required query field", `${providerUrl}&pageNo=2`],
     [
@@ -225,6 +307,52 @@ describe("createG2bRelayFetcher", () => {
         code: "CONFIGURATION_ERROR",
       });
       expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe("award relay allowlist", () => {
+  it.each([
+    "getScsbidListSttusThng",
+    "getOpengResultListInfoThngPreparPcDetail",
+  ])(
+    "serializes only the official %s query without service key and refuses redirects",
+    async (operation) => {
+      const fetcher = jest.fn().mockResolvedValue(new Response("{}"));
+      const relay = createG2bRelayFetcher({ relayUrl, sharedSecret }, fetcher);
+      const url = new URL(
+        `https://apis.data.go.kr/1230000/as/ScsbidInfoService/${operation}`,
+      );
+      const query =
+        operation === "getScsbidListSttusThng"
+          ? {
+              type: "json",
+              inqryDiv: "1",
+              inqryBgnDt: "202609010000",
+              inqryEndDt: "202609302359",
+              pageNo: "101",
+              numOfRows: "100",
+            }
+          : {
+              type: "json",
+              inqryDiv: "2",
+              bidNtceNo: "R26BK01000001",
+              pageNo: "1",
+              numOfRows: "100",
+            };
+      for (const [key, value] of Object.entries(query))
+        url.searchParams.set(key, value);
+      url.searchParams.set("serviceKey", "fixture-key");
+      await relay(url);
+      expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+        operation,
+        query,
+      });
+      expect(fetcher.mock.calls[0][1].redirect).toBe("error");
+      url.hostname = "evil.example";
+      await expect(relay(url)).rejects.toMatchObject({
+        code: "CONFIGURATION_ERROR",
+      });
     },
   );
 });

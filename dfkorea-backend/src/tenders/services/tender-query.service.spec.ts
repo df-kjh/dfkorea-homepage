@@ -36,7 +36,10 @@ describe("TenderQueryService", () => {
 
   beforeEach(() => {
     repository = { createQueryBuilder: jest.fn() };
-    service = new TenderQueryService(repository as never);
+    service = new TenderQueryService(
+      repository as never,
+      { getSummaries: jest.fn(async () => new Map()) } as never,
+    );
   });
 
   it("hides persisted non-goods G2B notices from calendar, list, and detail queries", async () => {
@@ -89,7 +92,7 @@ describe("TenderQueryService", () => {
       },
     );
     expect(builder.groupBy).toHaveBeenCalledWith(
-      "(tender.registeredAt AT TIME ZONE 'Asia/Seoul')::date",
+      "((tender.registeredAt AT TIME ZONE 'Asia/Seoul')::date)::text",
     );
   });
 

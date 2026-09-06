@@ -160,6 +160,56 @@ Unique constraint: `UQ_tender_mail_oauth_credential_singleton_key` on (`singleto
 
 Index: `IDX_tender_daily_dispatch_status_lease` on (`status`, `leaseExpiresAt`). The unique KST (`businessDate`, `deliveryTime`) slot is the final replica idempotency boundary in addition to advisory lock `824002`. Changing the shared time on the same date creates another slot without deleting prior audit rows. A fresh `CLAIMED` lease is skipped; a stale claim can be atomically reclaimed and processes only recipients without an existing durable outcome for that slot.
 
+### Tender suitability analysis tables
+
+`1788699000000-CreateTenderAnalysisTables` adds the persistent inputs and compact outputs for tender suitability analysis. The source TypeORM discovery glob already includes `src/tenders/entities/*.entity.ts`; the Nest application also registers these entities explicitly for its runtime connection. The tables do not store source-document binary, provider award payloads, bidder names, bidder business numbers, or complete rankings.
+
+### `tender_company_profiles`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `singletonKey` | varchar(32) | Always one profile; `UQ_tender_company_profile_singleton_key` enforces this |
+| `companyName`, `businessNumber` | varchar | Company identity; the service normalizes the 10 digit business number |
+| `headquartersSido`, `headquartersSigungu`, `g2bRegistered` | varchar, varchar, boolean | Participant location and G2B registration state |
+| `supplyProducts`, `licenses`, `companyTypes`, `directProduction`, `certifications`, `performanceRecords` | jsonb | Normalized, validated profile collections only |
+| `version`, `createdAt`, `updatedAt` | integer, timestamptz | Replacement version and audit timestamps |
+
+### `tender_documents`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id`, `tenderId` | UUID | Primary key and FK to `tenders.id`, `ON DELETE CASCADE` |
+| `sourceDocumentIdentity` | varchar | Unique with `tenderId` through `UQ_tender_document_tender_identity` |
+| `displayName`, `sourceUrl`, `mimeType`, `format`, `contentHash` | varchar | Safe document metadata and a normalized content hash |
+| `status`, `errorCode`, `extractedAt` | varchar, varchar, timestamptz | Extraction state, safe failure code, and completion time |
+| `textBlocks`, `tableBlocks`, `extractionMetadata` | jsonb | Normalized extracted output; original bytes are never persisted |
+| `createdAt`, `updatedAt` | timestamptz | Audit timestamps |
+
+Index: `IDX_tender_document_tender_status` on (`tenderId`, `status`).
+
+### `tender_analyses` and `tender_analysis_reviews`
+
+`tender_analyses.tenderId` is a cascading FK to `tenders.id` and `UQ_tender_analysis_tender` retains one current analysis per tender. It stores the tender, document, company-profile, and product-catalog fingerprints; analyzer version; status/suitability; nullable numeric specification score; comparable/satisfied/unsatisfied/unknown counts; normalized requirements; certification, participation and compact price analyses; evidence; worker lease; safe error code; and audit timestamps. `IDX_tender_analysis_status_lease` on (`status`, `leaseExpiresAt`) supports recovery of interrupted work.
+
+`eligibilityValidUntil` is a nullable `timestamptz` added by `1788699300000-AddTenderEligibilityValidity`. It records the first future qualification expiry boundary that changes the evaluated snapshot; an expiry date remains valid until the following midnight in Korea (for example, `2026-09-07` expires at `2026-09-07T15:00:00Z`). The analyzer checks distinct profile expiry dates against coherent product/qualification results, skips irrelevant dates and still-valid OR alternatives, and stores null if no expiry changes the result. The hourly stale sweep queues passed boundaries. Detail/list projections and review writes reject expired or older-analyzer snapshots immediately, before the sweep; old review rows remain intact. The one-time `rules-3` version sweep computes legacy null boundaries from full inputs. Rollback drops only the new column.
+
+`reviewSemanticDigest` is a nullable `varchar(64)` added by `1788699200000-AddTenderReviewSemanticDigest`. It stores SHA-256 over all canonical normalized requirement, evaluation, formula and diagnostic semantics before display caps. Each textual semantic field is hashed before canonical aggregation; complete text is never stored in this column. Existing rows remain null until a version sweep reanalyzes source inputs; already clipped evidence cannot reconstruct omitted facts. The additive migration does not modify review history. Detail JSON is projected to known fields with 320-character text / 128-character identifiers / 64-character decimals / 80-element arrays and a 16 KiB limit per section; evidence has independent diagnostic category quotas and an 80-item / 48 KiB total cap. Projection applies before persistence and again to legacy responses. Diagnostic evidence also retains a 64-character `semanticId` computed from canonical condition/source-anchor hashes before quotas; it preserves deterministic display order after related source citations are omitted. Long identities become stable hash tokens, oversized decimals are null, and safe truncation diagnostics explain omitted display data.
+
+`tender_analysis_reviews` stores immutable analysis fingerprint context, review status, 2,000-character internal note, nullable integer `reviewerAdminId` matching the existing `admins.id`, and timestamps. Its `tenderId` FK cascades on tender deletion. `analysisId` is nullable and uses `ON DELETE SET NULL`, preserving a historic review when a current analysis row is replaced.
+
+Review POST requires the 64-character lowercase hexadecimal `analysisFingerprint` displayed by the client. After acquiring the analysis row lock, the service compares it with the current fingerprint and checks the validity boundary/analyzer version. A mismatch or stale result returns HTTP 409 before creating a review. Reviewer identity still comes exclusively from the authenticated Admin account.
+
+The corrective migration `1788699100000-FixTenderReviewAdminIdentity` changes the unreleased review UUID identity column to integer. Both up and down acquire an exclusive table lock and refuse non-null identities before conversion; existing reviews must never be silently erased or assigned an invented admin. No admin FK is added, so a historic numeric reviewer reference survives later admin removal.
+
+Analysis queue changes clear the claim token and lease. Profile replacement/version increment invalidates current analyses in the same transaction. Product fingerprints use the sorted global ID/updatedAt set. Final document replacement and analysis writes occur only after token/lease/current-input checks in one transaction. Review history remains immutable when a current analysis changes.
+
+### `tender_award_results` and `tender_award_sync_runs`
+
+`tender_award_results` stores only the source, notice/revision, product classification/group, method, region, opening time, precision-safe numeric basis/expected/winning amounts and rates, final-award/failed-bid flags, and collection timestamps. `UQ_tender_award_result_identity` covers (`source`, `sourceNoticeId`, `revision`, `productClassification`, `openedAt`). The price-statistic indexes are `IDX_tender_award_result_opened_at` on `openedAt` and `IDX_tender_award_result_classification_method_region` on (`productClassification`, `awardMethod`, `region`).
+
+`tender_award_sync_runs` stores source and monthly/incremental period identity, resume cursor, status/counts, worker lease, safe error code, completion time, and audit timestamps. `UQ_tender_award_sync_run_source_period` prevents duplicate source-period processing; `IDX_tender_award_sync_run_status_lease` on (`status`, `leaseExpiresAt`) supports stale-job recovery.
+
 ## Update rule
 
 Whenever a migration changes this schema, update this root `database-schema.md` in the same change with affected tables, relationships, foreign-key deletion behavior, unique constraints, and indexes.
@@ -180,6 +230,9 @@ Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1
 - `1787820400000-AllowMultipleDailyDispatchTimes` replaces the date-only dispatch unique constraint with `UQ_tender_daily_dispatch_business_date_delivery_time`. It preserves every existing dispatch and allows a changed shared time to create another same-day slot. Rollback refuses to collapse multiple same-day audit rows instead of deleting history.
 - `1788135000000-AddTenderOpportunityType` is retained as an already-applied production migration. Its columns and index are legacy compatibility data and no longer control collection, display, or mail delivery; no destructive rollback is run.
 - `1788135100000-FixKaptSourceUrls` is a data-only, row-preserving correction. It changes only stale K-apt `sourceUrl` values from the known 404 `/web/bid/bidDetail.do` prefix to the canonical `/bid/bidDetail.do` prefix; it does not add or remove columns, delete rows, or alter tender and mail history. Rollback is intentionally a no-op so a valid URL is never restored to the broken route.
+- `1788699000000-CreateTenderAnalysisTables` adds company qualification, ephemeral-document extraction metadata, one current tender analysis, historic reviews, normalized award statistics, and restartable award-sync state. Its rollback drops only these six new tables in reverse foreign-key order.
+- `1788699100000-FixTenderReviewAdminIdentity` converts the unreleased nullable `tender_analysis_reviews.reviewerAdminId` from UUID to integer so it matches `admins.id`. The migration takes an exclusive table lock and refuses to convert when any non-null identity exists; it does not add an admin foreign key or rewrite review ownership.
+- `1788699200000-AddTenderReviewSemanticDigest` adds nullable `tender_analyses.reviewSemanticDigest varchar(64)`. Existing rows stay null until source reanalysis computes the canonical pre-display-cap digest, and the migration does not infer omitted semantics from previously clipped JSON.
 
 The TypeORM source and compiled runtime both discover `tenders/entities/*.entity` and every migration under `migrations/`. Production deployments must execute the compiled migration command before the application starts; schema synchronization is not a replacement for this sequence.
 
@@ -236,3 +289,5 @@ The TypeORM source and compiled runtime both discover `tenders/entities/*.entity
 격리 PostgreSQL16 `dfkorea_quote_test`에서 현재 Product schema를 준비한 뒤 신규 migration과 실제 트랜잭션/동시접수/첨부소유권/강제 outbox실패 rollback/작업자중단 복구/사진정리를 검증했다. 추가 payload migration up/down, production 무저장소설정 업로드,3장 실제첨부,202+purge 원자성/강제 purge실패,429·불명 결과 보존,1일정책 상한,7일만료,legacy payload누락,stale claim 삭제차단,관리자 bytes미노출도 격리DB에서 검증했다. 기존 전체 migration을 빈 DB에 처음 적용하는 경로는 기존 `1738027500000-ChangeProductFieldsToNumber.ts`의 PostgreSQL `ALTER ... USING` 내부 subquery 오류로 실패한다. 이미 적용된 과거 migration을 이번 기능에서 수정하지 않았다. 신규 운영 DB 전체 설치는 별도 baseline 정비가 필요하며 이번 quote migration 검증과 구분한다.
 
 실제 국세청 등록정보 대조, NAVER WORKS 수신함·사진 열기 확인은 운영키/승인된 테스트정보를 연결한 뒤 수행한다. 로컬 테스트는 외부 실정보·이메일을 보내지 않았다.
+
+- `1788699300000-AddTenderEligibilityValidity` adds nullable `tender_analyses.eligibilityValidUntil timestamptz`; it neither fabricates a boundary for legacy rows nor rewrites review history. The `rules-3` rollout treats older snapshots as stale immediately and recomputes their boundaries.

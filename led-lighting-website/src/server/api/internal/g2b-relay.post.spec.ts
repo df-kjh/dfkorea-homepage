@@ -25,6 +25,17 @@ const runtimeConfig = {
   publicDataServiceKey: 'vercel-key',
 }
 
+const enrichmentBody = JSON.stringify({
+  operation: 'getBidPblancListInfoThngBsisAmount',
+  query: {
+    type: 'json',
+    inqryDiv: '2',
+    bidNtceNo: 'R26BK01000001',
+    pageNo: '1',
+    numOfRows: '100',
+  },
+})
+
 const createDependencies = (
   overrides: Partial<Parameters<typeof createG2bRelayHandler>[0]> = {},
 ) => ({
@@ -229,10 +240,50 @@ describe('POST /api/internal/g2b-relay', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
+  it('authenticates and relays one fixed goods enrichment operation without a client key', async () => {
+    const enrichmentSignature = createHmac('sha256', sharedSecret)
+      .update(`${timestamp}.${enrichmentBody}`)
+      .digest('hex')
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          response: {
+            header: { resultCode: '00', resultMsg: 'NORMAL_SERVICE' },
+            body: { items: [], pageNo: 1, numOfRows: 100, totalCount: 0 },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+    const dependencies = createDependencies({
+      readBody: vi.fn().mockResolvedValue(Buffer.from(enrichmentBody)),
+      getHeader: vi.fn((_event, name: string) => {
+        if (name === 'x-dfkorea-timestamp') return timestamp
+        if (name === 'x-dfkorea-signature') return enrichmentSignature
+        return undefined
+      }),
+      fetcher,
+    })
+    const handler = createG2bRelayHandler(dependencies)
+
+    await expect(handler({} as never)).resolves.toMatchObject({
+      response: { header: { resultCode: '00' } },
+    })
+    const [input, init] = fetcher.mock.calls[0]!
+    const providerUrl = new URL(String(input))
+    expect(providerUrl.pathname).toBe(
+      '/1230000/ad/BidPublicInfoService/getBidPblancListInfoThngBsisAmount',
+    )
+    expect(providerUrl.searchParams.get('serviceKey')).toBe('vercel-key')
+    expect(enrichmentBody).not.toContain('serviceKey')
+    expect(init).toMatchObject({ method: 'GET', redirect: 'error' })
+  })
+
   it('uses the bounded body stream when an intermediary normalizes content-length', async () => {
     const dependencies = createDependencies({
       getHeader: vi.fn((_event, name: string) => {
-        if (name === 'content-length') return `${Buffer.byteLength(body)}, ${Buffer.byteLength(body)}`
+        if (name === 'content-length')
+          return `${Buffer.byteLength(body)}, ${Buffer.byteLength(body)}`
         if (name === 'x-dfkorea-timestamp') return timestamp
         if (name === 'x-dfkorea-signature') return signature
         return undefined

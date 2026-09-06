@@ -1,0 +1,6 @@
+# Preserve document container bytes and PDF's fixed-width xref padding.
+*.hwp binary
+*.hwpx binary
+*.pdf binary
+*.docx binary
+*.xlsx binary

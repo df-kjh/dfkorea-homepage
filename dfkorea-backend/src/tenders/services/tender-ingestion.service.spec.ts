@@ -196,7 +196,7 @@ describe("TenderIngestionService", () => {
   });
 
   it("uses the source identity and revision to distinguish inserts from mutable updates", async () => {
-    tenderRepository.find.mockResolvedValue([
+    tenderRepository.find.mockResolvedValueOnce([
       {
         source: TenderSource.G2B,
         sourceNoticeId: "G2B-1",
