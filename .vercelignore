@@ -1,0 +1,8 @@
+# Local tooling and generated files must not be uploaded.
+.superpowers/
+.worktrees/
+**/node_modules/
+**/.output/
+**/.nuxt/
+.env*
+**/.env*
