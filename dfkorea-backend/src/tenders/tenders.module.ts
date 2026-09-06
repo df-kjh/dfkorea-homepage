@@ -32,6 +32,7 @@ import { TenderIngestionService } from "./services/tender-ingestion.service";
 import { TenderSchedulerService } from "./services/tender-scheduler.service";
 import { TenderQueryService } from "./services/tender-query.service";
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
+import { TenderCompanyProfileService } from "./services/tender-company-profile.service";
 import { TenderMailRenderer } from "./mail/tender-mail-renderer";
 import {
   TENDER_MAIL_TRANSPORT,
@@ -147,6 +148,7 @@ const createSafeRetryLogger = (context: string) => {
     TenderSchedulerService,
     TenderQueryService,
     TenderSubscriptionService,
+    TenderCompanyProfileService,
   ],
   exports: [
     NaverWorksOAuthService,
@@ -154,6 +156,7 @@ const createSafeRetryLogger = (context: string) => {
     TenderSchedulerService,
     TenderQueryService,
     TenderSubscriptionService,
+    TenderCompanyProfileService,
   ],
 })
 export class TendersModule {}

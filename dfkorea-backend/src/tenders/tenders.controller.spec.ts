@@ -17,16 +17,22 @@ describe("TendersController", () => {
   const ingestion = {
     collectAll: jest.fn(),
   };
+  const companyProfile = {
+    get: jest.fn(),
+    replace: jest.fn(),
+  };
   const controller = new TendersController(
     query as never,
     subscription as never,
     ingestion as never,
+    companyProfile as never,
   );
 
   beforeEach(() => {
     Object.values(query).forEach((method) => method.mockReset());
     Object.values(subscription).forEach((method) => method.mockReset());
     Object.values(ingestion).forEach((method) => method.mockReset());
+    Object.values(companyProfile).forEach((method) => method.mockReset());
   });
 
   it("protects every tender endpoint with the JWT guard", () => {
@@ -35,7 +41,7 @@ describe("TendersController", () => {
     );
   });
 
-  it("declares the calendar, subscription, and collection static routes before the ID route", () => {
+  it("declares the static routes, including company profile, before the ID route", () => {
     expect(
       Reflect.getMetadata(PATH_METADATA, TendersController.prototype.calendar),
     ).toBe("calendar");
@@ -55,8 +61,33 @@ describe("TendersController", () => {
       Reflect.getMetadata(PATH_METADATA, TendersController.prototype.collect),
     ).toBe("collect");
     expect(
+      Reflect.getMetadata(
+        PATH_METADATA,
+        TendersController.prototype.companyProfile,
+      ),
+    ).toBe("company-profile");
+    expect(
+      Reflect.getMetadata(
+        PATH_METADATA,
+        TendersController.prototype.replaceCompanyProfile,
+      ),
+    ).toBe("company-profile");
+    expect(
       Reflect.getMetadata(PATH_METADATA, TendersController.prototype.findOne),
     ).toBe(":id");
+  });
+
+  it("delegates company profile reads and replacements without controller state", async () => {
+    const saved = { companyName: "디에프코리아", version: 1 };
+    const replacement = { companyName: "디에프코리아" };
+    companyProfile.get.mockResolvedValue(null);
+    companyProfile.replace.mockResolvedValue(saved);
+
+    await expect(controller.companyProfile()).resolves.toBeNull();
+    await expect(
+      controller.replaceCompanyProfile(replacement as never),
+    ).resolves.toBe(saved);
+    expect(companyProfile.replace).toHaveBeenCalledWith(replacement);
   });
 
   it("returns the ingestion summary for a manual collection, including an unavailable lock", async () => {

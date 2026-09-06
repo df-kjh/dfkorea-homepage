@@ -22,6 +22,7 @@ import {
   TenderSource,
 } from "../src/tenders/domain/tender.enums";
 import { Tender } from "../src/tenders/entities/tender.entity";
+import { TenderCompanyProfile } from "../src/tenders/entities/tender-company-profile.entity";
 import { TenderMailDelivery } from "../src/tenders/entities/tender-mail-delivery.entity";
 import {
   MailDeliveryError,
@@ -221,6 +222,34 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ ...payload, keyword: "LED" })
       .expect(400);
+  });
+
+  it("persists only the latest authenticated company qualification profile", async () => {
+    const profile = {
+      companyName: "디에프코리아",
+      businessNumber: "123-45-67890",
+      headquarters: { sido: "경기도", sigungu: "화성시" },
+      g2bRegistered: true,
+      supplyProducts: [], licenses: [], companyTypes: [], directProduction: [],
+      certifications: [], performanceRecords: [],
+    };
+
+    await request(app.getHttpServer())
+      .put("/tenders/company-profile")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send(profile)
+      .expect(200)
+      .expect(({ body }) => expect(body).toEqual(expect.objectContaining({
+        businessNumber: "1234567890", version: 1,
+      })));
+    await request(app.getHttpServer())
+      .put("/tenders/company-profile")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ ...profile, companyName: "디에프코리아 주식회사" })
+      .expect(200)
+      .expect(({ body }) => expect(body.version).toBe(2));
+
+    await expect(dataSource.getRepository(TenderCompanyProfile).count()).resolves.toBe(1);
   });
 
   it("keeps recipients isolated and makes exactly one due provider retry", async () => {

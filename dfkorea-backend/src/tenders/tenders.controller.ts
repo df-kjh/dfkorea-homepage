@@ -20,6 +20,8 @@ import { UpdateTenderSubscriptionDto } from "./dto/update-tender-subscription.dt
 import { TenderSubscriptionService } from "./services/tender-subscription.service";
 import { TenderSubscriptionQueryDto } from "./dto/tender-subscription-query.dto";
 import { TenderIngestionService } from "./services/tender-ingestion.service";
+import { ReplaceTenderCompanyProfileDto } from "./dto/tender-company-profile.dto";
+import { TenderCompanyProfileService } from "./services/tender-company-profile.service";
 
 @Controller("tenders")
 @UseGuards(JwtAuthGuard)
@@ -28,6 +30,7 @@ export class TendersController {
     private readonly tenderQueryService: TenderQueryService,
     private readonly tenderSubscriptionService: TenderSubscriptionService,
     private readonly tenderIngestionService: TenderIngestionService,
+    private readonly tenderCompanyProfileService: TenderCompanyProfileService,
   ) {}
 
   @Get("calendar")
@@ -47,6 +50,16 @@ export class TendersController {
   async updateSubscription(@Body() updateDto: UpdateTenderSubscriptionDto) {
     const subscription = await this.tenderSubscriptionService.update(updateDto);
     return subscription;
+  }
+
+  @Get("company-profile")
+  companyProfile() {
+    return this.tenderCompanyProfileService.get();
+  }
+
+  @Put("company-profile")
+  replaceCompanyProfile(@Body() profile: ReplaceTenderCompanyProfileDto) {
+    return this.tenderCompanyProfileService.replace(profile);
   }
 
   @Get()

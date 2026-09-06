@@ -9,6 +9,7 @@ import * as request from "supertest";
 import { JwtAuthGuard } from "../src/auth/jwt-auth.guard";
 import { TenderQueryService } from "../src/tenders/services/tender-query.service";
 import { TenderSubscriptionService } from "../src/tenders/services/tender-subscription.service";
+import { TenderCompanyProfileService } from "../src/tenders/services/tender-company-profile.service";
 import { TendersController } from "../src/tenders/tenders.controller";
 import { TenderClassifier } from "../src/tenders/domain/tender-classifier";
 import {
@@ -52,6 +53,10 @@ describe("Tender admin HTTP contract", () => {
   };
   const ingestion = {
     collectAll: jest.fn(),
+  };
+  const companyProfile = {
+    get: jest.fn(),
+    replace: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -106,6 +111,15 @@ describe("Tender admin HTTP contract", () => {
       ],
       failedSources: [TenderSource.KEPCO],
     });
+    companyProfile.get.mockResolvedValue(null);
+    companyProfile.replace.mockResolvedValue({
+      companyName: "디에프코리아",
+      businessNumber: "1234567890",
+      headquarters: { sido: "경기도", sigungu: "화성시" },
+      g2bRegistered: true,
+      supplyProducts: [], licenses: [], companyTypes: [], directProduction: [],
+      certifications: [], performanceRecords: [], version: 1,
+    });
 
     const module = await Test.createTestingModule({
       controllers: [TendersController],
@@ -113,6 +127,7 @@ describe("Tender admin HTTP contract", () => {
         { provide: TenderQueryService, useValue: query },
         { provide: TenderSubscriptionService, useValue: subscription },
         { provide: TenderIngestionService, useValue: ingestion },
+        { provide: TenderCompanyProfileService, useValue: companyProfile },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -156,6 +171,45 @@ describe("Tender admin HTTP contract", () => {
 
   it("rejects an unauthenticated manual collection request", async () => {
     await request(app!.getHttpServer()).post("/tenders/collect").expect(401);
+  });
+
+  it("rejects unauthenticated company profile requests", async () => {
+    await request(app!.getHttpServer())
+      .get("/tenders/company-profile")
+      .expect(401);
+    await request(app!.getHttpServer())
+      .put("/tenders/company-profile")
+      .send({})
+      .expect(401);
+  });
+
+  it("serves and replaces the authenticated company profile contract", async () => {
+    const payload = {
+      companyName: "디에프코리아",
+      businessNumber: "123-45-67890",
+      headquarters: { sido: "경기도", sigungu: "화성시" },
+      g2bRegistered: true,
+      supplyProducts: [], licenses: [], companyTypes: [], directProduction: [],
+      certifications: [], performanceRecords: [],
+    };
+
+    await request(app!.getHttpServer())
+      .get("/tenders/company-profile")
+      .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
+      .expect(200)
+      // Nest represents a controller's null result as an empty JSON response.
+      // A missing profile is still distinguishable because it has no version.
+      .expect(({ body }) => expect(body).toEqual({}));
+    expect(companyProfile.get).toHaveBeenCalledTimes(1);
+    await request(app!.getHttpServer())
+      .put("/tenders/company-profile")
+      .set("Authorization", `Bearer ${ADMIN_TOKEN}`)
+      .send(payload)
+      .expect(200)
+      .expect(({ body }) => expect(body.version).toBe(1));
+    expect(companyProfile.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ businessNumber: "1234567890" }),
+    );
   });
 
   it("returns the authenticated manual collection summary", async () => {
