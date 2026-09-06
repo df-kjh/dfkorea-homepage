@@ -53,6 +53,9 @@ export const cleanAnalysisString = (value: unknown): string =>
     : "";
 const bounded = (value: unknown, length: number): string =>
   Array.from(cleanAnalysisString(value)).slice(0, length).join("");
+/** Canonical display/persistence identity. Already bounded IDs, including
+ * sha256 tokens, stay unchanged on re-projection. A hash-looking prefix does
+ * not authorize stripping a suffix: oversized input is hashed in full. */
 export const boundedAnalysisIdentity = (
   value: unknown,
   limit: number,
@@ -149,14 +152,13 @@ const diagnosticSemanticId = (
     ),
   });
 };
-// Equal diagnostic meanings can still have distinct display IDs. Use an ID
-// hash only as the final display tie-breaker; it never enters the review digest.
+// Equal diagnostic meanings can still have distinct display IDs. Compare the
+// same canonical ID that persistence writes; hashing the raw ID here would
+// change the order after long IDs have become sha256 tokens. This final display
+// tie-breaker never enters the review digest.
 const evidenceOrder = (value: RecordValue): string =>
   value.semanticId
-    ? canonicalJson([
-        value.semanticId,
-        fingerprint(cleanAnalysisString(value.id)),
-      ])
+    ? canonicalJson([value.semanticId, boundedAnalysisIdentity(value.id, 128)])
     : canonicalJson(orderingValue(value));
 
 const SPECIFICATION_HINTS: Record<string, string[]> = {
@@ -278,8 +280,8 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
       ),
   );
   for (const [id, { value, hints }] of [...diagnosticSelections, ...selected]) {
-    if (output.some((value) => value.id === boundedAnalysisIdentity(id, 128)))
-      continue;
+    const displayId = boundedAnalysisIdentity(id, 128);
+    if (output.some((value) => value.id === displayId)) continue;
     if (output.length >= TENDER_EVIDENCE_LIMITS.totalItems) break;
     if (
       !["SOURCE", "UNSUPPORTED", "CONFLICT"].includes(String(value.kind)) ||
@@ -287,7 +289,7 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
     )
       continue;
     const citation: RecordValue = {
-      id: boundedAnalysisIdentity(id, 128),
+      id: displayId,
       kind: value.kind,
       source: value.source,
       state: value.state === "UNKNOWN" ? "UNKNOWN" : null,

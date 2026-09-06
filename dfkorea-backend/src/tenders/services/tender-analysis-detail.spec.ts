@@ -253,3 +253,65 @@ it("orders conflicts by resolved semantic anchors instead of source IDs or bulk 
   expect(selected(after)).toEqual(selected(before));
   expect(after.reviewSemanticDigest).toBe(before.reviewSemanticDigest);
 });
+
+it("retains capped identical conflicts with long IDs through JSON persistence and repeated projection", () => {
+  const evidence = Array.from({ length: 12 }, (_, index) => ({
+    id: `${"diagnostic-".repeat(17)}${index}`,
+    kind: "CONFLICT",
+    source: "STRUCTURED",
+    state: "UNKNOWN",
+    conflictField: "POWER",
+    snippet: "소비전력 조건 충돌",
+  }));
+  const forward = compactAnalysisDetail({ evidence });
+  expect(forward.evidence).toHaveLength(8);
+  expect(new Set(forward.evidence.map((value) => value.id)).size).toBe(8);
+  forward.evidence.forEach((value) =>
+    expect(value.id).toMatch(/^sha256:[a-f0-9]{64}$/),
+  );
+  expect(compactAnalysisDetail({ evidence: [...evidence].reverse() })).toEqual(
+    forward,
+  );
+  let projected = forward;
+  for (let pass = 0; pass < 3; pass++) {
+    projected = compactAnalysisDetail(JSON.parse(JSON.stringify(projected)));
+    expect(projected).toEqual(forward);
+  }
+});
+
+it("preserves canonical and malformed hash-looking IDs without collapsing distinct diagnostics", () => {
+  const canonicalId = `sha256:${"a".repeat(64)}`;
+  const shortIds = [
+    canonicalId,
+    `sha256:${"a".repeat(63)}`,
+    `sha256:${"a".repeat(65)}`,
+    `sha256:${"g".repeat(64)}`,
+    `sha256:${"A".repeat(64)}`,
+    `${canonicalId}:suffix`,
+  ];
+  const longIds = [
+    `${canonicalId}${"x".repeat(100)}`,
+    `${canonicalId}${"x".repeat(99)}y`,
+  ];
+  const evidence = [...shortIds, ...longIds].map((id) => ({
+    id,
+    kind: "CONFLICT",
+    source: "STRUCTURED",
+    conflictField: "POWER",
+    snippet: "소비전력 조건 충돌",
+  }));
+  const compact = compactAnalysisDetail({ evidence });
+  const outputIds = compact.evidence.map((value) => value.id);
+  expect(outputIds).toEqual(expect.arrayContaining(shortIds));
+  expect(new Set(outputIds).size).toBe(8);
+  expect(outputIds).not.toEqual(expect.arrayContaining(longIds));
+  outputIds
+    .filter((id) => !shortIds.includes(String(id)))
+    .forEach((id) => expect(id).toMatch(/^sha256:[a-f0-9]{64}$/));
+  expect(compactAnalysisDetail({ evidence: [...evidence].reverse() })).toEqual(
+    compact,
+  );
+  expect(compactAnalysisDetail(JSON.parse(JSON.stringify(compact)))).toEqual(
+    compact,
+  );
+});
