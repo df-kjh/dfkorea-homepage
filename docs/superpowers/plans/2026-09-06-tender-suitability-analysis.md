@@ -44,7 +44,7 @@
 - Produces: TypeORM entities `TenderCompanyProfile`, `TenderDocument`, `TenderAnalysis`, `TenderAnalysisReview`, `TenderAwardResult`, and `TenderAwardSyncRun`.
 - Produces: database uniqueness for one company profile, one current analysis per tender, one source document per tender identity, and one normalized award-result identity.
 
-- [ ] **Step 1: Write migration and metadata tests that fail because the entities and migration do not exist**
+- [x] **Step 1: Write migration and metadata tests that fail because the entities and migration do not exist**
 
 ```ts
 it('keeps one current suitability analysis per tender', () => {
@@ -62,13 +62,13 @@ it('does not create a binary document column', async () => {
 })
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/entities/tender.entities.spec.ts migrations/tender-analysis.migrations.spec.ts`
 
 Expected: FAIL on missing imports/files and absent metadata.
 
-- [ ] **Step 3: Implement the six entities and additive migration**
+- [x] **Step 3: Implement the six entities and additive migration**
 
 Use these exact enums and public field shapes as the shared persistence contract:
 
@@ -82,17 +82,17 @@ export enum TenderAwardSyncStatus { RUNNING='RUNNING', SUCCEEDED='SUCCEEDED', PA
 
 Store JSONB only for normalized profile collections, extracted text/table blocks, requirements, evidence, and compact price analysis. Add indexes on analysis status/lease, document tender/status, award openedAt/productClassification/awardMethod/region, and award sync status/lease. `down()` drops only the six new tables in reverse FK order.
 
-- [ ] **Step 4: Register entities and update schema documentation**
+- [x] **Step 4: Register entities and update schema documentation**
 
 Add every entity to `TypeOrmModule.forFeature`. Existing glob discovery already covers `tenders/entities/*.entity`; verify it instead of changing the glob. Document columns, FKs, unique constraints, indexes, and the no-binary/no-bidder-data rule in `database-schema.md`.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run: `cd dfkorea-backend && npm test -- --runInBand tenders/entities/tender.entities.spec.ts migrations/tender-analysis.migrations.spec.ts`
 
 Expected: PASS with migration SQL covering every entity constraint.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add dfkorea-backend/src/migrations/1788699000000-CreateTenderAnalysisTables.ts dfkorea-backend/src/migrations/tender-analysis.migrations.spec.ts dfkorea-backend/src/tenders/entities dfkorea-backend/src/tenders/tenders.module.ts database-schema.md
