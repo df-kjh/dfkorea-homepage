@@ -15,7 +15,7 @@
 
 ## 부족하거나 개선이 필요한 기능
 
-- 배포 후 Google Search Console과 네이버 서치어드바이저에 `https://dfkorealed.com/sitemap.xml`을 제출하고, 회사 소개 URL의 색인 상태와 선택된 canonical을 확인해야 한다.
+- 2026-09-06 Google Search Console과 네이버 서치어드바이저의 사이트 등록 및 `https://dfkorealed.com/sitemap.xml` 제출을 확인했다. 이후 회사 소개 URL의 색인 상태와 선택된 canonical을 정기적으로 확인한다.
 - 매월 Search Console과 서치어드바이저에서 색인 제외 사유, 크롤링 오류, 중복 canonical, 구조화 데이터 오류를 점검한다. 사이트맵 제출만으로 검색 노출이나 순위가 보장되지는 않는다.
 
 - 히어로 이미지는 외부 이미지 URL을 사용하므로 회사·제조 현장의 실제 사진으로 교체하면 브랜드 신뢰도를 더 높일 수 있다.
