@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { tendersAPI } from '@/api/tenders'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseCard from '@/components/common/BaseCard.vue'
+import TenderCompanyProfileModal from './tenders/TenderCompanyProfileModal.vue'
+import { analysisSummary, isAnalysisActive } from '@/utils/tender-analysis-display'
+import type { TenderAnalysis } from '@/types'
 import TenderCalendar from './tenders/TenderCalendar.vue'
 import TenderDetailModal from './tenders/TenderDetailModal.vue'
 import TenderFilterPanel from './tenders/TenderFilterPanel.vue'
@@ -17,9 +20,18 @@ import type {
   TenderSubscription,
 } from '@/types'
 
-type CalendarFilters = Pick<TenderQuery, 'keyword' | 'source' | 'region' | 'procurementType' | 'relevance'>
+type CalendarFilters = Pick<
+  TenderQuery,
+  'keyword' | 'source' | 'region' | 'procurementType' | 'relevance'
+>
 
-const emptyResponse = (): PaginatedTenderResponse => ({ data: [], total: 0, page: 1, pageSize: 20, totalPages: 1 })
+const emptyResponse = (): PaginatedTenderResponse => ({
+  data: [],
+  total: 0,
+  page: 1,
+  pageSize: 20,
+  totalPages: 1,
+})
 const currentDateLabel = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -46,11 +58,95 @@ const filterVisible = ref(false)
 const appliedFilters = reactive<CalendarFilters>({})
 const selectedTender = ref<Tender | null>(null)
 const detailOpen = ref(false)
+const profileOpen = ref(false)
+const profileProgress = ref('')
+let profilePoll: ReturnType<typeof setTimeout> | undefined
+let profileGeneration = 0,
+  profilePollCount = 0
+const stopProfilePolling = () => {
+  clearTimeout(profilePoll)
+  profilePoll = undefined
+}
+const scheduleProfileRefresh = (generation: number): void => {
+  stopProfilePolling()
+  if (generation !== profileGeneration || !profileOpen.value) return
+  if (profilePollCount >= 30) {
+    profileProgress.value += ' 자동 갱신을 일시 중지했습니다. 목록을 다시 확인해 주세요.'
+    return
+  }
+  profilePoll = setTimeout(() => {
+    profilePollCount++
+    void refreshProfileAnalyses(generation)
+  }, 5000)
+}
+const refreshProfileAnalyses = async (generation: number) => {
+  if (generation !== profileGeneration || !profileOpen.value) return
+  // A background status refresh must not cancel a user-requested list load and
+  // leave its loading flag owned by an obsolete request generation.
+  if (listLoading.value) {
+    scheduleProfileRefresh(generation)
+    return
+  }
+  const request = ++listRequest
+  try {
+    const { data } = await tendersAPI.getAll({
+      registeredDate: selectedDate.value,
+      ...appliedFilters,
+      page: currentListPage.value,
+      pageSize: 20,
+    })
+    if (generation !== profileGeneration || !profileOpen.value) return
+    if (request !== listRequest) {
+      scheduleProfileRefresh(generation)
+      return
+    }
+    listResponse.value = data
+    const active = data.data.filter((tender) =>
+      isAnalysisActive(tender.analysisSummary?.status),
+    ).length
+    profileProgress.value = active
+      ? `현재 목록 ${active}건 재계산 중입니다. 다른 날짜와 페이지의 진행 상태는 해당 목록에서 확인해 주세요.`
+      : '현재 목록의 분석 갱신이 완료되었습니다. 다른 날짜와 페이지의 진행 상태는 해당 목록에서 확인해 주세요.'
+    if (active) scheduleProfileRefresh(generation)
+  } catch {
+    if (generation === profileGeneration)
+      profileProgress.value = '분석 진행 상태를 불러오지 못했습니다. 목록에서 다시 확인해 주세요.'
+  }
+}
+const profileSaved = () => {
+  stopProfilePolling()
+  profilePollCount = 0
+  profileProgress.value =
+    '기존 분석이 재계산 대상으로 등록되었습니다. 현재 목록을 확인하고 있습니다.'
+  void refreshProfileAnalyses(++profileGeneration)
+}
+const updateAnalysis = (data: TenderAnalysis) => {
+  const summary = analysisSummary(data)
+  listResponse.value = {
+    ...listResponse.value,
+    data: listResponse.value.data.map((tender) =>
+      tender.id === data.tenderId ? { ...tender, analysisSummary: summary } : tender,
+    ),
+  }
+  if (selectedTender.value?.id === data.tenderId)
+    selectedTender.value = { ...selectedTender.value, analysisSummary: summary }
+}
+watch(profileOpen, (open) => {
+  if (open) profileProgress.value = ''
+  if (!open) {
+    ++profileGeneration
+    stopProfilePolling()
+  }
+})
 const subscriptionOpen = ref(false)
 const subscriptionLoading = ref(false)
 const subscriptionLoaded = ref(false)
 const subscriptionError = ref<string | null>(null)
-const subscription = ref<TenderSubscription>({ enabled: false, deliveryTime: '09:00', recipients: [] })
+const subscription = ref<TenderSubscription>({
+  enabled: false,
+  deliveryTime: '09:00',
+  recipients: [],
+})
 const mailOAuthStatus = ref<TenderMailOAuthStatus | null>(null)
 const mailOAuthLoading = ref(false)
 const mailOAuthError = ref<string | null>(null)
@@ -60,10 +156,16 @@ let listRequest = 0
 let subscriptionRequest = 0
 let mailOAuthRequest = 0
 
-const summary = computed(() => calendarDays.value.reduce(
-  (total, day) => ({ total: total.total + day.total, direct: total.direct + day.direct, potential: total.potential + day.potential }),
-  { total: 0, direct: 0, potential: 0 },
-))
+const summary = computed(() =>
+  calendarDays.value.reduce(
+    (total, day) => ({
+      total: total.total + day.total,
+      direct: total.direct + day.direct,
+      potential: total.potential + day.potential,
+    }),
+    { total: 0, direct: 0, potential: 0 },
+  ),
+)
 
 const fetchCalendar = async () => {
   const request = ++calendarRequest
@@ -89,7 +191,12 @@ const fetchList = async (page = currentListPage.value) => {
   listError.value = null
   listResponse.value = emptyResponse()
   try {
-    const { data } = await tendersAPI.getAll({ registeredDate: selectedDate.value, ...appliedFilters, page, pageSize: 20 })
+    const { data } = await tendersAPI.getAll({
+      registeredDate: selectedDate.value,
+      ...appliedFilters,
+      page,
+      pageSize: 20,
+    })
     if (request === listRequest) listResponse.value = data
   } catch {
     if (request === listRequest) {
@@ -114,14 +221,24 @@ const collectTenders = async () => {
     }
 
     const partialSources = data.sources.filter(({ status }) => status === 'PARTIAL')
-    collectionFeedback.value = data.failedSources.length > 0
-      ? { role: 'alert', message: '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.' }
-      : partialSources.length > 0
-        ? { role: 'alert', message: '나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.' }
-        : { role: 'status', message: '공고 수집이 완료되었습니다.' }
+    collectionFeedback.value =
+      data.failedSources.length > 0
+        ? {
+            role: 'alert',
+            message: '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.',
+          }
+        : partialSources.length > 0
+          ? {
+              role: 'alert',
+              message: '나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.',
+            }
+          : { role: 'status', message: '공고 수집이 완료되었습니다.' }
     await Promise.all([fetchCalendar(), fetchList(currentListPage.value)])
   } catch {
-    collectionFeedback.value = { role: 'alert', message: '공고 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.' }
+    collectionFeedback.value = {
+      role: 'alert',
+      message: '공고 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    }
   } finally {
     collectionLoading.value = false
   }
@@ -170,7 +287,10 @@ const authorizeMailOAuth = async () => {
   try {
     const { data } = await tendersAPI.authorizeMailOAuth()
     const authorizationUrl = new URL(data.authorizationUrl)
-    if (authorizationUrl.protocol !== 'https:' || authorizationUrl.hostname !== 'auth.worksmobile.com') {
+    if (
+      authorizationUrl.protocol !== 'https:' ||
+      authorizationUrl.hostname !== 'auth.worksmobile.com'
+    ) {
       throw new Error('Untrusted NAVER WORKS authorization URL')
     }
     window.location.assign(authorizationUrl.toString())
@@ -189,13 +309,48 @@ const handleMailOAuthCallback = () => {
   void fetchMailOAuthStatus()
 }
 
-const selectDate = (date: string) => { selectedDate.value = date; fetchList(1) }
-const changeMonth = (nextMonth: string) => { month.value = nextMonth; selectedDate.value = `${nextMonth}-01`; fetchCalendar(); fetchList(1) }
-const goToday = () => { const today = currentDateLabel(); month.value = today.slice(0, 7); selectedDate.value = today; fetchCalendar(); fetchList(1) }
-const applyFilters = (filters: CalendarFilters) => { Object.assign(appliedFilters, filters); fetchCalendar(); fetchList(1) }
-const resetFilters = () => { Object.assign(appliedFilters, { keyword: undefined, source: undefined, region: undefined, procurementType: undefined, relevance: undefined }); fetchCalendar(); fetchList(1) }
-const openDetail = (tender: Tender) => { selectedTender.value = tender; detailOpen.value = true }
-const openSubscription = () => { subscriptionOpen.value = true; void fetchSubscription(); void fetchMailOAuthStatus() }
+const selectDate = (date: string) => {
+  selectedDate.value = date
+  fetchList(1)
+}
+const changeMonth = (nextMonth: string) => {
+  month.value = nextMonth
+  selectedDate.value = `${nextMonth}-01`
+  fetchCalendar()
+  fetchList(1)
+}
+const goToday = () => {
+  const today = currentDateLabel()
+  month.value = today.slice(0, 7)
+  selectedDate.value = today
+  fetchCalendar()
+  fetchList(1)
+}
+const applyFilters = (filters: CalendarFilters) => {
+  Object.assign(appliedFilters, filters)
+  fetchCalendar()
+  fetchList(1)
+}
+const resetFilters = () => {
+  Object.assign(appliedFilters, {
+    keyword: undefined,
+    source: undefined,
+    region: undefined,
+    procurementType: undefined,
+    relevance: undefined,
+  })
+  fetchCalendar()
+  fetchList(1)
+}
+const openDetail = (tender: Tender) => {
+  selectedTender.value = tender
+  detailOpen.value = true
+}
+const openSubscription = () => {
+  subscriptionOpen.value = true
+  void fetchSubscription()
+  void fetchMailOAuthStatus()
+}
 const closeSubscription = () => {
   ++subscriptionRequest
   ++mailOAuthRequest
@@ -206,7 +361,10 @@ const closeSubscription = () => {
   mailOAuthLoading.value = false
   mailOAuthError.value = null
 }
-const setSubscriptionOpen = (open: boolean) => { if (open) openSubscription(); else closeSubscription() }
+const setSubscriptionOpen = (open: boolean) => {
+  if (open) openSubscription()
+  else closeSubscription()
+}
 const saveSubscription = async (next: TenderSubscription) => {
   if (!subscriptionLoaded.value) return
   const request = subscriptionRequest
@@ -227,34 +385,225 @@ const saveSubscription = async (next: TenderSubscription) => {
   }
 }
 
-onMounted(() => { fetchCalendar(); fetchList(); handleMailOAuthCallback() })
+onUnmounted(() => {
+  ++profileGeneration
+  ++listRequest
+  ++calendarRequest
+  ++subscriptionRequest
+  ++mailOAuthRequest
+  stopProfilePolling()
+})
+
+onMounted(() => {
+  fetchCalendar()
+  fetchList()
+  handleMailOAuthCallback()
+})
 </script>
 
 <template>
   <section class="tender-management" aria-label="입찰 공고 관리">
     <div class="tender-management__toolbar">
-      <div><h3 class="text-lg sm:text-xl font-bold text-gray-900">입찰 공고</h3><p class="mt-1 text-sm text-gray-500">등록일 기준으로 LED 조명 관련 공고를 확인합니다.</p></div>
-      <div class="flex flex-wrap gap-2"><BaseButton data-test="collect-tenders" type="button" variant="default" size="small" icon-left="sync" :loading="collectionLoading" aria-label="공고 즉시 수집" :aria-busy="collectionLoading" @click="collectTenders">즉시 수집</BaseButton><BaseButton data-test="open-filter" type="button" variant="default" size="small" icon-left="filter_alt" @click="filterVisible = !filterVisible">필터</BaseButton><BaseButton data-test="open-subscription" type="button" variant="primary" size="small" icon-left="mail" @click="openSubscription">수신 설정</BaseButton></div>
+      <div>
+        <h3 class="text-lg sm:text-xl font-bold text-gray-900">입찰 공고</h3>
+        <p class="mt-1 text-sm text-gray-500">등록일 기준으로 LED 조명 관련 공고를 확인합니다.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <BaseButton data-test="open-profile" type="button" size="small" @click="profileOpen = true"
+          >회사 자격 설정</BaseButton
+        ><BaseButton
+          data-test="collect-tenders"
+          type="button"
+          variant="default"
+          size="small"
+          icon-left="sync"
+          :loading="collectionLoading"
+          aria-label="공고 즉시 수집"
+          :aria-busy="collectionLoading"
+          @click="collectTenders"
+          >즉시 수집</BaseButton
+        ><BaseButton
+          data-test="open-filter"
+          type="button"
+          variant="default"
+          size="small"
+          icon-left="filter_alt"
+          @click="filterVisible = !filterVisible"
+          >필터</BaseButton
+        ><BaseButton
+          data-test="open-subscription"
+          type="button"
+          variant="primary"
+          size="small"
+          icon-left="mail"
+          @click="openSubscription"
+          >수신 설정</BaseButton
+        >
+      </div>
     </div>
 
-    <TenderFilterPanel v-if="filterVisible" :filters="appliedFilters" class="mt-4" @apply="applyFilters" @reset="resetFilters" />
-    <p v-if="collectionFeedback" class="tender-management__feedback" :role="collectionFeedback.role">{{ collectionFeedback.message }}</p>
-    <p v-if="mailOAuthFeedback" data-test="mail-oauth-feedback" class="tender-management__feedback" role="status">{{ mailOAuthFeedback }}</p>
+    <TenderFilterPanel
+      v-if="filterVisible"
+      :filters="appliedFilters"
+      class="mt-4"
+      @apply="applyFilters"
+      @reset="resetFilters"
+    />
+    <p
+      v-if="collectionFeedback"
+      class="tender-management__feedback"
+      :role="collectionFeedback.role"
+    >
+      {{ collectionFeedback.message }}
+    </p>
+    <p
+      v-if="mailOAuthFeedback"
+      data-test="mail-oauth-feedback"
+      class="tender-management__feedback"
+      role="status"
+    >
+      {{ mailOAuthFeedback }}
+    </p>
     <p v-if="calendarError" class="tender-management__error" role="alert">{{ calendarError }}</p>
 
     <div class="tender-management__summary" aria-label="월간 공고 요약">
-      <BaseCard :hoverable="false" custom-class="tender-summary-card"><p>이번 달 전체</p><strong>{{ summary.total }}건</strong></BaseCard>
-      <BaseCard :hoverable="false" custom-class="tender-summary-card tender-summary-card--direct"><p>💡 직접 관련</p><strong>{{ summary.direct }}건</strong></BaseCard>
-      <BaseCard :hoverable="false" custom-class="tender-summary-card tender-summary-card--potential"><p>⚡ 잠재 관련</p><strong>{{ summary.potential }}건</strong></BaseCard>
+      <BaseCard :hoverable="false" custom-class="tender-summary-card"
+        ><p>이번 달 전체</p>
+        <strong>{{ summary.total }}건</strong></BaseCard
+      >
+      <BaseCard :hoverable="false" custom-class="tender-summary-card tender-summary-card--direct"
+        ><p>💡 직접 관련</p>
+        <strong>{{ summary.direct }}건</strong></BaseCard
+      >
+      <BaseCard :hoverable="false" custom-class="tender-summary-card tender-summary-card--potential"
+        ><p>⚡ 잠재 관련</p>
+        <strong>{{ summary.potential }}건</strong></BaseCard
+      >
     </div>
 
-    <BaseCard :hoverable="false" custom-class="tender-calendar-card"><div class="tender-management__calendar-scroll"><TenderCalendar :month="month" :selected-date="selectedDate" :days="calendarDays" :loading="calendarLoading" @change-month="changeMonth" @select-date="selectDate" @today="goToday" /></div></BaseCard>
-    <TenderList :response="listResponse" :loading="listLoading" :error="listError" :selected-date="selectedDate" @select="openDetail" @retry="fetchList(currentListPage)" @page-change="fetchList" />
-    <TenderDetailModal v-model="detailOpen" :tender="selectedTender" />
-    <TenderSubscriptionModal :model-value="subscriptionOpen" :subscription="subscription" :loading="subscriptionLoading" :loaded="subscriptionLoaded" :error="subscriptionError" :mail-o-auth-status="mailOAuthStatus" :mail-o-auth-loading="mailOAuthLoading" :mail-o-auth-error="mailOAuthError" @update:model-value="setSubscriptionOpen" @retry="fetchSubscription" @retry-mail-o-auth="fetchMailOAuthStatus" @authorize-mail-o-auth="authorizeMailOAuth" @save="saveSubscription" />
+    <BaseCard :hoverable="false" custom-class="tender-calendar-card"
+      ><div class="tender-management__calendar-scroll">
+        <TenderCalendar
+          :month="month"
+          :selected-date="selectedDate"
+          :days="calendarDays"
+          :loading="calendarLoading"
+          @change-month="changeMonth"
+          @select-date="selectDate"
+          @today="goToday"
+        /></div
+    ></BaseCard>
+    <TenderList
+      :response="listResponse"
+      :loading="listLoading"
+      :error="listError"
+      :selected-date="selectedDate"
+      @select="openDetail"
+      @retry="fetchList(currentListPage)"
+      @page-change="fetchList"
+    />
+    <TenderDetailModal
+      v-model="detailOpen"
+      :tender="selectedTender"
+      @analysis-updated="updateAnalysis"
+    />
+    <TenderCompanyProfileModal v-model="profileOpen" @saved="profileSaved"
+      ><template #progress
+        ><p v-if="profileProgress" role="status" class="mb-4 text-sm text-gray-600">
+          {{ profileProgress }}
+        </p></template
+      ></TenderCompanyProfileModal
+    >
+    <TenderSubscriptionModal
+      :model-value="subscriptionOpen"
+      :subscription="subscription"
+      :loading="subscriptionLoading"
+      :loaded="subscriptionLoaded"
+      :error="subscriptionError"
+      :mail-o-auth-status="mailOAuthStatus"
+      :mail-o-auth-loading="mailOAuthLoading"
+      :mail-o-auth-error="mailOAuthError"
+      @update:model-value="setSubscriptionOpen"
+      @retry="fetchSubscription"
+      @retry-mail-o-auth="fetchMailOAuthStatus"
+      @authorize-mail-o-auth="authorizeMailOAuth"
+      @save="saveSubscription"
+    />
   </section>
 </template>
 
 <style scoped>
-.tender-management { background: white; border-radius: .75rem; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }.tender-management__toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }.tender-management__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1.25rem 0; }.tender-management :deep(.tender-summary-card .card-body) { padding: 1rem; }.tender-management :deep(.tender-summary-card p) { margin: 0; color: #6b7280; font-size: .8rem; font-weight: 700; }.tender-management :deep(.tender-summary-card strong) { display: block; margin-top: .35rem; color: #111827; font-size: 1.5rem; }.tender-management :deep(.tender-summary-card--direct) { border-color: #b7e9f1; }.tender-management :deep(.tender-summary-card--potential) { border-color: #f7dea1; }.tender-management :deep(.tender-calendar-card .card-body) { padding: 1rem; }.tender-management__calendar-scroll { overflow-x: auto; }.tender-management__error, .tender-management__feedback { margin-top: 1rem; font-size: .875rem; }.tender-management__error { color: #b42318; }.tender-management__feedback { color: #176b45; } .tender-management__feedback[role='alert'] { color: #b54708; }@media (max-width: 520px) { .tender-management__toolbar { flex-direction: column; }.tender-management__summary { gap: .45rem; }.tender-management :deep(.tender-summary-card .card-body) { padding: .7rem; }.tender-management :deep(.tender-summary-card strong) { font-size: 1.15rem; } }
+.tender-management {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.tender-management__toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.tender-management__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+.tender-management :deep(.tender-summary-card .card-body) {
+  padding: 1rem;
+}
+.tender-management :deep(.tender-summary-card p) {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.tender-management :deep(.tender-summary-card strong) {
+  display: block;
+  margin-top: 0.35rem;
+  color: #111827;
+  font-size: 1.5rem;
+}
+.tender-management :deep(.tender-summary-card--direct) {
+  border-color: #b7e9f1;
+}
+.tender-management :deep(.tender-summary-card--potential) {
+  border-color: #f7dea1;
+}
+.tender-management :deep(.tender-calendar-card .card-body) {
+  padding: 1rem;
+}
+.tender-management__calendar-scroll {
+  overflow-x: auto;
+}
+.tender-management__error,
+.tender-management__feedback {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+.tender-management__error {
+  color: #b42318;
+}
+.tender-management__feedback {
+  color: #176b45;
+}
+.tender-management__feedback[role='alert'] {
+  color: #b54708;
+}
+@media (max-width: 520px) {
+  .tender-management__toolbar {
+    flex-direction: column;
+  }
+  .tender-management__summary {
+    gap: 0.45rem;
+  }
+  .tender-management :deep(.tender-summary-card .card-body) {
+    padding: 0.7rem;
+  }
+  .tender-management :deep(.tender-summary-card strong) {
+    font-size: 1.15rem;
+  }
+}
 </style>

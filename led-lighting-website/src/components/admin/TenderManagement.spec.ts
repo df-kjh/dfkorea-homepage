@@ -2,6 +2,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
+  getCompanyProfile: vi.fn(),
+  replaceCompanyProfile: vi.fn(),
+  getAnalysis: vi.fn(),
+  reanalyze: vi.fn(),
+  saveReview: vi.fn(),
   getCalendar: vi.fn(),
   getAll: vi.fn(),
   getOne: vi.fn(),
@@ -15,6 +20,7 @@ const api = vi.hoisted(() => ({
 vi.mock('@/api/tenders', () => ({ tendersAPI: api }))
 
 import TenderManagement from './TenderManagement.vue'
+import { analysis, profile } from './tenders/__fixtures__/analysis'
 
 const tender = {
   id: 'tender-1',
@@ -35,6 +41,7 @@ const tender = {
   sourceUrl: 'https://example.go.kr/tenders/1',
   relevance: 'DIRECT' as const,
   relevanceScore: 100,
+  analysisSummary: null,
   relevanceReasons: [{ field: 'title', keyword: 'LED', score: 100 }],
 }
 
@@ -64,10 +71,7 @@ const closeSubscriptionModal = () => {
 
 const mountedWrappers: Array<ReturnType<typeof mount>> = []
 const mountTenderManagement = (attachToBody = false) => {
-  const wrapper = mount(
-    TenderManagement,
-    attachToBody ? { attachTo: document.body } : {},
-  )
+  const wrapper = mount(TenderManagement, attachToBody ? { attachTo: document.body } : {})
   mountedWrappers.push(wrapper)
   return wrapper
 }
@@ -82,7 +86,12 @@ describe('TenderManagement', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-08-27T12:00:00.000Z'))
     vi.resetAllMocks()
-    api.getCalendar.mockResolvedValue({ data: [{ date: '2026-08-27', total: 1, direct: 1, potential: 0 }] })
+    api.getCalendar.mockResolvedValue({
+      data: [{ date: '2026-08-27', total: 1, direct: 1, potential: 0 }],
+    })
+    api.getCompanyProfile.mockResolvedValue({ data: structuredClone(profile) })
+    api.replaceCompanyProfile.mockResolvedValue({ data: { ...profile, version: 2 } })
+    api.getAnalysis.mockResolvedValue({ data: analysis })
     api.getAll.mockResolvedValue({ data: listResponse })
     api.collect.mockResolvedValue({
       data: {
@@ -117,6 +126,125 @@ describe('TenderManagement', () => {
     vi.useRealTimers()
   })
 
+  it('opens the real company editor, updates list badges, and polls compact results only while active and open', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+    await wrapper.get('[data-test="open-profile"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('회사 자격 설정')
+    api.getAll.mockResolvedValue({
+      data: {
+        ...listResponse,
+        data: [
+          {
+            ...tender,
+            analysisSummary: {
+              status: 'PENDING',
+              suitability: null,
+              specificationScore: null,
+              unknownCount: 0,
+              analyzedAt: null,
+            },
+          },
+        ],
+      },
+    })
+    document
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(document.body.textContent).toContain('현재 목록 1건')
+    expect(wrapper.text()).toContain('분석 대기')
+    api.getAll.mockResolvedValue({
+      data: {
+        ...listResponse,
+        data: [
+          {
+            ...tender,
+            analysisSummary: {
+              status: 'COMPLETED',
+              suitability: 'RECOMMENDED',
+              specificationScore: 100,
+              unknownCount: 0,
+              analyzedAt: null,
+            },
+          },
+        ],
+      },
+    })
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    expect(wrapper.text()).toContain('참여 추천')
+    const count = api.getAll.mock.calls.length
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(api.getAll).toHaveBeenCalledTimes(count)
+  })
+
+  it('updates list badges immediately after detail reanalysis and ignores polling after profile close/unmount', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+    await wrapper.get('[data-test="tender-details-tender-1"]').trigger('click')
+    await flushPromises()
+    api.reanalyze.mockResolvedValue({ data: { ...analysis, status: 'PENDING' } })
+    Array.from(document.body.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('다시 분석'))!
+      .click()
+    await flushPromises()
+    expect(wrapper.text()).toContain('분석 대기')
+    document.querySelector<HTMLButtonElement>('[aria-label="모달 닫기"]')!.click()
+    await flushPromises()
+    await wrapper.get('[data-test="open-profile"]').trigger('click')
+    await flushPromises()
+    api.getAll.mockResolvedValue({
+      data: {
+        ...listResponse,
+        data: [
+          {
+            ...tender,
+            analysisSummary: {
+              status: 'PENDING',
+              suitability: null,
+              specificationScore: null,
+              unknownCount: 0,
+              analyzedAt: null,
+            },
+          },
+        ],
+      },
+    })
+    document
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    document.querySelector<HTMLButtonElement>('[aria-label="모달 닫기"]')!.click()
+    await flushPromises()
+    const count = api.getAll.mock.calls.length
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(api.getAll).toHaveBeenCalledTimes(count)
+    cleanupMountedWrappers()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(api.getAll).toHaveBeenCalledTimes(count)
+  })
+
+  it('does not strand list loading when profile recomputation overlaps a date request', async () => {
+    const wrapper = mountTenderManagement(true)
+    await flushPromises()
+    await wrapper.get('[data-test="open-profile"]').trigger('click')
+    await flushPromises()
+    const pending = deferred<{ data: typeof listResponse }>()
+    api.getAll.mockReturnValueOnce(pending.promise)
+    await wrapper.get('[data-date="2026-08-27"]').trigger('click')
+    document
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    pending.resolve({ data: listResponse })
+    await flushPromises()
+    expect(wrapper.find('[data-test="tender-details-tender-1"]').exists()).toBe(true)
+  })
+
   it('applies and resets calendar filters', async () => {
     const wrapper = mountTenderManagement()
     await flushPromises()
@@ -126,20 +254,28 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-test="apply-filter"]').trigger('click')
     await flushPromises()
 
-    expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: '서울' }))
+    expect(api.getCalendar).toHaveBeenLastCalledWith(
+      '2026-08',
+      expect.objectContaining({ keyword: '서울' }),
+    )
     expect(api.getAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ registeredDate: '2026-08-27', keyword: '서울', page: 1 }),
     )
     await wrapper.get('[data-test="reset-filter"]').trigger('click')
     await flushPromises()
-    expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: undefined }))
+    expect(api.getCalendar).toHaveBeenLastCalledWith(
+      '2026-08',
+      expect.objectContaining({ keyword: undefined }),
+    )
     expect(api.getAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ registeredDate: '2026-08-27', keyword: undefined, page: 1 }),
     )
   })
 
   it('prevents a second immediate collection while the first request is loading and reports a held lock without refreshing', async () => {
-    const collection = deferred<{ data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] } }>()
+    const collection = deferred<{
+      data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] }
+    }>()
     api.collect.mockImplementationOnce(() => collection.promise)
     const wrapper = mountTenderManagement()
     await flushPromises()
@@ -172,7 +308,9 @@ describe('TenderManagement', () => {
   })
 
   it('preserves a page change made during collection for the post-collection refresh', async () => {
-    const collection = deferred<{ data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] } }>()
+    const collection = deferred<{
+      data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] }
+    }>()
     const pageChange = deferred<{ data: typeof listResponse }>()
     const refresh = deferred<{ data: typeof listResponse }>()
     api.getAll
@@ -224,13 +362,18 @@ describe('TenderManagement', () => {
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain('일부 출처 수집에 실패했습니다.')
-    expect(api.getCalendar).toHaveBeenLastCalledWith('2026-08', expect.objectContaining({ keyword: '서울' }))
-    expect(api.getAll).toHaveBeenLastCalledWith(expect.objectContaining({
-      registeredDate: '2026-08-27',
-      keyword: '서울',
-      page: 1,
-      pageSize: 20,
-    }))
+    expect(api.getCalendar).toHaveBeenLastCalledWith(
+      '2026-08',
+      expect.objectContaining({ keyword: '서울' }),
+    )
+    expect(api.getAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        registeredDate: '2026-08-27',
+        keyword: '서울',
+        page: 1,
+        pageSize: 20,
+      }),
+    )
   })
 
   it('reports a partial source and refreshes successful notices', async () => {
@@ -238,15 +381,17 @@ describe('TenderManagement', () => {
       data: {
         lockAcquired: true,
         collectedAt: '2026-09-01T01:53:57.683Z',
-        sources: [{
-          source: 'G2B',
-          status: 'PARTIAL',
-          fetchedCount: 120,
-          createdCount: 4,
-          updatedCount: 3,
-          excludedCount: 113,
-          errorCode: 'PARTIAL_PROVIDER_FAILURE',
-        }],
+        sources: [
+          {
+            source: 'G2B',
+            status: 'PARTIAL',
+            fetchedCount: 120,
+            createdCount: 4,
+            updatedCount: 3,
+            excludedCount: 113,
+            errorCode: 'PARTIAL_PROVIDER_FAILURE',
+          },
+        ],
         failedSources: [],
       },
     })
@@ -307,15 +452,17 @@ describe('TenderManagement', () => {
       data: {
         lockAcquired: true,
         collectedAt: '2026-09-01T01:53:57.683Z',
-        sources: [{
-          source: 'G2B',
-          status: 'SUCCEEDED',
-          fetchedCount: 120,
-          createdCount: 4,
-          updatedCount: 3,
-          excludedCount: 113,
-          errorCode: null,
-        }],
+        sources: [
+          {
+            source: 'G2B',
+            status: 'SUCCEEDED',
+            fetchedCount: 120,
+            createdCount: 4,
+            updatedCount: 3,
+            excludedCount: 113,
+            errorCode: null,
+          },
+        ],
         failedSources: [],
       },
     })
@@ -351,7 +498,9 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-test="apply-filter"]').trigger('click')
     await flushPromises()
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
-    const saveButton = document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')
+    const saveButton = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="save-subscription"]',
+    )
     if (!saveButton) throw new Error('Expected subscription save button')
     await saveButton.click()
     await flushPromises()
@@ -378,8 +527,12 @@ describe('TenderManagement', () => {
     await flushPromises()
 
     expect(api.getMailOAuthStatus).toHaveBeenCalledTimes(1)
-    expect(document.body.querySelector('[data-test="mail-oauth-status"]')?.textContent).toContain('연결됨')
-    expect(document.body.querySelector('[data-test="authorize-mail-oauth"]')?.textContent).toContain('다시 연결')
+    expect(document.body.querySelector('[data-test="mail-oauth-status"]')?.textContent).toContain(
+      '연결됨',
+    )
+    expect(
+      document.body.querySelector('[data-test="authorize-mail-oauth"]')?.textContent,
+    ).toContain('다시 연결')
   })
 
   it('shows a safe error instead of navigating to an untrusted authorization URL', async () => {
@@ -391,12 +544,16 @@ describe('TenderManagement', () => {
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     await flushPromises()
-    const button = document.body.querySelector<HTMLButtonElement>('[data-test="authorize-mail-oauth"]')
+    const button = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="authorize-mail-oauth"]',
+    )
     if (!button) throw new Error('Expected NAVER WORKS authorization button')
     button.click()
     await flushPromises()
 
-    expect(document.body.querySelector('[data-test="mail-oauth-error"]')?.textContent).toContain('연결을 시작하지 못했습니다')
+    expect(document.body.querySelector('[data-test="mail-oauth-error"]')?.textContent).toContain(
+      '연결을 시작하지 못했습니다',
+    )
     expect(window.location.hostname).not.toBe('evil.example')
   })
 
@@ -408,7 +565,9 @@ describe('TenderManagement', () => {
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     await flushPromises()
-    const button = document.body.querySelector<HTMLButtonElement>('[data-test="authorize-mail-oauth"]')
+    const button = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="authorize-mail-oauth"]',
+    )
     if (!button) throw new Error('Expected NAVER WORKS authorization button')
     button.click()
     await flushPromises()
@@ -430,7 +589,9 @@ describe('TenderManagement', () => {
     await flushPromises()
 
     expect(api.getMailOAuthStatus).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('[data-test="mail-oauth-feedback"]').text()).toContain('NAVER WORKS 메일 연결이 완료되었습니다')
+    expect(wrapper.get('[data-test="mail-oauth-feedback"]').text()).toContain(
+      'NAVER WORKS 메일 연결이 완료되었습니다',
+    )
     expect(new URL(window.location.href).searchParams.has('mailOAuth')).toBe(false)
     expect(new URL(window.location.href).searchParams.get('tab')).toBe('tenders')
   })
@@ -442,7 +603,9 @@ describe('TenderManagement', () => {
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     await flushPromises()
     expect(api.getSubscription).toHaveBeenCalledTimes(1)
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(false)
 
     closeSubscriptionModal()
     await flushPromises()
@@ -464,8 +627,12 @@ describe('TenderManagement', () => {
   })
 
   it('keeps the latest failed load authoritative when an older success resolves afterward', async () => {
-    const first = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
-    const second = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    const first = deferred<{
+      data: { enabled: boolean; deliveryTime: string; recipients: string[] }
+    }>()
+    const second = deferred<{
+      data: { enabled: boolean; deliveryTime: string; recipients: string[] }
+    }>()
     api.getSubscription
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
@@ -487,12 +654,18 @@ describe('TenderManagement', () => {
 
     expect(document.body.textContent).toContain('수신 설정을 불러오지 못했습니다')
     expect(document.body.textContent).not.toContain('stale@dfkorea.co.kr')
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(true)
   })
 
   it('keeps the latest successful load when an older failure rejects afterward', async () => {
-    const first = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
-    const second = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    const first = deferred<{
+      data: { enabled: boolean; deliveryTime: string; recipients: string[] }
+    }>()
+    const second = deferred<{
+      data: { enabled: boolean; deliveryTime: string; recipients: string[] }
+    }>()
     api.getSubscription
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
@@ -514,7 +687,9 @@ describe('TenderManagement', () => {
 
     expect(document.body.textContent).toContain('latest@dfkorea.co.kr')
     expect(document.body.textContent).not.toContain('수신 설정을 불러오지 못했습니다')
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(false)
   })
 
   it('retries the current failed load from the modal and enables save only after that retry succeeds', async () => {
@@ -528,7 +703,9 @@ describe('TenderManagement', () => {
 
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     await flushPromises()
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(true)
 
     const retry = document.body.querySelector<HTMLButtonElement>('[data-test="retry-subscription"]')
     if (!retry) throw new Error('Expected subscription retry button')
@@ -537,12 +714,18 @@ describe('TenderManagement', () => {
 
     expect(api.getSubscription).toHaveBeenCalledTimes(2)
     expect(document.body.textContent).toContain('retry@dfkorea.co.kr')
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(false)
   })
 
   it('invalidates an in-flight load as soon as the modal closes', async () => {
-    const first = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
-    const second = deferred<{ data: { enabled: boolean; deliveryTime: string; recipients: string[] } }>()
+    const first = deferred<{
+      data: { enabled: boolean; deliveryTime: string; recipients: string[] }
+    }>()
+    const second = deferred<{
+      data: { enabled: boolean; deliveryTime: string; recipients: string[] }
+    }>()
     api.getSubscription
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
@@ -561,14 +744,18 @@ describe('TenderManagement', () => {
     await flushPromises()
     await wrapper.get('[data-test="open-subscription"]').trigger('click')
     expect(document.body.textContent).not.toContain('closed-stale@dfkorea.co.kr')
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(true)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(true)
 
     second.resolve({
       data: { enabled: true, deliveryTime: '12:15', recipients: ['current@dfkorea.co.kr'] },
     })
     await flushPromises()
     expect(document.body.textContent).toContain('current@dfkorea.co.kr')
-    expect(document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled).toBe(false)
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[data-test="save-subscription"]')?.disabled,
+    ).toBe(false)
   })
 
   it('renders loading, error, and empty list states instead of stale notices', async () => {
