@@ -18,6 +18,10 @@ const MAX_REDIRECTS = 3;
 const MAX_CONTAINER_ENTRIES = 4_096;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const KAPT_HOSTS = new Set(["k-apt.go.kr", "www.k-apt.go.kr"]);
+const ZIP_COMMON_FLAGS = 0x0808;
+// PKWARE APPNOTE 4.4.4 assigns bits 1-2 to compression-speed hints only
+// for Deflate. The same bits describe unsupported features for other methods.
+const ZIP_DEFLATE_OPTION_FLAGS = 0x0006;
 
 export type TenderDocumentFetchErrorCode =
   | "DOCUMENT_OFF_ALLOWLIST"
@@ -494,6 +498,9 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         const entryCommentLength = buffer.readUInt16LE(offset + 32);
         const diskStart = buffer.readUInt16LE(offset + 34);
         const localOffset = buffer.readUInt32LE(offset + 42);
+        const allowedFlags =
+          ZIP_COMMON_FLAGS |
+          (compressionMethod === 8 ? ZIP_DEFLATE_OPTION_FLAGS : 0x0000);
         const nextOffset =
           offset + 46 + nameLength + extraLength + entryCommentLength;
         if (
@@ -503,7 +510,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
           compressedSize === 0xffffffff ||
           uncompressedSize === 0xffffffff ||
           localOffset === 0xffffffff ||
-          (flags & ~0x0808) !== 0 ||
+          (flags & ~allowedFlags) !== 0 ||
           (compressionMethod !== 0 && compressionMethod !== 8) ||
           (compressionMethod === 0 && compressedSize !== uncompressedSize) ||
           containsZip64Extra(offset + 46 + nameLength, extraLength)

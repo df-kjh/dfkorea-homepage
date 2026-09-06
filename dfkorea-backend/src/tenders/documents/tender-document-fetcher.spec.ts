@@ -8,6 +8,7 @@ import {
 import { request as httpsRequest } from "node:https";
 import { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
+import { deflateRawSync } from "node:zlib";
 import {
   TenderDocumentFetchError,
   TenderDocumentFetcher,
@@ -71,6 +72,64 @@ const createStoredZip = (
     name.copy(central, 46);
     centralParts.push(central);
     localOffset += local.length + (options.dataDescriptors ? 16 : 0);
+  }
+  const central = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entryNames.length, 8);
+  end.writeUInt16LE(entryNames.length, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(localOffset, 16);
+  return Buffer.concat([...localParts, central, end]);
+};
+
+const crc32 = (bytes: Buffer): number => {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+};
+
+const createDeflatedZip = (entryNames: string[], flags: number): Buffer => {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
+  for (const entryName of entryNames) {
+    const name = Buffer.from(entryName, "utf8");
+    const contents = Buffer.from(`<fixture entry="${entryName}"/>`, "utf8");
+    const compressed = deflateRawSync(contents);
+    const checksum = crc32(contents);
+    const local = Buffer.alloc(30 + name.length + compressed.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(flags, 6);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(contents.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    name.copy(local, 30);
+    compressed.copy(local, 30 + name.length);
+    localParts.push(local);
+
+    const central = Buffer.alloc(46 + name.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(flags, 8);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(contents.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(localOffset, 42);
+    name.copy(central, 46);
+    centralParts.push(central);
+    localOffset += local.length;
   }
   const central = Buffer.concat(centralParts);
   const end = Buffer.alloc(22);
@@ -590,6 +649,51 @@ describe("TenderDocumentFetcher", () => {
   });
 
   const docxEntries = ["[Content_Types].xml", "word/document.xml"];
+  it.each([
+    [0x0002, "maximum"],
+    [0x0004, "fast"],
+    [0x0006, "super-fast"],
+  ])(
+    "accepts nonempty Deflate entries using flag value %s for %s compression",
+    async (flags) => {
+      await expect(
+        fetchStaticDocument(
+          createDeflatedZip(docxEntries, flags),
+          "DOCX",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+      ).resolves.toMatchObject({ detectedFormat: "DOCX" });
+    },
+  );
+
+  it.each([
+    [0x0001, "encryption"],
+    [0x0020, "patched-data"],
+  ])("rejects Deflate entries using the unsupported %s flag", async (flags) => {
+    await expect(
+      fetchStaticDocument(
+        createDeflatedZip(docxEntries, flags),
+        "DOCX",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_FORMAT_MISMATCH" });
+  });
+
+  it("rejects Deflate option bits on a stored entry", async () => {
+    const bytes = mutateZip(createStoredZip(docxEntries), (zip) => {
+      zip.writeUInt16LE(0x0002, 6);
+      zip.writeUInt16LE(0x0002, centralOffset(zip) + 8);
+    });
+
+    await expect(
+      fetchStaticDocument(
+        bytes,
+        "DOCX",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_FORMAT_MISMATCH" });
+  });
+
   it.each([
     ["truncated end record", createStoredZip(docxEntries).subarray(0, -1)],
     [
