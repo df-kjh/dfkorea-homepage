@@ -402,44 +402,61 @@ const parseEligibilityClause = (
     ...text.matchAll(/(?:업종|면허)\s*코드\s*[:：]?\s*([A-Za-z0-9-]+)/gi),
   ];
   if (required && licenseMatches.length) {
-    const nameMatch = /([가-힣A-Za-z]+(?:공사업|면허))(?:\s*면허)?/.exec(text);
-    const name = nameMatch?.[1] ?? "업종·면허";
-    if (nameMatch)
-      ranges.push({
-        start: nameMatch.index,
-        end: nameMatch.index + nameMatch[0].length,
-      });
+    const nameMatches = [
+      ...text.matchAll(/([가-힣A-Za-z]+(?:공사업|면허))(?:\s*면허)?/g),
+    ];
+    // Consume every occurrence separately, including repeated names. Never
+    // consume the gap between a name and its code: it may contain another rule.
     ranges.push(
-      ...licenseMatches.map((match) => ({
+      ...[...licenseMatches, ...nameMatches].map((match) => ({
         start: match.index ?? 0,
         end: (match.index ?? 0) + match[0].length,
       })),
     );
-    const groups: string[][] = [];
+    const groups: Array<TextRange & { codes: string[] }> = [];
     for (const [index, match] of licenseMatches.entries()) {
       const code = match[1].toUpperCase();
       const previous = licenseMatches[index - 1];
-      const connector = previous
-        ? text.slice((previous.index ?? 0) + previous[0].length, match.index)
-        : "";
+      const previousEnd = previous
+        ? (previous.index ?? 0) + previous[0].length
+        : 0;
+      const connector = previous ? text.slice(previousEnd, match.index) : "";
       if (previous && /(?:또는|혹은)/.test(connector)) {
-        groups[groups.length - 1].push(code);
+        groups[groups.length - 1].codes.push(code);
       } else {
-        groups.push([code]);
+        const conjunction = /(?:및|그리고)/.exec(connector);
+        // Group boundaries associate names only; they are not consumed ranges.
+        // Names after an explicit conjunction belong to the following group,
+        // whether that alternative writes its name before or after the code.
+        const start = previous
+          ? conjunction
+            ? previousEnd + conjunction.index + conjunction[0].length
+            : (match.index ?? 0)
+          : 0;
+        if (groups.length) groups[groups.length - 1].end = start;
+        groups.push({ codes: [code], start, end: text.length });
       }
     }
     results.push(
-      ...groups.map((codes) =>
-        requirementId({
+      ...groups.map(({ codes, start, end }) => {
+        const names = [
+          ...new Set(
+            nameMatches
+              .filter((match) => match.index >= start && match.index < end)
+              .map((match) => match[1]),
+          ),
+        ];
+        const name = names.length ? names.join(" 또는 ") : "업종·면허";
+        return requirementId({
           kind: "LICENSE",
           label: codes.length > 1 ? `${name} (${codes.join(" 또는 ")})` : name,
           codes: [...new Set(codes)].sort(),
-          values: [name],
+          values: names.length ? names : [name],
           required: true,
           sourcePriority: "DOCUMENT",
           evidenceIds: [evidenceId],
-        }),
-      ),
+        });
+      }),
     );
   }
 
