@@ -51,8 +51,9 @@ export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
       schedule(
         "10 2 * * * *",
         async () => {
-          await this.analysis.refreshStaleAnalyses();
-          await this.analysis.processDue(new Date(), 5);
+          const now = new Date();
+          await this.analysis.refreshStaleAnalyses(now);
+          await this.analysis.processDue(now, 5);
         },
         options,
       ),

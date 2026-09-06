@@ -1,3 +1,4 @@
+import { koreanCalendarDate } from "./tender-calendar-date";
 import {
   TenderCompanyProfileDto,
   TenderCompanyQualificationDto,
@@ -182,7 +183,8 @@ const evaluateCertificationForProduct = (
   profile: TenderCompanyProfileDto,
   currentDate: string,
 ): TenderRequirementState => {
-  if (!product) return TenderRequirementState.UNKNOWN;
+  if (!product || !Array.isArray(product.certifications))
+    return TenderRequirementState.UNKNOWN;
   if (
     !normalizedCertificationCodes(product.certifications).has(requirement.code)
   ) {
@@ -266,7 +268,7 @@ const evaluateParticipation = (
   profile: TenderCompanyProfileDto,
   now: Date,
 ): TenderRequirementState => {
-  const currentDate = now.toISOString().slice(0, 10);
+  const currentDate = koreanCalendarDate(now);
   switch (condition.kind) {
     case "REGION": {
       const values = new Set([
@@ -376,6 +378,7 @@ interface ProductEvaluation {
   certifications: TenderRequirementEvaluation[];
   weightedSatisfied: number;
   weightedUnsatisfied: number;
+  mandatoryCertificationRank: number;
   certificationSatisfied: number;
   certificationUnsatisfied: number;
   unknown: number;
@@ -413,7 +416,9 @@ const resultFingerprintInputs = (
       ...item,
       power: [...item.power].sort((left, right) => left - right),
       colorTemp: [...item.colorTemp].sort((left, right) => left - right),
-      certifications: [...item.certifications].sort(),
+      certifications: Array.isArray(item.certifications)
+        ? [...item.certifications].sort()
+        : null,
     })),
   );
   return {
@@ -424,13 +429,63 @@ const resultFingerprintInputs = (
 };
 
 export class TenderSuitabilityAnalyzer {
+  nextValidityBoundary(
+    requirements: ParsedTenderRequirements,
+    profile: TenderCompanyProfileDto,
+    products: TenderProductSnapshot[],
+    now: Date,
+    current: TenderSuitabilityResult,
+  ): Date | null {
+    const boundaries = [
+      ...new Set(
+        [
+          ...profile.licenses,
+          ...profile.companyTypes,
+          ...profile.directProduction,
+          ...profile.certifications,
+        ].flatMap(({ expiresAt }) => {
+          if (!expiresAt) return [];
+          const boundary =
+            new Date(`${expiresAt.slice(0, 10)}T00:00:00+09:00`).getTime() +
+            24 * 60 * 60_000;
+          return Number.isFinite(boundary) && boundary > now.getTime()
+            ? [boundary]
+            : [];
+        }),
+      ),
+    ].sort((a, b) => a - b);
+    // Profile collections and distinct dates are bounded by the profile DTO.
+    // Evaluate only actual expiry boundaries: irrelevant certificates and OR
+    // alternatives that remain valid must not cause daily invalidation.
+    const decision = (result: TenderSuitabilityResult) =>
+      canonicalJson({
+        suitability: result.suitability,
+        specificationScore: result.specificationScore,
+        satisfiedCount: result.satisfiedCount,
+        unsatisfiedCount: result.unsatisfiedCount,
+        unknownCount: result.unknownCount,
+        certifications: result.certifications,
+        participationConditions: result.participationConditions,
+      });
+    const baseline = decision(current);
+    for (const boundary of boundaries) {
+      if (
+        decision(
+          this.analyze(requirements, profile, products, new Date(boundary)),
+        ) !== baseline
+      )
+        return new Date(boundary);
+    }
+    return null;
+  }
+
   analyze(
     requirements: ParsedTenderRequirements,
     profile: TenderCompanyProfileDto,
     products: TenderProductSnapshot[],
     now: Date,
   ): TenderSuitabilityResult {
-    const currentDate = now.toISOString().slice(0, 10);
+    const currentDate = koreanCalendarDate(now);
     const selectedByItem = new Map<string, ProductEvaluation | null>();
     const specificationResults: TenderRequirementEvaluation[] = [];
 
@@ -492,6 +547,19 @@ export class TenderSuitabilityAnalyzer {
                 : 0),
             0,
           ),
+          // A candidate with a known mandatory failure can never displace
+          // one with complete (or still unknown) mandatory certification evidence.
+          mandatoryCertificationRank: certifications.some(
+            ({ required, state }) =>
+              required && state === TenderRequirementState.UNSATISFIED,
+          )
+            ? 2
+            : certifications.some(
+                  ({ required, state }) =>
+                    required && state === TenderRequirementState.UNKNOWN,
+                )
+              ? 1
+              : 0,
           certificationSatisfied: certifications.filter(
             ({ state }) => state === TenderRequirementState.SATISFIED,
           ).length,
@@ -505,6 +573,7 @@ export class TenderSuitabilityAnalyzer {
       });
       candidates.sort(
         (left, right) =>
+          left.mandatoryCertificationRank - right.mandatoryCertificationRank ||
           right.weightedSatisfied - left.weightedSatisfied ||
           left.weightedUnsatisfied - right.weightedUnsatisfied ||
           right.certificationSatisfied - left.certificationSatisfied ||

@@ -11,7 +11,7 @@ describe("TenderSchedulerService", () => {
   it("refreshes fingerprints before hourly analysis, runs bounded batches away from award collection, and destroys all jobs", async () => {
     const order: string[] = [];
     const analysis = {
-      refreshStaleAnalyses: jest.fn(async () => {
+      refreshStaleAnalyses: jest.fn(async (_now?: Date) => {
         order.push("refresh");
       }),
       processDue: jest.fn(async () => {
@@ -38,6 +38,13 @@ describe("TenderSchedulerService", () => {
       ([cron]) => cron === "10 2 * * * *",
     )[1]();
     expect(order).toEqual(["refresh", "process"]);
+    expect(analysis.refreshStaleAnalyses).toHaveBeenCalledWith(
+      expect.any(Date),
+    );
+    expect(analysis.processDue).toHaveBeenCalledWith(
+      analysis.refreshStaleAnalyses.mock.calls[0][0],
+      5,
+    );
     const awardJobs = (schedule as jest.Mock).mock.calls.filter(([cron]) =>
       ["0 15 2 * * *", "30 5-50/5 * * * *"].includes(cron),
     );

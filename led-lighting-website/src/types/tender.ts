@@ -289,6 +289,7 @@ export interface TenderAnalysis extends Partial<Omit<TenderAnalysisSummary, 'sta
   } | null
 }
 export interface TenderReviewInput {
+  analysisFingerprint: string
   completed: boolean
   note?: string
 }

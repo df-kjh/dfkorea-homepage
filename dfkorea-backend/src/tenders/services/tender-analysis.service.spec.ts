@@ -1,3 +1,8 @@
+import { AddTenderEligibilityValidity1788699300000 } from "../../migrations/1788699300000-AddTenderEligibilityValidity";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { G2bEnrichmentAdapter } from "../adapters/g2b-enrichment.adapter";
+import { PublicApiClient } from "../adapters/public-api-client";
 import { AddTenderReviewSemanticDigest1788699200000 } from "../../migrations/1788699200000-AddTenderReviewSemanticDigest";
 import { compactAnalysisEvidence } from "./tender-analysis-evidence";
 import { analysisFingerprint } from "./tender-analysis-queue";
@@ -159,6 +164,350 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       new TenderPriceAnalyzer(),
     );
   });
+  it("projects qualification expiry at KST midnight before a sweep and queues only affected analyses", async () => {
+    const before = new Date("2099-09-07T14:59:59.999Z");
+    const boundary = new Date("2099-09-07T15:00:00.000Z");
+    await profile.replace({
+      ...profileInput,
+      licenses: [{ code: "1468", name: "전기공사업", expiresAt: "2099-09-07" }],
+    });
+    enrichment.licenses = [
+      {
+        code: "1468",
+        name: "전기공사업",
+        group: "1",
+        required: true,
+        evidence: { source: "G2B_API", operation: "fixture", field: "license" },
+      },
+    ];
+    await service.reanalyze(tender.id, before);
+    await service.processDue(before, 1);
+    const row = await db
+      .getRepository(TenderAnalysis)
+      .findOneByOrFail({ tenderId: tender.id });
+    expect((row as any).eligibilityValidUntil).toEqual(boundary);
+    const reviewer = await db
+      .getRepository(Admin)
+      .save({ username: "expiry-reviewer", password: "unused" });
+    await service.saveReview(
+      tender.id,
+      {
+        completed: true,
+        note: "current",
+        analysisFingerprint: analysisFingerprint(row),
+      } as any,
+      reviewer.id,
+    );
+    expect(
+      await Reflect.apply(service.getAnalysis, service, [tender.id, before]),
+    ).toMatchObject({ status: "COMPLETED", reviewed: true });
+    expect(
+      await Reflect.apply(service.getAnalysis, service, [tender.id, boundary]),
+    ).toMatchObject({ status: "PENDING", reviewed: false, suitability: null });
+    expect(
+      (
+        await Reflect.apply(service.getSummaries, service, [
+          [tender.id],
+          boundary,
+        ])
+      ).get(tender.id),
+    ).toMatchObject({ status: "PENDING", suitability: null });
+    expect(
+      await Reflect.apply(service.refreshStaleAnalyses, service, [before]),
+    ).toEqual({ queuedCount: 0 });
+    expect(
+      await Reflect.apply(service.refreshStaleAnalyses, service, [boundary]),
+    ).toEqual({ queuedCount: 1 });
+    await service.processDue(boundary, 1);
+    expect(
+      await Reflect.apply(service.getAnalysis, service, [tender.id, boundary]),
+    ).toMatchObject({
+      status: "COMPLETED",
+      reviewed: false,
+      suitability: "DIFFICULT",
+    });
+    expect(
+      await Reflect.apply(service.refreshStaleAnalyses, service, [
+        new Date("2099-09-08T15:00:00Z"),
+      ]),
+    ).toEqual({ queuedCount: 0 });
+  });
+
+  it("does not schedule irrelevant or redundant qualification expiries", async () => {
+    const before = new Date("2099-09-07T14:59:59.999Z");
+    await profile.replace({
+      ...profileInput,
+      licenses: [{ code: "1468", name: "전기공사업", expiresAt: "2099-09-07" }],
+      certifications: [{ code: "KC", name: "KC", expiresAt: "2099-09-08" }],
+    });
+    await service.reanalyze(tender.id, before);
+    await service.processDue(before, 1);
+    const row = await db
+      .getRepository(TenderAnalysis)
+      .findOneByOrFail({ tenderId: tender.id });
+    expect((row as any).eligibilityValidUntil).toBeNull();
+    expect(
+      await Reflect.apply(service.refreshStaleAnalyses, service, [
+        new Date("2099-09-10T15:00:00Z"),
+      ]),
+    ).toEqual({ queuedCount: 0 });
+  });
+
+  it("rejects a stale displayed fingerprint after waiting for a concurrent analysis update under row lock", async () => {
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const displayed = await service.getAnalysis(tender.id);
+    const reviewer = await db
+      .getRepository(Admin)
+      .save({ username: "concurrent-reviewer", password: "unused" });
+    const runner = db.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    let save: Promise<unknown> | undefined;
+    try {
+      const [{ pid }] = await runner.query("SELECT pg_backend_pid() AS pid");
+      await runner.manager
+        .getRepository(TenderAnalysis)
+        .update(
+          { tenderId: tender.id },
+          { reviewSemanticDigest: "f".repeat(64) },
+        );
+      save = service
+        .saveReview(
+          tender.id,
+          {
+            completed: true,
+            note: "old page",
+            analysisFingerprint: displayed.analysisFingerprint,
+          } as any,
+          reviewer.id,
+        )
+        .then(
+          () => "saved",
+          (error: { status: number }) => error.status,
+        );
+      const deadline = Date.now() + 2000;
+      let blocked = false;
+      while (Date.now() < deadline) {
+        const [value] = await db.query(
+          "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+          [pid],
+        );
+        if (value.blocked) {
+          blocked = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(blocked).toBe(true);
+      await runner.commitTransaction();
+      expect(await save).toBe(409);
+      expect(await db.getRepository(TenderAnalysisReview).count()).toBe(0);
+    } finally {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      await save;
+      await runner.release();
+    }
+  });
+
+  it("loads stored awards and computes AVAILABLE prices through the actual G2B adapter", async () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        join(__dirname, "../adapters/fixtures/g2b-enrichment-pricing.json"),
+        "utf8",
+      ),
+    );
+    await db
+      .getRepository(Tender)
+      .update(tender.id, { sourceNoticeId: "R26BK01000001" });
+    const client = new PublicApiClient(
+      async (url) =>
+        new Response(
+          JSON.stringify(fixture[new URL(url).pathname.split("/").at(-1)!]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const adapter = new G2bEnrichmentAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "fixture",
+    });
+    service = new TenderAnalysisService(
+      db,
+      adapter,
+      { enrich } as never,
+      { fetch },
+      { extract } as never,
+      profile,
+      new TenderPriceAnalyzer(),
+    );
+    await db.getRepository(TenderAwardResult).save(
+      Array.from({ length: 15 }, (_, index) => ({
+        source: "G2B",
+        sourceNoticeId: `real-adapter-${index}`,
+        revision: "000",
+        productClassification: "3911210201",
+        productGroup: "LED",
+        awardMethod: "적격심사",
+        region: "41",
+        openedAt: new Date(now.getTime() - 86400000),
+        basisAmount: "100000000",
+        expectedPrice: "99820000",
+        winningAmount: "88700052",
+        adjustmentRate: "0.9982",
+        winningRate: "0.8886",
+        isFinalAward: true,
+        isFailedBid: false,
+      })),
+    );
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    expect(await service.getAnalysis(tender.id)).toMatchObject({
+      priceAnalysis: {
+        official: {
+          status: "AVAILABLE",
+          minimum: "86240000",
+          maximum: "89760000",
+        },
+        statistics: {
+          status: "AVAILABLE",
+          sampleCount: 15,
+          estimatedPrice: "88700052",
+          matchingLevel: "ITEM_METHOD_REGION",
+        },
+      },
+    });
+  });
+
+  it("keeps rejected G2B restrictions and attachments PARTIAL with a matching catalog", async () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        join(__dirname, "../adapters/fixtures/g2b-enrichment-pricing.json"),
+        "utf8",
+      ),
+    );
+    const identity = { bidNtceNo: "R26BK01000001", bidNtceOrd: "000" };
+    fixture.getBidPblancListInfoThng.response.body.items[0].ntceSpecDocUrl1 =
+      "https://invalid.example/private";
+    fixture.getBidPblancListInfoLicenseLimit.response.body.items = [
+      { ...identity, lcnsLmtNm: "전기공사업" },
+      { ...identity, permsnIndstrytyList: "1468" },
+    ];
+    fixture.getBidPblancListInfoLicenseLimit.response.body.totalCount = 2;
+    await db
+      .getRepository(Tender)
+      .update(tender.id, { sourceNoticeId: identity.bidNtceNo });
+    await profile.replace(profileInput);
+    await db.getRepository(Product).save({
+      name: "private",
+      modelName: "private",
+      category: "LED",
+      dimensions: "10x20x30",
+      power: [40],
+      lifespan: 10000,
+      colorTemp: [6500],
+      ledChipManufacturer: "private",
+      description: "private",
+    });
+    const client = new PublicApiClient(
+      async (url) =>
+        new Response(
+          JSON.stringify(fixture[new URL(url).pathname.split("/").at(-1)!]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    service = new TenderAnalysisService(
+      db,
+      new G2bEnrichmentAdapter(client, {
+        baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+        serviceKey: "fixture",
+      }),
+      { enrich } as never,
+      { fetch },
+      { extract } as never,
+      profile,
+      new TenderPriceAnalyzer(),
+    );
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const result = await service.getAnalysis(tender.id);
+    expect(result).toMatchObject({
+      status: "PARTIAL",
+      suitability: "REVIEW",
+      specificationScore: 100,
+    });
+    expect("unknownCount" in result && result.unknownCount).toBeGreaterThan(0);
+    expect(JSON.stringify(result)).not.toContain("invalid.example");
+  });
+
+  it("adds and reverses only the nullable validity boundary on PostgreSQL and preserves legacy data", async () => {
+    await service.reanalyze(tender.id, now);
+    const runner = db.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.query(`SET LOCAL search_path TO "${schema}", public`);
+      const migration = new AddTenderEligibilityValidity1788699300000();
+      await migration.down(runner);
+      await migration.up(runner);
+      expect(
+        await runner.query(
+          'SELECT "eligibilityValidUntil", status FROM tender_analyses WHERE "tenderId"=$1',
+          [tender.id],
+        ),
+      ).toEqual([{ eligibilityValidUntil: null, status: "PENDING" }]);
+      const boundary = new Date("2099-09-07T15:00:00Z");
+      await runner.query(
+        'UPDATE tender_analyses SET "eligibilityValidUntil"=$1 WHERE "tenderId"=$2',
+        [boundary, tender.id],
+      );
+      const [row] = await runner.query(
+        'SELECT "eligibilityValidUntil" FROM tender_analyses WHERE "tenderId"=$1',
+        [tender.id],
+      );
+      expect(row.eligibilityValidUntil).toEqual(boundary);
+      await migration.down(runner);
+      expect(
+        await runner.query(
+          'SELECT status FROM tender_analyses WHERE "tenderId"=$1',
+          [tender.id],
+        ),
+      ).toEqual([{ status: "PENDING" }]);
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+  });
+
+  it("projects legacy pre-boundary analyses stale immediately before their first version sweep", async () => {
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const reviewer = await db
+      .getRepository(Admin)
+      .save({ username: "legacy-validity-reviewer", password: "unused" });
+    await service.saveReview(
+      tender.id,
+      {
+        completed: true,
+        note: "legacy",
+        analysisFingerprint: (await service.getAnalysis(tender.id))
+          .analysisFingerprint,
+      },
+      reviewer.id,
+    );
+    await db
+      .getRepository(TenderAnalysis)
+      .update({ tenderId: tender.id }, { analyzerVersion: "rules-2" });
+    expect(await service.getAnalysis(tender.id)).toMatchObject({
+      status: "PENDING",
+      reviewed: false,
+      suitability: null,
+    });
+    expect(
+      (await service.getSummaries([tender.id])).get(tender.id),
+    ).toMatchObject({ status: "PENDING", suitability: null });
+    expect(await db.getRepository(TenderAnalysisReview).count()).toBe(1);
+  });
+
   const documentReference = () => ({
     identity: "large-document",
     displayName: "fixture",
@@ -335,7 +684,12 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       .save({ username: "spec-reviewer", password: "unused" });
     await service.saveReview(
       tender.id,
-      { completed: true, note: "30W checked" },
+      {
+        completed: true,
+        note: "30W checked",
+        analysisFingerprint: (await service.getAnalysis(tender.id))
+          .analysisFingerprint,
+      },
       reviewer.id,
     );
     const before = await service.getAnalysis(tender.id);
@@ -376,7 +730,12 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       .save({ username: "bounded-reviewer", password: "unused" });
     await service.saveReview(
       tender.id,
-      { completed: true, note: "bounded" },
+      {
+        completed: true,
+        note: "bounded",
+        analysisFingerprint: (await service.getAnalysis(tender.id))
+          .analysisFingerprint,
+      },
       reviewer.id,
     );
     const before = await service.getAnalysis(tender.id);
@@ -429,7 +788,12 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
         .save({ username: "undisplayed-reviewer", password: "unused" });
       await service.saveReview(
         tender.id,
-        { completed: true, note: "all conditions checked" },
+        {
+          completed: true,
+          note: "all conditions checked",
+          analysisFingerprint: (await service.getAnalysis(tender.id))
+            .analysisFingerprint,
+        },
         reviewer.id,
       );
       const before = await service.getAnalysis(tender.id);
@@ -731,7 +1095,12 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       .save({ username: "reviewer", password: "unused" });
     await service.saveReview(
       tender.id,
-      { completed: true, note: "  checked  " },
+      {
+        completed: true,
+        note: "  checked  ",
+        analysisFingerprint: (await service.getAnalysis(tender.id))
+          .analysisFingerprint,
+      },
       admin.id,
     );
     expect(await service.getAnalysis(tender.id)).toMatchObject({
@@ -978,7 +1347,12 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       .save({ username: "price-reviewer", password: "unused" });
     await service.saveReview(
       tender.id,
-      { completed: true, note: "price checked" },
+      {
+        completed: true,
+        note: "price checked",
+        analysisFingerprint: (await service.getAnalysis(tender.id))
+          .analysisFingerprint,
+      },
       reviewer.id,
     );
     await db

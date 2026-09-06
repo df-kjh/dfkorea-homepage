@@ -617,8 +617,23 @@ export const parseBidFormulaText = (
     `(?:예정가격\\s*범위[^.\\n]*?)?기초금액(?:의|\\s*)\\s*${DECIMAL}\\s*%\\s*이상\\s*${DECIMAL}\\s*%\\s*이하`,
   ).exec(text);
   if (reserveRange) {
-    result.reservePriceMinimumRate = addDecimal("100", reserveRange[1]);
-    result.reservePriceMaximumRate = addDecimal("100", reserveRange[2]);
+    const minimumSigned = /^[+-]/.test(reserveRange[1]);
+    const maximumSigned = /^[+-]/.test(reserveRange[2]);
+    // Explicit signs identify offsets; unsigned percentages already refer to
+    // the basis. Retain invalid sentinels so law defaults cannot mask a mixed
+    // representation whose intended calculation has not been established.
+    result.reservePriceMinimumRate =
+      minimumSigned !== maximumSigned
+        ? "UNKNOWN"
+        : minimumSigned
+          ? addDecimal("100", reserveRange[1])
+          : decimal(reserveRange[1]);
+    result.reservePriceMaximumRate =
+      minimumSigned !== maximumSigned
+        ? "UNKNOWN"
+        : maximumSigned
+          ? addDecimal("100", reserveRange[2])
+          : decimal(reserveRange[2]);
   }
   if (Object.keys(result).length) result.evidenceIds = [evidenceId];
   return result;
@@ -825,6 +840,28 @@ export class TenderRequirementParser {
     documents: TenderRequirementDocument[],
   ): ParsedTenderRequirements {
     const evidence: TenderRequirementEvidence[] = [];
+    // Missing/rejected source material must remain visible to the pure analyzer
+    // as well as the job orchestrator. Use one stable value-free diagnostic.
+    if (
+      enrichment.failures.length ||
+      enrichment.documents.some(
+        (reference) =>
+          !documents.some(
+            (document) =>
+              document.identity === reference.identity &&
+              document.status === "EXTRACTED",
+          ),
+      )
+    ) {
+      const diagnostic: Omit<TenderRequirementEvidence, "id"> = {
+        kind: "UNSUPPORTED",
+        source: "STRUCTURED",
+        state: "UNKNOWN",
+        snippet:
+          "공식 자료 일부를 확인하지 못했습니다. 참가 조건 원문 확인이 필요합니다.",
+      };
+      evidence.push({ id: evidenceId(diagnostic), ...diagnostic });
+    }
     const certifications: TenderCertificationRequirement[] = [];
     const orderedPurchaseItems = [...enrichment.purchaseItems].sort(
       (left, right) =>
@@ -1242,6 +1279,11 @@ export class TenderRequirementParser {
           field,
         );
       }
+    }
+    for (const fact of enrichment.pricingEvidence ?? []) {
+      const item = evidenceFromStructured(fact.evidence, fact.value);
+      evidence.push(item);
+      evidenceIds.push(item.id);
     }
     if (evidenceIds.length) result.evidenceIds = evidenceIds.sort();
     return result;

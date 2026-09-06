@@ -156,6 +156,7 @@ describe('TenderDetailModal', () => {
     await click('검토 완료')
     expect(api.saveReview).toHaveBeenLastCalledWith(tender.id, {
       completed: true,
+      analysisFingerprint: analysis.analysisFingerprint,
       note: '원문 확인',
     })
     api.reanalyze.mockResolvedValue({ data: { ...analysis, status: 'PENDING' } })

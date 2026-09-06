@@ -105,7 +105,9 @@ export class TenderAnalysisService {
     return this.getAnalysis(tenderId);
   }
 
-  async refreshStaleAnalyses(): Promise<{ queuedCount: number }> {
+  async refreshStaleAnalyses(
+    now = new Date(),
+  ): Promise<{ queuedCount: number }> {
     const products = await this.db
       .getRepository(Product)
       .find({ select: { id: true, updatedAt: true } });
@@ -116,9 +118,10 @@ export class TenderAnalysisService {
       .update()
       .set(pendingAnalysis)
       .where(
-        '("productCatalogFingerprint" IS DISTINCT FROM :catalog OR "analyzerVersion" <> :version) AND status <> :pending',
+        '("productCatalogFingerprint" IS DISTINCT FROM :catalog OR "analyzerVersion" <> :version OR "eligibilityValidUntil" <= :now) AND status <> :pending',
         {
           catalog,
+          now,
           version: TENDER_ANALYZER_VERSION,
           pending: TenderAnalysisStatus.PENDING,
         },
@@ -167,7 +170,7 @@ export class TenderAnalysisService {
     return { processed };
   }
 
-  async getAnalysis(tenderId: string) {
+  async getAnalysis(tenderId: string, now = new Date()) {
     await this.requireTender(this.db.manager, tenderId);
     const row = await this.db
       .getRepository(TenderAnalysis)
@@ -206,7 +209,7 @@ export class TenderAnalysisService {
     return {
       id: row.id,
       tenderId,
-      ...this.summary(row),
+      ...this.summary(row, now),
       analysisFingerprint: currentFingerprint,
       comparableCount: row.comparableRequirementCount,
       satisfiedCount: row.satisfiedRequirementCount,
@@ -239,6 +242,7 @@ export class TenderAnalysisService {
       })),
       reviewed:
         finalStatuses.includes(row.status) &&
+        !this.analysisStale(row, now) &&
         review?.analysisFingerprint === currentFingerprint &&
         review.completed === true,
       review: review
@@ -255,6 +259,7 @@ export class TenderAnalysisService {
 
   async getSummaries(
     ids: string[],
+    now = new Date(),
   ): Promise<Map<string, TenderAnalysisSummaryDto>> {
     if (!ids.length) return new Map();
     const rows = await this.db.getRepository(TenderAnalysis).find({
@@ -266,9 +271,11 @@ export class TenderAnalysisService {
         specificationScore: true,
         unknownRequirementCount: true,
         analyzedAt: true,
+        eligibilityValidUntil: true,
+        analyzerVersion: true,
       },
     });
-    return new Map(rows.map((row) => [row.tenderId, this.summary(row)]));
+    return new Map(rows.map((row) => [row.tenderId, this.summary(row, now)]));
   }
 
   async resolveAdminId(username: string): Promise<number> {
@@ -296,12 +303,21 @@ export class TenderAnalysisService {
       const row = await manager
         .getRepository(TenderAnalysis)
         .findOne({ where: { tenderId }, lock: { mode: "pessimistic_write" } });
-      if (!row || !finalStatuses.includes(row.status))
+      if (
+        !row ||
+        !finalStatuses.includes(row.status) ||
+        this.analysisStale(row, new Date())
+      )
         throw new ConflictException("Analysis is not ready for review");
+      const currentFingerprint = analysisFingerprint(row);
+      if (dto.analysisFingerprint !== currentFingerprint)
+        throw new ConflictException(
+          "Analysis changed; refresh before reviewing",
+        );
       await manager.getRepository(TenderAnalysisReview).save({
         tenderId,
         analysisId: row.id,
-        analysisFingerprint: analysisFingerprint(row),
+        analysisFingerprint: currentFingerprint,
         completed: dto.completed,
         note: dto.note,
         reviewerAdminId: adminId,
@@ -311,10 +327,25 @@ export class TenderAnalysisService {
     return this.getAnalysis(tenderId);
   }
 
-  private summary(row: TenderAnalysis): TenderAnalysisSummaryDto {
+  private analysisStale(row: TenderAnalysis, now: Date): boolean {
+    return (
+      row.analyzerVersion !== TENDER_ANALYZER_VERSION ||
+      (row.eligibilityValidUntil != null &&
+        row.eligibilityValidUntil.getTime() <= now.getTime())
+    );
+  }
+
+  private summary(
+    row: TenderAnalysis,
+    now = new Date(),
+  ): TenderAnalysisSummaryDto {
+    const stale = this.analysisStale(row, now);
     return {
-      status: row.status,
-      suitability: row.suitability,
+      status:
+        stale && finalStatuses.includes(row.status)
+          ? TenderAnalysisStatus.PENDING
+          : row.status,
+      suitability: stale ? null : row.suitability,
       specificationScore:
         row.specificationScore === null ? null : Number(row.specificationScore),
       unknownCount: row.unknownRequirementCount,
@@ -474,7 +505,21 @@ export class TenderAnalysisService {
       );
       // An absent company profile is missing evidence, never a negative claim
       // about actual qualifications. Map affected evaluations to UNKNOWN.
-      const result = new TenderSuitabilityAnalyzer().analyze(
+      const productSnapshot = products.map((product) => ({
+        id: product.id,
+        dimensions: product.dimensions,
+        power: product.power.map(Number),
+        colorTemp: product.colorTemp.map(Number),
+        certifications: product.certifications,
+        ...(product.luminanceEfficiency != null
+          ? { luminanceEfficiency: Number(product.luminanceEfficiency) }
+          : {}),
+        ...(product.colorRendering
+          ? { colorRendering: product.colorRendering }
+          : {}),
+      }));
+      const analyzer = new TenderSuitabilityAnalyzer();
+      const result = analyzer.analyze(
         requirements,
         profile ?? {
           companyName: "",
@@ -489,19 +534,7 @@ export class TenderAnalysisService {
           performanceRecords: [],
           version: 0,
         },
-        products.map((product) => ({
-          id: product.id,
-          dimensions: product.dimensions,
-          power: product.power.map(Number),
-          colorTemp: product.colorTemp.map(Number),
-          certifications: product.certifications,
-          ...(product.luminanceEfficiency != null
-            ? { luminanceEfficiency: Number(product.luminanceEfficiency) }
-            : {}),
-          ...(product.colorRendering
-            ? { colorRendering: product.colorRendering }
-            : {}),
-        })),
+        productSnapshot,
         now,
       );
       if (!profile) {
@@ -526,9 +559,9 @@ export class TenderAnalysisService {
           (key) => key !== "evidenceIds",
         ) ||
         extracted.some((document) => document.blocks.length > 0);
-      // Current live adapters have no verified contract/currency/formula
-      // metadata. Future adapters can supply it explicitly at this normalized
-      // boundary; a source name or the presence of amounts proves none of it.
+      // Only verified adapter facts permit matching stored awards. The G2B
+      // adapter admits a narrow explicit total/KRW/standard declaration;
+      // absent or ambiguous metadata still cannot enable calculation.
       const context = enrichment.pricingContext;
       const history =
         context?.contractKind === "TOTAL" &&
@@ -565,6 +598,15 @@ export class TenderAnalysisService {
         history,
       );
       changes = {
+        eligibilityValidUntil: profile
+          ? analyzer.nextValidityBoundary(
+              requirements,
+              profile,
+              productSnapshot,
+              now,
+              result,
+            )
+          : null,
         status: failed
           ? useful
             ? TenderAnalysisStatus.PARTIAL
@@ -608,6 +650,7 @@ export class TenderAnalysisService {
     } catch {
       changes = {
         status: TenderAnalysisStatus.FAILED,
+        eligibilityValidUntil: null,
         errorCode: "ANALYSIS_FAILED",
       };
     }

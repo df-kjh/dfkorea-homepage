@@ -30,7 +30,9 @@ const stopPolling = () => {
   clearTimeout(timer)
   timer = undefined
 }
-const ready = computed(() => isAnalysisReady(analysis.value?.status))
+const ready = computed(
+  () => isAnalysisReady(analysis.value?.status) && !!analysis.value?.analysisFingerprint,
+)
 const safeSourceUrl = computed(() => {
   try {
     const url = new URL(props.tender?.sourceUrl ?? '')
@@ -65,11 +67,11 @@ const schedule = (request: number) => {
     void fetchAnalysis(request, false)
   }, 5000)
 }
-const fetchAnalysis = async (request = generation, initial = true) => {
+const fetchAnalysis = async (request = generation, initial = true, preserveError = false) => {
   const id = props.tender?.id
   if (!id || !props.modelValue) return
   if (initial) loading.value = true
-  error.value = ''
+  if (!preserveError) error.value = ''
   try {
     const { data } = await tendersAPI.getAnalysis(id)
     if (request !== generation) return
@@ -78,7 +80,7 @@ const fetchAnalysis = async (request = generation, initial = true) => {
     schedule(request)
   } catch {
     if (request === generation) {
-      error.value = '분석을 불러오지 못했습니다. 다시 시도해 주세요.'
+      error.value = `${preserveError ? error.value + ' ' : ''}분석을 불러오지 못했습니다. 다시 시도해 주세요.`
       stopPolling()
     }
   } finally {
@@ -98,16 +100,26 @@ const mutate = async (action: 'analyze' | 'review') => {
     const { data } =
       action === 'analyze'
         ? await tendersAPI.reanalyze(id)
-        : await tendersAPI.saveReview(id, { completed: true, note: note.value.trim() })
+        : await tendersAPI.saveReview(id, {
+            completed: true,
+            note: note.value.trim(),
+            analysisFingerprint: analysis.value!.analysisFingerprint!,
+          })
     if (request !== generation) return
     accept(data)
     schedule(request)
-  } catch {
-    if (request === generation)
-      error.value =
-        action === 'review'
+  } catch (failure) {
+    if (request === generation) {
+      const conflict =
+        action === 'review' &&
+        (failure as { response?: { status?: number } })?.response?.status === 409
+      error.value = conflict
+        ? '분석 결과가 변경되었습니다. 최신 결과를 확인한 뒤 다시 검토해 주세요. 입력한 메모는 유지됩니다.'
+        : action === 'review'
           ? '검토를 저장하지 못했습니다. 입력한 메모는 유지됩니다.'
           : '분석을 요청하지 못했습니다. 다시 시도해 주세요.'
+      if (conflict) await fetchAnalysis(request, false, true)
+    }
   } finally {
     if (request === generation) busy.value = false
   }

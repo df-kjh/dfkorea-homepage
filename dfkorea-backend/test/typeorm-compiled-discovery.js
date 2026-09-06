@@ -39,6 +39,7 @@ for (const relativePath of [
   "dist/migrations/1787819900000-RemoveInsecureDefaultAdmin.js",
   "dist/migrations/1787820000000-AddDailyDispatchLease.js",
   "dist/migrations/1787820200000-UseNaverWorksMailApi.js",
+  "dist/migrations/1788699300000-AddTenderEligibilityValidity.js",
   "dist/scripts/provision-admin.js",
 ]) {
   assert.ok(

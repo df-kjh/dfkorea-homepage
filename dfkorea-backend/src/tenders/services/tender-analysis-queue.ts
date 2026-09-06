@@ -6,7 +6,7 @@ import { TenderAnalysisStatus } from "../domain/tender-analysis.enums";
 import { TenderAnalysis } from "../entities/tender-analysis.entity";
 import { Tender } from "../entities/tender.entity";
 
-export const TENDER_ANALYZER_VERSION = "rules-2";
+export const TENDER_ANALYZER_VERSION = "rules-3";
 export const pendingAnalysis = {
   status: TenderAnalysisStatus.PENDING,
   processingToken: null,

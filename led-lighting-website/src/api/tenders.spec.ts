@@ -35,12 +35,20 @@ describe('tendersAPI', () => {
     }
     tendersAPI.getAnalysis('one')
     tendersAPI.reanalyze('one')
-    tendersAPI.saveReview('one', { completed: true, note: '확인' })
+    tendersAPI.saveReview('one', {
+      completed: true,
+      note: '확인',
+      analysisFingerprint: 'a'.repeat(64),
+    })
     tendersAPI.getCompanyProfile()
     tendersAPI.replaceCompanyProfile(profile)
     expect(get).toHaveBeenCalledWith('/tenders/one/analysis')
     expect(post).toHaveBeenCalledWith('/tenders/one/analysis')
-    expect(post).toHaveBeenCalledWith('/tenders/one/review', { completed: true, note: '확인' })
+    expect(post).toHaveBeenCalledWith('/tenders/one/review', {
+      completed: true,
+      note: '확인',
+      analysisFingerprint: 'a'.repeat(64),
+    })
     expect(get).toHaveBeenCalledWith('/tenders/company-profile')
     expect(put).toHaveBeenCalledWith('/tenders/company-profile', profile)
   })

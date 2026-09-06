@@ -7,6 +7,7 @@ describe("analysis review DTO", () => {
     for (const note of ["", "   ", "  checked  ", `  ${"a".repeat(2000)}  `]) {
       const dto = plainToInstance(SaveTenderAnalysisReviewDto, {
         completed: true,
+        analysisFingerprint: "a".repeat(64),
         note,
       });
       expect(await validate(dto)).toHaveLength(0);
@@ -20,9 +21,37 @@ describe("analysis review DTO", () => {
       { completed: true, note: null },
     ]) {
       expect(
-        (await validate(plainToInstance(SaveTenderAnalysisReviewDto, value)))
-          .length,
+        (
+          await validate(
+            plainToInstance(SaveTenderAnalysisReviewDto, {
+              analysisFingerprint: "a".repeat(64),
+              ...value,
+            }),
+          )
+        ).length,
       ).toBeGreaterThan(0);
     }
   });
+});
+
+it("requires the displayed analysis fingerprint", async () => {
+  for (const analysisFingerprint of [
+    undefined,
+    null,
+    "",
+    "old",
+    "a".repeat(65),
+  ]) {
+    expect(
+      (
+        await validate(
+          plainToInstance(SaveTenderAnalysisReviewDto, {
+            completed: true,
+            note: "checked",
+            analysisFingerprint,
+          }),
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+  }
 });

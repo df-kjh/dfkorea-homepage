@@ -191,9 +191,9 @@ describe("TenderSuitabilityAnalyzer specification scoring", () => {
       now,
     );
 
-    expect(result.satisfiedCount).toBe(1);
+    expect(result.satisfiedCount).toBe(0);
     expect(result.certifications).toEqual([
-      expect.objectContaining({ state: TenderRequirementState.UNSATISFIED }),
+      expect.objectContaining({ state: TenderRequirementState.SATISFIED }),
     ]);
     expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
     expect(JSON.stringify(result)).not.toMatch(/product-a|product-b/i);
@@ -1704,4 +1704,167 @@ describe("participation semantic range residuals", () => {
       expect(result.suitability).toBe(TenderSuitability.RECOMMENDED);
     },
   );
+});
+
+describe("certification-aware coherent candidate selection", () => {
+  const input = () =>
+    requirements({
+      items: [
+        {
+          key: "item:1",
+          classificationCode: "39112102",
+          specifications: [10, 20, 30, 40, 50].map((value, index) =>
+            spec(`spec-${index}`, true, String(value)),
+          ),
+          evidenceIds: [],
+        },
+      ],
+      certifications: [
+        {
+          id: "ks",
+          code: "KS",
+          name: "KS",
+          required: true,
+          itemKeys: ["item:1"],
+          evidenceIds: [],
+        },
+      ],
+    });
+  it("adding an uncertified 100% product cannot displace a certified 80% eligible product", () => {
+    const certified = product("private-certified", {
+      power: [40],
+      certifications: ["KS"],
+    });
+    const uncertified = product("private-uncertified", {
+      power: [50],
+      certifications: [],
+    });
+    for (const catalog of [
+      [certified],
+      [certified, uncertified],
+      [uncertified, certified],
+    ]) {
+      const result = new TenderSuitabilityAnalyzer().analyze(
+        input(),
+        profile(),
+        catalog,
+        now,
+      );
+      expect(result).toMatchObject({
+        suitability: "RECOMMENDED",
+        specificationScore: 80,
+        satisfiedCount: 4,
+        unsatisfiedCount: 1,
+        certifications: [{ state: "SATISFIED" }],
+      });
+      expect(JSON.stringify(result)).not.toContain("private-");
+    }
+  });
+  it("selects certified ties deterministically and keeps a hard failure when every candidate is explicitly uncertified", () => {
+    const certified = product("z", { power: [40], certifications: ["KS"] });
+    const uncertified = product("a", { power: [40], certifications: [] });
+    const run = (catalog: TenderProductSnapshot[]) =>
+      new TenderSuitabilityAnalyzer().analyze(input(), profile(), catalog, now);
+    expect(run([certified, uncertified])).toEqual(
+      run([uncertified, certified]),
+    );
+    expect(run([certified, uncertified]).suitability).toBe("RECOMMENDED");
+    expect(run([uncertified]).suitability).toBe("DIFFICULT");
+  });
+  it("distinguishes unknown certification evidence from an explicit empty list", () => {
+    const unknown = product("unknown", {
+      power: [50],
+      certifications: undefined,
+    });
+    const absent = product("absent", { power: [50], certifications: [] });
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      input(),
+      profile(),
+      [absent, unknown],
+      now,
+    );
+    expect(result.suitability).toBe("REVIEW");
+    expect(result.certifications[0].state).toBe("UNKNOWN");
+  });
+});
+
+describe("Korean calendar qualification expiry", () => {
+  it.each(["LICENSE", "COMPANY_TYPE", "DIRECT_PRODUCTION"] as const)(
+    "expires %s at midnight KST",
+    (kind) => {
+      const field =
+        kind === "LICENSE"
+          ? "licenses"
+          : kind === "COMPANY_TYPE"
+            ? "companyTypes"
+            : "directProduction";
+      const input = requirements({
+        participationConditions: [
+          {
+            id: "q",
+            kind,
+            sourcePriority: "STRUCTURED",
+            label: "qualification",
+            codes: ["1468"],
+            values: [],
+            required: true,
+            evidenceIds: [],
+          },
+        ],
+      });
+      const company = profile({
+        [field]: [
+          { code: "1468", name: "qualification", expiresAt: "2026-09-07" },
+        ],
+      });
+      const analyzer = new TenderSuitabilityAnalyzer();
+      expect(
+        analyzer.analyze(
+          input,
+          company,
+          [],
+          new Date("2026-09-07T14:59:59.999Z"),
+        ).participationConditions[0].state,
+      ).toBe("SATISFIED");
+      expect(
+        analyzer.analyze(input, company, [], new Date("2026-09-07T15:00:00Z"))
+          .participationConditions[0].state,
+      ).toBe("UNSATISFIED");
+    },
+  );
+});
+
+it("uses the last valid OR qualification boundary and ignores unrelated expiries", () => {
+  const input = requirements({
+    participationConditions: [
+      {
+        id: "license",
+        kind: "LICENSE",
+        label: "OR",
+        codes: ["1468", "0037"],
+        values: [],
+        required: true,
+        sourcePriority: "STRUCTURED",
+        evidenceIds: [],
+      },
+    ],
+  });
+  const company = profile({
+    licenses: [
+      { code: "1468", name: "first", expiresAt: "2026-09-07" },
+      { code: "0037", name: "last", expiresAt: "2026-09-09" },
+      { code: "0000", name: "unrelated", expiresAt: "2026-09-08" },
+    ],
+  });
+  const analyzer = new TenderSuitabilityAnalyzer();
+  const before = new Date("2026-09-07T14:59:59.999Z");
+  expect(
+    analyzer.nextValidityBoundary(
+      input,
+      company,
+      [],
+      before,
+      analyzer.analyze(input, company, [], before),
+    ),
+  ).toEqual(new Date("2026-09-09T15:00:00Z"));
 });

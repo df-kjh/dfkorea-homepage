@@ -1,3 +1,4 @@
+import { koreanCalendarDate } from "../domain/tender-calendar-date";
 import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
@@ -29,7 +30,8 @@ const normalizeCode = ({ value }: { value: unknown }) =>
 // ArrayUnique runs before nested constraints finish. Malformed collection
 // entries must therefore receive a unique inert identifier here, allowing
 // ValidateNested to return a normal 400 validation error instead of throwing.
-const qualificationIdentifier = (field: "code" | "name") =>
+const qualificationIdentifier =
+  (field: "code" | "name") =>
   (qualification: unknown): string | Record<never, never> => {
     if (typeof qualification !== "object" || qualification === null) {
       return {};
@@ -44,18 +46,14 @@ const qualificationCodeIdentifier = qualificationIdentifier("code");
 const qualificationNameIdentifier = qualificationIdentifier("name");
 
 @ValidatorConstraint({ name: "notExpiredTenderQualification", async: false })
-class NotExpiredTenderQualificationConstraint
-  implements ValidatorConstraintInterface
-{
+class NotExpiredTenderQualificationConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
     if (value === null || value === undefined) return true;
     if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
       return false;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(value).getTime() >= today.getTime();
+    return value.slice(0, 10) >= koreanCalendarDate(new Date());
   }
 
   defaultMessage(): string {
@@ -196,7 +194,6 @@ export class ReplaceTenderCompanyProfileDto {
   performanceRecords: TenderCompanyPerformanceRecordDto[];
 }
 
-export interface TenderCompanyProfileDto
-  extends ReplaceTenderCompanyProfileDto {
+export interface TenderCompanyProfileDto extends ReplaceTenderCompanyProfileDto {
   version: number;
 }

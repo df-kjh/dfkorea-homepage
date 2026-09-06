@@ -73,18 +73,21 @@ describe("ReplaceTenderCompanyProfileDto", () => {
     "qualification",
     { code: null, name: "KS 인증", expiresAt: null },
     { code: "KS", name: null, expiresAt: null },
-  ])("reports malformed nested qualifications without throwing: %p", async (entry) => {
-    const dto = plainToInstance(
-      ReplaceTenderCompanyProfileDto,
-      profile({ certifications: [entry] }),
-    );
+  ])(
+    "reports malformed nested qualifications without throwing: %p",
+    async (entry) => {
+      const dto = plainToInstance(
+        ReplaceTenderCompanyProfileDto,
+        profile({ certifications: [entry] }),
+      );
 
-    await expect(validate(dto)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ property: "certifications" }),
-      ]),
-    );
-  });
+      await expect(validate(dto)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ property: "certifications" }),
+        ]),
+      );
+    },
+  );
 
   it("requires every qualification to explicitly declare its expiry state", async () => {
     const dto = plainToInstance(
@@ -130,4 +133,26 @@ describe("ReplaceTenderCompanyProfileDto", () => {
       ]),
     );
   });
+});
+
+it("rejects yesterday's qualification at midnight KST independently of server timezone", async () => {
+  jest.useFakeTimers().setSystemTime(new Date("2026-09-07T15:00:00Z"));
+  try {
+    const expired = plainToInstance(
+      ReplaceTenderCompanyProfileDto,
+      profile({
+        licenses: [{ code: "1468", name: "license", expiresAt: "2026-09-07" }],
+      }),
+    );
+    const today = plainToInstance(
+      ReplaceTenderCompanyProfileDto,
+      profile({
+        licenses: [{ code: "1468", name: "license", expiresAt: "2026-09-08" }],
+      }),
+    );
+    expect((await validate(expired)).length).toBeGreaterThan(0);
+    expect(await validate(today)).toHaveLength(0);
+  } finally {
+    jest.useRealTimers();
+  }
 });

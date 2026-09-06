@@ -84,6 +84,8 @@ export const isIssuedTenderDocumentReference = (
 ): boolean => issuedTenderDocumentReferences.has(reference);
 
 export interface TenderEnrichmentOperationFailure {
+  /** Bounded aggregate count, never rejected provider values. */
+  rejectedCount?: number;
   operation: string;
   errorCode: string;
   pageNo: number | null;
@@ -95,6 +97,7 @@ export interface TenderEnrichmentOperationFailure {
 export interface TenderEnrichment {
   /** Verified adapter metadata only; never inferred from source or amount presence. */
   pricingContext?: Omit<TenderPricingContext, "source" | "now">;
+  pricingEvidence?: TenderEvidenceValue<string>[];
   basisAmount: TenderEvidenceValue<string> | null;
   lowerLimitRate: TenderEvidenceValue<string> | null;
   lawKind: TenderEvidenceValue<TenderLawKind> | null;

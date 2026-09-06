@@ -247,7 +247,11 @@ describe("Tender AppModule PostgreSQL integration", () => {
     await request(app.getHttpServer())
       .post(`/tenders/${tender.id}/review`)
       .set(auth)
-      .send({ completed: true, note: "  checked  " })
+      .send({
+        completed: true,
+        note: "  checked  ",
+        analysisFingerprint: analysis.body.analysisFingerprint,
+      })
       .expect(201)
       .expect(({ body }) => expect(body.reviewed).toBe(true));
     await app.get(TenderIngestionService).collectAll(new Date());
@@ -346,7 +350,13 @@ describe("Tender AppModule PostgreSQL integration", () => {
     await request(app.getHttpServer())
       .post(`/tenders/${tender.id}/review`)
       .set(auth)
-      .send({ completed: true, note: "checked" })
+      .send({
+        completed: true,
+        note: "checked",
+        analysisFingerprint: (
+          await app.get(TenderAnalysisService).getAnalysis(tender.id)
+        ).analysisFingerprint,
+      })
       .expect(201)
       .expect(({ body }) => expect(body.reviewed).toBe(true));
     enrichment.formulaVariables[0].value = `${bulk}B`;
@@ -360,6 +370,29 @@ describe("Tender AppModule PostgreSQL integration", () => {
       .set(auth)
       .expect(200);
     expect(after.body.reviewed).toBe(false);
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/review`)
+      .set(auth)
+      .send({
+        completed: true,
+        note: "old browser snapshot",
+        analysisFingerprint: before.body.analysisFingerprint,
+      })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/review`)
+      .set(auth)
+      .send({ completed: true, note: "missing fingerprint" })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(`/tenders/${tender.id}/review`)
+      .set(auth)
+      .send({
+        completed: true,
+        analysisFingerprint: after.body.analysisFingerprint,
+        reviewerAdminId: 999,
+      })
+      .expect(400);
     expect(after.body.analysisFingerprint).not.toBe(
       before.body.analysisFingerprint,
     );

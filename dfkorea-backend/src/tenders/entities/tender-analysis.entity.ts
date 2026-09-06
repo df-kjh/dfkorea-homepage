@@ -88,6 +88,10 @@ export class TenderAnalysis {
   @Column({ type: "varchar", nullable: true })
   errorCode: string | null;
 
+  /** First KST expiry boundary that changes the evaluated qualification snapshot. */
+  @Column({ type: "timestamptz", nullable: true })
+  eligibilityValidUntil: Date | null;
+
   @Column({ type: "timestamptz", nullable: true })
   analyzedAt: Date | null;
 

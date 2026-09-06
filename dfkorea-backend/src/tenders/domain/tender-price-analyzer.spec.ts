@@ -1,3 +1,4 @@
+import { parseBidFormulaText } from "./tender-requirement-parser";
 import {
   TenderPriceAnalyzer,
   TenderPriceRequirements,
@@ -213,5 +214,40 @@ it("rejects a differing evaluation basis and invalid historical dates", () => {
   rows[0].openedAt = new Date("invalid");
   expect(analyzer.analyze(requirements(), rows).statistics.sampleCount).toBe(
     14,
+  );
+});
+
+describe("document reserve percentages", () => {
+  it.each(["98% 이상 102% 이하", "-2% 이상 +2% 이하"])(
+    "uses exact absolute prices for %s",
+    (range) => {
+      const input = requirements();
+      input.bidFormula = {
+        ...input.bidFormula,
+        ...parseBidFormulaText(`기초금액의 ${range}`, "doc"),
+      };
+      expect(input.bidFormula).toMatchObject({
+        reservePriceMinimumRate: "98",
+        reservePriceMaximumRate: "102",
+      });
+      expect(analyzer.analyze(input, []).official).toMatchObject({
+        status: "AVAILABLE",
+        minimum: "86240000",
+        maximum: "89760000",
+      });
+    },
+  );
+  it.each(["-2% 이상 102% 이하", "98% 이상 +2% 이하", "-2% 이상 2% 이하"])(
+    "rejects mixed representation %s",
+    (range) => {
+      const input = requirements();
+      input.bidFormula = {
+        ...input.bidFormula,
+        ...parseBidFormulaText(`기초금액의 ${range}`, "doc"),
+      };
+      expect(analyzer.analyze(input, []).official.status).toBe(
+        "FORMULA_REVIEW_REQUIRED",
+      );
+    },
   );
 });

@@ -1,3 +1,6 @@
+import { TenderPriceAnalyzer } from "../domain/tender-price-analyzer";
+import { TenderRequirementParser } from "../domain/tender-requirement-parser";
+import { TenderSuitabilityAnalyzer } from "../domain/tender-suitability-analyzer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { G2bEnrichmentAdapter } from "./g2b-enrichment.adapter";
@@ -375,4 +378,238 @@ describe("G2bEnrichmentAdapter", () => {
     ).rejects.toMatchObject({ code: "ENRICHMENT_UNSUPPORTED_TYPE" });
     expect(getAllPages).not.toHaveBeenCalled();
   });
+});
+
+describe("incomplete G2B data through parser and analyzer", () => {
+  const identity = {
+    bidNtceNo: tender.sourceNoticeId,
+    bidNtceOrd: tender.revision,
+  };
+  const invalidCases: Array<[string, string, Record<string, unknown>]> = [
+    [
+      "rejected attachment",
+      "getBidPblancListInfoThng",
+      {
+        ntceSpecDocUrl1: "https://invalid.example/file?serviceKey=never-expose",
+        ntceSpecFileNm1: "required.pdf",
+      },
+    ],
+    [
+      "advertised missing URL",
+      "getBidPblancListInfoThng",
+      { ntceSpecFileNm1: "required.pdf" },
+    ],
+    [
+      "malformed URL",
+      "getBidPblancListInfoThng",
+      { ntceSpecDocUrl1: { private: "never-expose" } },
+    ],
+    [
+      "malformed basis amount",
+      "getBidPblancListInfoThngBsisAmount",
+      { bssamt: { private: "never-expose" } },
+    ],
+    [
+      "invalid lower rate",
+      "getBidPblancListInfoThng",
+      { sucsfbidLwltRate: "never-expose" },
+    ],
+    [
+      "license name only",
+      "getBidPblancListInfoLicenseLimit",
+      { lcnsLmtNm: "전기공사업" },
+    ],
+    [
+      "license code only",
+      "getBidPblancListInfoLicenseLimit",
+      { permsnIndstrytyList: "1468" },
+    ],
+    [
+      "unnormalizable region name",
+      "getBidPblancListInfoPrtcptPsblRgn",
+      { prtcptPsblRgnNm: "알 수 없는 지역" },
+    ],
+    [
+      "region code only",
+      "getBidPblancListInfoPrtcptPsblRgn",
+      { prtcptPsblRgnCd: "41" },
+    ],
+    [
+      "purchase code only",
+      "getBidPblancListInfoThngPurchsObjPrdct",
+      { prdctClsfcNo: "39111515" },
+    ],
+  ];
+  const run = async (operation: string, row: Record<string, unknown>) => {
+    const { client } = createClient(async (request) => [
+      ...(request.operation === operation ? [{ ...identity, ...row }] : []),
+      ...(request.operation === "getBidPblancListInfoThngPurchsObjPrdct"
+        ? [
+            {
+              ...identity,
+              prdctClsfcNo: "39111515",
+              prdctClsfcNoNm: "LED",
+              prdctSpecNm: "소비전력 40W 이하",
+            },
+          ]
+        : []),
+    ]);
+    const enriched = await new G2bEnrichmentAdapter(client, {
+      baseUrl: "fixture",
+      serviceKey: "fixture",
+    }).enrich(tender, new AbortController().signal);
+    const parsed = new TenderRequirementParser().parse(enriched, []);
+    const result = new TenderSuitabilityAnalyzer().analyze(
+      parsed,
+      {
+        companyName: "test",
+        businessNumber: "1234567890",
+        headquarters: { sido: "경기도", sigungu: "화성시" },
+        g2bRegistered: true,
+        supplyProducts: [],
+        licenses: [],
+        companyTypes: [],
+        directProduction: [],
+        certifications: [],
+        performanceRecords: [],
+        version: 1,
+      },
+      [
+        {
+          id: "hidden",
+          power: [40],
+          colorTemp: [],
+          dimensions: "",
+          certifications: [],
+        },
+      ],
+      new Date(),
+    );
+    return { enriched, result };
+  };
+  it.each(invalidCases)(
+    "keeps %s UNKNOWN and prevents a false recommendation",
+    async (_label, operation, row) => {
+      const { enriched, result } = await run(operation, row);
+      expect(enriched.failures).toHaveLength(1);
+      expect(result).toMatchObject({
+        specificationScore: 100,
+        suitability: "REVIEW",
+      });
+      expect(result.evidence).toEqual(
+        expect.arrayContaining([expect.objectContaining({ state: "UNKNOWN" })]),
+      );
+      expect(
+        JSON.stringify({ failures: enriched.failures, result }),
+      ).not.toMatch(/never-expose|invalid.example|required.pdf/);
+    },
+  );
+  it("also treats a discovered but unreadable attachment as UNKNOWN", async () => {
+    const { enriched, result } = await run("getBidPblancListInfoThng", {
+      ntceSpecDocUrl1: rowsFor("getBidPblancListInfoThng")[1].ntceSpecDocUrl1,
+      ntceSpecFileNm1: "required.pdf",
+    });
+    expect(enriched.documents).toHaveLength(1);
+    expect(result.suitability).toBe("REVIEW");
+  });
+  it("leaves truly absent optional document slots complete", async () => {
+    const { enriched, result } = await run("getBidPblancListInfoThng", {
+      ntceSpecDocUrl1: "",
+      ntceSpecFileNm1: "",
+    });
+    expect(enriched.failures).toEqual([]);
+    expect(result.suitability).toBe("RECOMMENDED");
+  });
+});
+
+describe("verified G2B production pricing context", () => {
+  const enriched = async (detailChanges: Record<string, unknown> = {}) => {
+    const fixture = JSON.parse(
+      readFileSync(
+        join(__dirname, "fixtures/g2b-enrichment-pricing.json"),
+        "utf8",
+      ),
+    );
+    Object.assign(
+      fixture.getBidPblancListInfoThng.response.body.items[0],
+      detailChanges,
+    );
+    const client = new PublicApiClient(
+      async (url) =>
+        new Response(
+          JSON.stringify(fixture[new URL(url).pathname.split("/").at(-1)!]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    return new G2bEnrichmentAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "fixture",
+    }).enrich(tender, new AbortController().signal);
+  };
+  it("emits supported total KRW context only with explicit official facts", async () => {
+    expect((await enriched()).pricingContext).toMatchObject({
+      contractKind: "TOTAL",
+      currency: "KRW",
+      formulaKind: "STANDARD",
+      awardMethod: "적격심사",
+      region: "41",
+      productGroup: "LED",
+    });
+  });
+  it.each([
+    { bidNtceNm: "LED 구매" },
+    { bidNtceNm: "LED 구매 (단가, 총액, 원화 KRW, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액, USD, A값 미적용)" },
+    { bidNtceNm: "LED 구매 (총액, 원화)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 적용)" },
+    { bidNtceNm: "LED 구매 (총액, 원화, A값 미적용, 특수산식)" },
+    { intrbidYn: "Y" },
+    { sucsfbidMthdNm: "협상에 의한 계약" },
+    { prearngPrceDcsnMthdNm: "단일예가" },
+  ])(
+    "leaves ambiguous/unit/foreign/special or unknown A-value facts unpriced: %j",
+    async (change) => {
+      const result = await enriched(change);
+      const parsed = new TenderRequirementParser().parse(result, []);
+      const price = new TenderPriceAnalyzer().analyze(
+        {
+          ...parsed,
+          pricingContext: {
+            contractKind: "UNKNOWN",
+            currency: "UNKNOWN",
+            formulaKind: "UNKNOWN",
+            ...result.pricingContext,
+            source: "G2B",
+            now: new Date(),
+          },
+        },
+        [],
+      );
+      expect(price.official.status).toBe("FORMULA_REVIEW_REQUIRED");
+    },
+  );
+});
+
+it("aggregates every rejected row into bounded stable value-free failure buckets", async () => {
+  const { client } = createClient(async (request) =>
+    request.operation === "getBidPblancListInfoLicenseLimit"
+      ? Array.from({ length: 1000 }, () => ({
+          bidNtceNo: tender.sourceNoticeId,
+          bidNtceOrd: tender.revision,
+          lcnsLmtNm: "private-provider-condition",
+        }))
+      : [],
+  );
+  const result = await new G2bEnrichmentAdapter(client, {
+    baseUrl: "fixture",
+    serviceKey: "fixture",
+  }).enrich(tender, new AbortController().signal);
+  expect(result.failures).toEqual([
+    expect.objectContaining({
+      errorCode: "SOURCE_RESTRICTION_INCOMPLETE",
+      rejectedCount: 1000,
+    }),
+  ]);
+  expect(JSON.stringify(result.failures).length).toBeLessThan(300);
+  expect(JSON.stringify(result)).not.toContain("private-provider-condition");
 });
