@@ -1,3 +1,5 @@
+import { analysisFingerprint } from "./tender-analysis-queue";
+import { TenderRequirementParser } from "../domain/tender-requirement-parser";
 import { FixTenderReviewAdminIdentity1788699100000 } from "../../migrations/1788699100000-FixTenderReviewAdminIdentity";
 import { randomUUID } from "crypto";
 import { DataSource } from "typeorm";
@@ -31,6 +33,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
   let enrichment: TenderEnrichment;
   let enrich: jest.Mock;
   let fetch: jest.Mock;
+  let extract: jest.Mock;
   let profile: TenderCompanyProfileService;
   const now = new Date();
   const schema = `analysis_test_${randomUUID().replace(/-/g, "")}`;
@@ -137,29 +140,338 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       sha256: "a".repeat(64),
     }));
     profile = new TenderCompanyProfileService(db);
+    extract = jest.fn(async () => ({
+      status: "EXTRACTED",
+      blocks: [
+        { kind: "text", ordinal: 0, location: "p1", text: "소비전력 30W 이하" },
+      ],
+      metadata: {},
+    }));
     service = new TenderAnalysisService(
       db,
       { enrich } as never,
       { enrich } as never,
       { fetch },
-      {
-        extract: async () => ({
-          status: "EXTRACTED",
-          blocks: [
-            {
-              kind: "text",
-              ordinal: 0,
-              location: "p1",
-              text: "소비전력 30W 이하",
-            },
-          ],
-          metadata: {},
-        }),
-      } as never,
+      { extract } as never,
       profile,
       new TenderPriceAnalyzer(),
     );
   });
+  const documentReference = () => ({
+    identity: "large-document",
+    displayName: "fixture",
+    url: "https://www.g2b.go.kr/doc",
+    formatHint: "DOCX" as const,
+    source: "G2B_API" as const,
+    sourceNoticeId: "fixture",
+    revision: "000",
+    evidence: {
+      source: "G2B_API" as const,
+      operation: "fixture",
+      field: "doc",
+    },
+  });
+
+  it("persists and projects only bounded linked evidence from 140k unrelated text and tables, including legacy rows", async () => {
+    const unrelated = "UNRELATED_TEXT ".repeat(10000);
+    const tableUnrelated = "UNRELATED_TABLE ".repeat(10000);
+    const blocks = [
+      {
+        kind: "text" as const,
+        ordinal: 0,
+        location: "unrelated-page",
+        text: unrelated,
+      },
+      {
+        kind: "table" as const,
+        ordinal: 1,
+        location: "unrelated-table",
+        rows: [[tableUnrelated]],
+      },
+      {
+        kind: "text" as const,
+        ordinal: 2,
+        location: "page:3",
+        text: `${unrelated}
+소비전력 30W 이하`,
+      },
+      {
+        kind: "table" as const,
+        ordinal: 3,
+        location: "table:4",
+        rows: [[tableUnrelated], ["색온도 6500K 이하"]],
+      },
+    ];
+    enrichment.purchaseItems = [];
+    enrichment.documents = [documentReference()];
+    extract.mockResolvedValue({ status: "EXTRACTED", blocks, metadata: {} });
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const row = await db
+      .getRepository(TenderAnalysis)
+      .findOneByOrFail({ tenderId: tender.id });
+    const assertCompact = (evidence: Record<string, unknown>[]) => {
+      expect(Buffer.byteLength(JSON.stringify(evidence))).toBeLessThanOrEqual(
+        48 * 1024,
+      );
+      expect(evidence.length).toBeLessThanOrEqual(80);
+      expect(
+        evidence.some(
+          (value) =>
+            value.location === "unrelated-page" ||
+            value.location === "unrelated-table",
+        ),
+      ).toBe(false);
+      expect(evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            documentIdentity: "large-document",
+            location: "page:3",
+            snippet: expect.stringContaining("소비전력 30W"),
+          }),
+        ]),
+      );
+      for (const value of evidence) {
+        expect(Array.from(String(value.snippet)).length).toBeLessThanOrEqual(
+          320,
+        );
+        expect(String(value.snippet)).not.toMatch(/[\u0000-\u0008]/);
+      }
+      expect(JSON.stringify(evidence)).not.toContain(unrelated);
+      expect(JSON.stringify(evidence)).not.toContain(tableUnrelated);
+    };
+    assertCompact(row.evidence);
+    const legacy = new TenderRequirementParser().parse(enrichment, [
+      {
+        identity: "large-document",
+        revision: "000",
+        status: "EXTRACTED",
+        blocks,
+        metadata: {},
+      },
+    ]);
+    await db.getRepository(TenderAnalysis).update(row.id, {
+      evidence: legacy.evidence.map((value) => ({ ...value })),
+    });
+    const response = await service.getAnalysis(tender.id);
+    if (!("evidence" in response)) throw new Error("Expected analysis");
+    assertCompact(response.evidence);
+    expect(Buffer.byteLength(JSON.stringify(response))).toBeLessThan(60 * 1024);
+  });
+
+  it("enforces evidence byte, global, item and requirement citation limits for existing rows", async () => {
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const evidence: Record<string, unknown>[] = [];
+    const requirements = Array.from({ length: 10 }, (_, itemIndex) => ({
+      key: `item-${itemIndex}`,
+      classificationCode: `code-${itemIndex}`,
+      specifications: Array.from({ length: 5 }, (_, specIndex) => ({
+        id: `spec-${itemIndex}-${specIndex}`,
+        itemKey: `item-${itemIndex}`,
+        kind: "POWER",
+        comparator: "LTE",
+        value: "30",
+        unit: "W",
+        required: true,
+        evidenceIds: Array.from({ length: 8 }, (_, index) => {
+          const id = `${itemIndex}-${specIndex}-${index}`;
+          evidence.push({
+            id,
+            kind: "SOURCE",
+            source: "DOCUMENT",
+            documentIdentity: `item-${itemIndex}`,
+            location: `paragraph-${specIndex}`,
+            snippet: `소비전력 30W 이하 ${"긴설명".repeat(150)}`,
+            state: null,
+          });
+          return id;
+        }),
+      })),
+    }));
+    await db
+      .getRepository(TenderAnalysis)
+      .update({ tenderId: tender.id }, { requirements, evidence });
+    const response = await service.getAnalysis(tender.id);
+    if (!("evidence" in response)) throw new Error("Expected analysis");
+    expect(response.evidence.length).toBeLessThanOrEqual(80);
+    expect(
+      Buffer.byteLength(JSON.stringify(response.evidence)),
+    ).toBeLessThanOrEqual(48 * 1024);
+    for (const item of requirements) {
+      expect(
+        response.evidence.filter((value) => value.documentIdentity === item.key)
+          .length,
+      ).toBeLessThanOrEqual(12);
+      for (const spec of item.specifications)
+        expect(
+          response.evidence.filter((value) =>
+            spec.evidenceIds.includes(String(value.id)),
+          ).length,
+        ).toBeLessThanOrEqual(4);
+    }
+    expect(response.evidence.length).toBeGreaterThan(0);
+  });
+
+  it("invalidates review when structured specification changes 30W to 40W with the same score and inputs", async () => {
+    await profile.replace(profileInput);
+    await db.getRepository(Product).save({
+      name: "hidden",
+      modelName: "hidden",
+      category: "LED",
+      dimensions: "10x20x30",
+      power: [20],
+      lifespan: 10000,
+      colorTemp: [6500],
+      ledChipManufacturer: "private",
+      description: "private",
+    });
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const reviewer = await db
+      .getRepository(Admin)
+      .save({ username: "spec-reviewer", password: "unused" });
+    await service.saveReview(
+      tender.id,
+      { completed: true, note: "30W checked" },
+      reviewer.id,
+    );
+    const before = await service.getAnalysis(tender.id);
+    expect(before).toMatchObject({ reviewed: true, specificationScore: 100 });
+    enrichment.purchaseItems[0].specification = "소비전력 40W 이하";
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+    const after = await service.getAnalysis(tender.id);
+    expect(after).toMatchObject({ reviewed: false, specificationScore: 100 });
+    expect(after.analysisFingerprint).not.toBe(before.analysisFingerprint);
+    expect(await db.getRepository(TenderAnalysisReview).count()).toBe(1);
+  });
+
+  it("cannot commit after a catalog lock wait outlasts its lease; a fresh worker can recover", async () => {
+    enrichment.documents = [documentReference()];
+    const blocker = db.createQueryRunner();
+    await blocker.connect();
+    await blocker.startTransaction();
+    const [{ pid }] = await blocker.query("SELECT pg_backend_pid() AS pid");
+    await blocker.query(
+      `LOCK TABLE "${schema}".products IN ROW EXCLUSIVE MODE`,
+    );
+    let entered!: () => void;
+    const extractionFinished = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    extract.mockImplementationOnce(async () => {
+      await db
+        .getRepository(TenderAnalysis)
+        .update(
+          { tenderId: tender.id },
+          { leaseExpiresAt: new Date(Date.now() + 400) },
+        );
+      entered();
+      return {
+        status: "EXTRACTED",
+        blocks: [
+          {
+            kind: "text",
+            ordinal: 0,
+            location: "p1",
+            text: "소비전력 30W 이하",
+          },
+        ],
+        metadata: {},
+      };
+    });
+    await service.reanalyze(tender.id, now);
+    const work = service.processDue(now, 1);
+    try {
+      await extractionFinished;
+      let blocked = false;
+      for (let i = 0; i < 30 && !blocked; i++) {
+        const [result] = await db.query(
+          "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+          [pid],
+        );
+        blocked = result.blocked;
+        if (!blocked) await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(blocked).toBe(true);
+      await db.query("SELECT pg_sleep(0.65)");
+    } finally {
+      await blocker.rollbackTransaction();
+      await blocker.release();
+      await work;
+    }
+    expect(
+      await db
+        .getRepository(TenderAnalysis)
+        .findOneByOrFail({ tenderId: tender.id }),
+    ).toMatchObject({
+      status: "PROCESSING",
+      analyzedAt: null,
+      requirements: null,
+      evidence: null,
+      unknownRequirementCount: 0,
+    });
+    expect(await db.getRepository(TenderDocument).count()).toBe(0);
+    await service.processDue(now, 1);
+    expect(await service.getAnalysis(tender.id)).toMatchObject({
+      status: "COMPLETED",
+    });
+  });
+
+  it("rolls back document writes if the lease expires after the initial fenced read", async () => {
+    enrichment.documents = [documentReference()];
+    const runner = db.createQueryRunner();
+    await runner.connect();
+    await runner.query(
+      `CREATE FUNCTION "${schema}".slow_document_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.6); RETURN NEW; END $$`,
+    );
+    await runner.query(
+      `CREATE TRIGGER slow_insert BEFORE INSERT ON "${schema}".tender_documents FOR EACH ROW EXECUTE FUNCTION "${schema}".slow_document_insert()`,
+    );
+    extract.mockImplementationOnce(async () => {
+      await db
+        .getRepository(TenderAnalysis)
+        .update(
+          { tenderId: tender.id },
+          { leaseExpiresAt: new Date(Date.now() + 350) },
+        );
+      return {
+        status: "EXTRACTED",
+        blocks: [
+          {
+            kind: "text",
+            ordinal: 0,
+            location: "p1",
+            text: "소비전력 30W 이하",
+          },
+        ],
+        metadata: {},
+      };
+    });
+    try {
+      await service.reanalyze(tender.id, now);
+      await service.processDue(now, 1);
+      expect(
+        await db
+          .getRepository(TenderAnalysis)
+          .findOneByOrFail({ tenderId: tender.id }),
+      ).toMatchObject({
+        status: "PROCESSING",
+        analyzedAt: null,
+        evidence: null,
+        unknownRequirementCount: 0,
+      });
+      expect(await db.getRepository(TenderDocument).count()).toBe(0);
+    } finally {
+      await runner.query(
+        `DROP TRIGGER slow_insert ON "${schema}".tender_documents`,
+      );
+      await runner.query(`DROP FUNCTION "${schema}".slow_document_insert()`);
+      await runner.release();
+    }
+  });
+
   it("queues a current job without waiting for enrichment and completes with safe detail and list summaries", async () => {
     const queued = await service.reanalyze(tender.id, now);
     expect(queued.status).toBe("PENDING");
@@ -595,4 +907,214 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       queuedCount: 1,
     });
   });
+});
+
+describe("review fingerprint requirement semantics", () => {
+  const fixture = () =>
+    ({
+      tenderFingerprint: "tender",
+      documentFingerprint: "document",
+      companyProfileFingerprint: "profile",
+      productCatalogFingerprint: "products",
+      analyzerVersion: "rules-1",
+      suitability: "RECOMMENDED",
+      specificationScore: "100.00",
+      requirements: [
+        {
+          key: "item-a",
+          classificationCode: "A",
+          specifications: [
+            {
+              id: "spec-1",
+              itemKey: "item-a",
+              kind: "POWER",
+              value: "30",
+              unit: "W",
+              comparator: "LTE",
+              required: true,
+              evidenceIds: ["source-1"],
+            },
+            {
+              id: "spec-2",
+              itemKey: "item-a",
+              kind: "CRI",
+              value: "80",
+              unit: "CRI",
+              comparator: "GTE",
+              required: false,
+              evidenceIds: ["source-2"],
+            },
+          ],
+          evidenceIds: ["source-1", "source-2"],
+        },
+      ],
+      evidence: [
+        {
+          id: "source-1",
+          kind: "SOURCE",
+          source: "DOCUMENT",
+          documentIdentity: "doc",
+          location: "p1",
+          snippet: "소비전력 30W 이하",
+          state: null,
+        },
+        {
+          id: "source-2",
+          kind: "SOURCE",
+          source: "DOCUMENT",
+          documentIdentity: "doc",
+          location: "p2",
+          snippet: "연색성 80 이상",
+          state: null,
+        },
+      ],
+    }) as unknown as TenderAnalysis;
+  it("ignores irrelevant ordering and snippet formatting/derived identifiers", () => {
+    const before = fixture();
+    const after = structuredClone(before);
+    after.requirements.reverse();
+    (after.requirements[0].specifications as any[]).reverse();
+    const replaceIds = (value: unknown): unknown =>
+      Array.isArray(value)
+        ? value.map(replaceIds)
+        : value && typeof value === "object"
+          ? Object.fromEntries(
+              Object.entries(value).map(([key, child]) => [
+                key,
+                replaceIds(child),
+              ]),
+            )
+          : typeof value === "string"
+            ? value
+                .replace(/source-/g, "new-source-")
+                .replace(/spec-/g, "new-spec-")
+            : value;
+    const cosmetic = replaceIds(after) as TenderAnalysis;
+    cosmetic.evidence.reverse();
+    cosmetic.evidence[0].snippet = "  연색성   80 이상  ";
+    expect(analysisFingerprint(cosmetic)).toBe(analysisFingerprint(before));
+  });
+  it("keeps capped evidence selection stable under item order and derived-ID changes", () => {
+    const before = fixture();
+    before.requirements = Array.from({ length: 100 }, (_, index) => ({
+      key: `item-${index}`,
+      classificationCode: `item-${index}`,
+      specifications: [
+        {
+          id: `spec-${index}`,
+          itemKey: `item-${index}`,
+          kind: "POWER",
+          value: "30",
+          unit: "W",
+          comparator: "LTE",
+          required: true,
+          evidenceIds: [`source-${index}`],
+        },
+      ],
+    }));
+    before.evidence = Array.from({ length: 100 }, (_, index) => ({
+      id: `source-${index}`,
+      kind: "SOURCE",
+      source: "DOCUMENT",
+      documentIdentity: `doc-${index}`,
+      location: "p1",
+      snippet: `소비전력 30W 이하 ${"긴설명".repeat(150)}`,
+      state: null,
+    }));
+    const after = structuredClone(before);
+    after.requirements.reverse();
+    after.evidence.reverse();
+    expect(analysisFingerprint(after)).toBe(analysisFingerprint(before));
+
+    const manyRefs = fixture();
+    manyRefs.requirements = [
+      {
+        key: "item-a",
+        specifications: [
+          {
+            id: "spec-a",
+            itemKey: "item-a",
+            kind: "POWER",
+            value: "30",
+            unit: "W",
+            comparator: "LTE",
+            required: true,
+            evidenceIds: Array.from({ length: 8 }, (_, index) => `id-${index}`),
+          },
+        ],
+      },
+    ];
+    manyRefs.evidence = Array.from({ length: 8 }, (_, index) => ({
+      id: `id-${index}`,
+      kind: "SOURCE",
+      source: "DOCUMENT",
+      documentIdentity: "doc",
+      location: `p${index}`,
+      snippet: "소비전력 30W 이하",
+      state: null,
+    }));
+    const relabeled = structuredClone(manyRefs);
+    (relabeled.requirements[0].specifications as any[])[0].evidenceIds =
+      Array.from({ length: 8 }, (_, index) => `new-id-${7 - index}`);
+    relabeled.evidence.forEach((value, index) => {
+      value.id = `new-id-${7 - index}`;
+    });
+    expect(analysisFingerprint(relabeled)).toBe(analysisFingerprint(manyRefs));
+  });
+
+  it("preserves dimension and hierarchical region coordinate order", () => {
+    const before = fixture();
+    before.requirements = [
+      {
+        key: "item-a",
+        specifications: [
+          {
+            id: "dimensions",
+            itemKey: "item-a",
+            kind: "DIMENSIONS",
+            values: ["10", "20", "30"],
+            unit: "MM",
+            comparator: "LTE",
+            required: true,
+            evidenceIds: [],
+          },
+        ],
+      },
+    ];
+    const dimensions = structuredClone(before);
+    (dimensions.requirements[0].specifications as any[])[0].values.reverse();
+    expect(analysisFingerprint(dimensions)).not.toBe(
+      analysisFingerprint(before),
+    );
+    before.participationAnalysis = {
+      requirements: [
+        {
+          id: "region",
+          kind: "REGION",
+          regionPaths: [
+            { codes: ["41", "41590"], values: ["경기도", "화성시"] },
+          ],
+          required: true,
+          evidenceIds: [],
+        },
+      ],
+      evaluations: [],
+    };
+    const region = structuredClone(before);
+    (
+      region.participationAnalysis.requirements as any[]
+    )[0].regionPaths[0].values.reverse();
+    expect(analysisFingerprint(region)).not.toBe(analysisFingerprint(before));
+  });
+
+  it.each(["value", "required", "comparator", "itemKey"])(
+    "invalidates a changed %s even when every score is the same",
+    (field) => {
+      const before = fixture();
+      const after = structuredClone(before);
+      const specification = (after.requirements[0].specifications as any[])[0];
+      specification[field] = field === "required" ? false : `changed-${field}`;
+      expect(analysisFingerprint(after)).not.toBe(analysisFingerprint(before));
+    },
+  );
 });

@@ -1,3 +1,4 @@
+import { compactAnalysisEvidence } from "./tender-analysis-evidence";
 import { TenderAwardResult } from "../entities/tender-award-result.entity";
 import { monthlyAwardWindows } from "../domain/tender-award-window";
 import {
@@ -57,6 +58,8 @@ import {
   tenderContentFingerprint,
   TENDER_ANALYZER_VERSION,
 } from "./tender-analysis-queue";
+
+class AnalysisLeaseExpired extends Error {}
 
 const finalStatuses = [
   TenderAnalysisStatus.COMPLETED,
@@ -134,7 +137,7 @@ export class TenderAnalysisService {
         const row = await repo
           .createQueryBuilder("analysis")
           .where(
-            "analysis.status = :pending OR (analysis.status = :processing AND analysis.leaseExpiresAt <= CURRENT_TIMESTAMP)",
+            "analysis.status = :pending OR (analysis.status = :processing AND analysis.leaseExpiresAt <= clock_timestamp())",
             {
               pending: TenderAnalysisStatus.PENDING,
               processing: TenderAnalysisStatus.PROCESSING,
@@ -208,7 +211,7 @@ export class TenderAnalysisService {
       certificationAnalysis: row.certificationAnalysis,
       participationAnalysis: row.participationAnalysis,
       priceAnalysis: row.priceAnalysis,
-      evidence: row.evidence,
+      evidence: compactAnalysisEvidence(row),
       errorCode: row.errorCode,
       documents,
       reviewed:
@@ -350,21 +353,37 @@ export class TenderAnalysisService {
     for (const reference of enrichment.documents.slice(0, 10)) {
       // Several independently bounded documents can outlast one lease. Renew
       // only an unexpired claim; a superseded worker may never revive itself.
-      const renewed = await this.db
-        .getRepository(TenderAnalysis)
-        .createQueryBuilder()
-        .update()
-        .set({ leaseExpiresAt: new Date(Date.now() + 5 * 60_000) })
-        .where(
-          'id = :id AND "processingToken" = :token AND "tenderFingerprint" = :input AND "leaseExpiresAt" > CURRENT_TIMESTAMP',
-          {
+      const renewed = await this.db.transaction(async (manager) => {
+        const repository = manager.getRepository(TenderAnalysis);
+        const row = await repository.findOne({
+          where: {
             id: claim.id,
-            token: claim.processingToken,
-            input: claim.tenderFingerprint,
+            processingToken: claim.processingToken,
+            tenderFingerprint: claim.tenderFingerprint,
           },
-        )
-        .execute();
-      if (!renewed.affected) return;
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!row) return false;
+        // Compare the fresh DB clock in a separate statement after any row
+        // lock wait; an UPDATE predicate evaluated before waiting is too early.
+        const update = await repository
+          .createQueryBuilder()
+          .update()
+          .set({
+            leaseExpiresAt: () => "clock_timestamp() + interval '5 minutes'",
+          })
+          .where(
+            'id = :id AND "processingToken" = :token AND "tenderFingerprint" = :input AND "leaseExpiresAt" > clock_timestamp()',
+            {
+              id: claim.id,
+              token: claim.processingToken,
+              input: claim.tenderFingerprint,
+            },
+          )
+          .execute();
+        return update.affected === 1;
+      });
+      if (!renewed) return;
       const document: Partial<TenderDocument> = {
         tenderId: tender.id,
         sourceDocumentIdentity: reference.identity,
@@ -565,72 +584,107 @@ export class TenderAnalysisService {
         errorCode: "ANALYSIS_FAILED",
       };
     }
-    await this.db.transaction(async (manager) => {
-      // Match writer lock order (profile -> tender -> analysis). A brief table
-      // SHARE lock also fences catalog INSERT/DELETE phantoms at final commit.
-      const currentProfile = await manager
-        .getRepository(TenderCompanyProfile)
-        .findOne({
-          where: { singletonKey: "company" },
-          lock: { mode: "pessimistic_read" },
-        });
-      const table = manager
-        .getRepository(Product)
-        .metadata.tablePath.split(".")
-        .map((part) => manager.connection.driver.escape(part))
-        .join(".");
-      await manager.query(`LOCK TABLE ${table} IN SHARE MODE`);
-      const currentTender = await this.requireTender(manager, tender.id, true);
-      const row = await manager
-        .getRepository(TenderAnalysis)
-        .createQueryBuilder("analysis")
-        .where(
-          "analysis.id = :id AND analysis.processingToken = :token AND analysis.tenderFingerprint = :input AND analysis.leaseExpiresAt > CURRENT_TIMESTAMP",
-          {
-            id: claim.id,
-            token: claim.processingToken,
-            input: claim.tenderFingerprint,
-          },
-        )
-        .setLock("pessimistic_write")
-        .getOne();
-      if (!row) return;
-      const latestProducts = await manager
-        .getRepository(Product)
-        .find({ select: { id: true, updatedAt: true } });
-      if (
-        tenderContentFingerprint(currentTender) !== tenderInput ||
-        tenderInput !== claim.tenderFingerprint ||
-        (currentProfile?.version ?? null) !== (profile?.version ?? null) ||
-        productCatalogFingerprint(latestProducts) !== catalogInput
-      ) {
-        await manager.getRepository(TenderAnalysis).update(row.id, {
-          ...pendingAnalysis,
-          tenderFingerprint: tenderContentFingerprint(currentTender),
-        });
-        return;
-      }
-      const documentRepo = manager.getRepository(TenderDocument);
-      await documentRepo.delete({ tenderId: tender.id });
-      if (documents.length) await documentRepo.save(documents);
-      await manager.getRepository(TenderAnalysis).update(row.id, {
-        ...changes,
-        documentFingerprint: fingerprint(
-          documents
-            .map((document) => ({
-              identity: document.sourceDocumentIdentity,
-              hash: document.contentHash,
-              status: document.status,
-            }))
-            .sort((a, b) => a.identity.localeCompare(b.identity)),
-        ),
-        companyProfileFingerprint: profileInput,
-        productCatalogFingerprint: catalogInput,
-        analyzerVersion: TENDER_ANALYZER_VERSION,
-        processingToken: null,
-        leaseExpiresAt: null,
-        analyzedAt: now,
+    changes.evidence = compactAnalysisEvidence(changes);
+    await this.db
+      .transaction(async (manager) => {
+        // Match writer lock order (profile -> tender -> analysis). A brief table
+        // SHARE lock also fences catalog INSERT/DELETE phantoms at final commit.
+        const currentProfile = await manager
+          .getRepository(TenderCompanyProfile)
+          .findOne({
+            where: { singletonKey: "company" },
+            lock: { mode: "pessimistic_read" },
+          });
+        const table = manager
+          .getRepository(Product)
+          .metadata.tablePath.split(".")
+          .map((part) => manager.connection.driver.escape(part))
+          .join(".");
+        await manager.query(`LOCK TABLE ${table} IN SHARE MODE`);
+        const currentTender = await this.requireTender(
+          manager,
+          tender.id,
+          true,
+        );
+        const row = await manager
+          .getRepository(TenderAnalysis)
+          .createQueryBuilder("analysis")
+          .where(
+            "analysis.id = :id AND analysis.processingToken = :token AND analysis.tenderFingerprint = :input AND analysis.leaseExpiresAt > clock_timestamp()",
+            {
+              id: claim.id,
+              token: claim.processingToken,
+              input: claim.tenderFingerprint,
+            },
+          )
+          .setLock("pessimistic_write")
+          .getOne();
+        if (!row) return;
+        const latestProducts = await manager
+          .getRepository(Product)
+          .find({ select: { id: true, updatedAt: true } });
+        if (
+          tenderContentFingerprint(currentTender) !== tenderInput ||
+          tenderInput !== claim.tenderFingerprint ||
+          (currentProfile?.version ?? null) !== (profile?.version ?? null) ||
+          productCatalogFingerprint(latestProducts) !== catalogInput
+        ) {
+          await manager
+            .getRepository(TenderAnalysis)
+            .createQueryBuilder()
+            .update()
+            .set({
+              ...pendingAnalysis,
+              tenderFingerprint: tenderContentFingerprint(currentTender),
+            })
+            .where(
+              'id = :id AND "processingToken" = :token AND "tenderFingerprint" = :input AND "leaseExpiresAt" > clock_timestamp()',
+              {
+                id: row.id,
+                token: claim.processingToken,
+                input: claim.tenderFingerprint,
+              },
+            )
+            .execute();
+          return;
+        }
+        const documentRepo = manager.getRepository(TenderDocument);
+        await documentRepo.delete({ tenderId: tender.id });
+        if (documents.length) await documentRepo.save(documents);
+        const committed = await manager
+          .getRepository(TenderAnalysis)
+          .createQueryBuilder()
+          .update()
+          .set({
+            ...changes,
+            documentFingerprint: fingerprint(
+              documents
+                .map((document) => ({
+                  identity: document.sourceDocumentIdentity,
+                  hash: document.contentHash,
+                  status: document.status,
+                }))
+                .sort((a, b) => a.identity.localeCompare(b.identity)),
+            ),
+            companyProfileFingerprint: profileInput,
+            productCatalogFingerprint: catalogInput,
+            analyzerVersion: TENDER_ANALYZER_VERSION,
+            processingToken: null,
+            leaseExpiresAt: null,
+            analyzedAt: now,
+          })
+          .where(
+            'id = :id AND "processingToken" = :token AND "tenderFingerprint" = :input AND "leaseExpiresAt" > clock_timestamp()',
+            { id: row.id, token: claim.processingToken, input: tenderInput },
+          )
+          .execute();
+        // This final CAS runs after catalog/row/document writes have finished
+        // waiting. Throwing rolls back every document replacement if the lease
+        // expired in between; an initial SELECT fence alone cannot do that.
+        if (committed.affected !== 1) throw new AnalysisLeaseExpired();
+      })
+      .catch((error) => {
+        if (!(error instanceof AnalysisLeaseExpired)) throw error;
       });
-    });
   }
 }

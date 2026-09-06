@@ -1,3 +1,4 @@
+import { analysisReviewSemantics } from "./tender-analysis-evidence";
 import { EntityManager } from "typeorm";
 import { Product } from "../../entities/product.entity";
 import { fingerprint } from "../domain/tender-requirement";
@@ -93,8 +94,6 @@ export const analysisFingerprint = (analysis: TenderAnalysis): string =>
     result: {
       suitability: analysis.suitability,
       score: analysis.specificationScore,
-      certifications: analysis.certificationAnalysis,
-      participation: analysis.participationAnalysis,
-      price: analysis.priceAnalysis,
+      ...(analysisReviewSemantics(analysis) as Record<string, unknown>),
     },
   });

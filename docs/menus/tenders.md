@@ -8,6 +8,9 @@
 - 관리자 JWT 아래 `GET/PUT /tenders/company-profile`, `GET /tenders/:id/analysis`, `POST /tenders/:id/analysis`, `POST /tenders/:id/review`, `POST /tenders/award-results/backfill`, `GET /tenders/award-results/status`를 연결했다. 분석 POST와 백필 POST는 명시적인 HTTP 202로 현재 작업 상태를 반환하며 문서 해석이나 공급자 수집을 기다리지 않는다.
 - 회사 프로필 전체 교체는 version 증가와 모든 현재 분석의 대기 전환을 같은 트랜잭션에서 반영한다. 매시 전체 제품의 ID·updatedAt을 정렬한 fingerprint를 한 번 계산하여 제품 추가·수정·삭제 또는 분석기 버전 변경을 감지하고 일치하지 않는 분석을 대기 상태로 바꾼다.
 - 리뷰는 `completed` boolean과 앞뒤 공백을 제거한 0~2000자 `note`를 받는다. 서버가 인증된 username으로 실제 정수 Admin ID를 조회하고 현재 분석 fingerprint와 함께 이력을 저장한다. 대기/처리/실패 상태에서는 리뷰 저장을 409로 거부한다. 입력 fingerprint 또는 재계산된 자격/가격 결과가 달라지면 기존 리뷰 행을 유지하고 현재 결과는 `reviewed: false`다.
+- 상세 근거는 요구조건에 연결된 인용과 명시적인 미해석/충돌 진단만 제공한다. 인용당 320자, 요구조건당 후보 4개·품목당 12개·전체 80개와 JSON 48 KiB 상한을 적용하고 제어문자·방향 전환 문자를 제거한다. 출처 문서 ID와 위치는 유지하며 관련 없는 전체 문단/표는 `evidence`에 복제하지 않는다. 신규 결과는 저장 전에 축약하고, 기존 결과도 응답 시 같은 경계로 축약한다. 원래 정규화 문서는 `tender_documents`에만 보존하며 일부 인용이 상한으로 생략될 수 있다.
+- 리뷰 fingerprint는 사양의 값·비교 연산자·필수 여부·품목 연결과 정규화 자격/가격 결과, 제한된 출처 식별 정보를 포함한다. 해시 기반 임시 ID·인용문 공백과 무관한 배열 순서는 제외하되 치수/지역 계층의 좌표 순서는 유지한다. 같은 점수에서도 요구조건이 바뀌면 이전 리뷰는 현재 검토 완료로 취급하지 않는다.
+- 최종 결과 저장은 모든 잠금/문서 저장 대기 뒤 DB의 실제 현재 시각(`clock_timestamp()`)과 token·입력 fingerprint를 다시 비교하는 조건부 갱신을 사용한다. lease가 대기 중 만료되면 문서 교체와 카운터·결과 저장을 모두 rollback하고 다음 유효 작업자가 재점유한다.
 - 목록의 `analysis`는 `{ status, suitability, specificationScore, unknownCount, analyzedAt }` 또는 null만 제공한다. 분석 상세는 조건·판정·근거 snippet과 문서별 상태를 제공하며 전체 추출 text/table block·점유 token·사내 제품명은 응답에 포함하지 않는다. comparable/satisfied/unsatisfied 수는 사양 기준이며 unknownCount는 사양·자격·미해석 근거·프로필 미설정·출처 실패 확인 항목을 포함한다.
 - cron은 모두 `Asia/Seoul`, `noOverlap: true`를 적용한다. 기존 매시 정각 공고 수집과 매분 정각 메일/재시도를 유지하고, 매시 02분 10초 fingerprint 갱신 후 최대 5건 분석, 매분 20초 최대 2건 분석, 매일 02:15 낙찰 증분 수집, 매시 05~50분 중 5분 간격의 30초에 낙찰 백필/증분 1페이지 재개를 실행한다. 종료 시 7개 작업 모두 stop/destroy한다. 낙찰 작업은 일반 수집 advisory lock을 공유하며 정각을 피한다.
 
@@ -83,6 +86,7 @@
 
 - `dfkorea-backend/src/tenders/services/tender-analysis.service.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis-queue.ts`
+- `dfkorea-backend/src/tenders/services/tender-analysis-evidence.ts`
 - `dfkorea-backend/src/tenders/dto/tender-analysis.dto.ts`
 - `dfkorea-backend/src/tenders/services/tender-company-profile.service.ts`
 - `dfkorea-backend/src/tenders/services/tender-scheduler.service.ts`
