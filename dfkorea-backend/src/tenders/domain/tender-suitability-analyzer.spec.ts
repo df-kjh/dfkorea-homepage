@@ -877,12 +877,12 @@ describe("Tender requirement parsing and scoring regressions", () => {
         formulaVariables: [
           {
             key: "reservePriceMinimumRate",
-            value: "99",
+            value: "-1",
             evidence: formulaEvidence,
           },
           {
             key: "reservePriceMaximumRate",
-            value: "101",
+            value: "1",
             evidence: { ...formulaEvidence, field: "rsrvtnPrceRngEndRate" },
           },
         ],
@@ -1185,12 +1185,12 @@ describe("Tender requirement parsing and scoring regressions", () => {
         formulaVariables: [
           {
             key: "reservePriceMinimumRate",
-            value: "98.0",
+            value: "-2.0",
             evidence: formulaEvidence,
           },
           {
             key: "reservePriceMaximumRate",
-            value: "102.0",
+            value: "2.0",
             evidence: { ...formulaEvidence, field: "rsrvtnPrceRngEndRate" },
           },
         ],

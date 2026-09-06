@@ -9,6 +9,8 @@ export interface G2bRelayFetcherConfig {
 }
 
 const G2B_OPERATIONS = new Set([
+  "getScsbidListSttusThng",
+  "getOpengResultListInfoThngPreparPcDetail",
   "getBidPblancListInfoThng",
   "getBidPblancListInfoThngBsisAmount",
   "getBidPblancListInfoLicenseLimit",
@@ -16,6 +18,7 @@ const G2B_OPERATIONS = new Set([
   "getBidPblancListInfoThngPurchsObjPrdct",
 ]);
 const ENRICHMENT_OPERATIONS_WITHOUT_REVISION = new Set([
+  "getOpengResultListInfoThngPreparPcDetail",
   "getBidPblancListInfoThng",
   "getBidPblancListInfoThngBsisAmount",
 ]);
@@ -77,13 +80,25 @@ const readOperation = (url: URL): string => {
   if (!operation || !G2B_OPERATIONS.has(operation)) {
     throw configurationError();
   }
+  if (
+    operation === "getScsbidListSttusThng" ||
+    operation === "getOpengResultListInfoThngPreparPcDetail"
+  ) {
+    if (
+      url.host !== "apis.data.go.kr" ||
+      url.pathname !== `/1230000/as/ScsbidInfoService/${operation}`
+    )
+      throw configurationError();
+  }
   return operation;
 };
 
 const readQuery = (url: URL, operation: string): Record<string, string> => {
   const inquiryDivision = url.searchParams.get("inqryDiv");
   const queryFields: readonly string[] =
-    operation === "getBidPblancListInfoThng" && inquiryDivision === "1"
+    (operation === "getBidPblancListInfoThng" ||
+      operation === "getScsbidListSttusThng") &&
+    inquiryDivision === "1"
       ? LIST_QUERY_FIELDS
       : ENRICHMENT_OPERATIONS_WITHOUT_REVISION.has(operation) &&
           inquiryDivision === "2"
@@ -143,6 +158,7 @@ export function createG2bRelayFetcher(
 
     return fetcher(relayUrl.toString(), {
       method: "POST",
+      redirect: "error",
       headers: {
         "content-type": "application/json",
         "x-dfkorea-timestamp": timestamp,

@@ -1,3 +1,6 @@
+import { G2bAwardAdapter } from "./adapters/g2b-award.adapter";
+import { TenderAwardCollectorService } from "./services/tender-award-collector.service";
+import { TenderPriceAnalyzer } from "./domain/tender-price-analyzer";
 import { Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -83,6 +86,38 @@ const createSafeRetryLogger = (context: string) => {
   ],
   controllers: [TendersController, TenderMailOAuthController],
   providers: [
+    TenderAwardCollectorService,
+    TenderPriceAnalyzer,
+    {
+      provide: G2bAwardAdapter,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
+        const options = {
+          minimumRequestIntervalMs: 1_500,
+          retryDelaysMs: [1_000, 3_000],
+          onRetry: createSafeRetryLogger("G2bAwardPublicApiClient"),
+        };
+        return new G2bAwardAdapter(
+          new PublicApiClient(undefined, options),
+          {
+            serviceKey: config.get<string>("PUBLIC_DATA_SERVICE_KEY") ?? "",
+            baseUrl: config.get<string>("G2B_AWARD_API_BASE_URL"),
+            relayEnabled,
+          },
+          relayEnabled
+            ? new PublicApiClient(
+                createG2bRelayFetcher({
+                  relayUrl: config.get<string>("G2B_RELAY_URL") ?? "",
+                  sharedSecret:
+                    config.get<string>("G2B_RELAY_SHARED_SECRET") ?? "",
+                }),
+                options,
+              )
+            : undefined,
+        );
+      },
+    },
     TenderClassifier,
     {
       provide: G2B_TENDER_ADAPTER,
@@ -210,6 +245,9 @@ const createSafeRetryLogger = (context: string) => {
     TenderCompanyProfileService,
   ],
   exports: [
+    G2bAwardAdapter,
+    TenderAwardCollectorService,
+    TenderPriceAnalyzer,
     NaverWorksOAuthService,
     TenderIngestionService,
     TenderSchedulerService,

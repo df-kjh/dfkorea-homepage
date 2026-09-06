@@ -377,3 +377,52 @@ describe("TenderRequirementParser", () => {
     );
   });
 });
+
+it("normalizes official G2B reserve offsets to the same absolute-percent contract as documents", () => {
+  const enrichment = emptyTenderEnrichment();
+  enrichment.formulaVariables = [
+    {
+      key: "reservePriceMinimumRate",
+      value: "-2.5",
+      evidence: {
+        source: "G2B_API",
+        operation: "getBidPblancListInfoThngBsisAmount",
+        field: "rsrvtnPrceRngBgnRate",
+      },
+    },
+    {
+      key: "reservePriceMaximumRate",
+      value: "2.5",
+      evidence: {
+        source: "G2B_API",
+        operation: "getBidPblancListInfoThngBsisAmount",
+        field: "rsrvtnPrceRngEndRate",
+      },
+    },
+  ];
+  expect(
+    new TenderRequirementParser().parse(enrichment, []).bidFormula,
+  ).toMatchObject({
+    reservePriceMinimumRate: "97.5",
+    reservePriceMaximumRate: "102.5",
+  });
+});
+
+it("keeps malformed provider reserve offsets unknown without throwing or substituting defaults", () => {
+  const enrichment = emptyTenderEnrichment();
+  enrichment.formulaVariables = [
+    {
+      key: "reservePriceMinimumRate",
+      value: "확인 필요",
+      evidence: {
+        source: "G2B_API",
+        operation: "getBidPblancListInfoThngBsisAmount",
+        field: "rsrvtnPrceRngBgnRate",
+      },
+    },
+  ];
+  expect(
+    new TenderRequirementParser().parse(enrichment, []).bidFormula
+      .reservePriceMinimumRate,
+  ).toBe("확인 필요");
+});

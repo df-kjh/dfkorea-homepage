@@ -33,6 +33,7 @@ describe("createG2bRelayFetcher", () => {
     expect(response).toBe(providerResponse);
     expect(fetcher).toHaveBeenCalledWith(relayUrl, {
       method: "POST",
+      redirect: "error",
       headers: {
         "content-type": "application/json",
         "x-dfkorea-timestamp": String(timestamp),
@@ -306,6 +307,52 @@ describe("createG2bRelayFetcher", () => {
         code: "CONFIGURATION_ERROR",
       });
       expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe("award relay allowlist", () => {
+  it.each([
+    "getScsbidListSttusThng",
+    "getOpengResultListInfoThngPreparPcDetail",
+  ])(
+    "serializes only the official %s query without service key and refuses redirects",
+    async (operation) => {
+      const fetcher = jest.fn().mockResolvedValue(new Response("{}"));
+      const relay = createG2bRelayFetcher({ relayUrl, sharedSecret }, fetcher);
+      const url = new URL(
+        `https://apis.data.go.kr/1230000/as/ScsbidInfoService/${operation}`,
+      );
+      const query =
+        operation === "getScsbidListSttusThng"
+          ? {
+              type: "json",
+              inqryDiv: "1",
+              inqryBgnDt: "202609010000",
+              inqryEndDt: "202609302359",
+              pageNo: "101",
+              numOfRows: "100",
+            }
+          : {
+              type: "json",
+              inqryDiv: "2",
+              bidNtceNo: "R26BK01000001",
+              pageNo: "1",
+              numOfRows: "100",
+            };
+      for (const [key, value] of Object.entries(query))
+        url.searchParams.set(key, value);
+      url.searchParams.set("serviceKey", "fixture-key");
+      await relay(url);
+      expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+        operation,
+        query,
+      });
+      expect(fetcher.mock.calls[0][1].redirect).toBe("error");
+      url.hostname = "evil.example";
+      await expect(relay(url)).rejects.toMatchObject({
+        code: "CONFIGURATION_ERROR",
+      });
     },
   );
 });

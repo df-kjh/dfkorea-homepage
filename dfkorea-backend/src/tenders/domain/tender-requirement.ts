@@ -85,6 +85,7 @@ export interface TenderBidFormula {
   basisAmount?: string;
   lowerLimitRate?: string;
   lawKind?: "NATIONAL" | "LOCAL" | "OTHER";
+  /** Absolute percentages of basis amount (97 means 0.97), never offsets. */
   reservePriceMinimumRate?: string;
   reservePriceMaximumRate?: string;
   evaluationBasisAmount?: string;

@@ -1222,7 +1222,26 @@ export class TenderRequirementParser {
       (left, right) => left.key.localeCompare(right.key),
     )) {
       const field = fields[variable.key];
-      if (field) add(variable.value, variable.evidence, field);
+      if (field) {
+        // Official G2B range fields are offsets (-3/+3). Parsed requirements
+        // always expose absolute percentages (97/103), also used by documents.
+        const isOfficialOffset =
+          variable.evidence.source === "G2B_API" &&
+          variable.evidence.operation ===
+            "getBidPblancListInfoThngBsisAmount" &&
+          ((field === "reservePriceMinimumRate" &&
+            variable.evidence.field === "rsrvtnPrceRngBgnRate") ||
+            (field === "reservePriceMaximumRate" &&
+              variable.evidence.field === "rsrvtnPrceRngEndRate"));
+        add(
+          isOfficialOffset &&
+            /^[+-]?\d{1,8}(?:\.\d{1,8})?$/.test(variable.value)
+            ? addDecimal("100", variable.value)
+            : variable.value,
+          variable.evidence,
+          field,
+        );
+      }
     }
     if (evidenceIds.length) result.evidenceIds = evidenceIds.sort();
     return result;

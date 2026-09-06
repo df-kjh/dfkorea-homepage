@@ -2,6 +2,9 @@
 
 ## 구현 완료
 
+- 낙찰 이력 수집·가격 분석 기반 서비스: 공식 물품 최종낙찰 목록과 예비가격·물품 공고를 연결하며 금액을 decimal string으로 보존한다. 최근 2년의 KST 월별 구간과 DB lease/cursor로 중단 후 재개하며, 일반 수집 lock이 사용 중이면 건너뛴다. 한 tick에 목록 1페이지와 LED 후보 1건의 상세 조회만 처리한다.
+- 투찰 가격 계산은 명시된 총액·통화·산식 정보를 요구하며 BigInt 유리수 연산으로 계산한다. 통계는 최근 2년·동일 방식의 유효 결과에 IQR 제거, 세부품명/지역 → 세부품명 → LED 제품군 순서의 fallback, 15/30/100건 신뢰도 경계를 적용한다.
+
 - 입찰 첨부문서 추출의 독립 백엔드 어댑터를 구현했다. HWP 5.x/HWPX/PDF/DOCX/XLSX를 메모리에서 읽어 순번·쪽/섹션/sheet 위치가 있는 문단·표 블록으로 변환한다. 암호화, 손상, OCR 필요, 미지원, 크기·압축·시간 제한은 안전한 오류 코드로 반환하며 원본·파서 오류 본문을 저장하거나 로그에 남기지 않는다. 아직 실제 분석 작업·관리자 화면에는 연결하지 않았다.
 
 - 관리자 좌측 메뉴의 `입찰 공고` 탭에서 등록일 기준 월간 공고를 조회한다.
@@ -37,6 +40,10 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 낙찰 수집 서비스의 관리자 시작 API·cron 연결과 가격 UI는 후속 작업이다. 공식 Swagger 필드 전체를 포함한 익명 fixture와 독립 로컬 PostgreSQL로 검증했으며, 승인된 운영 key로 응답 검증은 아직 하지 않았다.
+- 공식 낙찰/물품 응답에 단가·총액 구분 필드가 없으므로 동일 공고 제목에 `총액`이 명시되고 국내 입찰이며 단일 LED 품목인 경우만 저장한다. 명시가 없는 많은 정상 결과도 보수적으로 제외한다. 현재 수집 이력은 지역이 null이므로 세부품명+방식 단계부터 비교하며 지역별 근거 연계는 후속 개선이다.
+- 백필 기간은 DB date와 provider 분 단위 조회에 맞춘 KST 양끝 날짜 포함 구간이다. 현재 날짜의 증분 결과는 다음 날짜의 7일 겹침 구간에서 다시 확인한다. 목록 page+offset 재개는 provider 목록 순서가 안정적인 범위에서 동작하며 변경 중인 당일 목록은 다음 겹침 수집으로 보완한다.
+
 - 문서 추출은 직접 생성한 유효 형식 fixture와 내부 손상·제한 계약으로 검증했다. 운영 공고의 공개 문서 표본을 검증하기 전에는 분석 파이프라인에 활성화하지 않는다. PDF 표는 텍스트 기준선과 반복된 열 정렬을 이용한 추정이며 OCR·복잡한 다단 편집·병합 셀의 시각 배치를 재구성하지 않는다. 이미지 전용 PDF는 `DOCUMENT_OCR_REQUIRED`, 일부 빈/이미지 쪽은 `PARTIAL`이다.
 - 추출기는 20 MiB 입력, 10 MiB 출력 텍스트, 15초 worker 종료, ZIP/CFB entry 4,096개, 전체 압축 해제 40 MiB와 100:1 압축비 제한을 적용한다. HWP 원본 CFB는 외부 파서로 읽지 않고 제한된 리더가 헤더·DIFAT/FAT/miniFAT·디렉터리와 모든 도달 가능한 스트림의 순환·중첩·선언/실제 체인 크기를 먼저 검증한다. 스트림 메모리는 전체 검증이 끝난 뒤 할당하며 외부 HWP 파서에는 다시 작성한 비압축 컨테이너만 전달한다. XML은 문자열·AST를 만들기 전 원본 XML 합계도 10 MiB로 제한하며 DTD/사용자 entity를 거부하므로 큰 서식 정보가 있는 문서는 텍스트가 작아도 제한될 수 있다. PDF는 직접 stream length와 단일 Flate 필터(`/F` 별칭 포함)를 사전 검증하고 중복·충돌하는 필터 선언을 거부하며 간접 길이·복합/미지원 필터는 `DOCUMENT_UNSUPPORTED`로 남긴다.
 - HWP의 본문 밖 머리말·각주·도형, 중첩 표 및 DOCX의 복잡한 병합·비텍스트 구성은 완전한 해석 범위가 아니다. DOCX는 각주·미주 참조와 run·hyperlink 아래의 이미지도 검사하여 생략한 내용이 있으면 `PARTIAL`로 표시하고 문단·표 셀의 탭 단어 경계는 보존한다. XLSX는 계산을 실행하지 않고 저장된 formula 결과와 표시 형식을 사용하며 결과 cache가 없으면 `PARTIAL`이다. 숨김 sheet는 metadata에 명시하고 내용도 근거에 포함한다.
@@ -53,6 +60,10 @@
 - 이미 운영 DB에 적용된 `opportunityType`·`opportunityReasons` 컬럼은 기존 데이터와 마이그레이션 이력을 보호하기 위해 삭제하지 않는다. 현재 애플리케이션은 이 레거시 컬럼을 조회·메일 대상 제한에 사용하지 않는다.
 
 ## 관련 파일
+
+- `dfkorea-backend/src/tenders/adapters/g2b-award.adapter.ts`
+- `dfkorea-backend/src/tenders/services/tender-award-collector.service.ts`
+- `dfkorea-backend/src/tenders/domain/tender-price-analyzer.ts`
 
 - `dfkorea-backend/src/tenders/documents/tender-document-extractor.ts`
 - `dfkorea-backend/src/tenders/documents/tender-document-extraction.worker.ts`

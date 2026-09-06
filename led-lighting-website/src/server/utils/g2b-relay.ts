@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export const G2B_RELAY_OPERATIONS = [
+  'getScsbidListSttusThng',
+  'getOpengResultListInfoThngPreparPcDetail',
   'getBidPblancListInfoThng',
   'getBidPblancListInfoThngBsisAmount',
   'getBidPblancListInfoLicenseLimit',
@@ -32,7 +34,7 @@ interface G2bRevisionEnrichmentQuery extends G2bEnrichmentQuery {
 }
 
 export type G2bRelayRequest =
-  | { operation: 'getBidPblancListInfoThng'; query: G2bListQuery }
+  | { operation: 'getBidPblancListInfoThng' | 'getScsbidListSttusThng'; query: G2bListQuery }
   | {
       operation: G2bRelayOperation
       query: G2bEnrichmentQuery | G2bRevisionEnrichmentQuery
@@ -50,6 +52,7 @@ const LIST_QUERY_KEYS = [
 const ENRICHMENT_QUERY_KEYS = ['type', 'inqryDiv', 'bidNtceNo', 'pageNo', 'numOfRows'] as const
 const REVISION_ENRICHMENT_QUERY_KEYS = [...ENRICHMENT_QUERY_KEYS, 'bidNtceOrd'] as const
 const ENRICHMENT_OPERATIONS_WITHOUT_REVISION = new Set<G2bRelayOperation>([
+  'getOpengResultListInfoThngPreparPcDetail',
   'getBidPblancListInfoThng',
   'getBidPblancListInfoThngBsisAmount',
 ])
@@ -234,7 +237,9 @@ export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
 
   const query = value.query
   const isListQuery =
-    value.operation === 'getBidPblancListInfoThng' && hasExactOwnKeys(query, LIST_QUERY_KEYS)
+    (value.operation === 'getBidPblancListInfoThng' ||
+      value.operation === 'getScsbidListSttusThng') &&
+    hasExactOwnKeys(query, LIST_QUERY_KEYS)
   const isEnrichmentQuery =
     ENRICHMENT_OPERATIONS_WITHOUT_REVISION.has(value.operation) &&
     hasExactOwnKeys(query, ENRICHMENT_QUERY_KEYS)
@@ -255,12 +260,17 @@ export const validateRelayPayload = (value: unknown): G2bRelayRequest => {
       return rejectPayload('end_date')
     }
     if (query.inqryBgnDt > query.inqryEndDt) return rejectPayload('date_order')
-    if (typeof query.pageNo !== 'string' || !VALID_PAGE.test(query.pageNo)) {
+    if (
+      typeof query.pageNo !== 'string' ||
+      !(
+        value.operation === 'getScsbidListSttusThng' ? /^(?:[1-9]\d{0,5}|1000000)$/ : VALID_PAGE
+      ).test(query.pageNo)
+    ) {
       return rejectPayload('page_no')
     }
     if (query.numOfRows !== '100') return rejectPayload('row_count')
     return {
-      operation: 'getBidPblancListInfoThng',
+      operation: value.operation as 'getBidPblancListInfoThng' | 'getScsbidListSttusThng',
       query: {
         type: query.type,
         inqryDiv: query.inqryDiv,
@@ -368,6 +378,14 @@ export const buildG2bProviderUrl = ({
     }
   } catch {
     throw new Error('Invalid provider configuration')
+  }
+  // The request selects one of two fixed official service paths; callers
+  // cannot supply a host or arbitrary service/operation through the payload.
+  if (
+    request.operation === 'getScsbidListSttusThng' ||
+    request.operation === 'getOpengResultListInfoThngPreparPcDetail'
+  ) {
+    normalizedBaseUrl.pathname = '/1230000/as/ScsbidInfoService'
   }
   normalizedBaseUrl.search = ''
   normalizedBaseUrl.hash = ''

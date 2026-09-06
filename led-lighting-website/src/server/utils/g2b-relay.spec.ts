@@ -317,3 +317,45 @@ describe('buildG2bProviderUrl', () => {
     expect(JSON.stringify(rejected)).not.toContain('provider-password')
   })
 })
+
+describe('award relay routes', () => {
+  it.each(['getScsbidListSttusThng', 'getOpengResultListInfoThngPreparPcDetail'] as const)(
+    'routes %s only to official Scsbid goods path',
+    (operation) => {
+      const query =
+        operation === 'getScsbidListSttusThng'
+          ? { ...validPayload.query, pageNo: '101' }
+          : {
+              type: 'json',
+              inqryDiv: '2',
+              bidNtceNo: 'R26BK01000001',
+              pageNo: '1',
+              numOfRows: '100',
+            }
+      const request = validateRelayPayload({ operation, query })
+      expect(request).toEqual({ operation, query })
+      const url = buildG2bProviderUrl({
+        baseUrl: 'https://apis.data.go.kr/1230000/ad/BidPublicInfoService',
+        serviceKey: 'fixture-key',
+        request,
+      })
+      expect(url.pathname).toBe(`/1230000/as/ScsbidInfoService/${operation}`)
+      expect(url.searchParams.get('serviceKey')).toBe('fixture-key')
+      expect(() =>
+        validateRelayPayload({ operation, query: { ...query, bidwinnrBizno: '123' } }),
+      ).toThrow()
+    },
+  )
+  it('rejects other award operations and unbounded pages', () => {
+    expect(() =>
+      validateRelayPayload({ ...validPayload, operation: 'getScsbidListSttusCnstwk' }),
+    ).toThrow()
+    expect(() =>
+      validateRelayPayload({
+        ...validPayload,
+        operation: 'getScsbidListSttusThng',
+        query: { ...validPayload.query, pageNo: '1000001' },
+      }),
+    ).toThrow()
+  })
+})
