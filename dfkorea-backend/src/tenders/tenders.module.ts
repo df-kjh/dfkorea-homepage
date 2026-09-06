@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { G2bAwardAdapter } from "./adapters/g2b-award.adapter";
 import { TenderAwardCollectorService } from "./services/tender-award-collector.service";
 import { TenderPriceAnalyzer } from "./domain/tender-price-analyzer";
@@ -90,8 +91,8 @@ const createSafeRetryLogger = (context: string) => {
     TenderPriceAnalyzer,
     {
       provide: G2bAwardAdapter,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      inject: [ConfigService, DataSource],
+      useFactory: (config: ConfigService, dataSource: DataSource) => {
         const relayEnabled = config.get<string>("G2B_RELAY_ENABLED") === "true";
         const options = {
           minimumRequestIntervalMs: 1_500,
@@ -115,6 +116,11 @@ const createSafeRetryLogger = (context: string) => {
                 options,
               )
             : undefined,
+          (identities) =>
+            dataSource.getRepository(TenderAwardResult).find({
+              where: identities,
+              select: { source: true, sourceNoticeId: true, revision: true },
+            }),
         );
       },
     },

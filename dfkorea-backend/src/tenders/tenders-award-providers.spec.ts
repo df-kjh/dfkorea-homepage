@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { MODULE_METADATA } from "@nestjs/common/constants";
 import { TendersModule } from "./tenders.module";
 import { G2bAwardAdapter } from "./adapters/g2b-award.adapter";
@@ -21,4 +22,12 @@ it("registers and exports the award adapter, collector and price analyzer for or
     ).toBe(true);
     expect(exports).toContain(token);
   }
+});
+
+it("injects the durable award repository into the adapter for tracked-title reconciliation", () => {
+  const provider = Reflect.getMetadata(
+    MODULE_METADATA.PROVIDERS,
+    TendersModule,
+  ).find((provider) => provider.provide === G2bAwardAdapter);
+  expect(provider.inject).toContain(DataSource);
 });

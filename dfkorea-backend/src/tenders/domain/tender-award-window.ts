@@ -36,3 +36,47 @@ export function monthlyAwardWindows(now: Date): AwardWindow[] {
   );
   return splitWindows(start, end);
 }
+
+interface CoverageWindow {
+  periodStart: string;
+  periodEnd: string;
+  status: string;
+}
+/** Follow connected completed intervals from the earliest durable requested
+ * date. MAX(periodEnd) would incorrectly jump over a gap or unfinished month. */
+export function awardCoverageThrough(runs: CoverageWindow[]): string | null {
+  if (!runs.length) return null;
+  const ordered = [...runs].sort((a, b) =>
+    a.periodStart.localeCompare(b.periodStart),
+  );
+  const anchor = new Date(ordered[0].periodStart).getTime();
+  let through = anchor - 86400000;
+  for (const run of ordered) {
+    if (run.status !== "SUCCEEDED") continue;
+    const start = new Date(run.periodStart).getTime(),
+      end = new Date(run.periodEnd).getTime();
+    if (start > through + 86400000) break;
+    through = Math.max(through, end);
+  }
+  return through < anchor ? null : day(new Date(through));
+}
+export function planIncrementalAwardWindows(
+  now: Date,
+  runs: CoverageWindow[],
+): AwardWindow[] {
+  const end = new Date(kstDay(now));
+  if (!runs.length)
+    return splitWindows(new Date(end.getTime() - 6 * 86400000), end);
+  const anchor = runs.map((run) => run.periodStart).sort()[0];
+  const through = awardCoverageThrough(runs);
+  if (through && through >= kstDay(now)) return [];
+  const start = through
+    ? new Date(
+        Math.max(
+          new Date(anchor).getTime(),
+          new Date(through).getTime() - 6 * 86400000,
+        ),
+      )
+    : new Date(anchor);
+  return splitWindows(start, end);
+}

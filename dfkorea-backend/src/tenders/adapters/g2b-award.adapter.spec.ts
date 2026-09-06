@@ -9,6 +9,7 @@ const recorded = JSON.parse(
 const window = { start: "2026-09-01", end: "2026-09-30" };
 const setup = (
   mutate: (fixtures: typeof recorded) => void = () => undefined,
+  tracked = false,
 ) => {
   const fixtures = structuredClone(recorded);
   mutate(fixtures);
@@ -21,7 +22,12 @@ const setup = (
     );
   });
   return {
-    adapter: new G2bAwardAdapter(client, { serviceKey: "fixture-key" }),
+    adapter: new G2bAwardAdapter(
+      client,
+      { serviceKey: "fixture-key" },
+      undefined,
+      async (identities) => (tracked ? identities : []),
+    ),
     calls,
   };
 };
@@ -132,5 +138,140 @@ describe("G2bAwardAdapter", () => {
       code: "CONFIGURATION_ERROR",
     });
     expect(calls).toEqual([]);
+  });
+});
+
+describe("award authoritative reconciliation regressions", () => {
+  const identity = {
+    source: "G2B",
+    sourceNoticeId: "R26BK01000001",
+    revision: "000",
+  };
+  it.each(["", "2"])(
+    "rejects absent or mismatching purchase bid class %s",
+    async (bidClass) => {
+      const { adapter } = setup((f) => {
+        f.getBidPblancListInfoThngPurchsObjPrdct.response.body.items[0].bidClsfcNo =
+          bidClass;
+      });
+      const page = await adapter.fetchWindow(window, null);
+      expect(page.items).toEqual([]);
+      expect(page.invalidations).toEqual([]);
+    },
+  );
+  it("matches the final lot rather than accepting another lot's LED item", async () => {
+    const { adapter } = setup((f) => {
+      const body = f.getBidPblancListInfoThngPurchsObjPrdct.response.body;
+      body.items = [
+        { ...body.items[0], bidClsfcNo: "2", dtilPrdctClsfcNo: "3911210202" },
+        body.items[0],
+      ];
+      body.totalCount = "2";
+    });
+    const page = await adapter.fetchWindow(window, null);
+    expect(page.items[0].productClassification).toBe("3911210201");
+    expect(page.invalidations).toEqual([]);
+    expect(page.diagnostics).toContain("AMBIGUOUS_CLASS_IDENTITY");
+  });
+  it("rejects conflicting product classification or supplied rebid identity", async () => {
+    for (const change of [
+      { dtilPrdctClsfcNo: "3911210202" },
+      { rbidNo: "001" },
+    ]) {
+      const { adapter } = setup((f) =>
+        Object.assign(
+          f.getBidPblancListInfoThngPurchsObjPrdct.response.body.items[0],
+          change,
+        ),
+      );
+      const page = await adapter.fetchWindow(window, null);
+      expect(page.items).toEqual([]);
+      expect(page.invalidations).toEqual([]);
+    }
+  });
+  it.each(["취소공고", "유찰", "재입찰"])(
+    "returns only a notice identity for authoritative %s",
+    async (status) => {
+      const { adapter } = setup((f) => {
+        f.getBidPblancListInfoThng.response.body.items[0].ntceKindNm = status;
+        f.getScsbidListSttusThng.response.body.items[0].fnlSucsfDate = "";
+      });
+      const page = await adapter.fetchWindow(window, null);
+      expect(page.items).toEqual([]);
+      expect(page.invalidations).toEqual([
+        { kind: "NOTICE_EXCLUDED", ...identity },
+      ]);
+      expect(JSON.stringify(page)).not.toMatch(
+        /fixture company|fixture person|bidwinnr|payload/,
+      );
+    },
+  );
+  it("reconciles a tracked notice even after its LED title and single product become non-LED", async () => {
+    const { adapter, calls } = setup((f) => {
+      f.getScsbidListSttusThng.response.body.items[0].bidNtceNm =
+        "컴퓨터 구매 총액";
+      Object.assign(f.getBidPblancListInfoThng.response.body.items[0], {
+        bidNtceNm: "컴퓨터 구매 총액",
+        dtilPrdctClsfcNo: "4321150801",
+        dtilPrdctClsfcNoNm: "컴퓨터",
+      });
+      Object.assign(
+        f.getBidPblancListInfoThngPurchsObjPrdct.response.body.items[0],
+        { dtilPrdctClsfcNo: "4321150801", dtilPrdctClsfcNoNm: "컴퓨터" },
+      );
+    }, true);
+    const page = await adapter.fetchWindow(window, null);
+    expect(page.items).toEqual([]);
+    expect(page.invalidations).toEqual([
+      {
+        kind: "SINGLE_ITEM_RECONCILED",
+        ...identity,
+        openedAt: new Date("2026-09-01T01:00:00Z"),
+        retainedProductClassification: null,
+      },
+    ]);
+    expect(calls.length).toBeLessThanOrEqual(4);
+  });
+  it("returns replacement identity for a completely observed single-item reclassification", async () => {
+    const { adapter } = setup((f) => {
+      f.getBidPblancListInfoThng.response.body.items[0].dtilPrdctClsfcNo =
+        "3911210202";
+      f.getBidPblancListInfoThngPurchsObjPrdct.response.body.items[0].dtilPrdctClsfcNo =
+        "3911210202";
+    }, true);
+    const page = await adapter.fetchWindow(window, null);
+    expect(page.invalidations).toEqual([
+      {
+        kind: "SINGLE_ITEM_RECONCILED",
+        ...identity,
+        openedAt: new Date("2026-09-01T01:00:00Z"),
+        retainedProductClassification: "3911210202",
+      },
+    ]);
+  });
+  it("never invalidates on missing rows, incomplete pages, missing finality or ambiguous joins", async () => {
+    for (const change of [
+      (f) => {
+        f.getBidPblancListInfoThng.response.body.items = [];
+      },
+      (f) => {
+        f.getBidPblancListInfoThngPurchsObjPrdct.response.body.totalCount =
+          "101";
+      },
+      (f) => {
+        f.getScsbidListSttusThng.response.body.items[0].fnlSucsfDate = "";
+      },
+      (f) => {
+        f.getOpengResultListInfoThngPreparPcDetail.response.body.items = [];
+      },
+      (f) => {
+        f.getOpengResultListInfoThngPreparPcDetail.response.body.items[0].bidClsfcNo =
+          "2";
+      },
+    ]) {
+      const page = await setup(change, true).adapter.fetchWindow(window, null);
+      expect(page.items).toEqual([]);
+      expect(page.invalidations).toEqual([]);
+    }
   });
 });

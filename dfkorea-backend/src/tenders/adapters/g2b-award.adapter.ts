@@ -16,7 +16,22 @@ export type NormalizedAward = Omit<
   TenderAwardResult,
   "id" | "collectedAt" | "updatedAt"
 >;
+export interface AwardNoticeIdentity {
+  source: string;
+  sourceNoticeId: string;
+  revision: string;
+}
+export type AwardInvalidation =
+  | (AwardNoticeIdentity & { kind: "NOTICE_EXCLUDED" })
+  | (AwardNoticeIdentity & {
+      kind: "SINGLE_ITEM_RECONCILED";
+      openedAt: Date;
+      retainedProductClassification: string | null;
+    });
+export type AwardDiagnostic = "AMBIGUOUS_CLASS_IDENTITY";
 export interface AwardPage {
+  invalidations?: AwardInvalidation[];
+  diagnostics?: AwardDiagnostic[];
   items: NormalizedAward[];
   nextCursor: string | null;
   fetchedCount: number;
@@ -39,6 +54,9 @@ export class G2bAwardAdapter {
       relayEnabled?: boolean;
     },
     private readonly relay?: PublicApiClient,
+    private readonly trackedNotices?: (
+      identities: AwardNoticeIdentity[],
+    ) => Promise<AwardNoticeIdentity[]>,
   ) {}
   async fetchWindow(
     window: AwardWindow,
@@ -68,15 +86,40 @@ export class G2bAwardAdapter {
     if (!page.items.length && page.totalCount > (pageNo - 1) * 100) {
       throw new TenderSourceError(TenderSource.G2B, "INVALID_RESPONSE");
     }
+    const identities = page.items.flatMap(
+      (row) => this.noticeIdentity(row) ?? [],
+    );
+    const tracked =
+      identities.length && this.trackedNotices
+        ? await this.trackedNotices(identities)
+        : [];
+    const trackedKeys = new Set(
+      tracked.map(
+        (identity) =>
+          `${identity.source}:${identity.sourceNoticeId}:${identity.revision}`,
+      ),
+    );
     const items: NormalizedAward[] = [];
+    const invalidations: AwardInvalidation[] = [];
+    const diagnostics: AwardDiagnostic[] = [];
     let consumed = offset;
     // One monthly page plus at most one candidate's three bounded detail calls.
     // Re-read the list on resume instead of persisting personal provider payloads.
     for (; consumed < page.items.length; consumed++) {
       const row = page.items[consumed];
-      if (!this.isCandidate(row)) continue;
+      const identity = this.noticeIdentity(row);
+      if (
+        !identity ||
+        (!LED.test(String(row.bidNtceNm)) &&
+          !trackedKeys.has(
+            `${identity.source}:${identity.sourceNoticeId}:${identity.revision}`,
+          ))
+      )
+        continue;
       const normalized = await this.enrich(row);
-      if (normalized) items.push(normalized);
+      if (normalized.item) items.push(normalized.item);
+      invalidations.push(...normalized.invalidations);
+      diagnostics.push(...normalized.diagnostics);
       consumed++;
       break;
     }
@@ -89,25 +132,34 @@ export class G2bAwardAdapter {
     const fetchedCount = Math.max(0, consumed - offset);
     return {
       items,
+      invalidations,
+      diagnostics,
       nextCursor,
       fetchedCount,
       excludedCount: fetchedCount - items.length,
     };
   }
-  private isCandidate(row: Row): boolean {
-    const title = toNullableText(row.bidNtceNm) ?? "";
-    return (
-      LED.test(title) &&
-      !EXCLUDED.test(title) &&
-      !!parseKstDate(row.fnlSucsfDate) &&
-      !!parseKstDate(row.rlOpengDt) &&
-      !!positiveDecimal(row.sucsfbidAmt) &&
-      /^0+$/.test(String(row.rbidNo)) &&
-      /^[A-Za-z0-9-]{1,40}$/.test(String(row.bidNtceNo)) &&
+  private noticeIdentity(row: Row): AwardNoticeIdentity | null {
+    return /^[A-Za-z0-9-]{1,40}$/.test(String(row.bidNtceNo)) &&
       /^\d{3}$/.test(String(row.bidNtceOrd))
-    );
+      ? {
+          source: TenderSource.G2B,
+          sourceNoticeId: String(row.bidNtceNo),
+          revision: String(row.bidNtceOrd),
+        }
+      : null;
   }
-  private async enrich(final: Row): Promise<NormalizedAward | null> {
+  private async enrich(final: Row): Promise<{
+    item: NormalizedAward | null;
+    invalidations: AwardInvalidation[];
+    diagnostics: AwardDiagnostic[];
+  }> {
+    const result: {
+      item: NormalizedAward | null;
+      invalidations: AwardInvalidation[];
+      diagnostics: AwardDiagnostic[];
+    } = { item: null, invalidations: [], diagnostics: [] };
+    const notice = this.noticeIdentity(final)!;
     const identity = { inqryDiv: "2", bidNtceNo: String(final.bidNtceNo) };
     const detailPage = await this.fetch(
       "getBidPblancListInfoThng",
@@ -117,33 +169,63 @@ export class G2bAwardAdapter {
     const details = detailPage.items.filter((row) =>
       this.sameNotice(row, final),
     );
-    if (details.length !== 1 || detailPage.totalCount > 100) return null;
+    if (details.length !== 1 || detailPage.totalCount > 100) return result;
     const detail = details[0];
-    // The official goods API has no structured unit/total or currency field.
-    // Require explicit total wording in its own notice title and domestic goods;
-    // absence is unknown, never evidence of a comparable total KRW contract.
+    // Only explicit authoritative notice status invalidates an entire revision.
+    // A missing final date, missing page or failed request is never cancellation.
+    if (
+      ["취소공고", "취소", "유찰", "재입찰"].includes(String(detail.ntceKindNm))
+    ) {
+      result.invalidations.push({ kind: "NOTICE_EXCLUDED", ...notice });
+      return result;
+    }
+    const openedAt = parseKstDate(final.rlOpengDt);
+    if (
+      !openedAt ||
+      !parseKstDate(final.fnlSucsfDate) ||
+      !positiveDecimal(final.sucsfbidAmt) ||
+      !/^0+$/.test(String(final.rbidNo)) ||
+      !/^\d{1,10}$/.test(String(final.bidClsfcNo))
+    )
+      return result;
+    // Total KRW comparability requires explicit total wording and domestic
+    // goods. Unknown or contradictory wording is not an invalidation signal.
     if (
       detail.intrbidYn !== "N" ||
-      !/(?:총액)/.test(String(detail.bidNtceNm)) ||
+      !/총액/.test(String(detail.bidNtceNm)) ||
       EXCLUDED.test(String(detail.bidNtceNm) + String(detail.ntceKindNm))
     )
-      return null;
+      return result;
     const productPage = await this.fetch(
       "getBidPblancListInfoThngPurchsObjPrdct",
       { ...identity, bidNtceOrd: String(final.bidNtceOrd) },
       1,
     );
-    const products = productPage.items.filter((row) =>
+    const noticeProducts = productPage.items.filter((row) =>
       this.sameNotice(row, final),
     );
-    if (products.length !== 1 || productPage.totalCount > 100) return null;
+    if (
+      productPage.totalCount !== productPage.items.length ||
+      productPage.totalCount > 100 ||
+      noticeProducts.some((row) => !/^\d{1,10}$/.test(String(row.bidClsfcNo)))
+    )
+      return result;
+    const products = noticeProducts.filter(
+      (row) => String(row.bidClsfcNo) === String(final.bidClsfcNo),
+    );
+    if (
+      products.length !== 1 ||
+      (toNullableText(products[0].rbidNo) !== null &&
+        String(products[0].rbidNo) !== String(final.rbidNo))
+    )
+      return result;
     const classification = toNullableText(products[0].dtilPrdctClsfcNo);
     if (
       !classification ||
       !/^\d{10}$/.test(classification) ||
-      !LED.test(String(products[0].dtilPrdctClsfcNoNm))
+      toNullableText(detail.dtilPrdctClsfcNo) !== classification
     )
-      return null;
+      return result;
     const pricePage = await this.fetch(PRICE_OPERATION, identity, 1);
     const prices = pricePage.items.filter(
       (row) =>
@@ -154,16 +236,17 @@ export class G2bAwardAdapter {
     const price = prices[0];
     if (
       !price ||
+      pricePage.totalCount !== pricePage.items.length ||
       pricePage.totalCount > 100 ||
       prices.some(
         (row) => row.bssamt !== price.bssamt || row.plnprc !== price.plnprc,
       )
     )
-      return null;
+      return result;
     const basis = positiveDecimal(price.bssamt),
       expected = positiveDecimal(price.plnprc),
       winning = positiveDecimal(final.sucsfbidAmt);
-    if (!basis || !expected || !winning) return null;
+    if (!basis || !expected || !winning) return result;
     // Enforce the persisted numeric(20,2) domain before PostgreSQL can round data.
     const amounts = [price.bssamt, price.plnprc, final.sucsfbidAmt];
     if (
@@ -172,8 +255,26 @@ export class G2bAwardAdapter {
           typeof value !== "string" || !/^\d{1,18}(?:\.\d{1,2})?$/.test(value),
       )
     )
-      return null;
-    return {
+      return result;
+    const isLed = LED.test(String(products[0].dtilPrdctClsfcNoNm));
+    const singleNoticeClass =
+      noticeProducts.length === 1 &&
+      pricePage.items
+        .filter((row) => this.sameNotice(row, final))
+        .every((row) => String(row.bidClsfcNo) === String(final.bidClsfcNo));
+    // Persistence predates bid-class storage. A complete single-item notice can
+    // reconcile the prior product identity. Multi-class changes cannot prove
+    // that mapping: retain unrelated history and expose a safe review code.
+    if (singleNoticeClass)
+      result.invalidations.push({
+        kind: "SINGLE_ITEM_RECONCILED",
+        ...notice,
+        openedAt,
+        retainedProductClassification: isLed ? classification : null,
+      });
+    else result.diagnostics.push("AMBIGUOUS_CLASS_IDENTITY");
+    if (!isLed) return result;
+    result.item = {
       source: TenderSource.G2B,
       sourceNoticeId: String(final.bidNtceNo),
       revision: String(final.bidNtceOrd),
@@ -190,6 +291,7 @@ export class G2bAwardAdapter {
       isFinalAward: true,
       isFailedBid: false,
     };
+    return result;
   }
   private persistedRate(value: TenderDecimal): string | null {
     const serialized = value.toString(6, true);
