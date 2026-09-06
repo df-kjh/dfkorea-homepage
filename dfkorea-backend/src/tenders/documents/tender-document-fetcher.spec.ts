@@ -39,7 +39,10 @@ const hwpBytes = Buffer.from([
   0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00,
 ]);
 
-const createStoredZip = (entryNames: string[]): Buffer => {
+const createStoredZip = (
+  entryNames: string[],
+  options: { dataDescriptors?: boolean } = {},
+): Buffer => {
   const localParts: Buffer[] = [];
   const centralParts: Buffer[] = [];
   let localOffset = 0;
@@ -48,19 +51,26 @@ const createStoredZip = (entryNames: string[]): Buffer => {
     const local = Buffer.alloc(30 + name.length);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(options.dataDescriptors ? 0x0008 : 0, 6);
     local.writeUInt16LE(name.length, 26);
     name.copy(local, 30);
     localParts.push(local);
+    if (options.dataDescriptors) {
+      const descriptor = Buffer.alloc(16);
+      descriptor.writeUInt32LE(0x08074b50, 0);
+      localParts.push(descriptor);
+    }
 
     const central = Buffer.alloc(46 + name.length);
     central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(20, 4);
     central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(options.dataDescriptors ? 0x0008 : 0, 8);
     central.writeUInt16LE(name.length, 28);
     central.writeUInt32LE(localOffset, 42);
     name.copy(central, 46);
     centralParts.push(central);
-    localOffset += local.length;
+    localOffset += local.length + (options.dataDescriptors ? 16 : 0);
   }
   const central = Buffer.concat(centralParts);
   const end = Buffer.alloc(22);
@@ -71,6 +81,18 @@ const createStoredZip = (entryNames: string[]): Buffer => {
   end.writeUInt32LE(localOffset, 16);
   return Buffer.concat([...localParts, central, end]);
 };
+
+const mutateZip = (zip: Buffer, mutate: (copy: Buffer) => void): Buffer => {
+  const copy = Buffer.from(zip);
+  mutate(copy);
+  return copy;
+};
+
+const centralOffset = (zip: Buffer): number =>
+  zip.readUInt32LE(zip.length - 22 + 16);
+
+const firstLocalDataOffset = (zip: Buffer): number =>
+  30 + zip.readUInt16LE(26) + zip.readUInt16LE(28);
 
 const createHwpCompoundFile = (): Buffer => {
   const file = Buffer.alloc(512 * 5);
@@ -136,27 +158,34 @@ const createTruncatedHwpCompoundFile = (): Buffer => {
   return file;
 };
 
-const g2bDocumentUrl = (
-  fixture: string,
-  extra: Record<string, string> = {},
-) => {
-  const url = new URL("https://www.g2b.go.kr/pt/file/download.do");
-  url.searchParams.set("bidNtceNo", "R26BK01000001");
-  url.searchParams.set("bidNtceOrd", "000");
-  url.searchParams.set("fileSeq", "1");
-  url.searchParams.set("fixture", fixture);
-  for (const [name, value] of Object.entries(extra)) {
-    url.searchParams.set(name, value);
-  }
+const g2bDocumentUrl = (fixture: string) => {
+  const fixtureSequence: Record<string, number> = {
+    document: 1,
+    oversized: 2,
+    mismatch: 3,
+    slow: 4,
+    offsite: 5,
+  };
+  const sequence = fixture === "redirect" ? 6 : fixtureSequence[fixture]!;
+  const url = new URL(
+    "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do",
+  );
+  url.searchParams.set("bidPbancNo", "R26BK01000001");
+  url.searchParams.set("bidPbancOrd", "000");
+  url.searchParams.set("fileType", "");
+  url.searchParams.set("fileSeq", String(sequence));
+  url.searchParams.set("prcmBsneSeCd", "01");
   return url.toString();
 };
 
 const document = (
   overrides: Partial<TenderDocumentReference> = {},
-): TenderDocumentReference =>
-  issueTenderDocumentReference({
-    identity: "G2B:R26BK01000001:000:1",
-    url: g2bDocumentUrl("document"),
+): TenderDocumentReference => {
+  const url = overrides.url ?? g2bDocumentUrl("document");
+  const fileSequence = Number(new URL(url).searchParams.get("fileSeq") ?? 1);
+  return issueTenderDocumentReference({
+    identity: `G2B:R26BK01000001:000:${fileSequence}`,
+    url,
     displayName: "규격서.pdf",
     formatHint: "PDF",
     source: "G2B_API",
@@ -165,10 +194,11 @@ const document = (
     evidence: {
       source: "G2B_API",
       operation: "getBidPblancListInfoThng",
-      field: "ntceSpecDocUrl1",
+      field: `ntceSpecDocUrl${fileSequence}`,
     },
     ...overrides,
   });
+};
 
 describe("TenderDocumentFetcher", () => {
   let server: Server;
@@ -181,10 +211,24 @@ describe("TenderDocumentFetcher", () => {
   beforeAll(async () => {
     server = createServer((request, response) => {
       const url = new URL(request.url || "/", "http://local.test");
-      const fixture =
-        url.pathname === "/pt/file/download.do"
-          ? url.searchParams.get("fixture")
+      const fileSequence =
+        url.pathname === "/pn/pnp/pnpe/UntyAtchFile/downloadFile.do"
+          ? Number(url.searchParams.get("fileSeq"))
           : null;
+      const fixture =
+        fileSequence === 1
+          ? "document"
+          : fileSequence === 2
+            ? "oversized"
+            : fileSequence === 3
+              ? "mismatch"
+              : fileSequence === 4
+                ? "slow"
+                : fileSequence === 5
+                  ? "offsite"
+                  : fileSequence !== null && fileSequence >= 6
+                    ? "redirect"
+                    : null;
       if (url.pathname === "/document.pdf" || fixture === "document") {
         response.writeHead(200, { "content-type": "application/pdf" });
         response.end(pdfBytes);
@@ -228,14 +272,8 @@ describe("TenderDocumentFetcher", () => {
         return;
       }
       if (url.pathname === "/redirect.pdf" || fixture === "redirect") {
-        const count = Number(url.searchParams.get("count") || "0");
         response.writeHead(302, {
-          location:
-            count >= 5
-              ? g2bDocumentUrl("document")
-              : g2bDocumentUrl("redirect", {
-                  count: String(count + 1),
-                }),
+          location: g2bDocumentUrl("redirect"),
         });
         response.end();
         return;
@@ -394,12 +432,17 @@ describe("TenderDocumentFetcher", () => {
     ["a missing notice binding", "https://www.g2b.go.kr/document.pdf"],
     [
       "a mismatched revision",
-      "https://www.g2b.go.kr/document.pdf?bidNtceNo=R26BK01000001&bidNtceOrd=999",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01000001&bidPbancOrd=999&fileType=&fileSeq=1&prcmBsneSeCd=01",
     ],
     [
       "a manufactured official-host path",
-      "https://www.g2b.go.kr/manufactured.pdf?bidNtceNo=R26BK01000001&bidNtceOrd=000",
+      "https://www.g2b.go.kr/manufactured.pdf?bidPbancNo=R26BK01000001&bidPbancOrd=000&fileType=&fileSeq=1&prcmBsneSeCd=01",
     ],
+    [
+      "the obsolete synthetic attachment path",
+      "https://www.g2b.go.kr/pt/file/download.do?bidNtceNo=R26BK01000001&bidNtceOrd=000&fileSeq=1",
+    ],
+    ["an unexpected query key", `${g2bDocumentUrl("document")}&token=secret`],
   ])(
     "rejects %s even when its reference metadata looks valid",
     async (_label, url) => {
@@ -408,6 +451,22 @@ describe("TenderDocumentFetcher", () => {
       ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
     },
   );
+
+  it("rejects an issued URL rebound to a different evidence slot", async () => {
+    await expect(
+      createFetcher().fetch(
+        document({
+          identity: "G2B:R26BK01000001:000:2",
+          evidence: {
+            source: "G2B_API",
+            operation: "getBidPblancListInfoThng",
+            field: "ntceSpecDocUrl2",
+          },
+        }),
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
+  });
 
   it("rejects a cloned document reference that was not issued by an adapter", async () => {
     const manufactured = { ...document() };
@@ -530,6 +589,67 @@ describe("TenderDocumentFetcher", () => {
     });
   });
 
+  const docxEntries = ["[Content_Types].xml", "word/document.xml"];
+  it.each([
+    ["truncated end record", createStoredZip(docxEntries).subarray(0, -1)],
+    [
+      "contradictory local compressed size",
+      mutateZip(createStoredZip(docxEntries), (zip) =>
+        zip.writeUInt32LE(0x7fffffff, 18),
+      ),
+    ],
+    [
+      "contradictory local compression method",
+      mutateZip(createStoredZip(docxEntries), (zip) => zip.writeUInt16LE(8, 8)),
+    ],
+    [
+      "contradictory local flags",
+      mutateZip(createStoredZip(docxEntries), (zip) =>
+        zip.writeUInt16LE(0x0008, 6),
+      ),
+    ],
+    [
+      "ZIP64 sentinel metadata",
+      mutateZip(createStoredZip(docxEntries), (zip) =>
+        zip.writeUInt32LE(0xffffffff, centralOffset(zip) + 24),
+      ),
+    ],
+    [
+      "compressed data extent overlapping the next local header",
+      mutateZip(createStoredZip(docxEntries), (zip) => {
+        zip.writeUInt32LE(10, 18);
+        zip.writeUInt32LE(10, 22);
+        zip.writeUInt32LE(10, centralOffset(zip) + 20);
+        zip.writeUInt32LE(10, centralOffset(zip) + 24);
+      }),
+    ],
+    [
+      "contradictory data descriptor sizes",
+      mutateZip(
+        createStoredZip(docxEntries, { dataDescriptors: true }),
+        (zip) => zip.writeUInt32LE(1, firstLocalDataOffset(zip) + 8),
+      ),
+    ],
+  ])("rejects ZIP container with %s", async (_label, bytes) => {
+    await expect(
+      fetchStaticDocument(
+        bytes,
+        "DOCX",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_FORMAT_MISMATCH" });
+  });
+
+  it("accepts a valid ZIP data descriptor layout without decompressing entries", async () => {
+    await expect(
+      fetchStaticDocument(
+        createStoredZip(docxEntries, { dataDescriptors: true }),
+        "DOCX",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).resolves.toMatchObject({ detectedFormat: "DOCX" });
+  });
+
   it.each([
     ["HWP", createHwpCompoundFile(), "application/x-hwp"],
     [
@@ -590,7 +710,7 @@ describe("TenderDocumentFetcher", () => {
   it("rejects excessive redirect count", async () => {
     await expect(
       createFetcher().fetch(
-        document({ url: g2bDocumentUrl("redirect", { count: "0" }) }),
+        document({ url: g2bDocumentUrl("redirect") }),
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ code: "DOCUMENT_REDIRECT_LIMIT" });

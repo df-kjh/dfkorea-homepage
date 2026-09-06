@@ -171,6 +171,39 @@ describe("G2bEnrichmentAdapter", () => {
     }
   });
 
+  it("issues a bound reference for the recorded official goods attachment URL shape", async () => {
+    const sourceNoticeId = "R26BK01707695";
+    const recordedUrl =
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01707695&bidPbancOrd=000&fileType=&fileSeq=1&prcmBsneSeCd=01";
+    const { client } = createClient((request) =>
+      Promise.resolve(
+        request.operation === "getBidPblancListInfoThng"
+          ? [
+              {
+                bidNtceNo: sourceNoticeId,
+                bidNtceOrd: "000",
+                ntceSpecFileNm1: "물품 규격서.hwp",
+                ntceSpecDocUrl1: recordedUrl,
+              },
+            ]
+          : [],
+      ),
+    );
+
+    const result = await new G2bEnrichmentAdapter(client, {
+      baseUrl: "https://apis.data.go.kr/1230000/ad/BidPublicInfoService",
+      serviceKey: "test-key",
+    }).enrich({ ...tender, sourceNoticeId }, new AbortController().signal);
+
+    expect(result.documents).toEqual([
+      expect.objectContaining({
+        identity: "G2B:R26BK01707695:000:1",
+        url: recordedUrl,
+        formatHint: "HWP",
+      }),
+    ]);
+  });
+
   it("keeps successful facts and records each failed provider operation explicitly", async () => {
     const { client } = createClient((request) => {
       if (request.operation === "getBidPblancListInfoLicenseLimit") {

@@ -17,6 +17,7 @@ import {
   TenderSourceError,
   toNullableText,
 } from "./public-api-client";
+import { parseValidatedG2bDocumentUrl } from "../documents/g2b-document-url";
 
 export interface G2bEnrichmentAdapterConfig {
   baseUrl: string;
@@ -61,13 +62,6 @@ const REGION_CODES: Readonly<Record<string, string>> = {
   강원도: "51",
   강원특별자치도: "51",
 };
-
-const G2B_DOCUMENT_HOSTS = new Set([
-  "g2b.go.kr",
-  "www.g2b.go.kr",
-  "apis.data.go.kr",
-]);
-const G2B_DOCUMENT_PATH = "/pt/file/download.do";
 
 const evidence = (operation: Operation, field: string): EvidenceRef => ({
   source: "G2B_API",
@@ -273,36 +267,22 @@ export class G2bEnrichmentAdapter implements TenderEnrichmentAdapter {
     tender: NormalizedTender,
     operation: "getBidPblancListInfoThng",
   ) {
-    try {
-      const url = new URL(value);
-      if (
-        url.protocol !== "https:" ||
-        url.username ||
-        url.password ||
-        url.port ||
-        url.hash ||
-        !G2B_DOCUMENT_HOSTS.has(url.hostname) ||
-        url.pathname !== G2B_DOCUMENT_PATH ||
-        url.searchParams.getAll("bidNtceNo").length !== 1 ||
-        url.searchParams.get("bidNtceNo") !== tender.sourceNoticeId ||
-        url.searchParams.getAll("bidNtceOrd").length !== 1 ||
-        url.searchParams.get("bidNtceOrd") !== tender.revision
-      ) {
-        return null;
-      }
-      return issueTenderDocumentReference({
-        identity: `G2B:${tender.sourceNoticeId}:${tender.revision}:${index}`,
-        url: url.toString(),
-        displayName,
-        formatHint: formatFromName(displayName) ?? formatFromName(value),
-        source: "G2B_API",
-        sourceNoticeId: tender.sourceNoticeId,
-        revision: tender.revision,
-        evidence: evidence(operation, `ntceSpecDocUrl${index}`),
-      });
-    } catch {
-      return null;
-    }
+    const url = parseValidatedG2bDocumentUrl(value, {
+      sourceNoticeId: tender.sourceNoticeId,
+      revision: tender.revision,
+      fileSequence: index,
+    });
+    if (!url) return null;
+    return issueTenderDocumentReference({
+      identity: `G2B:${tender.sourceNoticeId}:${tender.revision}:${index}`,
+      url: url.toString(),
+      displayName,
+      formatHint: formatFromName(displayName) ?? formatFromName(value),
+      source: "G2B_API",
+      sourceNoticeId: tender.sourceNoticeId,
+      revision: tender.revision,
+      evidence: evidence(operation, `ntceSpecDocUrl${index}`),
+    });
   }
 
   private readBasis(

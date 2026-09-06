@@ -10,14 +10,13 @@ import {
   TenderDocumentFormat,
   TenderDocumentReference,
 } from "../domain/tender-enrichment";
+import { parseValidatedG2bDocumentUrl } from "./g2b-document-url";
 
 const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 const MAX_CONTAINER_ENTRIES = 4_096;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
-const G2B_HOSTS = new Set(["g2b.go.kr", "www.g2b.go.kr", "apis.data.go.kr"]);
-const G2B_DOCUMENT_PATH = "/pt/file/download.do";
 const KAPT_HOSTS = new Set(["k-apt.go.kr", "www.k-apt.go.kr"]);
 
 export type TenderDocumentFetchErrorCode =
@@ -230,25 +229,21 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         throw offAllowlist();
       }
       if (document.source === "G2B_API") {
+        const evidenceMatch = /^ntceSpecDocUrl([1-9]|10)$/.exec(
+          document.evidence.field,
+        );
+        const fileSequence = Number(evidenceMatch?.[1]);
         if (
-          !G2B_HOSTS.has(url.hostname) ||
-          url.pathname !== G2B_DOCUMENT_PATH ||
           document.evidence.source !== "G2B_API" ||
           document.evidence.operation !== "getBidPblancListInfoThng" ||
-          !/^ntceSpecDocUrl(?:[1-9]|10)$/.test(document.evidence.field) ||
-          !document.identity.startsWith(
-            `G2B:${document.sourceNoticeId}:${document.revision}:`,
-          )
-        ) {
-          throw offAllowlist();
-        }
-        const noticeNumberValues = url.searchParams.getAll("bidNtceNo");
-        const revisionValues = url.searchParams.getAll("bidNtceOrd");
-        if (
-          noticeNumberValues.length !== 1 ||
-          noticeNumberValues[0] !== document.sourceNoticeId ||
-          revisionValues.length !== 1 ||
-          revisionValues[0] !== document.revision
+          !Number.isInteger(fileSequence) ||
+          document.identity !==
+            `G2B:${document.sourceNoticeId}:${document.revision}:${fileSequence}` ||
+          !parseValidatedG2bDocumentUrl(url.toString(), {
+            sourceNoticeId: document.sourceNoticeId,
+            revision: document.revision,
+            fileSequence,
+          })
         ) {
           throw offAllowlist();
         }
@@ -440,7 +435,8 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
       if (endOffset + 22 + commentLength !== buffer.length) throw new Error();
       if (
         buffer.readUInt16LE(endOffset + 4) !== 0 ||
-        buffer.readUInt16LE(endOffset + 6) !== 0
+        buffer.readUInt16LE(endOffset + 6) !== 0 ||
+        (endOffset >= 20 && buffer.readUInt32LE(endOffset - 20) === 0x07064b50)
       ) {
         throw new Error();
       }
@@ -450,25 +446,70 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
       const centralOffset = buffer.readUInt32LE(endOffset + 16);
       if (
         entryCount === 0 ||
+        entryCount === 0xffff ||
         entryCount !== diskEntries ||
         entryCount > MAX_CONTAINER_ENTRIES ||
+        centralSize === 0xffffffff ||
+        centralOffset === 0xffffffff ||
         centralOffset + centralSize !== endOffset
       ) {
         throw new Error();
       }
 
       const entries = new Set<string>();
+      const localRecords: Array<{
+        bitThree: boolean;
+        compressedSize: number;
+        crc32: number;
+        dataOffset: number;
+        localOffset: number;
+        uncompressedSize: number;
+      }> = [];
+      const containsZip64Extra = (start: number, length: number): boolean => {
+        const end = start + length;
+        if (end > buffer.length) throw new Error();
+        let extraOffset = start;
+        while (extraOffset < end) {
+          if (extraOffset + 4 > end) throw new Error();
+          const headerId = buffer.readUInt16LE(extraOffset);
+          const dataLength = buffer.readUInt16LE(extraOffset + 2);
+          extraOffset += 4;
+          if (extraOffset + dataLength > end) throw new Error();
+          if (headerId === 0x0001) return true;
+          extraOffset += dataLength;
+        }
+        return false;
+      };
       let offset = centralOffset;
       for (let index = 0; index < entryCount; index += 1) {
+        if (offset + 46 > endOffset) throw new Error();
         if (buffer.readUInt32LE(offset) !== 0x02014b50) throw new Error();
+        const flags = buffer.readUInt16LE(offset + 8);
+        const compressionMethod = buffer.readUInt16LE(offset + 10);
+        const crc32 = buffer.readUInt32LE(offset + 16);
         const compressedSize = buffer.readUInt32LE(offset + 20);
+        const uncompressedSize = buffer.readUInt32LE(offset + 24);
         const nameLength = buffer.readUInt16LE(offset + 28);
         const extraLength = buffer.readUInt16LE(offset + 30);
         const entryCommentLength = buffer.readUInt16LE(offset + 32);
+        const diskStart = buffer.readUInt16LE(offset + 34);
         const localOffset = buffer.readUInt32LE(offset + 42);
         const nextOffset =
           offset + 46 + nameLength + extraLength + entryCommentLength;
-        if (nameLength === 0 || nextOffset > endOffset) throw new Error();
+        if (
+          nameLength === 0 ||
+          nextOffset > endOffset ||
+          diskStart !== 0 ||
+          compressedSize === 0xffffffff ||
+          uncompressedSize === 0xffffffff ||
+          localOffset === 0xffffffff ||
+          (flags & ~0x0808) !== 0 ||
+          (compressionMethod !== 0 && compressionMethod !== 8) ||
+          (compressionMethod === 0 && compressedSize !== uncompressedSize) ||
+          containsZip64Extra(offset + 46 + nameLength, extraLength)
+        ) {
+          throw new Error();
+        }
         const name = buffer.toString(
           "utf8",
           offset + 46,
@@ -477,25 +518,87 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         if (!name || name.includes("\0") || entries.has(name))
           throw new Error();
 
+        if (localOffset + 30 > centralOffset) throw new Error();
         if (buffer.readUInt32LE(localOffset) !== 0x04034b50) throw new Error();
+        const localFlags = buffer.readUInt16LE(localOffset + 6);
+        const localCompressionMethod = buffer.readUInt16LE(localOffset + 8);
+        const localCrc32 = buffer.readUInt32LE(localOffset + 14);
+        const localCompressedSize = buffer.readUInt32LE(localOffset + 18);
+        const localUncompressedSize = buffer.readUInt32LE(localOffset + 22);
         const localNameLength = buffer.readUInt16LE(localOffset + 26);
         const localExtraLength = buffer.readUInt16LE(localOffset + 28);
         const localDataOffset =
           localOffset + 30 + localNameLength + localExtraLength;
+        const bitThree = (flags & 0x0008) !== 0;
         if (
-          localDataOffset + compressedSize > centralOffset ||
+          localCompressedSize === 0xffffffff ||
+          localUncompressedSize === 0xffffffff ||
+          localFlags !== flags ||
+          localCompressionMethod !== compressionMethod ||
+          localDataOffset > centralOffset ||
+          containsZip64Extra(
+            localOffset + 30 + localNameLength,
+            localExtraLength,
+          ) ||
           buffer.toString(
             "utf8",
             localOffset + 30,
             localOffset + 30 + localNameLength,
-          ) !== name
+          ) !== name ||
+          (bitThree
+            ? localCrc32 !== 0 ||
+              localCompressedSize !== 0 ||
+              localUncompressedSize !== 0
+            : localCrc32 !== crc32 ||
+              localCompressedSize !== compressedSize ||
+              localUncompressedSize !== uncompressedSize)
         ) {
           throw new Error();
         }
         entries.add(name);
+        localRecords.push({
+          bitThree,
+          compressedSize,
+          crc32,
+          dataOffset: localDataOffset,
+          localOffset,
+          uncompressedSize,
+        });
         offset = nextOffset;
       }
       if (offset !== endOffset) throw new Error();
+
+      localRecords.sort((left, right) => left.localOffset - right.localOffset);
+      for (let index = 0; index < localRecords.length; index += 1) {
+        const record = localRecords[index]!;
+        const nextBoundary =
+          localRecords[index + 1]?.localOffset ?? centralOffset;
+        const dataEnd = record.dataOffset + record.compressedSize;
+        if (
+          (index > 0 &&
+            record.localOffset === localRecords[index - 1]!.localOffset) ||
+          record.dataOffset > nextBoundary ||
+          dataEnd > nextBoundary
+        ) {
+          throw new Error();
+        }
+        if (!record.bitThree) continue;
+
+        const signedDescriptorMatches =
+          dataEnd + 16 <= nextBoundary &&
+          buffer.readUInt32LE(dataEnd) === 0x08074b50 &&
+          buffer.readUInt32LE(dataEnd + 4) === record.crc32 &&
+          buffer.readUInt32LE(dataEnd + 8) === record.compressedSize &&
+          buffer.readUInt32LE(dataEnd + 12) === record.uncompressedSize;
+        const unsignedDescriptorMatches =
+          dataEnd + 12 <= nextBoundary &&
+          buffer.readUInt32LE(dataEnd) === record.crc32 &&
+          buffer.readUInt32LE(dataEnd + 4) === record.compressedSize &&
+          buffer.readUInt32LE(dataEnd + 8) === record.uncompressedSize;
+        if (!signedDescriptorMatches && !unsignedDescriptorMatches) {
+          throw new Error();
+        }
+      }
       return entries;
     } catch {
       throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");
