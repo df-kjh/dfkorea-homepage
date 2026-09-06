@@ -3,6 +3,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { AppModule, createApplicationDatabaseOptions } from "./app.module";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { join } from "path";
+import { quoteProxyHops } from "./quotes/quote-proxy";
 import { maybeWriteTestBootstrapConfigProbe } from "./config/bootstrap-config-probe";
 
 async function bootstrap() {
@@ -16,6 +17,9 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // 배포 경로의 프록시 수를 검증한 경우에만 전달 IP를 신뢰한다. 임의 XFF는 직접 읽지 않는다.
+  const trustedProxyHops = quoteProxyHops(process.env.TRUST_PROXY_HOPS);
+  if (trustedProxyHops !== undefined) app.set('trust proxy', trustedProxyHops);
 
   // CORS 설정
   const isDevelopment = process.env.NODE_ENV !== 'production';

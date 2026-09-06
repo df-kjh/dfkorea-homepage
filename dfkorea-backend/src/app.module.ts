@@ -27,12 +27,16 @@ import { TenderMailOAuthCredential } from "./tenders/entities/tender-mail-oauth-
 import { TendersModule } from "./tenders/tenders.module";
 import { resolveDatabaseConnectionOptions } from "./config/production-environment";
 
+import { QUOTE_ENTITIES } from "./quotes/entities/quote.entity";
+import { QuotesModule } from "./quotes/quotes.module";
+
 export const createApplicationDatabaseOptions = (
   environment: NodeJS.ProcessEnv,
 ): TypeOrmModuleOptions => ({
   type: "postgres",
   ...resolveDatabaseConnectionOptions(environment),
   entities: [
+    ...QUOTE_ENTITIES,
     Product,
     Post,
     Admin,
@@ -52,7 +56,8 @@ export const createApplicationDatabaseOptions = (
     environment.NODE_ENV === "production"
       ? false
       : environment.TYPEORM_SYNCHRONIZE === "true",
-  logging: environment.NODE_ENV !== "production",
+  // 견적 SQL 매개변수에 개인정보가 포함되어 모든 환경에서 쿼리 로깅을 끈다.
+  logging: false,
 });
 
 @Module({
@@ -76,6 +81,7 @@ export const createApplicationDatabaseOptions = (
     CertificatesModule,
     SeoModule,
     TendersModule,
+    QuotesModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

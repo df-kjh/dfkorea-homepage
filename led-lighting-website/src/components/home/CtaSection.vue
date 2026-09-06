@@ -72,6 +72,9 @@
 
               <!-- Content -->
               <div class="p-8 grid md:grid-cols-2 gap-4">
+                <button @click="handleQuoteContact" class="md:col-span-2 flex items-center justify-between p-6 rounded-2xl bg-primary text-white text-left hover:bg-primary/90 transition-colors">
+                  <span><strong class="block text-lg">온라인 견적</strong><span class="text-sm opacity-90">제품과 수량을 담아 견적을 요청하세요</span></span><span class="material-symbols-outlined" aria-hidden="true">request_quote</span>
+                </button>
                 <!-- Email Option -->
                 <button
                   @click="handleEmailContact"
@@ -116,6 +119,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useQuoteDraft } from '@/composables/useQuoteDraft'
 import { useToast } from '@/composables/useToast'
 
 interface Props {
@@ -132,6 +136,8 @@ const props = withDefaults(defineProps<Props>(), {
   companyPhone: '032-528-2953',
 })
 
+const quote = useQuoteDraft()
+const handleQuoteContact = (event: Event) => { dialogVisible.value = false; quote.open(event) }
 const toast = useToast()
 const dialogVisible = ref(false)
 

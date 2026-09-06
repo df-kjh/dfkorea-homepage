@@ -21,6 +21,8 @@
         </div>
       </section>
 
+      <div class="max-w-[1400px] mx-auto px-10 pb-12 flex flex-wrap items-center gap-4"><QuoteButton variant="primary" @click="quote.addProduct(product, $event)">견적에 담기</QuoteButton><p class="text-sm text-gray-600">희망 사양은 상담 후 결정할 수 있습니다. 수량은 견적 창에서 수정하세요.</p></div>
+
       <section v-if="product.description" class="py-24 bg-white border-t border-gray-100">
         <div class="max-w-4xl mx-auto px-10">
           <h2 class="text-text-main text-4xl lg:text-5xl font-bold mb-10 leading-tight">
@@ -42,6 +44,8 @@
 </template>
 
 <script setup lang="ts">
+import { useQuoteDraft } from '@/composables/useQuoteDraft'
+import QuoteButton from '@/components/common/quote/QuoteButton.vue'
 import { computed, ref } from 'vue'
 import '@/assets/styles/product-markdown.css'
 import type { Product } from '@/types'
@@ -58,6 +62,7 @@ import {
   toAbsoluteAssetUrl,
 } from '@/utils/seo'
 
+const quote = useQuoteDraft()
 const route = useRoute()
 const router = useRouter()
 const config = useRuntimeConfig()

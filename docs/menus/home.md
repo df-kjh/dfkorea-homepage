@@ -2,6 +2,10 @@
 
 ## 구현 완료
 
+- 공개 페이지 우하단에서 항상 보이는 `온라인 견적` 버튼과 홈 상담 문의 선택의 온라인 견적 버튼이 같은 3단계 견적 창을 연다. 맨 위로 버튼 위 12px 간격의 고정 위치를 사용하고 관리자 페이지에서는 숨긴다.
+- 견적 창은 데스크톱 440px 비모달 창과 모바일 하단 대화상자로 표시하며 본문 스크롤, 최소화 후 작성 유지, ESC·포커스 복귀·모바일 포커스 제한·동작 줄이기를 지원한다.
+- 기업 확인·제품 및 사진 선택·접수 확인·접수번호 성공 화면을 제공하고 실패 시 입력을 보존한다. 상세 흐름은 [온라인 견적 기능 현황](quote.md)에 기록한다.
+
 - HeroSection을 왼쪽 카피·CTA와 오른쪽 Three.js LED 전구 오브젝트의 2열 구성으로 표시한다.
 - 640px 미만 모바일에서는 Hero 높이를 `max(820px, 100svh)`로 유지하고 전용 레이아웃 레이어와 동일한 상하 패딩으로 카피와 CTA의 중심을 화면 정중앙에 배치한다. 3D 전구는 포인터 입력이 없는 32% 불투명도의 배경 레이어로 겹쳐 가장자리 페이드와 텍스트 그림자로 가독성을 유지한다.
 - 웹과 모바일 모두 Hero 하단에 마스킹된 블러와 다단계 그라데이션을 적용해 어두운 장면이 다음 흰색 통계 섹션으로 자연스럽게 전환된다.
@@ -24,12 +28,21 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 견적 UI와 실제 API 연결 코드는 구현했지만 국세청 운영 상호 검증, NAVER WORKS 실제 수신, 사진 임시 보관·운영 보유기간 확인 전에는 외부 운영 연동 완료로 표시하지 않는다. 연결 불가 시 재시도와 기존 전화·이메일 문의를 안내한다.
+
 - 현재 전구는 브랜드 인상을 위한 추상화 모델이므로 실제 제품 외형과 내부 기판 구조가 다를 수 있다.
 - 전선 물리는 과도한 파동을 방지하기 위한 2차원 단일 진자 방식이므로 깊이 방향의 회전, 전선 휨, 복잡한 충돌은 지원하지 않는다.
 - 실제 제품 모델이 제공되면 현재 물리·밝기·렌더러 생명주기를 유지한 채 전구 메시와 재질만 교체해야 한다.
 - 저사양 기기별 실제 프레임 시간 데이터가 축적되면 픽셀 비율과 관절 수 기준을 추가 조정할 수 있다.
 
 ## 관련 파일
+
+- `led-lighting-website/src/app.vue`
+- `led-lighting-website/src/components/home/CtaSection.vue`
+- `led-lighting-website/src/components/quote/QuoteLauncher.vue`
+- `led-lighting-website/src/components/quote/QuotePanel.vue`
+- `led-lighting-website/src/composables/useQuoteDraft.ts`
+- `docs/menus/quote.md`
 
 - `led-lighting-website/src/components/home/HeroSection.vue`
 - `led-lighting-website/src/components/home/HeroSection.spec.ts`
@@ -41,6 +54,8 @@
 - `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.spec.ts`
 
 ## 갱신 규칙
+
+- 홈 상담 문의 진입점과 공개 전역 견적 창의 동작·반응형·접수 상태가 바뀌면 온라인 견적 문서와 함께 갱신한다.
 
 - 홈 Hero의 레이아웃, 카피, 3D 전구 모델, 줄 물리, 밝기 상호작용, 품질 정책 또는 fallback 방식이 변경되면 이 문서를 같은 작업에서 갱신한다.
 - 실제 제품 모델이나 측광 데이터를 적용할 때는 구현 완료와 한계 항목을 함께 수정한다.

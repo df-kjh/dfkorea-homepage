@@ -3,13 +3,25 @@ import { DatabaseService } from "../database/database.service";
 import { CreateProductDto } from "./dto/product.dto";
 import { UpdateProductDto } from "./dto/product.dto";
 import { Product } from "../entities/product.entity";
+import {
+  filterProducts,
+  getProductFilterOptions,
+  ProductFilterOptions,
+  ProductFilters,
+  ProductSpecificationFilters,
+  validateProductPagination,
+} from "./product-filters";
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async findAll(): Promise<Product[]> {
-    return this.databaseService.getProducts();
+  async findAll(filters: ProductFilters = {}): Promise<Product[]> {
+    return filterProducts(await this.databaseService.getProducts(), filters);
+  }
+
+  async findFilterOptions(): Promise<ProductFilterOptions> {
+    return getProductFilterOptions(await this.databaseService.getProducts());
   }
 
   async findAllPaginated(
@@ -17,6 +29,7 @@ export class ProductsService {
     limit: number,
     search?: string,
     category?: string,
+    filters: ProductSpecificationFilters = {},
   ): Promise<{
     data: Product[];
     total: number;
@@ -24,22 +37,20 @@ export class ProductsService {
     limit: number;
     totalPages: number;
   }> {
-    let allProducts = await this.databaseService.getProducts();
-
-    // 카테고리 필터링
-    if (category && category.trim() && category !== "전체") {
-      allProducts = allProducts.filter((product) =>
-        product.category === category,
-      );
-    }
-
-    // 검색어가 있으면 필터링
-    if (search && search.trim()) {
-      const searchLower = search.toLowerCase().trim();
-      allProducts = allProducts.filter((product) =>
-        product.name.toLowerCase().includes(searchLower),
-      );
-    }
+    validateProductPagination(page, limit);
+    const allProducts = filterProducts(
+      await this.databaseService.getProducts(),
+      {
+        ...filters,
+        search,
+        category,
+      },
+    ).sort((a, b) => {
+      // 등록 시각이 같아도 페이지 경계의 제품이 조회마다 바뀌지 않도록 ID를 보조 정렬 키로 사용한다.
+      const dateOrder =
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return dateOrder || a.id.localeCompare(b.id);
+    });
 
     const total = allProducts.length;
     const totalPages = Math.ceil(total / limit);

@@ -12,6 +12,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { ProductsService } from "./products.service";
+import { parseProductQuery } from "./product-filters";
 import { CreateProductDto, UpdateProductDto } from "./dto/product.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AiService, ProductInfo } from "../ai/ai.service";
@@ -24,20 +25,24 @@ export class ProductsController {
   ) {}
 
   @Get()
-  async findAll(
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-    @Query("category") category?: string,
-  ) {
-    const pageNum = page ? parseInt(page, 10) : undefined;
-    const limitNum = limit ? parseInt(limit, 10) : undefined;
-
-    if (pageNum !== undefined && limitNum !== undefined) {
-      return this.productsService.findAllPaginated(pageNum, limitNum, search, category);
+  async findAll(@Query() query: Record<string, unknown>) {
+    const { page, limit, search, category, ...filters } =
+      parseProductQuery(query);
+    if (page !== undefined && limit !== undefined) {
+      return this.productsService.findAllPaginated(
+        page,
+        limit,
+        search,
+        category,
+        filters,
+      );
     }
+    return this.productsService.findAll({ search, category, ...filters });
+  }
 
-    return this.productsService.findAll();
+  @Get("filter-options")
+  async findFilterOptions() {
+    return this.productsService.findFilterOptions();
   }
 
   @Get("featured/list")

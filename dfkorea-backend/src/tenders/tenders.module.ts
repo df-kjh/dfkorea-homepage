@@ -138,6 +138,7 @@ const createSafeRetryLogger = (context: string) => {
     TenderSubscriptionService,
   ],
   exports: [
+    NaverWorksOAuthService,
     TenderIngestionService,
     TenderSchedulerService,
     TenderQueryService,

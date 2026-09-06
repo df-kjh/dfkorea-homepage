@@ -16,13 +16,20 @@
         @category-change="handleCategoryChange"
       />
 
+      <div class="px-6 md:px-12 mb-8 max-w-3xl">
+        <ProductFilters v-model="filters" :options="filterOptions" />
+        <div class="flex flex-wrap gap-3 items-center"><QuoteButton variant="link" @click="resetFilters">검색 조건 초기화</QuoteButton><span class="text-sm text-gray-600">검색 결과 {{ totalProducts }}개</span></div>
+        <p v-if="filterError" class="text-sm text-red-700">검색 조건을 불러오지 못했습니다. <QuoteButton variant="link" @click="loadFilterOptions">다시 시도</QuoteButton></p>
+      </div>
+
+      <div v-if="fetchError && !loading" class="mx-6 md:mx-12 p-8 rounded-xl bg-red-50 text-gray-800" role="alert"><p>제품을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p><QuoteButton class="mt-4" @click="fetchProducts()">다시 시도</QuoteButton></div>
       <!-- Loading State -->
-      <LoadingSpinner v-if="loading" message="제품 목록을 불러오는 중..." class="py-20" />
+      <LoadingSpinner v-else-if="loading" message="제품 목록을 불러오는 중..." class="py-20" />
 
       <!-- Empty State -->
       <EmptyState
         v-else-if="filteredProducts.length === 0"
-        description="등록된 제품이 없습니다"
+        description="조건에 맞는 제품이 없습니다. 검색 조건을 초기화해 보세요."
         class="py-20"
       />
 
@@ -43,14 +50,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { useSEO } from '@/composables/useSEO'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { productsAPI } from '@/api'
 import type { Product } from '@/types'
-import { productCategories } from '@/utils/category'
+import type { ProductFilterOptions } from '@/types/quote'
+import { emptyFilters } from '@/composables/quote-draft'
+import ProductFilters from '@/components/common/quote/ProductFilters.vue'
+import QuoteButton from '@/components/common/quote/QuoteButton.vue'
 import ProductsHeader from '@/components/products/ProductsHeader.vue'
 import ProductGrid from '@/components/products/ProductGrid.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -77,9 +87,17 @@ const currentPage = ref(1)
 const pageSize = ref(20) // 한 번에 20개 제품 로드
 const totalProducts = ref(0)
 const searchQuery = ref('')
+const filters = ref(emptyFilters())
+const filterOptions = ref<ProductFilterOptions>({ categories: [], ...emptyFilters() })
+const fetchError = ref(false), filterError = ref(false)
+let requestGeneration = 0, disposed = false
+async function loadFilterOptions() { try { const { data } = await productsAPI.getFilterOptions(); if (!disposed) { filterOptions.value = data; filterError.value = false } } catch { if (!disposed) filterError.value = true } }
+function resetFilters() { searchQuery.value = ''; selectedCategory.value = '전체'; filters.value = emptyFilters() }
+watch(filters, () => { void fetchProducts() }, { deep: true })
+onBeforeUnmount(() => { disposed = true; requestGeneration++ })
 
 // 카테고리 레이블 목록
-const categoryLabels = computed(() => productCategories.map((cat) => cat.label))
+const categoryLabels = computed(() => ['전체', ...filterOptions.value.categories])
 
 // 선택된 카테고리 레이블
 const selectedCategoryLabel = computed(() => selectedCategory.value)
@@ -91,6 +109,8 @@ const filteredProducts = computed(() => products.value)
 const hasMore = computed(() => products.value.length < totalProducts.value)
 
 const fetchProducts = async (page: number = 1, append: boolean = false) => {
+  const generation = ++requestGeneration
+  fetchError.value = false
   if (append) {
     loadingMore.value = true
   } else {
@@ -103,8 +123,10 @@ const fetchProducts = async (page: number = 1, append: boolean = false) => {
       pageSize.value,
       searchQuery.value,
       selectedCategory.value,
+      filters.value,
     )
 
+    if (generation !== requestGeneration || disposed) return
     if (append) {
       products.value = [...products.value, ...data.data]
     } else {
@@ -114,16 +136,17 @@ const fetchProducts = async (page: number = 1, append: boolean = false) => {
     totalProducts.value = data.total
     currentPage.value = data.page
   } catch (error) {
+    if (generation !== requestGeneration || disposed) return
+    fetchError.value = true
     toast.error('제품 목록을 불러오는데 실패했습니다')
     console.error('Failed to fetch products:', error)
   } finally {
-    loading.value = false
-    loadingMore.value = false
+    if (generation === requestGeneration && !disposed) { loading.value = false; loadingMore.value = false }
   }
 }
 
 const loadMore = () => {
-  if (!loadingMore.value && hasMore.value) {
+  if (!loading.value && !loadingMore.value && !fetchError.value && hasMore.value) {
     fetchProducts(currentPage.value + 1, true)
   }
 }
@@ -131,7 +154,7 @@ const loadMore = () => {
 // 무한 스크롤 설정
 const { observerTarget } = useInfiniteScroll({
   onLoadMore: loadMore,
-  enabled: () => hasMore.value && !loading.value && !loadingMore.value,
+  enabled: () => hasMore.value && !fetchError.value && !loading.value && !loadingMore.value,
 })
 
 const handleSearch = (query: string) => {
@@ -155,6 +178,7 @@ const viewProductDetail = (product: Product) => {
 }
 
 onMounted(() => {
+  void loadFilterOptions()
   fetchProducts()
 })
 </script>

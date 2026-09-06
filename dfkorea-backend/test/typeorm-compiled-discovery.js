@@ -14,6 +14,7 @@ const discoveryPaths = [...paths.entities, ...paths.migrations];
 for (const expectedGlob of [
   "dist/entities/*.entity.js",
   "dist/tenders/entities/*.entity.js",
+  "dist/quotes/entities/*.entity.js",
   "dist/migrations/[0-9]*.js",
 ]) {
   assert.ok(
@@ -23,6 +24,9 @@ for (const expectedGlob of [
 }
 
 for (const relativePath of [
+  "dist/quotes/entities/quote.entity.js",
+  "dist/migrations/1788652800000-CreateQuoteTables.js",
+  "dist/migrations/1788652900000-AddQuoteAttachmentPayloads.js",
   "dist/tenders/entities/tender-recipient.entity.js",
   "dist/tenders/entities/tender-mail-delivery.entity.js",
   "dist/tenders/entities/tender-daily-dispatch.entity.js",

@@ -17,6 +17,8 @@
       <span class="material-symbols-outlined">arrow_upward</span>
     </button>
 
+    <ClientOnly><QuoteLauncher v-if="!isAdminPage" /></ClientOnly>
+
     <ToastContainer />
   </div>
 </template>
@@ -25,6 +27,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import TheNavigation from "@/components/layout/TheNavigation.vue";
 import TheFooter from "@/components/layout/TheFooter.vue";
+import QuoteLauncher from "@/components/quote/QuoteLauncher.vue";
 import ToastContainer from "@/components/common/ToastContainer.vue";
 
 const route = useRoute();

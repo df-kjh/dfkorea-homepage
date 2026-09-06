@@ -160,7 +160,8 @@ try {
       database: "dfkorea",
       entities: undefined,
       synchronize: false,
-      logging: true,
+      // 견적의 개인정보 SQL 매개변수를 개발 환경에서도 출력하지 않는다.
+      logging: false,
     },
   );
   const conflictingNonProduction = createApplicationDatabaseOptions({

@@ -1,4 +1,6 @@
 import apiClient from './client'
+import publicClient from './public-client'
+import type { ProductFilters, ProductFilterOptions } from '@/types/quote'
 import type {
   LoginDto,
   LoginResponse,
@@ -24,10 +26,17 @@ export const authAPI = {
 // 제품 API
 export const productsAPI = {
   getAll: () => apiClient.get<Product[]>('/products'),
-  getPaginated: (page: number, limit: number, search?: string, category?: string) =>
-    apiClient.get<PaginatedResponse<Product>>('/products', {
-      params: { page, limit, ...(search && { search }), ...(category && category !== '전체' && { category }) },
+  getPaginated: (page: number, limit: number, search?: string, category?: string, filters?: Partial<ProductFilters>) =>
+    publicClient.get<PaginatedResponse<Product>>('/products', {
+      params: {
+        page,
+        limit,
+        ...(search && { search }),
+        ...(category && category !== '전체' && { category }),
+        ...Object.fromEntries(Object.entries(filters || {}).filter(([, values]) => values?.length).map(([key, values]) => [key, values!.join(',')])),
+      },
     }),
+  getFilterOptions: () => publicClient.get<ProductFilterOptions>('/products/filter-options'),
   getFeatured: () => apiClient.get<Product[]>('/products/featured/list'),
   getOne: (id: string) => apiClient.get<Product>(`/products/${id}`),
   create: (data: CreateProductDto) => apiClient.post<Product>('/products', data),

@@ -45,7 +45,8 @@ const handleSearch = (query: string) => {
     <div class="px-6 md:px-12 mb-8">
       <SearchBar
         v-model="localSearchQuery"
-        placeholder="제품명으로 검색..."
+        placeholder="제품명 또는 모델명으로 검색..."
+        :debounce-ms="300"
         @search="handleSearch"
       />
     </div>

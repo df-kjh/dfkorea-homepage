@@ -12,6 +12,7 @@ describe("TypeORM migration discovery paths", () => {
       entities: [
         "src/entities/*.entity.ts",
         "src/tenders/entities/*.entity.ts",
+        "src/quotes/entities/*.entity.ts",
       ],
       migrations: ["src/migrations/[0-9]*.ts"],
     },
@@ -20,6 +21,7 @@ describe("TypeORM migration discovery paths", () => {
       entities: [
         "dist/entities/*.entity.js",
         "dist/tenders/entities/*.entity.js",
+        "dist/quotes/entities/*.entity.js",
       ],
       migrations: ["dist/migrations/[0-9]*.js"],
     },
