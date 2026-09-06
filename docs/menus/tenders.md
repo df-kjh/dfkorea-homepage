@@ -97,7 +97,7 @@
 - Railway 운영 환경에는 `PUBLIC_DATA_SERVICE_KEY`, `G2B_RELAY_ENABLED`, `G2B_RELAY_URL`, `G2B_RELAY_SHARED_SECRET`가 필요하다. Vercel 운영 환경에는 동일한 `G2B_RELAY_SHARED_SECRET`과 `G2B_TENDER_API_BASE_URL`, `G2B_DATA_SERVICE_KEY`가 필요하며, 모두 서버 전용 변수로 설정해야 한다. Vercel의 `G2B_DATA_SERVICE_KEY` 값은 Railway의 `PUBLIC_DATA_SERVICE_KEY`에서 복사하되 릴레이 요청에는 포함하지 않는다.
 - NAVER WORKS Mail API는 전송기 이중(mock)과 OAuth 암호화·갱신 및 영속 재시도 계약까지 검증했다. 스테이징에서 실제 Developer Console 앱의 `mail` scope, callback, 발신 계정 승인, `202` 성공, 주소 비중복, `429`/토큰 endpoint 일시 실패의 10분 후 1회 재시도를 확인해야 한다.
 - Mail API의 `429`처럼 수신이 명시적으로 거절된 일시 오류만 같은 슬롯에서 10분 뒤 한 번 재시도한다. `401`은 access token을 한 번 갱신하며, 그 밖의 `4xx`는 영구 실패다. Mail API는 idempotency key를 제공하지 않으므로 발송 요청의 network/timeout 오류와 `5xx`는 제공자가 이미 승인했을 가능성을 배제할 수 없어 해당 슬롯에서는 `DELIVERY_UNCERTAIN`으로 종결한다. 이후 관리자가 같은 날 발송 시각을 변경하거나 다음 날짜 슬롯이 열리면 이 공고는 다시 발송될 수 있으므로 드문 경우 중복 메일 가능성이 있다.
-- 빠른 HTTP·서비스 계약 테스트와 화면 테스트는 안전한 이중(mock)을 사용한다. 별도 `test:tender:integration` 실행기는 실제 AppModule, JWT, TypeORM, migration을 검증하도록 준비했지만, 현재 disposable PostgreSQL이 없어 실행하지 못했다. 이 파괴적 러너는 로컬/명시 Docker 테스트 DB만 허용하며 원격 스테이징 DB에는 실행할 수 없다. KST SQL 집계, 다중 연결 lock/unique claim, 권한 만료, 대량 데이터, 모바일 실기기 시각 검증은 배포 전 추가 확인이 필요하다.
+- 빠른 HTTP·서비스 계약 테스트와 화면 테스트는 안전한 이중(mock)을 사용한다. 별도 로컬 disposable PostgreSQL에서 `test:tender:integration`을 실행해 실제 AppModule, JWT, TypeORM, migration 흐름 6개 테스트를 모두 통과했다. 이 파괴적 러너는 로컬/명시 Docker 테스트 DB만 허용하며 원격 스테이징 DB에는 실행할 수 없다. 승인된 실운영 키의 공공 API 응답, 운영 공개 문서 corpus, 실제 배포 환경의 인증 E2E와 대량 데이터 동작은 아직 검증하지 않았다.
 - 이미 운영 DB에 적용된 `opportunityType`·`opportunityReasons` 컬럼은 기존 데이터와 마이그레이션 이력을 보호하기 위해 삭제하지 않는다. 현재 애플리케이션은 이 레거시 컬럼을 조회·메일 대상 제한에 사용하지 않는다.
 
 ## 관련 파일
