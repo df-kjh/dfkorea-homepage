@@ -1205,4 +1205,117 @@ describe("Tender requirement parsing and scoring regressions", () => {
       ),
     ).toEqual([]);
   });
+
+  it("shares a trailing certification obligation across an explicit conjunction", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      ["KS 인증 및 KC 인증 필수"],
+      profile(),
+      [product("catalog-1", { power: [50], certifications: ["KC"] })],
+    );
+
+    expect(parsed.certifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "KS", required: true }),
+        expect.objectContaining({ code: "KC", required: true }),
+      ]),
+    );
+    expect(result.certifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          requirementId: parsed.certifications.find(({ code }) => code === "KS")
+            ?.id,
+          state: TenderRequirementState.UNSATISFIED,
+        }),
+      ]),
+    );
+    expect(result.suitability).toBe(TenderSuitability.DIFFICULT);
+  });
+
+  it.each([
+    "업종코드 1234 등록 필수이며 내진 구조 필수",
+    "나라장터 등록 필수이며 내진 구조 필수",
+  ])(
+    "keeps an unsupported mandatory residual after a participation rule: %s",
+    (text) => {
+      const { parsed, result } = parseAndAnalyze(
+        {
+          ...emptyTenderEnrichment(),
+          purchaseItems: [
+            {
+              classificationCode: "39112102",
+              name: "LED 등기구",
+              specification: "소비전력 50W 필수",
+              quantity: "1",
+              unit: "EA",
+              evidence: source,
+            },
+          ],
+        },
+        [text],
+        profile({
+          licenses: [{ code: "1234", name: "면허 A", expiresAt: null }],
+        }),
+        [product("catalog-1", { power: [50] })],
+      );
+
+      expect(parsed.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "UNSUPPORTED",
+            state: "UNKNOWN",
+            snippet: expect.stringContaining("내진 구조 필수"),
+          }),
+        ]),
+      );
+      expect(result.specificationScore).toBe(100);
+      expect(result.suitability).toBe(TenderSuitability.REVIEW);
+    },
+  );
+
+  it("consumes supported certification obligation grammar without spurious UNKNOWN evidence", () => {
+    const { parsed, result } = parseAndAnalyze(
+      {
+        ...emptyTenderEnrichment(),
+        purchaseItems: [
+          {
+            classificationCode: "39112102",
+            name: "LED 등기구",
+            specification: "소비전력 50W 필수",
+            quantity: "1",
+            unit: "EA",
+            evidence: source,
+          },
+        ],
+      },
+      ["KS 인증 보유 필수"],
+      profile(),
+      [
+        product("catalog-1", {
+          power: [50],
+          certifications: ["KS"],
+        }),
+      ],
+    );
+
+    expect(parsed.certifications).toEqual([
+      expect.objectContaining({ code: "KS", required: true }),
+    ]);
+    expect(parsed.evidence.some(({ state }) => state === "UNKNOWN")).toBe(
+      false,
+    );
+    expect(result.suitability).toBe(TenderSuitability.RECOMMENDED);
+  });
 });

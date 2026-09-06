@@ -58,7 +58,7 @@ const splitClauses = (text: string): string[] => {
 const splitRequirementSpans = (text: string): string[] =>
   splitClauses(text).flatMap((clause) =>
     clause
-      .split(/\s+(?:및|그리고)\s+|;/)
+      .split(/\s+(?:및|그리고)\s+|;|(?:이며|이고|하며|하되)\s*/)
       .map((span) => span.trim())
       .filter(Boolean),
   );
@@ -589,14 +589,29 @@ const certificationRequirements = (
 ): TenderCertificationRequirement[] =>
   splitClauses(text).flatMap((clause) => {
     const matches = certificationMatches(clause);
-    return matches.map(({ code, name, index }, matchIndex) => {
-      const next = matches[matchIndex + 1];
-      const localContext = clause.slice(index, next?.index ?? clause.length);
-      const required = isExplicitObligation(localContext);
+    const requiredByIndex = Array.from({ length: matches.length }, () => false);
+    for (let index = matches.length - 1; index >= 0; index -= 1) {
+      const match = matches[index];
+      const next = matches[index + 1];
+      const localContext = clause.slice(
+        match.index,
+        next?.index ?? clause.length,
+      );
+      const connector = next
+        ? clause.slice(match.index + match.length, next.index).trim()
+        : "";
+      requiredByIndex[index] = isNegatedObligation(localContext)
+        ? false
+        : isExplicitObligation(localContext) ||
+          (Boolean(next) &&
+            /^(?:및|그리고|과|와)$/.test(connector) &&
+            requiredByIndex[index + 1]);
+    }
+    return matches.map(({ code, name }, index) => {
       const input = {
         code,
         name,
-        required,
+        required: requiredByIndex[index],
         itemKeys: [...itemKeys].sort(),
         evidenceIds: [sourceEvidenceId],
       };
@@ -627,10 +642,11 @@ const unconsumedRecognizedText = (text: string): string | null => {
       " ",
     )
     .replace(
-      /(?:필수|하여야|해야|요함|이며|이고|아니며|입니다|이다|임|및|그리고)/g,
+      /(?:필수|하여야|해야|요함|보유|등록|제출|제한|이며|이고|하며|하되|아니며|입니다|합니다|이다|임|함|및|그리고)/g,
       " ",
     )
     .replace(/^\s*(?:과|와)\s*/, "")
+    .replace(/(?:^|\s)(?:은|는|이|가|을|를|인|에|의)(?=\s|$)/g, " ")
     .replace(/[\s,.!。]+/g, "")
     .trim();
 };
