@@ -73,25 +73,25 @@ Run: `git commit -m "fix: canonicalize public search metadata"`
 **Interfaces:**
 - Produces: rendered anchors with `/products/:id` and `/blog/:id` href values while preserving existing click events
 
-- [ ] **Step 1: Write failing component tests**
+- [x] **Step 1: Write failing component tests**
 
 Assert that a rendered product card contains `a[href="/products/product-1"]` and a blog grid item contains `a[href="/blog/post-1"]`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npm test -- ProductCard.spec.ts BlogGrid.spec.ts`
 Expected: FAIL because current cards render clickable divs without anchors.
 
-- [ ] **Step 3: Wrap each card in NuxtLink**
+- [x] **Step 3: Wrap each card in NuxtLink**
 
 Use `NuxtLink` with the canonical route path and `@click.prevent` to preserve the existing parent event behavior.
 
-- [ ] **Step 4: Run component and full frontend tests**
+- [x] **Step 4: Run component and full frontend tests**
 
 Run: `npm test`
 Expected: all frontend tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git commit -m "fix: expose detail links to crawlers"`
 
