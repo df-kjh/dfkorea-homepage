@@ -331,6 +331,8 @@ npm run test:ci
 ### 공식 데이터 키
 
 - [조달청 나라장터 입찰공고정보서비스](https://www.data.go.kr/data/15129394/openapi.do)와 [공동주택 입찰공고 정보제공 서비스](https://www.data.go.kr/data/15058166/openapi.do)를 공공데이터포털에서 활용 신청한 뒤 `PUBLIC_DATA_SERVICE_KEY`를 설정한다.
+- 입찰 적합성의 최근 2년 가격 통계를 사용하려면 같은 계정과 기존 `PUBLIC_DATA_SERVICE_KEY`에 [조달청 나라장터 낙찰정보서비스](https://www.data.go.kr/)의 `ScsbidInfoService`를 별도로 활용 신청하고 승인 상태를 확인한다. 기존 키에 서비스별 승인이 추가되는 절차이며 새 키나 새 필수 환경변수를 만들지 않는다.
+- 낙찰정보서비스 base URL은 애플리케이션의 공식 기본값을 사용한다. 공급자 경계를 별도로 교체해야 할 때만 선택 변수 `G2B_AWARD_API_BASE_URL`을 설정한다. 설정하지 않은 운영 환경도 같은 공식 기본값으로 동작한다.
 - 포털은 URL 인코딩된 키와 디코딩된(원문) 키를 함께 보여줄 수 있다. 디코딩/원문 키가 있으면 그대로 넣고, 포털이 직접 API 호출용으로 지정한 값만 사용한다. 키를 복사한 뒤 다시 URL 인코딩하지 않는다. HTTP 클라이언트가 쿼리 값을 정확히 한 번 인코딩한다.
 - 한전 전자입찰계약정보는 현재 LINK API다. [공식 데이터셋](https://www.data.go.kr/data/15148223/openapi.do)에서 활용 승인을 받고 실제 OpenAPI 매뉴얼의 URL·operation·인증 파라미터·응답 필드를 `docs/references/kepco-tender-api-contract.md`와 비교하기 전에는 `KEPCO_TENDER_ENABLED=false`를 유지한다.
 
@@ -387,6 +389,17 @@ TEST_DATABASE_URL='postgresql://test_user:test_password@localhost:5432/dfkorea_t
 ```
 
 또는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 설정한다. 전용 실행기는 **로컬** `localhost`, `127.0.0.1`, `::1` 또는 명시된 Docker 서비스 `postgres`/`db`만 허용한다. DB 이름에는 `test` 또는 `e2e`가 있어야 하고 URL·host·DB 이름 어디에도 `prod`, `production`, `live`, `staging`이 있으면 AppModule을 시작하기 전에 실패한다. URL 안전성 검사는 최대 4회 percent decode하며 malformed 또는 그 이후에도 남은 어떤 `%`도 거부한다. 원격 스테이징 DB는 이 파괴적 통합 러너의 대상이 아니다. migration을 적용하고 명시된 tender 테이블 여덟 개만 트랜잭션으로 truncate하며, 종료 시에도 같은 범위만 정리한 뒤 앱을 닫는다. 실제 입찰 API 어댑터와 NAVER WORKS OAuth/Mail HTTP client만 이중으로 교체하며 운영 DB 변수(`DB_*`)만으로는 실행할 수 없다.
+
+### 입찰 적합성 분석 초기 활성화
+
+최근 2년 낙찰 이력 백필은 애플리케이션 배포와 분리한다. 아래 순서가 완료되기 전에는 관리자 백필 시작 동작을 실행하지 않는다.
+
+1. 기존 `PUBLIC_DATA_SERVICE_KEY`의 `ScsbidInfoService` 별도 활용 승인을 확인한다. 승인 확인 과정에서 키나 query가 포함된 요청 URL을 로그·문서·티켓에 남기지 않는다.
+2. 배포 전 백업을 확인하고 신규 migration을 먼저 적용한 뒤, 같은 revision의 backend와 frontend 애플리케이션을 배포한다. migration 실패 시 애플리케이션 시작과 백필을 모두 중단한다.
+3. backend health와 기존 공고 수집·메일 작업의 정상 상태를 확인한다. 관리자 화면에서 나라장터 물품 공고 한 건을 골라 분석을 한 번 실행하고, 상태·근거 snippet·문서 상태가 표시되며 개별 제품명이나 전체 추출 본문이 노출되지 않는지 확인한다.
+4. 실제 공급자 응답에 총액/통화/산식 metadata가 없거나 공공 낙찰 corpus가 보수적 필터를 통과하지 못하면 가격 분석은 `확인 필요` 또는 표본 부족으로 남을 수 있다. 이를 배포 실패나 임의 산식 적용 사유로 취급하지 않고 공식 원문과 수집 상태를 확인한다.
+5. 위 검증이 끝난 뒤에만 관리자 권한으로 최근 2년 백필을 명시적으로 시작한다. 상태 조회에서 월별 진행 cursor, 저장·제외 건수, `RUNNING`/`SUCCEEDED`/`PARTIAL`/`FAILED` 상태를 모니터링한다. 인증·설정 오류로 terminal 실패하면 자동 반복하지 말고 서비스 승인과 설정을 수정한 뒤 명시적 재개 절차를 사용한다.
+6. 백필 중에도 일반 공고 수집과 메일 작업의 오류율, DB 부하와 advisory lock 대기를 관찰한다. 이상 징후가 있으면 추가 백필 진행을 중단하고, 이미 저장된 진행 상태에서 원인을 조사한다.
 
 ### 스테이징 라이브 스모크 체크리스트
 
