@@ -558,17 +558,17 @@ git commit -m "feat: show tender suitability analysis"
 - Produces: one documented production setup step: approve G2B award service for the existing public-data key.
 - Produces: deployable backend/frontend artifacts with no new required environment variable.
 
-- [ ] **Step 1: Update human and deployment documentation**
+- [x] **Step 1: Update human and deployment documentation**
 
 In `.env.example`, document optional `G2B_AWARD_API_BASE_URL=https://apis.data.go.kr/1230000/as/ScsbidInfoService` as an override with a built-in default, not a required setting. In `DEPLOYMENT.md`, add only the separate award-service approval and safe initial backfill sequence. Update `docs/menus/tenders.md` under every required heading, accurately separating G2B support from K-apt best effort and OCR exclusion.
 
-- [ ] **Step 2: Run backend verification**
+- [x] **Step 2: Run backend verification**
 
 Run: `cd dfkorea-backend && npm run test:ci`
 
 Expected: lint, all Jest suites, contract tests, type-check, clean build, compiled process probe, and compiled TypeORM discovery pass.
 
-- [ ] **Step 3: Run frontend verification**
+- [x] **Step 3: Run frontend verification**
 
 Run: `cd led-lighting-website && npm test`
 
@@ -578,33 +578,35 @@ Run: `cd led-lighting-website && npm run build`
 
 Expected: all tests pass, type-check exits 0, and the production Nuxt build verifies the G2B relay artifact.
 
-- [ ] **Step 4: Run migration integration if disposable PostgreSQL is available**
+- [x] **Step 4: Run migration integration if disposable PostgreSQL is available**
 
 Run: `cd dfkorea-backend && npm run test:tender:integration`
 
 Expected: new migration, concurrent lease, bigint/numeric, and full AppModule flow pass. If a disposable DB is unavailable, report this exact unverified boundary and do not run against production or a remote shared DB.
 
-- [ ] **Step 5: Inspect the UI at desktop and mobile sizes**
+- [x] **Step 5: Inspect the UI at desktop and mobile sizes**
 
 Use the local production frontend build against a local fixture backend. Verify 1440×900 and 390×844: no clipped modal content, price numbers fit, evidence text wraps, focus remains trapped, close restores focus, and no hidden product name is rendered.
 
-- [ ] **Step 6: Check secrets and persisted-data exclusions**
+- [x] **Step 6: Check secrets and persisted-data exclusions**
 
 Run: `rg -n "PUBLIC_DATA_SERVICE_KEY=.+|G2B_DATA_SERVICE_KEY=.+|serviceKey=.+|bidderBusiness|providerPayload|bytea" dfkorea-backend led-lighting-website docs --glob '!package-lock.json' --glob '!*.spec.ts'`
 
 Expected: no secret values, no award bidder identity/provider payload persistence, and no tender-document binary column. Expected legitimate mentions are empty/example environment variable names and unrelated quote attachment BYTEA documentation.
 
-- [ ] **Step 7: Request code review and resolve findings**
+- [x] **Step 7: Request code review and resolve findings**
 
 Provide the approved spec, this plan, and the complete implementation commit range. Require checks for false-positive participation recommendations, formula misuse, document-fetch SSRF/archive limits, stale worker writes, precision loss, data minimization, and regression of existing tender mail/collection.
 
-- [ ] **Step 8: Commit final documentation and verification fixes**
+- [x] **Step 8: Commit final documentation and verification fixes**
 
 ```bash
 git add dfkorea-backend/.env.example DEPLOYMENT.md docs/menus/tenders.md database-schema.md
 git commit -m "docs: complete tender analysis rollout"
 ```
 
-- [ ] **Step 9: Prepare deployment without starting the historical backfill**
+- [x] **Step 9: Prepare deployment without starting the historical backfill**
 
 Confirm the existing public-data key has approval for the G2B award service. Push the reviewed commits to `main` only when deployment is explicitly authorized. Let migrations and application deploy first, verify health and one live analysis sample, then start the two-year backfill from the admin action and monitor its persisted progress.
+
+Deployment preparation is complete. The local environment did not expose a public-data key, so live G2B award-service approval remains a deployment gate; no push, deployment, or historical backfill was performed.
