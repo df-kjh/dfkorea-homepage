@@ -2,7 +2,15 @@
 import { computed } from 'vue'
 import QuoteButton from './QuoteButton.vue'
 import type { ProductFilters, ProductFilterOptions } from '@/types/quote'
-const props = defineProps<{ modelValue: ProductFilters; options: ProductFilterOptions }>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: ProductFilters
+    options: ProductFilterOptions
+    controls?: boolean
+    showChips?: boolean
+  }>(),
+  { controls: true, showChips: true },
+)
 const emit = defineEmits<{ 'update:modelValue': [value: ProductFilters] }>()
 const basic = [
   { key: 'power', label: '소비전력', unit: 'W' },
@@ -31,42 +39,44 @@ function toggle(key: keyof ProductFilters, value: string | number) {
 </script>
 <template>
   <div class="q-filters">
-    <div class="q-filter-row">
-      <details v-for="group in basic" :key="group.key">
-        <summary>
-          {{ group.label }}
-          <span v-if="modelValue[group.key].length">{{ modelValue[group.key].length }}</span
-          ><span aria-hidden="true">⌄</span>
-        </summary>
-        <div class="q-filter-values">
-          <label v-for="value in options[group.key]" :key="value"
-            ><input
-              type="checkbox"
-              :checked="(modelValue[group.key] as (string | number)[]).includes(value)"
-              @change="toggle(group.key, value)"
-            />{{ value }}{{ group.unit }}</label
-          >
-          <p v-if="!options[group.key].length">등록된 선택지가 없습니다.</p>
-        </div>
+    <div v-if="controls" class="q-filter-controls">
+      <div class="q-filter-row">
+        <details v-for="group in basic" :key="group.key">
+          <summary>
+            {{ group.label }}
+            <span v-if="modelValue[group.key].length">{{ modelValue[group.key].length }}</span
+            ><span aria-hidden="true">⌄</span>
+          </summary>
+          <div class="q-filter-values">
+            <label v-for="value in options[group.key]" :key="value"
+              ><input
+                type="checkbox"
+                :checked="(modelValue[group.key] as (string | number)[]).includes(value)"
+                @change="toggle(group.key, value)"
+              />{{ value }}{{ group.unit }}</label
+            >
+            <p v-if="!options[group.key].length">등록된 선택지가 없습니다.</p>
+          </div>
+        </details>
+      </div>
+      <details class="q-more-filters">
+        <summary>색온도·옵션 더 보기</summary>
+        <fieldset v-for="group in advanced" :key="group.key">
+          <legend>{{ group.label }}</legend>
+          <div class="q-filter-values">
+            <label v-for="value in options[group.key]" :key="value"
+              ><input
+                type="checkbox"
+                :checked="(modelValue[group.key] as (string | number)[]).includes(value)"
+                @change="toggle(group.key, value)"
+              />{{ value }}{{ group.unit }}</label
+            >
+            <p v-if="!options[group.key].length">등록된 선택지가 없습니다.</p>
+          </div>
+        </fieldset>
       </details>
     </div>
-    <details class="q-more-filters">
-      <summary>색온도·옵션 더 보기</summary>
-      <fieldset v-for="group in advanced" :key="group.key">
-        <legend>{{ group.label }}</legend>
-        <div class="q-filter-values">
-          <label v-for="value in options[group.key]" :key="value"
-            ><input
-              type="checkbox"
-              :checked="(modelValue[group.key] as (string | number)[]).includes(value)"
-              @change="toggle(group.key, value)"
-            />{{ value }}{{ group.unit }}</label
-          >
-          <p v-if="!options[group.key].length">등록된 선택지가 없습니다.</p>
-        </div>
-      </fieldset>
-    </details>
-    <div v-if="chips.length" class="q-filter-chips" aria-label="선택한 검색 조건">
+    <div v-if="showChips && chips.length" class="q-filter-chips" aria-label="선택한 검색 조건">
       <QuoteButton
         v-for="chip in chips"
         :key="`${chip.key}-${chip.value}`"

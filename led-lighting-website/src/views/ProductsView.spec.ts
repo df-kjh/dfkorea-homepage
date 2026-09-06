@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProductsView from './ProductsView.vue'
+import ProductFilterPopover from '@/components/products/ProductFilterPopover.vue'
 const api = vi.hoisted(() => ({ getPaginated: vi.fn(), getFilterOptions: vi.fn() }))
 const infinite = vi.hoisted(() => ({ load: () => {} }))
 vi.mock('@/api', () => ({ productsAPI: api }))
@@ -75,4 +76,45 @@ describe('main catalog append continuity', () => {
       wrapper.unmount()
     },
   )
+})
+
+describe('main catalog filters', () => {
+  it('requests the first page once with the filters applied from the popover', async () => {
+    api.getPaginated.mockReset().mockResolvedValue(page('first'))
+    api.getFilterOptions.mockResolvedValue({
+      data: {
+        categories: [],
+        power: [20, 40],
+        colorTemp: [],
+        options: [],
+        certifications: ['KS'],
+      },
+    })
+    const wrapper = mount(ProductsView, {
+      global: {
+        stubs: {
+          ProductCard: { props: ['product'], template: '<article>{{ product.name }}</article>' },
+        },
+      },
+    })
+    await flushPromises()
+    api.getPaginated.mockClear()
+
+    wrapper.getComponent(ProductFilterPopover).vm.$emit('apply', {
+      power: [40],
+      colorTemp: [],
+      certifications: ['KS'],
+      options: [],
+    })
+    await flushPromises()
+
+    expect(api.getPaginated).toHaveBeenCalledTimes(1)
+    expect(api.getPaginated).toHaveBeenCalledWith(1, 20, '', '전체', {
+      power: [40],
+      colorTemp: [],
+      certifications: ['KS'],
+      options: [],
+    })
+    wrapper.unmount()
+  })
 })

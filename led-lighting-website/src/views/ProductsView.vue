@@ -6,7 +6,10 @@
         title="제품 목록"
         :total-items="totalProducts"
         :search-query="searchQuery"
+        :filters="filters"
+        :filter-options="filterOptions"
         @search="handleSearch"
+        @apply-filters="applyFilters"
       />
 
       <!-- Category Filter -->
@@ -17,7 +20,7 @@
       />
 
       <div class="px-6 md:px-12 mb-8 max-w-3xl">
-        <ProductFilters v-model="filters" :options="filterOptions" />
+        <ProductFilters v-model="filters" :options="filterOptions" :controls="false" />
         <div class="flex flex-wrap gap-3 items-center">
           <QuoteButton variant="link" @click="resetFilters">검색 조건 초기화</QuoteButton
           ><span class="text-sm text-gray-600">검색 결과 {{ totalProducts }}개</span>
@@ -129,6 +132,9 @@ function resetFilters() {
   searchQuery.value = ''
   selectedCategory.value = '전체'
   filters.value = emptyFilters()
+}
+function applyFilters(value: ReturnType<typeof emptyFilters>) {
+  filters.value = value
 }
 watch(
   filters,

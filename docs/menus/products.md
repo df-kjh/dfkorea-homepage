@@ -7,6 +7,8 @@
 - 2026-09-06 온라인 견적 관련 변경을 운영 배포하고 실제 도메인에서 확인했다. 홈의 PC·모바일 견적 창과 제품명/소비전력 필터를 검증했다.
 
 - 제품 목록에서 제품명·모델명 검색과 실제 카탈로그 기반 카테고리·소비전력·인증·색온도·옵션 필터를 제공한다. 같은 필터 안은 OR, 필터 사이는 AND로 전체 데이터를 필터링한 후 페이지를 나눈다.
+- 제품 목록의 사양 필터는 검색창 오른쪽 필터 버튼에서 연다. PC에서는 버튼 아래 팝오버, 모바일에서는 하단 플로팅 패널로 표시하며 소비전력·인증·색온도·옵션을 임시 선택한 뒤 `필터 적용`을 눌러 한 번에 반영한다. 적용 전에는 현재 목록을 유지하고, 적용된 조건 수 배지·조건 칩·초기화·바깥 클릭·ESC 닫기와 포커스 복귀를 제공한다.
+- 모바일 필터 패널은 온라인 견적 및 페이지 위로 플로팅 버튼 전체 높이를 비워 주요 동작 버튼이 겹치지 않게 한다.
 - 제품 목록과 견적 선택기는 공통 사양 필터를 사용한다. 선택 조건 제거, 검색 조건 초기화, 결과 수, 검색 실패 재시도를 지원하며 오래된 응답은 현재 검색 결과를 덮어쓰지 않는다.
 - 견적 선택기의 ‘사양 선택’을 누르면 희망 사양 제목에 포커스를 주고 견적 본문 내부에서 즉시 보이게 한다. 취소는 선택한 제품 버튼으로 돌아가며 사양 입력 중에는 요청 확인 단계로 넘어가지 않는다. 담기 완료 후 상태 안내와 품목 요약, ‘제품 더 선택하기’ 동작을 제공한다. 직접 입력 내용도 검색 복귀 시 유지한다.
 - 견적 ‘제품 더 보기’와 제품 페이지 무한 스크롤은 추가 요청 중 기존 결과 DOM을 유지한다. 하단에 로딩·오류·재시도만 표시하고 중복 추가 요청을 막는다. 실패 재시도는 다음 페이지를 다시 받아 기존 결과에 이어 붙이며, 필터 변경 전 응답은 무시한다. 견적 본문 및 제품 페이지의 자동 스크롤 앵커를 끄고 사용자 스크롤을 요청 시작 위치로 되돌리지 않는다.
@@ -49,6 +51,8 @@
 
 - `led-lighting-website/src/views/ProductsView.vue`
 - `led-lighting-website/src/components/products/ProductsHeader.vue`
+- `led-lighting-website/src/components/products/ProductFilterPopover.vue`
+- `led-lighting-website/src/components/products/ProductFilterPopover.spec.ts`
 - `led-lighting-website/src/components/common/quote/ProductFilters.vue`
 - `led-lighting-website/src/components/quote/ProductPicker.vue`
 - `led-lighting-website/src/components/quote/CatalogSpecification.vue`

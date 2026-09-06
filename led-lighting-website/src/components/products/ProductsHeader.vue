@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import SearchBar from '@/components/common/SearchBar.vue'
+import ProductFilterPopover from './ProductFilterPopover.vue'
+import type { ProductFilters, ProductFilterOptions } from '@/types/quote'
 
 interface Props {
   title?: string
   totalItems?: number
   searchQuery?: string
+  filters: ProductFilters
+  filterOptions: ProductFilterOptions
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -16,6 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   search: [query: string]
+  applyFilters: [filters: ProductFilters]
 }>()
 
 const localSearchQuery = ref(props.searchQuery)
@@ -42,12 +47,19 @@ const handleSearch = (query: string) => {
     </header>
 
     <!-- Search Bar -->
-    <div class="px-6 md:px-12 mb-8">
+    <div class="products-search px-6 md:px-12 mb-8">
       <SearchBar
         v-model="localSearchQuery"
+        class="products-search__input"
+        max-width="max-w-none"
         placeholder="제품명 또는 모델명으로 검색..."
         :debounce-ms="300"
         @search="handleSearch"
+      />
+      <ProductFilterPopover
+        :model-value="filters"
+        :options="filterOptions"
+        @apply="emit('applyFilters', $event)"
       />
     </div>
   </div>
@@ -60,5 +72,15 @@ const handleSearch = (query: string) => {
     'wght' 300,
     'GRAD' 0,
     'opsz' 24;
+}
+.products-search {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  max-width: 896px;
+}
+.products-search__input {
+  flex: 1;
+  min-width: 0;
 }
 </style>
