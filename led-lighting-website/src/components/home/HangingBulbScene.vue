@@ -76,6 +76,7 @@ onUnmounted(() => {
       <div data-test="fallback-cable" class="fallback-cable"></div>
       <div data-test="fallback-bulb" class="fallback-bulb">
         <span class="fallback-bulb__socket"></span>
+        <span class="fallback-bulb__housing"><span>LED · 4000 K</span></span>
         <span class="fallback-bulb__globe"></span>
       </div>
     </div>
@@ -129,75 +130,80 @@ onUnmounted(() => {
   position: absolute;
   top: clamp(136px, 25vh, 222px);
   left: 50%;
-  width: 128px;
-  height: 224px;
+  width: 144px;
+  height: 228px;
   transform: translateX(-50%);
-  filter: drop-shadow(0 0 24px rgba(255, 169, 69, 0.2));
-  animation: fallback-flicker 5.4s linear infinite;
 }
 
 .fallback-bulb__socket {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 38px;
-  height: 52px;
-  border-radius: 7px 7px 5px 5px;
-  background: repeating-linear-gradient(
-    to bottom,
-    #c3a06c 0,
-    #c3a06c 7px,
-    #826138 8px,
-    #826138 11px
-  );
-  box-shadow:
-    inset 7px 0 rgba(255, 244, 218, 0.16),
-    inset -6px 0 rgba(66, 42, 18, 0.22);
+  width: 40px;
+  height: 49px;
+  border-radius: 9px 9px 4px 4px;
+  background:
+    linear-gradient(90deg, #566067, transparent 35%, #ffffff66 52%, #27323988),
+    repeating-linear-gradient(170deg, #ccd2d6 0 4px, #79848b 5px 7px, #eef0f1 8px 9px);
   transform: translateX(-50%);
+}
+
+.fallback-bulb__housing {
+  position: absolute;
+  top: 47px;
+  left: 0;
+  display: flex;
+  width: 144px;
+  height: 87px;
+  align-items: end;
+  justify-content: center;
+  padding-bottom: 18px;
+  clip-path: polygon(
+    36% 0,
+    64% 0,
+    70% 22%,
+    87% 64%,
+    98% 88%,
+    100% 100%,
+    0 100%,
+    2% 88%,
+    13% 64%,
+    30% 22%
+  );
+  background: linear-gradient(100deg, #899398, #e5e8e9 34%, #f4f5f5 58%, #a9b1b5);
+  color: #687277;
+  font: 7px/1.4 sans-serif;
+  letter-spacing: 0.04em;
 }
 
 .fallback-bulb__globe {
   position: absolute;
-  top: 48px;
-  left: 50%;
-  width: 122px;
-  height: 160px;
-  border: 1px solid rgba(255, 234, 202, 0.58);
-  border-radius: 43% 43% 49% 49% / 35% 35% 65% 65%;
-  background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.68) 0 3%, transparent 15%),
-    radial-gradient(
-      circle at 50% 48%,
-      rgba(255, 183, 72, 0.18),
-      rgba(255, 225, 183, 0.07) 48%,
-      rgba(255, 255, 255, 0.02) 72%
-    );
-  box-shadow:
-    inset 8px 4px 18px rgba(255, 255, 255, 0.12),
-    inset -8px -2px 18px rgba(101, 52, 13, 0.08),
-    0 0 24px rgba(255, 184, 74, 0.2),
-    0 0 64px rgba(255, 139, 38, 0.1);
-  transform: translateX(-50%);
+  top: 133px;
+  left: 0;
+  width: 144px;
+  height: 91px;
+  border-top: 2px solid #aab0b1;
+  border-radius: 3% 3% 50% 50% / 4% 4% 78% 78%;
+  background: radial-gradient(ellipse at 44% 18%, #fffaf1, #f6eedf 50%, #d7d4cd 100%);
 }
 
+/* Animate emitted light only: the opaque housing must remain visible when powered down. */
 .fallback-bulb__globe::before {
   position: absolute;
-  top: 48px;
-  left: 50%;
-  width: 3px;
-  height: 62px;
-  border-radius: 999px;
-  background: #ff9a38;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 45% 20%, #fffdf7, #fff3de 80%);
   box-shadow:
-    -15px 0 #ffb14d,
-    15px 0 #ffb14d,
-    0 0 14px 5px rgba(255, 132, 31, 0.32);
+    0 0 35px #ffe4c43d,
+    0 0 75px #ffe4c424;
   content: '';
-  transform: translateX(-50%);
+  animation: fallback-flicker 5.4s linear infinite;
 }
 
-.hanging-bulb:hover .fallback-bulb {
-  filter: brightness(1.55) drop-shadow(0 0 48px rgba(255, 169, 69, 0.48));
+.hanging-bulb:hover .fallback-bulb__globe::before {
+  animation: none;
+  opacity: 1;
+  filter: brightness(1.15);
 }
 
 @keyframes fallback-flicker {
@@ -256,7 +262,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 639px) {
-  .fallback-bulb {
+  .fallback-bulb__globe::before {
     animation: mobile-fallback-power-cycle 12s linear infinite;
   }
 }
@@ -267,7 +273,7 @@ onUnmounted(() => {
     transition: none;
   }
 
-  .fallback-bulb {
+  .fallback-bulb__globe::before {
     animation: none;
     opacity: 0.62;
   }

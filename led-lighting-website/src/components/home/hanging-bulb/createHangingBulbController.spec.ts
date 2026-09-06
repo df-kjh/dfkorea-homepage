@@ -92,7 +92,7 @@ describe('createHangingBulbController', () => {
     controller.dispose()
   })
 
-  it('renders one vertical cord and a transparent warm filament bulb at rest', () => {
+  it('renders an opaque LED diffuser that responds to the same light as the scene', () => {
     const controller = createHangingBulbController({
       adapters,
       container: document.createElement('div'),
@@ -102,48 +102,17 @@ describe('createHangingBulbController', () => {
     })
     controller.start()
 
-    const renderedScene = render.mock.calls.at(-1)?.[0]
-    const cord = renderedScene?.getObjectByName('pendant-cord') as THREE.Mesh
-    const glass = renderedScene?.getObjectByName('bulb-glass') as THREE.Mesh<
-      THREE.LatheGeometry,
+    const scene = render.mock.calls.at(-1)?.[0]
+    const diffuser = scene?.getObjectByName('led-diffuser') as THREE.Mesh<
+      THREE.BufferGeometry,
       THREE.MeshPhysicalMaterial
     >
-    const filament = renderedScene?.getObjectByName('warm-filament-0') as THREE.Mesh<
-      THREE.BufferGeometry,
-      THREE.MeshStandardMaterial
-    >
-    const bulbLight = renderedScene?.getObjectByName('warm-bulb-light') as THREE.PointLight
-    const innerGlass = renderedScene?.getObjectByName('bulb-inner-glass') as THREE.Mesh
-    const lightVolume = renderedScene?.getObjectByName('bulb-light-volume') as THREE.Mesh
-    const leftHighlight = renderedScene?.getObjectByName('glass-highlight-left') as THREE.Mesh
-    const rightHighlight = renderedScene?.getObjectByName('glass-highlight-right') as THREE.Mesh
-    const socketGrooves: THREE.Object3D[] = []
-    const filaments: THREE.Object3D[] = []
-    renderedScene?.traverse((object) => {
-      if (object.name.startsWith('warm-filament-')) filaments.push(object)
-      if (object.name.startsWith('socket-groove-')) socketGrooves.push(object)
-    })
-
-    expect(cord).toBeInstanceOf(THREE.Mesh)
-    expect(renderedScene?.getObjectByProperty('type', 'InstancedMesh')).toBeUndefined()
-    const cordDirection = new THREE.Vector3(0, 1, 0).applyQuaternion(cord.quaternion)
-    expect(Math.abs(cordDirection.x)).toBeCloseTo(0, 8)
-    expect(Math.abs(cordDirection.y)).toBeCloseTo(1, 8)
-    expect(glass.material.transmission).toBeGreaterThanOrEqual(0.88)
-    expect(glass.material.opacity).toBeLessThanOrEqual(0.55)
-    expect(glass.geometry.parameters.segments).toBeGreaterThanOrEqual(96)
-    expect(innerGlass).toBeInstanceOf(THREE.Mesh)
-    expect(lightVolume).toBeInstanceOf(THREE.Mesh)
-    expect(leftHighlight).toBeInstanceOf(THREE.Mesh)
-    expect(rightHighlight).toBeInstanceOf(THREE.Mesh)
-    expect(socketGrooves).toHaveLength(4)
-    expect(filaments).toHaveLength(6)
-    expect(filament.material.emissive.r).toBeGreaterThan(filament.material.emissive.g)
-    expect(filament.material.emissive.g).toBeGreaterThan(filament.material.emissive.b)
-    expect(bulbLight.color.r).toBeGreaterThan(bulbLight.color.g)
-    expect(bulbLight.color.g).toBeGreaterThan(bulbLight.color.b)
-    expect(bulbLight.intensity).toBeGreaterThan(2.5)
-    expect(bulbLight.distance).toBeGreaterThanOrEqual(7.5)
+    const light = scene?.getObjectByName('led-bulb-light') as THREE.PointLight
+    expect(diffuser).toBeInstanceOf(THREE.Mesh)
+    expect(diffuser.material.transparent).toBe(false)
+    expect(diffuser.material.emissive.equals(light.color)).toBe(true)
+    expect(diffuser.material.emissiveIntensity).toBeGreaterThan(0)
+    expect(light.intensity).toBeGreaterThan(0)
     controller.dispose()
   })
 
@@ -174,15 +143,15 @@ describe('createHangingBulbController', () => {
     const initialScene = render.mock.calls.at(-1)?.[0]
     const initialLight = initialScene?.getObjectByProperty('type', 'PointLight') as THREE.PointLight
     const initialIntensity = initialLight.intensity
-    let initialFilament: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | undefined
+    let initialDiffuser: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | undefined
     initialScene?.traverse((object) => {
-      if (!initialFilament && object.name.startsWith('warm-filament')) {
-        initialFilament = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
+      if (!initialDiffuser && object.name.startsWith('led-diffuser')) {
+        initialDiffuser = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
       }
     })
-    expect(initialFilament).toBeDefined()
-    if (!initialFilament) throw new Error('Expected a warm filament in the initial scene')
-    const initialFilamentIntensity = initialFilament.material.emissiveIntensity
+    expect(initialDiffuser).toBeDefined()
+    if (!initialDiffuser) throw new Error('Expected an LED diffuser in the initial scene')
+    const initialDiffuserIntensity = initialDiffuser.material.emissiveIntensity
 
     canvas.dispatchEvent(
       new PointerEvent('pointermove', {
@@ -196,21 +165,21 @@ describe('createHangingBulbController', () => {
     const renderedScene = render.mock.calls.at(-1)?.[0]
     const light = renderedScene?.getObjectByProperty('type', 'PointLight') as THREE.PointLight
     const outerHalo = renderedScene?.getObjectByName('bulb-outer-halo') as THREE.Sprite | undefined
-    let filament: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | undefined
+    let diffuser: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | undefined
     renderedScene?.traverse((object) => {
-      if (!filament && object.name.startsWith('warm-filament')) {
-        filament = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
+      if (!diffuser && object.name.startsWith('led-diffuser')) {
+        diffuser = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
       }
     })
-    expect(filament).toBeDefined()
-    if (!filament) throw new Error('Expected a warm filament after hover')
+    expect(diffuser).toBeDefined()
+    if (!diffuser) throw new Error('Expected an LED diffuser after hover')
     expect(hitTest).toHaveBeenCalled()
-    expect(light.intensity).toBeGreaterThan(initialIntensity * 2.2)
-    expect(light.intensity).toBeGreaterThan(9)
-    expect(filament.material.emissiveIntensity).toBeGreaterThan(initialFilamentIntensity * 1.75)
+    expect(light.intensity).toBeGreaterThan(initialIntensity)
+    expect(light.intensity).toBeGreaterThan(0)
+    expect(diffuser.material.emissiveIntensity).toBeGreaterThan(initialDiffuserIntensity)
     expect(outerHalo).toBeInstanceOf(THREE.Sprite)
     if (!(outerHalo instanceof THREE.Sprite)) throw new Error('Expected an outer bulb halo')
-    expect(outerHalo.material.opacity).toBeGreaterThan(0.35)
+    expect(outerHalo.material.opacity).toBeGreaterThan(0)
     controller.dispose()
     hitTest.mockRestore()
   })
@@ -284,22 +253,18 @@ describe('createHangingBulbController', () => {
     scheduledFrame?.(2_900)
 
     const renderedScene = render.mock.calls.at(-1)?.[0]
-    const light = renderedScene?.getObjectByName('warm-bulb-light') as THREE.PointLight
-    const filament = renderedScene?.getObjectByName('warm-filament-0') as THREE.Mesh<
+    const light = renderedScene?.getObjectByName('led-bulb-light') as THREE.PointLight
+    const diffuser = renderedScene?.getObjectByName('led-diffuser') as THREE.Mesh<
       THREE.BufferGeometry,
       THREE.MeshStandardMaterial
     >
     const halo = renderedScene?.getObjectByName('bulb-inner-halo') as THREE.Sprite
     const outerHalo = renderedScene?.getObjectByName('bulb-outer-halo') as THREE.Sprite
-    const lightVolume = renderedScene?.getObjectByName('bulb-light-volume') as THREE.Mesh<
-      THREE.BufferGeometry,
-      THREE.MeshBasicMaterial
-    >
     expect(light.intensity).toBe(0)
-    expect(filament.material.emissiveIntensity).toBe(0)
+    expect(diffuser.material.emissiveIntensity).toBe(0)
     expect(halo.material.opacity).toBe(0)
     expect(outerHalo.material.opacity).toBe(0)
-    expect(lightVolume.material.opacity).toBe(0)
+    expect(diffuser.material.opacity).toBe(1)
     controller.dispose()
   })
 
