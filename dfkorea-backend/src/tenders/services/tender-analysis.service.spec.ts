@@ -447,6 +447,64 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     }
   });
 
+  it("persists and returns identical capped conflicts after reversing tied parser input", async () => {
+    const parsed = new TenderRequirementParser().parse(enrichment, []);
+    const sources = Array.from({ length: 12 }, (_, index) => ({
+      id: `conflict-source-${index}`,
+      kind: "SOURCE" as const,
+      source: "DOCUMENT" as const,
+      state: null,
+      documentIdentity: "doc",
+      location: `p${index}`,
+      snippet: "소비전력 40W 이하",
+    }));
+    parsed.evidence.push(
+      ...sources,
+      ...sources.map((source, index) => ({
+        id: `tied-conflict-${index}`,
+        kind: "CONFLICT" as const,
+        source: "STRUCTURED" as const,
+        state: "UNKNOWN" as const,
+        conflictField: "POWER",
+        snippet: "구조화 값과 문서의 소비전력 조건이 충돌합니다.",
+        relatedEvidenceIds: [source.id, "missing-structured-source"],
+      })),
+    );
+    const parser = jest
+      .spyOn(TenderRequirementParser.prototype, "parse")
+      .mockReturnValue(parsed);
+    try {
+      await service.reanalyze(tender.id, now);
+      await service.processDue(now, 1);
+      const before = await db
+        .getRepository(TenderAnalysis)
+        .findOneByOrFail({ tenderId: tender.id });
+      const responseBefore = await service.getAnalysis(tender.id);
+      expect(
+        before.evidence.filter((value) => value.kind === "CONFLICT"),
+      ).toHaveLength(8);
+      parsed.evidence.reverse();
+      parsed.evidence.forEach((value) => value.relatedEvidenceIds?.reverse());
+      await service.reanalyze(tender.id, now);
+      await service.processDue(now, 1);
+      const after = await db
+        .getRepository(TenderAnalysis)
+        .findOneByOrFail({ tenderId: tender.id });
+      const responseAfter = await service.getAnalysis(tender.id);
+      expect(after.evidence).toEqual(before.evidence);
+      expect((responseAfter as any).evidence).toEqual(
+        (responseBefore as any).evidence,
+      );
+      expect((responseAfter as any).evidence).toEqual(after.evidence);
+      expect(after.reviewSemanticDigest).toBe(before.reviewSemanticDigest);
+      expect(responseAfter.analysisFingerprint).toBe(
+        responseBefore.analysisFingerprint,
+      );
+    } finally {
+      parser.mockRestore();
+    }
+  });
+
   it("cannot commit after a catalog lock wait outlasts its lease; a fresh worker can recover", async () => {
     enrichment.documents = [documentReference()];
     const blocker = db.createQueryRunner();

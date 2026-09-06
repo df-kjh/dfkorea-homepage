@@ -88,13 +88,76 @@ const orderedRecords = (value: unknown): RecordValue[] =>
       canonicalJson(orderingValue(b)),
     ),
   );
-const evidenceOrder = (value: RecordValue): string =>
-  canonicalJson({
-    ...record(orderingValue(value)),
-    ...(value.kind === "UNSUPPORTED"
-      ? { condition: cleanAnalysisString(value.snippet).replace(/\s+/g, "") }
-      : {}),
+const evidenceSemanticAnchor = (value: RecordValue): RecordValue =>
+  Object.fromEntries(
+    [
+      "kind",
+      "source",
+      "state",
+      "documentIdentity",
+      "revision",
+      "location",
+      "operation",
+      "field",
+      "conflictField",
+      "diagnosticCategory",
+    ]
+      .filter((key) => value[key] !== undefined)
+      .map((key) => [
+        key,
+        typeof value[key] === "string"
+          ? fingerprint(cleanAnalysisString(value[key]))
+          : value[key],
+      ])
+      .concat(
+        ["UNSUPPORTED", "CONFLICT"].includes(String(value.kind))
+          ? [
+              [
+                "conditionDigest",
+                fingerprint(
+                  cleanAnalysisString(value.snippet).replace(/\s+/g, ""),
+                ),
+              ],
+            ]
+          : [],
+      ),
+  );
+
+/** A bounded semantic key survives persistence even when related SOURCE rows
+ * were not selected for display. Resolve complete source anchors before caps;
+ * never use source snippets/full blocks in ordering. Stale references cannot
+ * be resolved, so their opaque ID hashes provide a deterministic fallback.
+ * No recursive traversal is needed, including for cyclic legacy references. */
+const diagnosticSemanticId = (
+  value: RecordValue,
+  byId: Map<string, RecordValue>,
+): string => {
+  if (
+    typeof value.semanticId === "string" &&
+    /^[a-f0-9]{64}$/.test(value.semanticId)
+  )
+    return value.semanticId;
+  return fingerprint({
+    anchor: evidenceSemanticAnchor(value),
+    related: stableSet(
+      strings(value.relatedEvidenceIds).map((id) => {
+        const related = byId.get(id);
+        return related
+          ? { anchor: evidenceSemanticAnchor(related) }
+          : { unresolvedId: fingerprint(cleanAnalysisString(id)) };
+      }),
+    ),
   });
+};
+// Equal diagnostic meanings can still have distinct display IDs. Use an ID
+// hash only as the final display tie-breaker; it never enters the review digest.
+const evidenceOrder = (value: RecordValue): string =>
+  value.semanticId
+    ? canonicalJson([
+        value.semanticId,
+        fingerprint(cleanAnalysisString(value.id)),
+      ])
+    : canonicalJson(orderingValue(value));
 
 const SPECIFICATION_HINTS: Record<string, string[]> = {
   POWER: ["소비전력", "소비 전력", "정격전력", "정격 전력"],
@@ -196,7 +259,12 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
   );
   const output: RecordValue[] = [];
   const diagnosticBytes = new Map<string, number>();
-  const diagnostics = analysisDiagnostics(input);
+  const diagnostics: RecordValue[] = analysisDiagnostics(input).map(
+    (value) => ({
+      ...value,
+      semanticId: diagnosticSemanticId(value, byId),
+    }),
+  );
   const diagnosticSelections = Object.entries(
     TENDER_EVIDENCE_LIMITS.diagnosticQuotas,
   ).flatMap(([category, limit]) =>
@@ -224,6 +292,10 @@ export function compactAnalysisEvidence(input: EvidenceInput): RecordValue[] {
       source: value.source,
       state: value.state === "UNKNOWN" ? "UNKNOWN" : null,
       snippet: excerpt(value.snippet, hints),
+      ...(typeof value.semanticId === "string" &&
+      /^[a-f0-9]{64}$/.test(value.semanticId)
+        ? { semanticId: value.semanticId }
+        : {}),
       ...(Object.prototype.hasOwnProperty.call(
         TENDER_EVIDENCE_LIMITS.diagnosticQuotas,
         String(value.diagnosticCategory),
@@ -307,42 +379,8 @@ function analysisDiagnostics(input: EvidenceInput): RecordValue[] {
  * including those omitted from display. Source snippets are presentation only. */
 export function analysisReviewDigest(input: EvidenceInput): string {
   const evidence = records(input.evidence);
-  const anchor = (value: RecordValue): RecordValue =>
-    Object.fromEntries(
-      [
-        "kind",
-        "source",
-        "state",
-        "documentIdentity",
-        "revision",
-        "location",
-        "operation",
-        "field",
-        "conflictField",
-        "diagnosticCategory",
-      ]
-        .filter((key) => value[key] !== undefined)
-        .map((key) => [
-          key,
-          typeof value[key] === "string"
-            ? fingerprint(cleanAnalysisString(value[key]))
-            : value[key],
-        ])
-        .concat(
-          ["UNSUPPORTED", "CONFLICT"].includes(String(value.kind))
-            ? [
-                [
-                  "conditionDigest",
-                  fingerprint(
-                    cleanAnalysisString(value.snippet).replace(/\s+/g, ""),
-                  ),
-                ],
-              ]
-            : [],
-        ),
-    );
   const evidenceById = new Map(
-    evidence.map((value) => [String(value.id), anchor(value)]),
+    evidence.map((value) => [String(value.id), evidenceSemanticAnchor(value)]),
   );
   const definitions = [
     ...records(input.requirements).flatMap((item) =>
@@ -398,7 +436,7 @@ export function analysisReviewDigest(input: EvidenceInput): string {
     price: semantic(input.priceAnalysis),
     diagnostics: stableSet(
       analysisDiagnostics(input).map((value) => ({
-        ...anchor(value),
+        ...evidenceSemanticAnchor(value),
         related: semantic(value.relatedEvidenceIds, "relatedEvidenceIds"),
       })),
     ),

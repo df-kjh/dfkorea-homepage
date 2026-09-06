@@ -156,3 +156,100 @@ it("reserves category byte/count quotas even with long diagnostic anchors and 10
     }),
   ).toEqual(result);
 });
+
+it.each(["resolved", "stale", "absent", "same-anchor"])(
+  "selects identical capped same-field conflicts with %s related evidence in either input order",
+  (mode) => {
+    const sources = Array.from({ length: 12 }, (_, index) => ({
+      id: `source-${index}`,
+      kind: "SOURCE",
+      source: "DOCUMENT",
+      documentIdentity: "doc",
+      location: `p${index}`,
+      snippet: "본문".repeat(70000),
+    }));
+    const conflicts = sources.map((source, index) => ({
+      id: `conflict-${index}`,
+      kind: "CONFLICT",
+      source: "STRUCTURED",
+      state: "UNKNOWN",
+      conflictField: "POWER",
+      snippet:
+        mode === "absent" ? `소비전력 조건${index} 충돌` : "소비전력 조건 충돌",
+      relatedEvidenceIds:
+        mode === "absent"
+          ? []
+          : mode === "same-anchor"
+            ? ["source-0"]
+            : [source.id, "stale-common"],
+    }));
+    const evidence = mode === "stale" ? conflicts : [...sources, ...conflicts];
+    const forward = compactAnalysisDetail({ evidence });
+    const backward = compactAnalysisDetail({
+      evidence: [...evidence].reverse().map((value) => ({
+        ...value,
+        ...("relatedEvidenceIds" in value
+          ? { relatedEvidenceIds: [...value.relatedEvidenceIds].reverse() }
+          : {}),
+      })),
+    });
+    expect(
+      forward.evidence.filter((value) => value.kind === "CONFLICT"),
+    ).toHaveLength(8);
+    expect(backward.evidence).toEqual(forward.evidence);
+    expect(backward.reviewSemanticDigest).toBe(forward.reviewSemanticDigest);
+    expect(analysisFingerprint(backward as TenderAnalysis)).toBe(
+      analysisFingerprint(forward as TenderAnalysis),
+    );
+    // Source citations may be absent after persistence: re-projection must
+    // keep the same chosen diagnostics and their order with stale references.
+    expect(
+      compactAnalysisDetail(JSON.parse(JSON.stringify(forward))).evidence,
+    ).toEqual(forward.evidence);
+    expect(JSON.stringify(forward.evidence)).not.toContain(sources[0].snippet);
+  },
+);
+
+it("orders conflicts by resolved semantic anchors instead of source IDs or bulk snippets", () => {
+  const sources = Array.from({ length: 12 }, (_, index) => ({
+    id: `source-${index}`,
+    kind: "SOURCE",
+    source: "DOCUMENT",
+    documentIdentity: "doc",
+    location: `p${index}`,
+    snippet: "원문 전체".repeat(30000),
+  }));
+  const conflicts = sources.map((source, index) => ({
+    id: `conflict-${index}`,
+    kind: "CONFLICT",
+    source: "STRUCTURED",
+    state: "UNKNOWN",
+    conflictField: "POWER",
+    snippet: "소비전력 조건 충돌",
+    relatedEvidenceIds: [source.id],
+  }));
+  const before = compactAnalysisDetail({
+    evidence: [...sources, ...conflicts],
+  });
+  const after = compactAnalysisDetail({
+    evidence: [
+      ...sources.map((source, index) => ({
+        ...source,
+        id: `relabeled-${11 - index}`,
+        snippet: "완전히 다른 관련 없는 원문".repeat(20000),
+      })),
+      ...conflicts.map((conflict, index) => ({
+        ...conflict,
+        id: `derived-${11 - index}`,
+        relatedEvidenceIds: [`relabeled-${11 - index}`],
+      })),
+    ].reverse(),
+  });
+  const selected = (result: typeof before) =>
+    result.evidence.map((value) => value.semanticId);
+  before.evidence.forEach((value) =>
+    expect(value.semanticId).toMatch(/^[a-f0-9]{64}$/),
+  );
+  expect(selected(after)).toEqual(selected(before));
+  expect(after.reviewSemanticDigest).toBe(before.reviewSemanticDigest);
+});
