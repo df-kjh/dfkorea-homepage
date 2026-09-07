@@ -50,4 +50,11 @@ SameSite=Lax는 NAVER WORKS OAuth에서 홈페이지로 돌아오는 최상위 G
 
 ## 운영 반영 기록
 
-- 코드 검사 및 통합 중. 운영 적용 결과는 배포 후 기록한다.
+- 메인 통합 코드: `e797040ee062050226b09a86be8ef05b47ec9267`. 동시 진행된 입찰 변경과 견적 문구 변경도 보존했다.
+- Vercel: `dpl_HU4JyE1uvitaN2KMpTrGEzCPuh8s` READY, `dfkorealed.com` alias 연결 확인.
+- Railway: `1c83a6c9-fd95-45e0-9d19-492d2148ff15` SUCCESS, 동일 코드 revision 확인.
+- 운영 HTTP 15개 검사 통과: 관리자 익명 이동 302, 세션/입찰/견적/업로드/삭제 401, 외부 Origin 변경 요청 403, 정상 홈페이지/API 200, 임의 Vercel origin CORS 미허용과 대표 도메인 허용 확인.
+- 관리자 no-store/noindex, nosniff/DENY/CSP와 홈페이지 HSTS를 확인했다. Railway API는 TLS 종단 프록시를 신뢰하도록 설정하지 않아 app의 HSTS가 나오지 않는다. 임의 XFF 신뢰를 열지 않았으며 프록시 경로를 확인한 운영 HSTS 설정은 후속 검토 대상이다.
+- 운영 브라우저에서 제품 25개/필터 표시와 대시보드 익명 접근 시 새 로그인 화면 이동을 확인했다. 실제 관리자 자격으로 저장·삭제·메일을 수행하지 않았으며 인증 후 기능은 로컬 HTTP 이중으로 검증했다.
+- 운영 CORS_ORIGIN은 `https://dfkorealed.com`으로 좁혔다. 계정·비밀번호/DB 데이터/R2 제품 이미지는 이 점검에서 변경하지 않았다. 기존 세션은 다시 로그인해야 한다.
+- 증거: `output/security-audit/production-after.json`, `verification.json`.

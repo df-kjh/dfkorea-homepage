@@ -47,7 +47,7 @@
 - [x] Review scoped changes and run complete frontend/backend test suites, contract checks, type checks and production builds.
 - [x] Verify local authenticated and unauthenticated flows with mocked backend services; confirm no live-data mutation in tests.
 - [x] Record findings, fixes, remaining limits and operating instructions; update affected menu docs.
-- [ ] Integrate only security changes, deploy backend/front safely, and verify live unauthorized routes/headers/public pages without destructive probes.
+- [x] Integrate only security changes, deploy backend/front safely, and verify live unauthorized routes/headers/public pages without destructive probes.
 
 ### Verification record
 
@@ -56,3 +56,9 @@
 - Node22.23.2: compiled backend startup/TypeORM discovery and 59 HTTP/upload tests passed.
 - Browser built SSR `/admin/dashboard` redirects unauthenticated visitor to rendered login form.
 - Upload commit `56fc6e9`, auth `28a1c52`, boundary/dependency `33fe67e`; independent cross-review found OAuth cookie and long-operation timeout regressions; OAuth fixed in `58a7272`, timeout/streaming fixes in `ca0e9f9`, 4MiB upload compatibility in `428dcd7`; final full verification passed after merging current main `f21c3b8`.
+
+### Production verification
+
+- Code `e797040`: Vercel `dpl_HU4JyE1uvitaN2KMpTrGEzCPuh8s` READY; Railway `1c83a6c9-fd95-45e0-9d19-492d2148ff15` SUCCESS.
+- 15 safe live HTTP checks passed; actual products/filter UI and anonymous dashboard→login navigation verified. No authenticated content mutations.
+- Existing photo/research changes preserved in main working tree; pending linear product photographs were not published.

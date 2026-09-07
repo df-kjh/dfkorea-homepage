@@ -1,0 +1,290 @@
+{
+  "checkedAt": "2026-09-07T13:05:27.157Z",
+  "results": [
+    {
+      "name": "login",
+      "url": "https://dfkorealed.com/admin/login",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "headers": {
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": "max-age=31536000",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 11685
+    },
+    {
+      "name": "dashboard-anonymous",
+      "url": "https://dfkorealed.com/admin/dashboard",
+      "status": 302,
+      "expected": 302,
+      "passed": true,
+      "headers": {
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": "max-age=31536000",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": "/admin/login"
+      },
+      "bytes": 98
+    },
+    {
+      "name": "bff-session-anonymous",
+      "url": "https://dfkorealed.com/api/admin/auth/session",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "script-src 'none'; frame-ancestors 'none';",
+        "strict-transport-security": "max-age=31536000",
+        "referrer-policy": "no-referrer",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 162
+    },
+    {
+      "name": "bff-csrf",
+      "url": "https://dfkorealed.com/api/admin/auth/logout",
+      "status": 403,
+      "expected": 403,
+      "passed": true,
+      "headers": {
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "script-src 'none'; frame-ancestors 'none';",
+        "strict-transport-security": "max-age=31536000",
+        "referrer-policy": "no-referrer",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 155
+    },
+    {
+      "name": "products",
+      "url": "https://dfkorealed.com/products",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": "*",
+        "location": null
+      },
+      "bytes": 50553
+    },
+    {
+      "name": "about",
+      "url": "https://dfkorealed.com/about",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": "*",
+        "location": null
+      },
+      "bytes": 19636
+    },
+    {
+      "name": "backend-health",
+      "url": "https://dfkorea-production.up.railway.app/",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 12
+    },
+    {
+      "name": "backend-session",
+      "url": "https://dfkorea-production.up.railway.app/auth/session",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": "no-store",
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 43
+    },
+    {
+      "name": "tenders-anonymous",
+      "url": "https://dfkorea-production.up.railway.app/tenders",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 43
+    },
+    {
+      "name": "quotes-anonymous",
+      "url": "https://dfkorea-production.up.railway.app/quotes/admin",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 43
+    },
+    {
+      "name": "upload-image-anonymous",
+      "url": "https://dfkorea-production.up.railway.app/upload/image",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 43
+    },
+    {
+      "name": "upload-file-anonymous",
+      "url": "https://dfkorea-production.up.railway.app/upload/file",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 43
+    },
+    {
+      "name": "upload-delete-anonymous",
+      "url": "https://dfkorea-production.up.railway.app/upload/image",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 43
+    },
+    {
+      "name": "cors-hostile",
+      "url": "https://dfkorea-production.up.railway.app/products",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": null,
+        "location": null
+      },
+      "bytes": 48658
+    },
+    {
+      "name": "cors-legitimate",
+      "url": "https://dfkorea-production.up.railway.app/products",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "headers": {
+        "cache-control": null,
+        "x-robots-tag": null,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "strict-transport-security": null,
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "access-control-allow-origin": "https://dfkorealed.com",
+        "location": null
+      },
+      "bytes": 48658
+    }
+  ]
+}
