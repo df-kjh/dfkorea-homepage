@@ -67,9 +67,38 @@ describe('TenderCompanyProfileModal', () => {
     await flushPromises()
 
     expect(document.querySelector('[data-test="add-supplyProducts"]')).toBeNull()
+    await click('[data-test="toggle-profile-details"]')
+    await input('[data-test="supplyProducts-0-name"]', '수정한 LED 보안등기구')
     await save()
     expect(api.replaceCompanyProfile).toHaveBeenCalledWith(
-      expect.objectContaining({ supplyProducts: legacySupplyProducts }),
+      expect.objectContaining({
+        supplyProducts: [{ ...legacySupplyProducts[0], name: '수정한 LED 보안등기구' }],
+      }),
+    )
+  })
+
+  it('lets an administrator remove a hidden legacy supply product that can no longer be saved', async () => {
+    api.getCompanyProfile.mockResolvedValueOnce({
+      data: {
+        ...structuredClone(profile),
+        supplyProducts: [
+          { code: '39112102', name: '만료된 LED 보안등기구', expiresAt: '2000-01-01' },
+        ],
+      },
+    })
+    open()
+    await flushPromises()
+    await click('[data-test="toggle-profile-details"]')
+
+    expect(document.body.textContent).toContain('기존 공급물품 분류')
+    expect(
+      document.querySelector<HTMLInputElement>('[data-test="supplyProducts-0-name"]')?.value,
+    ).toBe('만료된 LED 보안등기구')
+    expect(document.querySelector('[data-test="add-supplyProducts"]')).toBeNull()
+    await click('[data-test="remove-supplyProducts-0"]')
+    await save()
+    expect(api.replaceCompanyProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ supplyProducts: [] }),
     )
   })
 

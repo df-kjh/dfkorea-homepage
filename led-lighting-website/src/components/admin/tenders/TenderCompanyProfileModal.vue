@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseCard from '@/components/common/BaseCard.vue'
@@ -29,7 +29,6 @@ const qualificationGroups = [
   { key: 'directProduction', label: '직접생산확인' },
   { key: 'certifications', label: '보유 인증' },
 ] as const
-const editableGroups = qualificationGroups.filter(({ key }) => key !== 'supplyProducts')
 const draft = ref(empty()),
   loading = ref(false),
   saving = ref(false),
@@ -38,6 +37,11 @@ const draft = ref(empty()),
   advancedOpen = ref(false),
   error = ref(''),
   feedback = ref('')
+const displayedQualificationGroups = computed(() =>
+  qualificationGroups.filter(
+    ({ key }) => key !== 'supplyProducts' || draft.value.supplyProducts.length > 0,
+  ),
+)
 let generation = 0
 const load = async () => {
   const request = ++generation
@@ -229,10 +233,21 @@ onUnmounted(() => {
             >
           </div>
           <div v-if="advancedOpen" id="profile-advanced-fields" class="profile-advanced">
-            <BaseCard v-for="group in editableGroups" :key="group.key" :hoverable="false"
+            <BaseCard
+              v-for="group in displayedQualificationGroups"
+              :key="group.key"
+              :hoverable="false"
               ><div class="profile-heading">
-                <h4 class="font-bold">{{ group.label }}</h4>
+                <div>
+                  <h4 class="font-bold">
+                    {{ group.key === 'supplyProducts' ? '기존 공급물품 분류' : group.label }}
+                  </h4>
+                  <p v-if="group.key === 'supplyProducts'" class="mt-1 text-sm text-gray-500">
+                    신규 항목은 추가할 수 없습니다. 기존 값만 수정하거나 삭제할 수 있습니다.
+                  </p>
+                </div>
                 <BaseButton
+                  v-if="group.key !== 'supplyProducts'"
                   :data-test="`add-${group.key}`"
                   type="button"
                   size="small"
