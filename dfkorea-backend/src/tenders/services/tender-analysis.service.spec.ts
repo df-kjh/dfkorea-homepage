@@ -164,6 +164,115 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       new TenderPriceAnalyzer(),
     );
   });
+
+  const saveHistoricalTender = (
+    sourceNoticeId: string,
+    registeredAt: Date,
+    source = TenderSource.G2B,
+    procurementType = ProcurementType.GOODS,
+  ) =>
+    db.getRepository(Tender).save({
+      source,
+      sourceNoticeId,
+      revision: "000",
+      title: `LED ${sourceNoticeId}`,
+      orderingOrganization: "fixture",
+      registeredAt,
+      sourceUrl: "https://example.invalid/tender",
+      procurementType,
+      relevance: TenderRelevance.DIRECT,
+      relevanceScore: 100,
+      relevanceReasons: [],
+      rawData: {},
+    });
+
+  it("queues only supported notices at or after the historical KST cutoff", async () => {
+    await db.getRepository(Tender).delete(tender.id);
+    const cutoff = new Date("2026-08-31T15:00:00.000Z");
+    const includedG2b = await saveHistoricalTender("included-g2b", cutoff);
+    const includedKapt = await saveHistoricalTender(
+      "included-kapt",
+      new Date(cutoff.getTime() + 1),
+      TenderSource.KAPT,
+      ProcurementType.SERVICE,
+    );
+    await saveHistoricalTender(
+      "before-cutoff",
+      new Date(cutoff.getTime() - 1),
+    );
+    await saveHistoricalTender(
+      "g2b-construction",
+      new Date(cutoff.getTime() + 2),
+      TenderSource.G2B,
+      ProcurementType.CONSTRUCTION,
+    );
+    await saveHistoricalTender(
+      "kepco-goods",
+      new Date(cutoff.getTime() + 3),
+      TenderSource.KEPCO,
+      ProcurementType.GOODS,
+    );
+
+    await expect(service.queueMissingAnalysesSince(cutoff, 50)).resolves.toEqual(
+      { queuedCount: 2 },
+    );
+    const queued = await db.getRepository(TenderAnalysis).find({
+      order: { createdAt: "ASC", id: "ASC" },
+    });
+    expect(new Set(queued.map(({ tenderId }) => tenderId))).toEqual(
+      new Set([includedG2b.id, includedKapt.id]),
+    );
+  });
+
+  it("queues the oldest bounded batch and eventually exhausts missing rows", async () => {
+    await db.getRepository(Tender).delete(tender.id);
+    const cutoff = new Date("2026-08-31T15:00:00.000Z");
+    const saved: Tender[] = [];
+    for (let index = 0; index < 52; index++) {
+      saved.push(
+        await saveHistoricalTender(
+          `bounded-${String(index).padStart(2, "0")}`,
+          new Date(cutoff.getTime() + index * 1000),
+        ),
+      );
+    }
+
+    await expect(
+      service.queueMissingAnalysesSince(cutoff, 999),
+    ).resolves.toEqual({ queuedCount: 50 });
+    const firstBatch = await db.getRepository(TenderAnalysis).find();
+    expect(new Set(firstBatch.map(({ tenderId }) => tenderId))).toEqual(
+      new Set(saved.slice(0, 50).map(({ id }) => id)),
+    );
+    await expect(service.queueMissingAnalysesSince(cutoff, 50)).resolves.toEqual(
+      { queuedCount: 2 },
+    );
+    await expect(service.queueMissingAnalysesSince(cutoff, 50)).resolves.toEqual(
+      { queuedCount: 0 },
+    );
+    expect(await db.getRepository(TenderAnalysis).count()).toBe(52);
+  });
+
+  it("uses row locks and the tender unique key to make concurrent catch-up idempotent", async () => {
+    await db.getRepository(Tender).delete(tender.id);
+    const cutoff = new Date("2026-08-31T15:00:00.000Z");
+    for (let index = 0; index < 60; index++) {
+      await saveHistoricalTender(
+        `concurrent-${String(index).padStart(2, "0")}`,
+        new Date(cutoff.getTime() + index * 1000),
+      );
+    }
+
+    const results = await Promise.all([
+      service.queueMissingAnalysesSince(cutoff, 50),
+      service.queueMissingAnalysesSince(cutoff, 50),
+    ]);
+    expect(results.reduce((sum, result) => sum + result.queuedCount, 0)).toBe(60);
+    expect(await db.getRepository(TenderAnalysis).count()).toBe(60);
+    await expect(service.queueMissingAnalysesSince(cutoff, 50)).resolves.toEqual(
+      { queuedCount: 0 },
+    );
+  });
   it("projects qualification expiry at KST midnight before a sweep and queues only affected analyses", async () => {
     const before = new Date("2099-09-07T14:59:59.999Z");
     const boundary = new Date("2099-09-07T15:00:00.000Z");

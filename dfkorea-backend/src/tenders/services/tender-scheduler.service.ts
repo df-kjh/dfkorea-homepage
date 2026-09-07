@@ -7,6 +7,10 @@ import { TenderMailService } from "./tender-mail.service";
 
 export const TENDER_COLLECTION_CRON = "0 0 * * * *";
 export const TENDER_COLLECTION_TIMEZONE = "Asia/Seoul";
+export const TENDER_ANALYSIS_CATCH_UP_SINCE = new Date(
+  "2026-08-31T15:00:00.000Z",
+);
+const TENDER_ANALYSIS_CATCH_UP_BATCH_SIZE = 50;
 
 @Injectable()
 export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -59,7 +63,14 @@ export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
       ),
       schedule(
         "20 * * * * *",
-        async () => this.analysis.processDue(new Date(), 2),
+        async () => {
+          const now = new Date();
+          await this.analysis.queueMissingAnalysesSince(
+            TENDER_ANALYSIS_CATCH_UP_SINCE,
+            TENDER_ANALYSIS_CATCH_UP_BATCH_SIZE,
+          );
+          await this.analysis.processDue(now, 2);
+        },
         options,
       ),
       // Award ticks share the collector's advisory lock. Leave the top of hour
@@ -75,6 +86,13 @@ export class TenderSchedulerService implements OnModuleInit, OnModuleDestroy {
         options,
       ),
     ];
+
+    // Startup only creates durable queue rows. Document fetching and analysis
+    // stay on the bounded cron workers so application readiness is not delayed.
+    await this.analysis.queueMissingAnalysesSince(
+      TENDER_ANALYSIS_CATCH_UP_SINCE,
+      TENDER_ANALYSIS_CATCH_UP_BATCH_SIZE,
+    );
   }
 
   onModuleDestroy(): void {

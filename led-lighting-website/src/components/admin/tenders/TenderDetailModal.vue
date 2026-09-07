@@ -55,7 +55,12 @@ const accept = (data: TenderAnalysis) => {
 }
 const schedule = (request: number) => {
   stopPolling()
-  if (!isAnalysisActive(analysis.value?.status) || request !== generation || !props.modelValue)
+  if (
+    !isAnalysisActive(analysis.value?.status) ||
+    !analysis.value?.analysisFingerprint ||
+    request !== generation ||
+    !props.modelValue
+  )
     return
   // A finite polling budget avoids a permanently queued job keeping this modal busy forever.
   if (pollCount >= 30) {
@@ -187,8 +192,27 @@ onUnmounted(() => {
       <p v-if="analysis?.status === 'FAILED'" role="status" class="analysis-notice">
         분석 실패 · 원문을 확인하거나 다시 분석해 주세요. {{ boundedEvidence(analysis.errorCode) }}
       </p>
-      <p v-if="analysis && isAnalysisActive(analysis.status)" role="status" class="analysis-notice">
-        최신 자료로 분석 중입니다. 이전 결과는 현재 판단에 사용하지 않습니다.
+      <p
+        v-if="analysis?.status === 'PENDING' && !analysis.analysisFingerprint"
+        role="status"
+        class="analysis-notice"
+      >
+        아직 분석 작업이 등록되지 않았습니다. 곧 자동으로 등록되며, ‘다시 분석’을 누르면 바로
+        등록할 수 있습니다.
+      </p>
+      <p
+        v-else-if="analysis?.status === 'PENDING'"
+        role="status"
+        class="analysis-notice"
+      >
+        분석 대기 중입니다. 최신 결과가 준비되면 자동으로 표시합니다.
+      </p>
+      <p
+        v-else-if="analysis?.status === 'PROCESSING'"
+        role="status"
+        class="analysis-notice"
+      >
+        최신 자료를 분석 중입니다. 이전 결과는 현재 판단에 사용하지 않습니다.
       </p>
       <p v-if="pollingPaused" role="status" class="analysis-notice">
         자동 갱신을 일시 중지했습니다.
