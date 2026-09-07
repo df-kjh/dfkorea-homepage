@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-09-07 관리자 보안 보완: 인증서 생성·수정·삭제와 이미지/PDF 업로드는 쿠키 기반 관리자 중계와 백엔드 JWT 검증을 거친다. PDF는 형식을 확인한 뒤 첨부 다운로드로 제공한다. 세션·제한사항은 [관리자 문서](admin.md)를 따른다.
+
 - 대표 도메인은 `https://dfkorealed.com`이다. 인증 목록은 `https://dfkorealed.com/certificates` canonical과 목록 전용 제목·설명·`index, follow`·Open Graph·Twitter 메타데이터를 서버 렌더링 HTML에 제공한다.
 - 인증 분류 상세는 `https://dfkorealed.com/certificates/:category` 형식의 URL을 사용한다. 분류명은 URL 인코딩하며, 경로에서 만든 제목·설명·`index, follow`·Open Graph·Twitter URL·canonical 링크를 서버 렌더링한다. 브라우저 전용 PDF 라이브러리와 화면 크기 감지를 사용하는 상세 화면 전체는 `ClientOnly`에서 지연 로드한다. 서버 HTML은 분류 메타데이터를 제공하고, 제목·인증서 수·선택기·다운로드·로딩 및 오류 상태·PDF 본문은 브라우저에서 렌더링한다.
 - 백엔드 동적 사이트맵은 인증 목록과 각 고유 인증 분류의 절대 canonical URL을 포함한다. 목록 그룹·상세 필터·경로 기반 canonical·사이트맵 모두 앞뒤 공백을 제거하고, null·빈 문자열·공백뿐인 분류는 `기타`로 정규화한다. Vue Router가 디코딩한 분류를 다시 디코딩하지 않으며, 같은 분류는 한 URL로 통합하며, 해당 분류의 가장 최근 수정일을 `lastmod`로 제공한다.

@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-09-07 관리자 보안 보완: 제품명은 HTML로 해석하지 않고 텍스트로 표시한다. 제품 생성·수정·삭제와 이미지 업로드/삭제는 쿠키 기반 관리자 중계와 백엔드 JWT 검증을 거친다. 공개 목록·상세 GET은 로그인 없이 유지한다. 세션·제한사항은 [관리자 문서](admin.md)를 따른다.
+
 - 대표 도메인은 `https://dfkorealed.com`이다. 제품 목록은 `https://dfkorealed.com/products` canonical과 전용 제목·설명·`index, follow`·Open Graph·Twitter 메타데이터를 서버 렌더링 HTML에 제공한다.
 - 제품 상세는 `https://dfkorealed.com/products/:id` canonical과 상세별 메타데이터를 서버 렌더링한다. 백엔드 동적 사이트맵은 제품 목록과 각 공개 제품 상세의 절대 canonical URL을 포함하며, 제품 변경 사항은 다음 사이트맵 응답에 반영된다.
 - 제품 카드는 실제 `href`를 가진 `/products/:id` NuxtLink 앵커를 렌더링한다. Nuxt 페이지가 API의 첫 20개 제품을 서버에서 가져와 기존 화면·카드에 전달하므로 초기 목록 HTML에 해당 상세 링크와 실제 카드 내용이 포함된다. hydration 시 같은 데이터를 재사용하고 추가 페이지는 기존 클라이언트 무한 스크롤로 불러온다. 검색로봇과 키보드 사용자는 목록 HTML에서 초기 항목의 상세 페이지를 발견할 수 있고, 기존 목록의 클릭 동작도 유지한다.

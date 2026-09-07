@@ -1,0 +1,36 @@
+# 관리자 기능 현황
+
+## 구현 완료
+
+- 로그인 JWT를 브라우저 JavaScript에서 읽을 수 없는 HttpOnly·Secure·SameSite=Lax 호스트 쿠키로 관리한다. 로그인 응답은 사용자명만 반환하며 기존 localStorage 토큰을 제거한다.
+- SSR/브라우저 관리자 이동 시 서버 세션을 확인한다. 모든 보호 API는 JWT 서명·만료·현재 관리자 계정과 비밀번호 상태를 검증한다. 세션은 1시간이며 이전 형식 토큰은 거부한다.
+- 로그인 입력 크기, 계정/원천별 시도 횟수를 제한하고 존재하지 않는 계정에도 bcrypt 비교와 동일한 실패 메시지를 사용한다.
+- 관리자 중계는 고정 API·허용한 경로/메서드만 처리한다. 변경 요청의 Origin을 정확히 검사하고 본문 크기를 제한하며 쿠키/자격증명/redirect를 그대로 중계하지 않는다. JSON·multipart·견적 첨부 바이너리를 지원한다.
+- 제품·소식·인증서 쓰기, 입찰 기능, 견적 관리, 스케줄러, 업로드/삭제 경로의 인증 경계를 로컬 HTTP 테스트로 검증한다. 공개 카탈로그·소식/인증 조회 및 고객 견적은 기존 공개 경계를 유지한다.
+- 파일 업로드는 인증을 multipart 파싱보다 먼저 수행한다. 허용 폴더·형식·시그니처·파일 크기·40MP 픽셀 제한을 적용하고 이미지를 WebP로 재인코딩한다. PDF는 형식 검사와 첨부 다운로드를 적용한다. 삭제는 설정된 R2 공개 base와 관리 파일명만 허용한다.
+- 정확한 CORS origin, 관리자 no-store/noindex, nosniff·프레임 삽입 방지와 HTTPS 응답 HSTS를 적용한다. 제품명 HTML 직접 렌더링을 제거하고 주요 보안 취약 의존성을 패치했다.
+
+## 미구현
+
+- MFA/패스키, 관리자별 역할 분리 및 보안 감사 이력 UI.
+- 서버 세션 테이블 기반 개별 토큰 즉시 폐기와 모든 기기 로그아웃.
+
+## 부족하거나 개선이 필요한 기능
+
+- 로그인 제한은 프로세스 메모리 기반이다. 재시작 시 초기화되며 여러 replica 간 공유되지 않는다. BFF/프록시 원천은 함께 집계될 수 있어 공유 저장소 또는 신뢰 가능한 플랫폼 제한을 추가할 수 있다.
+- 로그아웃은 쿠키를 삭제한다. 이미 탈취된 bearer는 최대 1시간 유효하므로 긴급 시 JWT_SECRET 회전 또는 관리자 자격 변경이 필요하다.
+- PDF 형식 검사는 악성코드 검사가 아니다. 기존 공개 R2 객체의 헤더 변경/재검사는 수행하지 않았다.
+- CSP는 frame-ancestors만 적용했다. script-src까지 강화하려면 Nuxt·에디터·3D 렌더링과 함께 별도 검증한다.
+- 운영에서 실제 관리자 저장/파일 삭제/메일 발송을 테스트하지 않는다. 인증된 기능은 외부 저장소와 DB를 대체한 로컬 HTTP 테스트로 검증한다.
+
+## 관련 파일
+
+- `dfkorea-backend/src/auth/`, `src/upload/`, `src/security/`, `src/main.ts`
+- `led-lighting-website/src/server/api/admin/`, `src/server/utils/admin-relay.ts`, `src/server/middleware/`
+- `led-lighting-website/src/api/client.ts`, `src/middleware/auth.ts`, `src/views/admin/`
+- `docs/security/2026-09-07-admin-hardening-report.md`, `DEPLOYMENT.md`
+
+## 갱신 규칙
+
+- 관리자 경로, 쿠키, 만료, 권한 또는 저장소 경계가 변경되면 이 문서와 관련 메뉴 문서를 같이 갱신한다.
+- 기능의 테스트 근거와 운영 미검증 범위, 인증/제한 정책의 남은 한계를 함께 기록한다.
