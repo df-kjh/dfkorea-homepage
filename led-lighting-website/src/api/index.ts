@@ -1,5 +1,6 @@
 import apiClient from './client'
 import publicClient from './public-client'
+import { UPLOAD_CONFIG } from '@/constants/upload'
 import type { ProductFilters, ProductFilterOptions } from '@/types/quote'
 import type {
   LoginDto,
@@ -21,19 +22,31 @@ export { tendersAPI } from './tenders'
 // 인증 API
 export const authAPI = {
   login: (credentials: LoginDto) => apiClient.post<LoginResponse>('/auth/login', credentials),
+  session: () => apiClient.get<{ user: { username: string } }>('/auth/session'),
+  logout: () => apiClient.post<{ success: boolean }>('/auth/logout', {}),
 }
 
 // 제품 API
 export const productsAPI = {
   getAll: () => apiClient.get<Product[]>('/products'),
-  getPaginated: (page: number, limit: number, search?: string, category?: string, filters?: Partial<ProductFilters>) =>
+  getPaginated: (
+    page: number,
+    limit: number,
+    search?: string,
+    category?: string,
+    filters?: Partial<ProductFilters>,
+  ) =>
     publicClient.get<PaginatedResponse<Product>>('/products', {
       params: {
         page,
         limit,
         ...(search && { search }),
         ...(category && category !== '전체' && { category }),
-        ...Object.fromEntries(Object.entries(filters || {}).filter(([, values]) => values?.length).map(([key, values]) => [key, values!.join(',')])),
+        ...Object.fromEntries(
+          Object.entries(filters || {})
+            .filter(([, values]) => values?.length)
+            .map(([key, values]) => [key, values!.join(',')]),
+        ),
       },
     }),
   getFilterOptions: () => publicClient.get<ProductFilterOptions>('/products/filter-options'),
@@ -79,13 +92,22 @@ export const certificatesAPI = {
   getAll: () => apiClient.get<Certificate[]>('/certificates'),
   getOne: (id: string) => apiClient.get<Certificate>(`/certificates/${id}`),
   create: (data: CreateCertificateDto) => apiClient.post<Certificate>('/certificates', data),
-  update: (id: string, data: UpdateCertificateDto) => apiClient.put<Certificate>(`/certificates/${id}`, data),
+  update: (id: string, data: UpdateCertificateDto) =>
+    apiClient.put<Certificate>(`/certificates/${id}`, data),
   delete: (id: string) => apiClient.delete(`/certificates/${id}`),
+}
+
+// 개별 컴포넌트 검증을 우회하는 호출도 호스팅 제한 전에 차단한다.
+const assertAdminUploadSize = (file: File) => {
+  if (file.size > UPLOAD_CONFIG.MAX_SIZE_BYTES) {
+    throw new Error(`파일 크기는 ${UPLOAD_CONFIG.MAX_SIZE_MB}MB를 초과할 수 없습니다`)
+  }
 }
 
 // 업로드 API
 export const uploadAPI = {
-  uploadImage: (file: File, folder?: 'products' | 'posts' | 'temp' | 'certificates') => {
+  uploadImage: async (file: File, folder?: 'products' | 'posts' | 'temp' | 'certificates') => {
+    assertAdminUploadSize(file)
     const formData = new FormData()
     formData.append('image', file)
     const params = folder ? { folder } : {}
@@ -100,7 +122,8 @@ export const uploadAPI = {
       },
     )
   },
-  uploadFile: (file: File, folder?: 'products' | 'posts' | 'temp' | 'certificates') => {
+  uploadFile: async (file: File, folder?: 'products' | 'posts' | 'temp' | 'certificates') => {
+    assertAdminUploadSize(file)
     const formData = new FormData()
     formData.append('file', file)
     const params = folder ? { folder } : {}

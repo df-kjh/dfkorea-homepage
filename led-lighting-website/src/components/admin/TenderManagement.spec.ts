@@ -476,6 +476,17 @@ describe('TenderManagement', () => {
     expect(wrapper.get('[role="status"]').text()).toContain('공고 수집이 완료되었습니다.')
   })
 
+  it('reports uncertain collection timeout without retrying the collection', async () => {
+    api.collect.mockRejectedValueOnce({ response: { status: 504 } })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('완료 여부를 확인하지 못했습니다')
+    expect(wrapper.get('[role="alert"]').text()).toContain('결과를 먼저 확인')
+    expect(api.collect).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps existing calendar and list data visible when immediate collection fails', async () => {
     api.collect.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mountTenderManagement()

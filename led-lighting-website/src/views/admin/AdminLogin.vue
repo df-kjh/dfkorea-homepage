@@ -87,7 +87,7 @@
           <div class="mt-8 pt-8 border-t border-gray-200 text-center">
             <p class="text-[13px] text-text-desc">
               허가되지 않은 접근은 엄격히 금지됩니다.<br />
-              모든 활동은 모니터링됩니다.
+              관리자 계정으로 로그인해 주세요. 보안을 위해 1시간 후 다시 로그인해야 합니다.
             </p>
           </div>
         </div>
@@ -130,19 +130,12 @@ const handleLogin = async (): Promise<void> => {
   try {
     loading.value = true
 
-    const { data } = await authAPI.login(loginForm)
-
-    // 토큰과 사용자 정보 저장
-    localStorage.setItem('admin_token', data.access_token)
-    localStorage.setItem('admin_user', JSON.stringify(data.user))
+    await authAPI.login(loginForm)
 
     toast.success('로그인 성공!')
 
-    // 라우터 가드가 localStorage를 확인할 수 있도록 약간의 딜레이 후 이동
-    await new Promise((resolve) => setTimeout(resolve, 100))
     await router.push('/admin/dashboard')
   } catch (error) {
-    console.error('Login error:', error)
     const err = error as { response?: { data?: { message?: string } } }
     toast.error(err.response?.data?.message || '로그인에 실패했습니다')
   } finally {

@@ -247,11 +247,11 @@ const closeImageViewer = () => {
   router.replace({ query })
 }
 
+useHead({ meta: [{ name: "keywords", content: () => `${product.value!.name}, ${product.value!.category}, ${product.value!.modelName}, LED 조명, 디에프코리아` }] });
+
 useSeoMeta({
   title: () => `${product.value!.name} | 제품 정보 | ${COMPANY_NAME}`,
   description: () => plainDescription.value,
-  keywords: () =>
-    `${product.value!.name}, ${product.value!.category}, ${product.value!.modelName}, LED 조명, 디에프코리아`,
   ogTitle: () => product.value!.name,
   ogDescription: () => plainDescription.value,
   ogUrl: () => canonicalUrl.value,

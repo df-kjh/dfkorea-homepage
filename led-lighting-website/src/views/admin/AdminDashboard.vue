@@ -113,6 +113,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { authAPI } from '@/api'
 import { useToast } from '@/composables/useToast'
 import ProductManagement from '@/components/admin/ProductManagement.vue'
 import PostManagement from '@/components/admin/PostManagement.vue'
@@ -152,12 +153,15 @@ const handleTabClick = (tabId: string) => {
   isSidebarOpen.value = false
 }
 
-const handleLogout = (): void => {
+const handleLogout = async (): Promise<void> => {
   if (confirm('로그아웃 하시겠습니까?')) {
-    localStorage.removeItem('admin_token')
-    localStorage.removeItem('admin_user')
-    toast.success('로그아웃 되었습니다')
-    router.push('/admin/login')
+    try {
+      await authAPI.logout()
+      toast.success('로그아웃 되었습니다')
+      await router.push('/admin/login')
+    } catch {
+      toast.error('로그아웃하지 못했습니다. 다시 시도해주세요.')
+    }
   }
 }
 </script>

@@ -159,7 +159,6 @@ export interface LoginDto {
  * 로그인 응답
  */
 export interface LoginResponse {
-  access_token: string
   user: {
     username: string
   }

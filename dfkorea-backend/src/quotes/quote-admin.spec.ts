@@ -2,7 +2,9 @@ import { AddQuoteAttachmentPayloads1788652900000 } from "../migrations/178865290
 import { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Test } from "@nestjs/testing";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
+import { AuthService } from "../auth/auth.service";
+import { DatabaseService } from "../database/database.service";
 import { DataSource } from "typeorm";
 import request = require("supertest");
 import { JwtStrategy } from "../auth/jwt.strategy";
@@ -13,7 +15,18 @@ import { QuoteAdminService } from "./quote-admin.service";
 
 const signingSecret = "quote-admin-tests-only-0123456789abcdef";
 const jwt = new JwtService({ secret: signingSecret });
-const token = () => jwt.sign({ username: "admin-test", sub: "admin-test" });
+const testAdmin = { username: "admin-test", password: "test-password-hash" };
+const token = () =>
+  jwt.sign(
+    {
+      username: "admin-test",
+      sub: "admin-test",
+      cv: createHmac("sha256", signingSecret)
+        .update(`admin-credential:${testAdmin.password}`)
+        .digest("hex"),
+    },
+    { expiresIn: "1h" },
+  );
 const actor = { userId: "admin-42", username: "admin-test" };
 const retryBody = {
   acknowledgeDuplicateRisk: true,
@@ -32,7 +45,14 @@ async function createApp(db: unknown, storage: unknown) {
           const previous = process.env.JWT_SECRET;
           process.env.JWT_SECRET = signingSecret;
           try {
-            return new JwtStrategy();
+            return new JwtStrategy(
+              new AuthService(
+                {
+                  getAdmin: async () => testAdmin,
+                } as DatabaseService,
+                jwt,
+              ),
+            );
           } finally {
             if (previous === undefined) delete process.env.JWT_SECRET;
             else process.env.JWT_SECRET = previous;

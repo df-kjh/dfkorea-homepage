@@ -14,8 +14,8 @@
 
 ### 필수 요구사항
 
-- 백엔드: Node.js 20.x 이상
-- 프론트엔드: Node.js 22.18.0 이상 (Node 22 계열), npm 11.17.0
+- 백엔드: Node.js 22.19.0 이상 (Node 22 계열)
+- 프론트엔드: Node.js 22.19.0 이상 (Node 22 계열), npm 11.17.0
 - Docker & Docker Compose (Docker 배포 시)
 - PostgreSQL (모든 백엔드 배포에서 필수)
 
@@ -40,7 +40,7 @@ NODE_ENV=production
 PORT=3000
 # secret store only: >=32 chars and 3+ of lower/upper/number/symbol
 JWT_SECRET=
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=1h
 CORS_ORIGIN=https://yourdomain.com
 MAX_FILE_SIZE=10485760
 UPLOAD_DEST=./uploads
@@ -159,7 +159,7 @@ NODE_ENV=production HOST=0.0.0.0 PORT=3000 \
 | `NODE_ENV`            | 환경 모드           | `production`              |
 | `PORT`                | 서버 포트           | `3000`                    |
 | `JWT_SECRET`          | JWT 서명키          | secret store에서 32자 이상 무작위 값 주입 |
-| `JWT_EXPIRES_IN`      | JWT 만료 시간       | `7d`                      |
+| `JWT_EXPIRES_IN`      | 레거시 설정값; 관리자 발급은 코드에서 최대 1시간 고정 | `1h` |
 | `CORS_ORIGIN`         | CORS 허용 도메인    | `https://yourdomain.com`  |
 | `MAX_FILE_SIZE`       | 최대 업로드 크기    | `10485760` (10MB)         |
 | `UPLOAD_DEST`         | 업로드 디렉토리     | `./uploads`               |
@@ -508,3 +508,19 @@ backend replica를 먼저 최소 1개만 시작해 health와 scheduler lock 획�
 - [필수 작업: ABORT ON DEFINED CRITERIA]
 
 오류율, DB connection, migration/schema 상태, 수집 lock, 메일 발송·중복, 캘린더 집계를 change window 동안 모니터링한다. schema 불일치, 예상 밖 쓰기, 중복 scheduler, 급격한 오류 증가 또는 backup 복구 불가가 확인되면 ingress를 닫고 모든 replica를 다시 정지하며 incident 책임자에게 escalate한다. 사전 정의한 중단 기준 없이 정상 종료로 선언하지 않는다.
+
+
+## 관리자 보안 운영 (2026-09-07)
+
+- 관리자 로그인은 홈페이지의 `/api/admin/auth/login`을 사용한다. JWT는 `__Host-dfkorea_admin` HttpOnly·Secure·SameSite=Lax 쿠키로 1시간 유지하며 JavaScript 응답/localStorage에 저장하지 않는다. 기존 localStorage 로그인은 무효화되어 배포 후 다시 로그인해야 한다.
+- Nuxt private runtime config의 `adminApiBaseUrl`/`adminOrigin` 기본값은 각각 `https://dfkorea-production.up.railway.app`, `https://dfkorealed.com`이다. 런타임 변경은 `NUXT_ADMIN_API_BASE_URL`, `NUXT_ADMIN_ORIGIN`을 사용한다. 운영 upstream은 현재 Railway API로 제한한다. 로컬 개발에서는 두 값을 로컬 backend origin과 실제 개발 페이지 origin으로 함께 설정한다.
+- 모든 관리자 변경 요청은 정확한 `Origin`과 HttpOnly 쿠키가 필요하다. 승인된 미리보기 도메인은 `NUXT_ADMIN_ORIGIN`에 그 HTTPS origin을 별도로 설정한다. API에는 caller Authorization·X-Forwarded-For를 전달하지 않는다.
+- 백엔드 `CORS_ORIGIN`은 쉼표로 구분한 정확한 origin만 허용한다. `*.vercel.app`, `*.railway.app`, URL path나 빈 값은 허용하지 않는다. 서버 간 요청의 Origin 부재는 허용하되 관리자 API JWT 검증은 항상 수행한다.
+- 로그인 제한은 프로세스별 15분 동안 계정 10회·접속 원천 30회다. 프록시를 통과한 BFF 요청들은 같은 원천으로 집계될 수 있다. 임의 XFF를 신뢰하지 않으며 `TRUST_PROXY_HOPS`는 실제 고정 프록시 경로가 확인된 경우에만 설정한다. 여러 replica를 사용하면 공유 제한 저장소/플랫폼 방화벽으로 보완해야 한다.
+- 비밀번호 hash·관리자 계정 변경이나 JWT_SECRET 회전은 기존 세션을 무효화한다. 일반 로그아웃은 브라우저 쿠키를 삭제하며, 이미 복사된 JWT의 서버 측 즉시 폐기 기능은 없다(최대 1시간 유효). 기존 bcrypt의 72바이트 처리 특성은 유지하며 계정 비밀번호를 임의 변경하지 않았다.
+- R2 공개 파일은 공개 제품/소식/인증 자료용이다. 업로드 권한, 폴더, 실제 래스터 형식, 파일/픽셀 크기를 검사하며 PDF는 형식 검사 후 첨부 다운로드로 제공한다. PDF 악성코드 검사나 과거 객체의 일괄 재검사는 별도 운영 과제다.
+- 관리자 응답은 no-store/noindex, 홈페이지/API는 nosniff·프레임 삽입 금지 헤더를 적용한다. CSP는 현재 `frame-ancestors`만 제한하며 스크립트 allowlist 정책은 별도 검증이 필요하다.
+- DB 구조 및 migration 변경은 없다. 보안 배포는 backend와 frontend를 함께 반영하고, 익명 보호 API의 401·공개 페이지·세션 만료 후 로그인 이동을 확인한다. 실제 게시물 저장이나 메일 발송은 보안 검증에 사용하지 않는다.
+
+- Vercel 요청 본문 4.5MB 제한에 맞춰 관리자 업로드 UI/API는 파일당 4MiB, multipart 중계는 4MiB+64KiB로 제한한다. 기존 backend 한도(이미지 5MiB/일반 파일 10MiB)와 구분한다. 대용량은 추후 짧은 유효기간의 서명 업로드로 지원한다.
+- 관리자 일반 중계는 60초, 수집/AI 동기 작업은 240초까지 기다리며 Vercel 함수 한도는 300초다. 타임아웃 때 백엔드 작업이 계속될 수 있어 재시도 전 결과 확인 안내를 표시한다.

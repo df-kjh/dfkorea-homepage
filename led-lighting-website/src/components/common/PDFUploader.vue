@@ -25,7 +25,7 @@
           upload_file
         </span>
         <p class="text-sm font-medium text-gray-500">PDF 파일을 추가해주세요.</p>
-        <p class="text-[10px] text-gray-400">PDF 형식, 최대 10MB</p>
+        <p class="text-[10px] text-gray-400">PDF 형식, 최대 {{ UPLOAD_CONFIG.MAX_SIZE_MB }}MB</p>
       </template>
 
       <!-- Hidden File Input -->
@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import { ref, inject } from 'vue'
+import { UPLOAD_CONFIG } from '@/constants/upload'
 import { useToast } from '@/composables/useToast'
 import type { useImageUpload } from '@/composables/useImageUpload'
 
@@ -94,9 +95,9 @@ const validateFile = (file: File): boolean => {
     return false
   }
 
-  const maxSize = 10 * 1024 * 1024 // 10MB
+  const maxSize = UPLOAD_CONFIG.MAX_SIZE_BYTES
   if (file.size > maxSize) {
-    toast.error('파일 크기는 10MB를 초과할 수 없습니다')
+    toast.error(`파일 크기는 ${UPLOAD_CONFIG.MAX_SIZE_MB}MB를 초과할 수 없습니다`)
     return false
   }
 

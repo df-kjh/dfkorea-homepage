@@ -17,13 +17,13 @@ export function useImageUpload(folder: UploadFolder = 'temp') {
    */
   const validateFile = (file: File): boolean => {
     const isImage = file.type.startsWith('image/')
-    const isLt5M = file.size <= UPLOAD_CONFIG.MAX_SIZE_BYTES
+    const withinSizeLimit = file.size <= UPLOAD_CONFIG.MAX_SIZE_BYTES
 
     if (!isImage) {
       ElMessage.error('이미지 파일만 업로드 가능합니다!')
       return false
     }
-    if (!isLt5M) {
+    if (!withinSizeLimit) {
       ElMessage.error(`이미지 크기는 ${UPLOAD_CONFIG.MAX_SIZE_MB}MB를 초과할 수 없습니다!`)
       return false
     }
@@ -35,14 +35,14 @@ export function useImageUpload(folder: UploadFolder = 'temp') {
    */
   const validatePdfFile = (file: File): boolean => {
     const isPdf = file.type === 'application/pdf'
-    const isLt10M = file.size <= 10 * 1024 * 1024 // 10MB
+    const withinSizeLimit = file.size <= UPLOAD_CONFIG.MAX_SIZE_BYTES
 
     if (!isPdf) {
       ElMessage.error('PDF 파일만 업로드 가능합니다!')
       return false
     }
-    if (!isLt10M) {
-      ElMessage.error('파일 크기는 10MB를 초과할 수 없습니다!')
+    if (!withinSizeLimit) {
+      ElMessage.error(`파일 크기는 ${UPLOAD_CONFIG.MAX_SIZE_MB}MB를 초과할 수 없습니다!`)
       return false
     }
     return true
@@ -106,6 +106,8 @@ export function useImageUpload(folder: UploadFolder = 'temp') {
    * 여러 이미지 업로드 (마크다운 에디터용)
    */
   const uploadMultipleImages = async (files: File[]): Promise<string[]> => {
+    // 배치 일부가 이미 저장된 뒤 큰 파일이 거절되는 상황을 막는다.
+    if (!files.every(validateFile)) throw new Error('업로드할 이미지 파일을 확인해주세요')
     uploading.value = true
     try {
       const uploadPromises = files.map(async (file) => {

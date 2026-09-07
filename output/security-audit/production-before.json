@@ -1,0 +1,82 @@
+[
+  {
+    "url": "https://dfkorealed.com/admin/login",
+    "requestOrigin": null,
+    "status": 200,
+    "headers": {
+      "content-security-policy": null,
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": null,
+      "strict-transport-security": "max-age=63072000",
+      "cache-control": "public, max-age=0, must-revalidate",
+      "access-control-allow-origin": null,
+      "access-control-allow-credentials": null,
+      "x-robots-tag": "noindex, nofollow"
+    }
+  },
+  {
+    "url": "https://dfkorealed.com/admin/dashboard",
+    "requestOrigin": null,
+    "status": 200,
+    "headers": {
+      "content-security-policy": null,
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": null,
+      "strict-transport-security": "max-age=63072000",
+      "cache-control": "public, max-age=0, must-revalidate",
+      "access-control-allow-origin": null,
+      "access-control-allow-credentials": null,
+      "x-robots-tag": "noindex, nofollow"
+    }
+  },
+  {
+    "url": "https://dfkorea-production.up.railway.app/tenders",
+    "requestOrigin": null,
+    "status": 401,
+    "headers": {
+      "content-security-policy": null,
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": null,
+      "strict-transport-security": null,
+      "cache-control": null,
+      "access-control-allow-origin": null,
+      "access-control-allow-credentials": "true",
+      "x-robots-tag": null
+    }
+  },
+  {
+    "url": "https://dfkorea-production.up.railway.app/quotes/admin",
+    "requestOrigin": null,
+    "status": 401,
+    "headers": {
+      "content-security-policy": null,
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": null,
+      "strict-transport-security": null,
+      "cache-control": null,
+      "access-control-allow-origin": null,
+      "access-control-allow-credentials": "true",
+      "x-robots-tag": null
+    }
+  },
+  {
+    "url": "https://dfkorea-production.up.railway.app/products",
+    "requestOrigin": "https://untrusted-example.vercel.app",
+    "status": 200,
+    "headers": {
+      "content-security-policy": null,
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": null,
+      "strict-transport-security": null,
+      "cache-control": null,
+      "access-control-allow-origin": "https://untrusted-example.vercel.app",
+      "access-control-allow-credentials": "true",
+      "x-robots-tag": null
+    }
+  }
+]

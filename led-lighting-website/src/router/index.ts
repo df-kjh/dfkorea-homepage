@@ -1,3 +1,4 @@
+import { authAPI } from '../api'
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 
@@ -121,16 +122,10 @@ const router = createRouter({
 })
 
 // 인증 가드
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('admin_token')
-
-  // 인증이 필요한 페이지인데 토큰이 없는 경우만 체크
-  if (to.meta.requiresAuth && !token) {
-    return next('/admin/login')
-  }
-
-  // 그 외의 경우는 모두 허용
-  next()
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth) return
+  try { await authAPI.session() }
+  catch { return '/admin/login' }
 })
 
 export default router

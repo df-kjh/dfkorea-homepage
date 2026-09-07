@@ -4,14 +4,18 @@ import {
   Delete,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   BadRequestException,
   Query,
   Body,
 } from "@nestjs/common";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { UploadService, UploadFolder } from "./upload.service";
+import { UploadService } from "./upload.service";
+import type { UploadFolder } from "./upload.service";
 
 @Controller("upload")
+@UseGuards(JwtAuthGuard)
 export class UploadController {
   constructor(private uploadService: UploadService) {}
 
@@ -19,6 +23,9 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor("image", {
       limits: {
+        files: 1,
+        fields: 0, // 폴더는 쿼리로 받으므로 임의 multipart 필드를 누적하지 않는다.
+        parts: 2,
         fileSize: 5 * 1024 * 1024, // 5MB
       },
       fileFilter: (req, file, callback) => {
@@ -41,7 +48,7 @@ export class UploadController {
     }
 
     try {
-      const url = await this.uploadService.uploadImage(file, folder || "temp");
+      const url = await this.uploadService.uploadImage(file, folder ?? "temp");
 
       return {
         url,
@@ -79,19 +86,24 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor("file", {
       limits: {
+        files: 1,
+        fields: 0, // 폴더는 쿼리로 받으므로 임의 multipart 필드를 누적하지 않는다.
+        parts: 2,
         fileSize: 10 * 1024 * 1024, // 10MB
       },
       fileFilter: (req, file, callback) => {
         // 이미지 또는 PDF 허용 (대소문자 무시)
-        const isValidExtension = file.originalname.match(/\.(jpg|jpeg|png|gif|webp|pdf)$/i);
-        const isValidMimeType = 
-          file.mimetype.startsWith('image/') || 
-          file.mimetype === 'application/pdf';
-        
+        const isValidExtension = file.originalname.match(
+          /\.(jpg|jpeg|png|gif|webp|pdf)$/i,
+        );
+        const isValidMimeType =
+          file.mimetype.startsWith("image/") ||
+          file.mimetype === "application/pdf";
+
         if (!isValidExtension || !isValidMimeType) {
-          console.error('Invalid file upload attempt:', {
+          console.error("Invalid file upload attempt:", {
             originalname: file.originalname,
-            mimetype: file.mimetype
+            mimetype: file.mimetype,
           });
           return callback(
             new BadRequestException("이미지 또는 PDF 파일만 업로드 가능합니다"),
@@ -109,16 +121,16 @@ export class UploadController {
     if (!file) {
       throw new BadRequestException("파일이 업로드되지 않았습니다");
     }
-    
-    console.log('File upload request:', {
+
+    console.log("File upload request:", {
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
-      folder
+      folder,
     });
 
     try {
-      const url = await this.uploadService.uploadImage(file, folder || "temp");
+      const url = await this.uploadService.uploadImage(file, folder ?? "temp");
 
       return {
         url,
