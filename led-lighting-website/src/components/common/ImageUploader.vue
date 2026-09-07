@@ -93,7 +93,7 @@ withDefaults(defineProps<Props>(), {
   alt: '이미지 추가',
   showTip: true,
   tipTitle: '이미지를 추가해주세요.',
-  tipDescription: 'JPG, PNG 또는 WebP 형식, 최대 5MB',
+  tipDescription: `JPG, PNG 또는 WebP 형식, 최대 ${UPLOAD_CONFIG.MAX_SIZE_MB}MB`,
   fieldName: UPLOAD_CONFIG.FIELD_NAME,
   accept: 'image/*',
   aspectRatio: 'square',
@@ -116,7 +116,7 @@ const validateFile = (file: File): boolean => {
     return false
   }
 
-  const maxSize = UPLOAD_CONFIG.MAX_SIZE_MB * 1024 * 1024
+  const maxSize = UPLOAD_CONFIG.MAX_SIZE_BYTES
   if (file.size > maxSize) {
     toast.error(`파일 크기는 ${UPLOAD_CONFIG.MAX_SIZE_MB}MB를 초과할 수 없습니다`)
     return false
