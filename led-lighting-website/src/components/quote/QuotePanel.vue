@@ -167,7 +167,7 @@ onBeforeUnmount(() => {
         >
         <div>
           <h2 id="quote-title">온라인 견적</h2>
-          <p>필요한 조명을 함께 찾아드릴게요</p>
+          <p>최대 24시간 이내 답변을 받으실 수 있습니다.</p>
         </div>
         <QuoteButton
           v-if="!mobile"
