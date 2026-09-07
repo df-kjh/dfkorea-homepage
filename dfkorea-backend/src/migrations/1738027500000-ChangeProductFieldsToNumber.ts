@@ -14,7 +14,7 @@ export class ChangeProductFieldsToNumber1738027500000 implements MigrationInterf
             USING "power"::numeric[]
         `);
     await queryRunner.query(
-      `ALTER TABLE "products" ALTER COLUMN "power" SET DEFAULT ARRAY[]::numeric[]`,
+      `ALTER TABLE "products" ALTER COLUMN "power" SET DEFAULT '{}'::numeric[]`,
     );
 
     // lifespan을 numeric 타입으로 변경
@@ -34,39 +34,14 @@ export class ChangeProductFieldsToNumber1738027500000 implements MigrationInterf
             USING "colorTemp"::numeric[]
         `);
     await queryRunner.query(
-      `ALTER TABLE "products" ALTER COLUMN "colorTemp" SET DEFAULT ARRAY[]::numeric[]`,
+      `ALTER TABLE "products" ALTER COLUMN "colorTemp" SET DEFAULT '{}'::numeric[]`,
     );
-
-    // These columns previously existed only in databases created with synchronize.
-    // IF NOT EXISTS preserves those databases while giving clean migration runs the
-    // same Product shape before later migrations start querying the entity.
-    await queryRunner.query(`
-            ALTER TABLE "products"
-            ADD COLUMN IF NOT EXISTS "powerFactor" character varying
-        `);
-    await queryRunner.query(`
-            ALTER TABLE "products"
-            ADD COLUMN IF NOT EXISTS "luminanceEfficiency" character varying
-        `);
-    await queryRunner.query(`
-            ALTER TABLE "products"
-            ADD COLUMN IF NOT EXISTS "colorRendering" character varying
-        `);
-    await queryRunner.query(`
-            ALTER TABLE "products"
-            ADD COLUMN IF NOT EXISTS "options" text[] NOT NULL DEFAULT ARRAY[]::text[]
-        `);
 
     // luminanceEfficiency를 numeric 타입으로 변경
     await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "luminanceEfficiency" TYPE numeric 
-            USING 
-                CASE 
-                    WHEN "luminanceEfficiency" IS NULL THEN NULL
-                    WHEN "luminanceEfficiency" = '' THEN NULL
-                    ELSE "luminanceEfficiency"::numeric
-                END
+            USING NULLIF("luminanceEfficiency"::text, '')::numeric
         `);
   }
 

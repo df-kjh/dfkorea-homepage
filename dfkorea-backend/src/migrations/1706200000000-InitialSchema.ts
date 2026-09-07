@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class InitialSchema1706200000000 implements MigrationInterface {
-  name = 'InitialSchema1706200000000';
+  name = "InitialSchema1706200000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // All baseline UUID primary keys use uuid_generate_v4(), so a pristine
@@ -14,19 +14,23 @@ export class InitialSchema1706200000000 implements MigrationInterface {
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
         "name" varchar NOT NULL,
         "category" varchar NOT NULL,
-        "images" text[] DEFAULT '{}',
+        "images" text[] NOT NULL DEFAULT '{}',
         "modelName" varchar NOT NULL,
         "dimensions" varchar NOT NULL,
         "power" varchar NOT NULL,
         "lifespan" varchar NOT NULL,
         "colorTemp" varchar NOT NULL,
         "ledChipManufacturer" varchar NOT NULL,
-        "certifications" text[] DEFAULT '{}',
+        "certifications" text[] NOT NULL DEFAULT '{}',
+        "powerFactor" varchar,
+        "luminanceEfficiency" varchar,
+        "colorRendering" varchar,
+        "options" text[] NOT NULL DEFAULT '{}',
         "description" text NOT NULL,
-        "isNew" boolean DEFAULT false,
-        "isFeatured" boolean DEFAULT false,
-        "createdAt" TIMESTAMP DEFAULT now(),
-        "updatedAt" TIMESTAMP DEFAULT now()
+        "isNew" boolean NOT NULL DEFAULT false,
+        "isFeatured" boolean NOT NULL DEFAULT false,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
       )
     `);
 
@@ -53,7 +57,6 @@ export class InitialSchema1706200000000 implements MigrationInterface {
         "password" varchar NOT NULL
       )
     `);
-
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
