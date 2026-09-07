@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { DataSource, QueryRunner } from "typeorm";
+import { DataSource, DataSourceOptions, QueryRunner } from "typeorm";
+import { configureTestDatabase } from "../../test/test-database";
 import { Product } from "../entities/product.entity";
 import { InitialSchema1706200000000 } from "./1706200000000-InitialSchema";
 import { ChangePowerAndColorTempToArray1738027000000 } from "./1738027000000-ChangePowerAndColorTempToArray";
@@ -60,12 +61,29 @@ describe("product number migration SQL contract", () => {
       ]),
     );
     expect(statements.join("\n")).not.toMatch(/ARRAY\s*\(\s*SELECT/i);
-    expect(statements.join("\n")).not.toMatch(/ADD COLUMN/i);
+    expect(statements).toEqual(
+      expect.arrayContaining([
+        'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "powerFactor" character varying',
+        'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "luminanceEfficiency" character varying',
+        'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "colorRendering" character varying',
+        'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "options" text[] NOT NULL DEFAULT \'{}\'',
+      ]),
+    );
   });
 });
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
-const postgres = databaseUrl ? describe : describe.skip;
+configureTestDatabase(process.env.REQUIRE_MIGRATION_TEST_DATABASE === "true");
+const databaseOptions: DataSourceOptions | null = process.env.DB_HOST
+  ? {
+      type: "postgres",
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    }
+  : null;
+const postgres = databaseOptions ? describe : describe.skip;
 
 postgres("product migrations on PostgreSQL 16", () => {
   let rootDb: DataSource;
@@ -73,25 +91,14 @@ postgres("product migrations on PostgreSQL 16", () => {
   const schema = `product_number_${randomUUID().replace(/-/g, "")}`;
 
   beforeAll(async () => {
-    const url = new URL(databaseUrl!);
-    if (
-      !["localhost", "127.0.0.1"].includes(url.hostname) ||
-      !url.pathname.endsWith("_test")
-    ) {
-      throw new Error("Dedicated local *_test DB required");
-    }
-    rootDb = await new DataSource({
-      type: "postgres",
-      url: databaseUrl,
-    }).initialize();
+    rootDb = await new DataSource(databaseOptions!).initialize();
     const [{ server_version_num: version }] = await rootDb.query(
       "SHOW server_version_num",
     );
     expect(Math.floor(Number(version) / 10_000)).toBe(16);
     await rootDb.query(`CREATE SCHEMA "${schema}"`);
     db = await new DataSource({
-      type: "postgres",
-      url: databaseUrl,
+      ...databaseOptions!,
       schema,
       entities: [Product],
       extra: { options: `-c search_path=${schema},public` },
@@ -228,6 +235,38 @@ postgres("product migrations on PostgreSQL 16", () => {
           'SELECT "luminanceEfficiency"::text FROM "products"',
         ),
       ).toEqual([{ luminanceEfficiency: "130" }]);
+    } finally {
+      await runner.release();
+    }
+  });
+
+  it("advances an old recorded baseline that lacks synchronized Product columns", async () => {
+    const runner = await preparePreNumberSchema();
+    try {
+      await runner.query(`
+        ALTER TABLE "products"
+        DROP COLUMN "powerFactor",
+        DROP COLUMN "luminanceEfficiency",
+        DROP COLUMN "colorRendering",
+        DROP COLUMN "options"
+      `);
+
+      await new ChangeProductFieldsToNumber1738027500000().up(runner);
+      expect(
+        await runner.query(
+          `SELECT column_name, udt_name
+           FROM information_schema.columns
+           WHERE table_schema=$1 AND table_name='products'
+             AND column_name IN ('powerFactor','luminanceEfficiency','colorRendering','options')
+           ORDER BY column_name`,
+          [schema],
+        ),
+      ).toEqual([
+        { column_name: "colorRendering", udt_name: "varchar" },
+        { column_name: "luminanceEfficiency", udt_name: "numeric" },
+        { column_name: "options", udt_name: "_text" },
+        { column_name: "powerFactor", udt_name: "varchar" },
+      ]);
     } finally {
       await runner.release();
     }

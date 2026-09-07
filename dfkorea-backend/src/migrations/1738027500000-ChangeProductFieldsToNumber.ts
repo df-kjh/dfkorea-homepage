@@ -4,6 +4,26 @@ export class ChangeProductFieldsToNumber1738027500000 implements MigrationInterf
   name = "ChangeProductFieldsToNumber1738027500000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // A database may have recorded the older InitialSchema without these fields.
+    // Keep this reconciliation idempotent because historical synchronize runs may
+    // already have created any subset of them.
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "powerFactor" character varying
+        `);
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "luminanceEfficiency" character varying
+        `);
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "colorRendering" character varying
+        `);
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "options" text[] NOT NULL DEFAULT '{}'
+        `);
+
     // power 배열을 numeric[] 타입으로 변경
     await queryRunner.query(
       `ALTER TABLE "products" ALTER COLUMN "power" DROP DEFAULT`,
@@ -46,6 +66,8 @@ export class ChangeProductFieldsToNumber1738027500000 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Optional Product columns belong to the baseline and may contain data from a
+    // historical synchronize run, so rollback reverses only this migration's types.
     // 롤백: numeric을 text로 변경
     await queryRunner.query(
       `ALTER TABLE "products" ALTER COLUMN "power" DROP DEFAULT`,
