@@ -39,7 +39,7 @@ afterEach(async () => {
 })
 
 describe('same-origin admin relay', () => {
-  it('keeps login bearer out of JSON and stores only an HttpOnly secure strict cookie', async () => {
+  it('keeps login bearer out of JSON and stores only an HttpOnly secure lax cookie', async () => {
     upstream = Response.json({ access_token: 'sensitive-bearer', user: { username: 'admin' } })
     const response = await call('auth/login', {
       method: 'POST',
@@ -49,7 +49,7 @@ describe('same-origin admin relay', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ user: { username: 'admin' } })
     expect(response.headers.get('set-cookie')).toMatch(
-      /__Host-dfkorea_admin=sensitive-bearer;.*Path=\/;.*HttpOnly;.*Secure;.*SameSite=Strict/i,
+      /__Host-dfkorea_admin=sensitive-bearer;.*Path=\/;.*HttpOnly;.*Secure;.*SameSite=Lax/i,
     )
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(requests[0]?.init.headers).not.toHaveProperty('Authorization')
@@ -67,6 +67,34 @@ describe('same-origin admin relay', () => {
         ...(badOrigin ? { origin: badOrigin } : {}),
       },
       body: '{}',
+    })
+    expect(response.status).toBe(403)
+    expect(requests).toHaveLength(0)
+  })
+  it('keeps the session on a cross-site OAuth callback navigation forwarded by SSR', async () => {
+    upstream = Response.json({ user: { username: 'admin' } })
+    const response = await call('auth/session', {
+      headers: {
+        cookie: '__Host-dfkorea_admin=secret-upstream-jwt',
+        'sec-fetch-site': 'cross-site',
+      },
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ user: { username: 'admin' } })
+    expect(requests[0]?.init.headers).toEqual({ Authorization: 'Bearer secret-upstream-jwt' })
+  })
+  it('still rejects unsafe cross-site fetch metadata even with a matching Origin', async () => {
+    const response = await call('products', {
+      method: 'POST',
+      headers: headers({ 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' }),
+      body: '{}',
+    })
+    expect(response.status).toBe(403)
+    expect(requests).toHaveLength(0)
+  })
+  it('still rejects safe cross-origin fetches with an explicit foreign Origin', async () => {
+    const response = await call('auth/session', {
+      headers: headers({ origin: 'https://attacker.example' }),
     })
     expect(response.status).toBe(403)
     expect(requests).toHaveLength(0)

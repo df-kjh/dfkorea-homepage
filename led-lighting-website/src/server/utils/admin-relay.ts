@@ -102,12 +102,14 @@ export const createAdminRelayHandler =
     if (
       (unsafe && origin !== config.adminOrigin) ||
       (origin && origin !== config.adminOrigin) ||
-      getRequestHeader(event, 'sec-fetch-site') === 'cross-site'
+      (unsafe && getRequestHeader(event, 'sec-fetch-site') === 'cross-site')
     )
       throw fail(403, 'Forbidden')
     const secure = config.adminOrigin.startsWith('https://')
     const cookieName = secure ? '__Host-dfkorea_admin' : 'dfkorea_admin_dev'
-    const cookieOptions = { httpOnly: true, secure, sameSite: 'strict' as const, path: '/' }
+    // OAuth returns through a cross-site top-level GET. Lax preserves its session;
+    // unsafe requests still require the exact trusted Origin and fetch metadata above.
+    const cookieOptions = { httpOnly: true, secure, sameSite: 'lax' as const, path: '/' }
     const clearSession = () => setCookie(event, cookieName, '', { ...cookieOptions, maxAge: 0 })
     if (path === 'auth/logout') {
       clearSession()
