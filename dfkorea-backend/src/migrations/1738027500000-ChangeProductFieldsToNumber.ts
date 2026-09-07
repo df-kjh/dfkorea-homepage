@@ -1,32 +1,64 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class ChangeProductFieldsToNumber1738027500000 implements MigrationInterface {
-    name = 'ChangeProductFieldsToNumber1738027500000'
+  name = "ChangeProductFieldsToNumber1738027500000";
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // power 배열을 numeric[] 타입으로 변경
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // power 배열을 numeric[] 타입으로 변경
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "power" DROP DEFAULT`,
+    );
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "power" TYPE numeric[] 
-            USING ARRAY(SELECT unnest(power)::numeric)
+            USING "power"::numeric[]
         `);
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "power" SET DEFAULT ARRAY[]::numeric[]`,
+    );
 
-        // lifespan을 numeric 타입으로 변경
-        await queryRunner.query(`
+    // lifespan을 numeric 타입으로 변경
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "lifespan" TYPE numeric 
             USING lifespan::numeric
         `);
 
-        // colorTemp 배열을 numeric[] 타입으로 변경
-        await queryRunner.query(`
+    // colorTemp 배열을 numeric[] 타입으로 변경
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "colorTemp" DROP DEFAULT`,
+    );
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "colorTemp" TYPE numeric[] 
-            USING ARRAY(SELECT unnest("colorTemp")::numeric)
+            USING "colorTemp"::numeric[]
+        `);
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "colorTemp" SET DEFAULT ARRAY[]::numeric[]`,
+    );
+
+    // These columns previously existed only in databases created with synchronize.
+    // IF NOT EXISTS preserves those databases while giving clean migration runs the
+    // same Product shape before later migrations start querying the entity.
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "powerFactor" character varying
+        `);
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "luminanceEfficiency" character varying
+        `);
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "colorRendering" character varying
+        `);
+    await queryRunner.query(`
+            ALTER TABLE "products"
+            ADD COLUMN IF NOT EXISTS "options" text[] NOT NULL DEFAULT ARRAY[]::text[]
         `);
 
-        // luminanceEfficiency를 numeric 타입으로 변경
-        await queryRunner.query(`
+    // luminanceEfficiency를 numeric 타입으로 변경
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "luminanceEfficiency" TYPE numeric 
             USING 
@@ -36,32 +68,44 @@ export class ChangeProductFieldsToNumber1738027500000 implements MigrationInterf
                     ELSE "luminanceEfficiency"::numeric
                 END
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // 롤백: numeric을 text로 변경
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // 롤백: numeric을 text로 변경
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "power" DROP DEFAULT`,
+    );
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "power" TYPE text[] 
-            USING ARRAY(SELECT unnest(power)::text)
+            USING "power"::text[]
         `);
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "power" SET DEFAULT ARRAY[]::text[]`,
+    );
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "lifespan" TYPE character varying 
             USING lifespan::character varying
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "colorTemp" DROP DEFAULT`,
+    );
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "colorTemp" TYPE text[] 
-            USING ARRAY(SELECT unnest("colorTemp")::text)
+            USING "colorTemp"::text[]
         `);
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "colorTemp" SET DEFAULT ARRAY[]::text[]`,
+    );
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             ALTER TABLE "products" 
             ALTER COLUMN "luminanceEfficiency" TYPE character varying 
-            USING luminanceEfficiency::character varying
+            USING "luminanceEfficiency"::character varying
         `);
-    }
+  }
 }
