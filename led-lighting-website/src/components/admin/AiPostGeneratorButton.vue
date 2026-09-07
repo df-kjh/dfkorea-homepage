@@ -14,6 +14,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { adminOperationTimeoutMessage } from '@/utils/admin-operation-timeout'
 import { schedulerAPI } from '@/api'
 import { useToast } from '@/composables/useToast'
 
@@ -77,7 +78,10 @@ const triggerAiGeneration = async (): Promise<void> => {
     aiGenerating.value = false
 
     const err = error as { response?: { status?: number; data?: { message?: string } } }
-    if (err.response?.status === 401) {
+    const timeoutMessage = adminOperationTimeoutMessage(error)
+    if (timeoutMessage) {
+      toast.error(timeoutMessage, 10000)
+    } else if (err.response?.status === 401) {
       toast.error('로그인이 필요합니다')
     } else if (err.response?.data?.message) {
       toast.error(err.response.data.message)

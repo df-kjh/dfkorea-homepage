@@ -155,6 +155,49 @@ describe('same-origin admin relay', () => {
     })
     expect(response.status).toBe(200)
   })
+  it('rejects uploads above the hosting-safe multipart envelope before upstream', async () => {
+    const response = await call('upload/file', {
+      method: 'POST',
+      headers: headers({ 'content-type': 'multipart/form-data; boundary=test' }),
+      body: new Uint8Array(4 * 1024 * 1024 + 64 * 1024 + 1),
+    })
+    expect(response.status).toBe(413)
+    expect(requests).toHaveLength(0)
+  })
+  it('streams attachment bytes before the complete upstream download is buffered', async () => {
+    let finish!: () => void
+    upstream = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1, 2, 3]))
+          let closed = false
+          finish = () => {
+            if (!closed) {
+              closed = true
+              controller.close()
+            }
+          }
+        },
+      }),
+      { headers: { 'content-type': 'application/pdf' } },
+    )
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const response = await Promise.race([
+        call('quotes/admin/q-1/attachments/a-1', { headers: headers() }),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('Attachment was buffered')), 1000)
+        }),
+      ])
+      const reader = response.body!.getReader()
+      expect([...(await reader.read()).value!]).toEqual([1, 2, 3])
+      finish()
+      expect((await reader.read()).done).toBe(true)
+    } finally {
+      finish()
+      clearTimeout(timer)
+    }
+  })
   it('preserves protected attachment download bytes and disposition', async () => {
     upstream = new Response(new Uint8Array([0, 255, 65]), {
       headers: {

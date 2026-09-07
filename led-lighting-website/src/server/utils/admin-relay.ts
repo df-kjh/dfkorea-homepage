@@ -1,3 +1,4 @@
+import { ADMIN_OPERATION_TIMEOUT_MESSAGE } from '../../utils/admin-operation-timeout'
 import {
   createError,
   getCookie,
@@ -5,6 +6,7 @@ import {
   setCookie,
   setResponseHeader,
   setResponseStatus,
+  sendStream,
   type H3Event,
 } from 'h3'
 
@@ -129,7 +131,7 @@ export const createAdminRelayHandler =
       const upload = method === 'POST' && path.startsWith('upload/')
       body = await readBody(
         event,
-        upload ? 21 * 1024 * 1024 : path === 'auth/login' ? 8192 : 1024 * 1024,
+        upload ? 4 * 1024 * 1024 + 64 * 1024 : path === 'auth/login' ? 8192 : 1024 * 1024,
       )
       if (
         (body.length > 0 || path === 'auth/login' || upload) &&
@@ -158,6 +160,26 @@ export const createAdminRelayHandler =
           throw fail(400, 'Invalid credentials')
       }
     }
+    // These existing synchronous jobs can exceed one minute. Keep all other
+    // requests bounded to 60s and leave 60s below Vercel's configured 300s ceiling.
+    const longOperation =
+      method === 'POST' &&
+      [
+        'scheduler/trigger',
+        'scheduler/trigger/product-company-news',
+        'tenders/collect',
+        'products/generate-description',
+      ].includes(path)
+    const signal = AbortSignal.timeout(longOperation ? 240_000 : 60_000)
+    const timeoutFailure = () =>
+      createError({
+        statusCode: 504,
+        statusMessage: 'Gateway Timeout',
+        message: ADMIN_OPERATION_TIMEOUT_MESSAGE,
+        data: { code: 'ADMIN_OPERATION_TIMEOUT' },
+      })
+    const upstreamFailure = () =>
+      signal.aborted ? timeoutFailure() : fail(502, 'Admin service unavailable')
     let response: Response
     try {
       response = await fetcher(`${config.adminApiBaseUrl}/${path}${query ? `?${query}` : ''}`, {
@@ -165,12 +187,13 @@ export const createAdminRelayHandler =
         headers,
         ...(body ? { body: new Uint8Array(body) } : {}),
         redirect: 'error',
-        signal: AbortSignal.timeout(60_000),
+        signal,
       })
     } catch {
-      throw fail(502, 'Admin service unavailable')
+      throw upstreamFailure()
     }
     if (!response.ok) {
+      if (response.status === 504) throw timeoutFailure()
       if (response.status === 401) clearSession()
       // Upstream diagnostics may include internal data. Keep failures generic at this boundary.
       throw fail(
@@ -203,7 +226,11 @@ export const createAdminRelayHandler =
       const value = response.headers.get(header)
       if (value) setResponseHeader(event, header, value)
     }
-    // Return bytes unchanged for authenticated quote attachments and JSON alike;
-    // do not relay upstream cookies, redirects or authorization headers.
-    return Buffer.from(await response.arrayBuffer())
+    // Streaming avoids buffering authenticated downloads through Vercel's normal
+    // response payload limit. Only the known backend body and safe headers pass.
+    try {
+      return response.body ? await sendStream(event, response.body) : null
+    } catch {
+      throw upstreamFailure()
+    }
   }

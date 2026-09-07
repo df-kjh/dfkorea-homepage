@@ -134,6 +134,8 @@ export default defineNuxtConfig({
     "@": fileURLToPath(new URL("./src", import.meta.url)),
   },
   nitro: {
+    // Allow bounded 240s synchronous admin jobs plus response/cleanup overhead.
+    vercel: { functions: { maxDuration: 300 } },
     prerender: {
       // Keep editable product/post details request-rendered even when lists link to them.
       crawlLinks: false,

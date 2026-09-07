@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { adminOperationTimeoutMessage } from '@/utils/admin-operation-timeout'
 import { tendersAPI } from '@/api/tenders'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseCard from '@/components/common/BaseCard.vue'
@@ -234,10 +235,10 @@ const collectTenders = async () => {
             }
           : { role: 'status', message: '공고 수집이 완료되었습니다.' }
     await Promise.all([fetchCalendar(), fetchList(currentListPage.value)])
-  } catch {
+  } catch (error) {
     collectionFeedback.value = {
       role: 'alert',
-      message: '공고 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      message: adminOperationTimeoutMessage(error) || '공고 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
     }
   } finally {
     collectionLoading.value = false

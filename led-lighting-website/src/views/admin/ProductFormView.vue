@@ -474,6 +474,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { adminOperationTimeoutMessage } from '@/utils/admin-operation-timeout'
 import { productsAPI } from '@/api'
 import type { Product } from '@/types'
 import { useToast } from '@/composables/useToast'
@@ -766,7 +767,10 @@ const generateAIDescription = async (): Promise<void> => {
   } catch (error: unknown) {
     console.error('Failed to generate description:', error)
     const axiosError = error as { response?: { status?: number } }
-    if (axiosError.response?.status === 503) {
+    const timeoutMessage = adminOperationTimeoutMessage(error)
+    if (timeoutMessage) {
+      toast.error(timeoutMessage, 10000)
+    } else if (axiosError.response?.status === 503) {
       toast.error('AI 서비스를 사용할 수 없습니다')
     } else {
       toast.error('설명 생성에 실패했습니다')
