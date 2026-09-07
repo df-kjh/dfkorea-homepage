@@ -218,7 +218,7 @@ Whenever a migration changes this schema, update this root `database-schema.md` 
 
 Before the tender migrations, `1740100000000-RenameCertificateImageToPdf` and `1771481900000-CreateCertificatesTable` converge legacy and fresh certificate databases on the current `certificates` entity schema. Both migrations are safe when the table or canonical columns already exist.
 
-- `1706200000000-InitialSchema` enables `uuid-ossp` before the baseline UUID tables. `1787819500000-CreateTenderTables` repeats the idempotent extension guard and creates the six tender tables, baseline foreign keys, unique constraints, and query indexes.
+- `1706200000000-InitialSchema` enables `uuid-ossp` and includes the complete Product baseline, including the optional specification columns that older deployments created through TypeORM synchronization. `1738027500000-ChangeProductFieldsToNumber` also reconciles those columns with `IF NOT EXISTS`, allowing databases that recorded an older baseline to advance. It temporarily removes array defaults, uses PostgreSQL 16-compatible direct array casts, and restores type-correct defaults. Rollback reverses its type changes but preserves optional columns because a historical synchronization may have created them with user data. Already-migrated databases do not rerun either historical migration. `1787819500000-CreateTenderTables` repeats the idempotent extension guard and creates the six tender tables, baseline foreign keys, unique constraints, and query indexes.
 - `1787819600000-AddTenderSubscriptionSingletonKey` adds the required shared subscription key and `UQ_tender_subscription_singleton_key`.
 - `1787819700000-AddTenderMailDeliveryClaimedAt` adds the durable delivery lease timestamp and `IDX_tender_mail_delivery_status_claimed_at`.
 - `1787819800000-HardenTenderMailDelivery` adds recipient soft activation, ambiguous mail-delivery audit timestamps, and the KST business-date daily dispatch table with its unique constraint and indexes.
@@ -286,7 +286,7 @@ The TypeORM source and compiled runtime both discover `tenders/entities/*.entity
 
 ### 검증과 기존 환경 제약
 
-격리 PostgreSQL16 `dfkorea_quote_test`에서 현재 Product schema를 준비한 뒤 신규 migration과 실제 트랜잭션/동시접수/첨부소유권/강제 outbox실패 rollback/작업자중단 복구/사진정리를 검증했다. 추가 payload migration up/down, production 무저장소설정 업로드,3장 실제첨부,202+purge 원자성/강제 purge실패,429·불명 결과 보존,1일정책 상한,7일만료,legacy payload누락,stale claim 삭제차단,관리자 bytes미노출도 격리DB에서 검증했다. 기존 전체 migration을 빈 DB에 처음 적용하는 경로는 기존 `1738027500000-ChangeProductFieldsToNumber.ts`의 PostgreSQL `ALTER ... USING` 내부 subquery 오류로 실패한다. 이미 적용된 과거 migration을 이번 기능에서 수정하지 않았다. 신규 운영 DB 전체 설치는 별도 baseline 정비가 필요하며 이번 quote migration 검증과 구분한다.
+격리 PostgreSQL16 `dfkorea_quote_test`에서 현재 Product schema를 준비한 뒤 신규 migration과 실제 트랜잭션/동시접수/첨부소유권/강제 outbox실패 rollback/작업자중단 복구/사진정리를 검증했다. 추가 payload migration up/down, production 무저장소설정 업로드,3장 실제첨부,202+purge 원자성/강제 purge실패,429·불명 결과 보존,1일정책 상한,7일만료,legacy payload누락,stale claim 삭제차단,관리자 bytes미노출도 격리DB에서 검증했다. PostgreSQL16 빈 DB의 전체 migration 경로와 AppModule 통합 경로도 검증한다.
 
 실제 국세청 등록정보 대조, NAVER WORKS 수신함·사진 열기 확인은 운영키/승인된 테스트정보를 연결한 뒤 수행한다. 로컬 테스트는 외부 실정보·이메일을 보내지 않았다.
 

@@ -55,7 +55,12 @@ const accept = (data: TenderAnalysis) => {
 }
 const schedule = (request: number) => {
   stopPolling()
-  if (!isAnalysisActive(analysis.value?.status) || request !== generation || !props.modelValue)
+  if (
+    !isAnalysisActive(analysis.value?.status) ||
+    !analysis.value?.analysisFingerprint ||
+    request !== generation ||
+    !props.modelValue
+  )
     return
   // A finite polling budget avoids a permanently queued job keeping this modal busy forever.
   if (pollCount >= 30) {
@@ -187,8 +192,27 @@ onUnmounted(() => {
       <p v-if="analysis?.status === 'FAILED'" role="status" class="analysis-notice">
         분석 실패 · 원문을 확인하거나 다시 분석해 주세요. {{ boundedEvidence(analysis.errorCode) }}
       </p>
-      <p v-if="analysis && isAnalysisActive(analysis.status)" role="status" class="analysis-notice">
-        최신 자료로 분석 중입니다. 이전 결과는 현재 판단에 사용하지 않습니다.
+      <p
+        v-if="analysis?.status === 'PENDING' && !analysis.analysisFingerprint"
+        role="status"
+        class="analysis-notice"
+      >
+        아직 분석 작업이 등록되지 않았습니다. 곧 자동으로 등록되며, ‘다시 분석’을 누르면 바로
+        등록할 수 있습니다.
+      </p>
+      <p
+        v-else-if="analysis?.status === 'PENDING'"
+        role="status"
+        class="analysis-notice"
+      >
+        분석 대기 중입니다. 최신 결과가 준비되면 자동으로 표시합니다.
+      </p>
+      <p
+        v-else-if="analysis?.status === 'PROCESSING'"
+        role="status"
+        class="analysis-notice"
+      >
+        최신 자료를 분석 중입니다. 이전 결과는 현재 판단에 사용하지 않습니다.
       </p>
       <p v-if="pollingPaused" role="status" class="analysis-notice">
         자동 갱신을 일시 중지했습니다.
@@ -197,7 +221,8 @@ onUnmounted(() => {
       <template v-if="analysis && ready">
         <TenderAnalysisSummary :analysis="analysis" />
         <p v-if="analysis.participationAnalysis?.profileMissing" class="analysis-notice">
-          회사 자격을 설정해 주세요. 현재 회사 참가 자격은 확인 필요입니다.
+          회사 자격은 선택 사항입니다. 미등록 상태에서는 참가 조건과 인증만 확인 필요로 표시되며,
+          사양과 가격 분석 결과는 그대로 이용할 수 있습니다.
         </p>
         <p v-if="analysis.review && !analysis.reviewed" class="analysis-notice">
           이전 검토 이후 분석이 변경되었거나 검토가 완료되지 않았습니다. 다시 검토해 주세요.

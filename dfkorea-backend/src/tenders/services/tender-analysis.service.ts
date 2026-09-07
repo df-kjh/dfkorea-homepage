@@ -132,6 +132,52 @@ export class TenderAnalysisService {
     return { queuedCount: result.affected ?? 0 };
   }
 
+  async queueMissingAnalysesSince(
+    since: Date,
+    limit: number,
+  ): Promise<{ queuedCount: number }> {
+    const count = Number.isFinite(limit)
+      ? Math.max(0, Math.min(50, Math.floor(limit)))
+      : 0;
+    if (count === 0) return { queuedCount: 0 };
+
+    return this.db.transaction(async (manager) => {
+      const analysisTable = manager
+        .getRepository(TenderAnalysis)
+        .metadata.tablePath.split(".")
+        .map((part) => manager.connection.driver.escape(part))
+        .join(".");
+      // Analysis rows are the durable catch-up cursor. Lock only supported
+      // tender rows so multiple app instances select disjoint bounded batches.
+      const tenders = await manager
+        .getRepository(Tender)
+        .createQueryBuilder("tender")
+        .where("tender.registeredAt >= :since", { since })
+        .andWhere(
+          "(tender.source = :kapt OR (tender.source = :g2b AND tender.procurementType = :goods))",
+          {
+            kapt: TenderSource.KAPT,
+            g2b: TenderSource.G2B,
+            goods: ProcurementType.GOODS,
+          },
+        )
+        .andWhere(
+          `NOT EXISTS (SELECT 1 FROM ${analysisTable} analysis WHERE analysis."tenderId" = tender.id)`,
+        )
+        .orderBy("tender.registeredAt", "ASC")
+        .addOrderBy("tender.id", "ASC")
+        .take(count)
+        .setLock("pessimistic_write")
+        .setOnLocked("skip_locked")
+        .getMany();
+
+      for (const tender of tenders) {
+        await queueTenderAnalysis(manager, tender);
+      }
+      return { queuedCount: tenders.length };
+    });
+  }
+
   async processDue(now: Date, limit: number): Promise<{ processed: number }> {
     let processed = 0;
     const count = Number.isFinite(limit)

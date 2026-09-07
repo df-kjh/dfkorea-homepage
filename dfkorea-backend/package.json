@@ -28,6 +28,7 @@
     "test:production-process:compiled": "node test/production-process-compiled-probe.js",
     "test:typeorm:compiled": "node test/typeorm-compiled-discovery.js",
     "test:tender:integration": "ts-node test/verify-test-db.ts && REQUIRE_TEST_DATABASE=true jest --config ./test/jest-tender-integration.json --runInBand",
+    "test:migration:postgres": "REQUIRE_MIGRATION_TEST_DATABASE=true jest --runInBand src/migrations/product-number.migrations.spec.ts",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:generate": "npm run typeorm -- migration:generate -d src/database/typeorm.config.ts",
     "migration:run": "npm run typeorm -- migration:run -d src/database/typeorm.config.ts",

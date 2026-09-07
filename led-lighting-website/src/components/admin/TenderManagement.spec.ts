@@ -130,6 +130,7 @@ describe('TenderManagement', () => {
     vi.useFakeTimers()
     const wrapper = mountTenderManagement(true)
     await flushPromises()
+    expect(wrapper.get('[data-test="open-profile"]').text()).toContain('선택')
     await wrapper.get('[data-test="open-profile"]').trigger('click')
     await flushPromises()
     expect(document.body.textContent).toContain('회사 자격 설정')

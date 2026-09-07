@@ -1,7 +1,10 @@
 jest.mock("node-cron", () => ({ schedule: jest.fn() }));
 
 import { schedule } from "node-cron";
-import { TenderSchedulerService } from "./tender-scheduler.service";
+import {
+  TENDER_ANALYSIS_CATCH_UP_SINCE,
+  TenderSchedulerService,
+} from "./tender-scheduler.service";
 
 describe("TenderSchedulerService", () => {
   beforeEach(() => {
@@ -11,6 +14,9 @@ describe("TenderSchedulerService", () => {
   it("refreshes fingerprints before hourly analysis, runs bounded batches away from award collection, and destroys all jobs", async () => {
     const order: string[] = [];
     const analysis = {
+      queueMissingAnalysesSince: jest.fn(async () => {
+        order.push("queue");
+      }),
       refreshStaleAnalyses: jest.fn(async (_now?: Date) => {
         order.push("refresh");
       }),
@@ -33,7 +39,18 @@ describe("TenderSchedulerService", () => {
       awards,
     );
     await service.onModuleInit();
+    expect(analysis.queueMissingAnalysesSince).toHaveBeenCalledWith(
+      TENDER_ANALYSIS_CATCH_UP_SINCE,
+      50,
+    );
+    expect(analysis.processDue).not.toHaveBeenCalled();
+    order.length = 0;
     expect(tasks).toHaveLength(7);
+    await (schedule as jest.Mock).mock.calls.find(
+      ([cron]) => cron === "20 * * * * *",
+    )[1]();
+    expect(order).toEqual(["queue", "process"]);
+    order.length = 0;
     await (schedule as jest.Mock).mock.calls.find(
       ([cron]) => cron === "10 2 * * * *",
     )[1]();
@@ -67,7 +84,11 @@ describe("TenderSchedulerService", () => {
     const service = new TenderSchedulerService(
       ingestion as never,
       mail as never,
-      { refreshStaleAnalyses: jest.fn(), processDue: jest.fn() } as never,
+      {
+        queueMissingAnalysesSince: jest.fn(),
+        refreshStaleAnalyses: jest.fn(),
+        processDue: jest.fn(),
+      } as never,
       { collectIncremental: jest.fn() } as never,
     );
 
@@ -91,7 +112,11 @@ describe("TenderSchedulerService", () => {
     const service = new TenderSchedulerService(
       ingestion as never,
       mail as never,
-      { refreshStaleAnalyses: jest.fn(), processDue: jest.fn() } as never,
+      {
+        queueMissingAnalysesSince: jest.fn(),
+        refreshStaleAnalyses: jest.fn(),
+        processDue: jest.fn(),
+      } as never,
       { collectIncremental: jest.fn() } as never,
     );
 
@@ -119,7 +144,11 @@ describe("TenderSchedulerService", () => {
     const service = new TenderSchedulerService(
       ingestion as never,
       mail as never,
-      { refreshStaleAnalyses: jest.fn(), processDue: jest.fn() } as never,
+      {
+        queueMissingAnalysesSince: jest.fn(),
+        refreshStaleAnalyses: jest.fn(),
+        processDue: jest.fn(),
+      } as never,
       { collectIncremental: jest.fn() } as never,
     );
 

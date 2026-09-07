@@ -100,7 +100,8 @@ describe('TenderDetailModal', () => {
       },
     })
     await flushPromises()
-    expect(body()).toContain('회사 자격을 설정')
+    expect(body()).toContain('회사 자격은 선택 사항입니다')
+    expect(body()).toContain('사양과 가격 분석 결과는 그대로 이용할 수 있습니다')
     expect(body()).toContain('이전 검토')
     expect(body()).toContain('다시 검토')
   })
@@ -119,8 +120,41 @@ describe('TenderDetailModal', () => {
     api.reanalyze.mockResolvedValue({ data: { ...analysis, status: 'PENDING' } })
     open()
     await flushPromises()
+    expect(body()).toContain('아직 분석 작업이 등록되지 않았습니다')
+    expect(body()).toContain('곧 자동으로 등록')
+    expect(body()).not.toContain('최신 자료를 분석 중입니다')
     await click('다시 분석')
     expect(api.reanalyze).toHaveBeenCalledWith(tender.id)
+  })
+
+  it.each([
+    ['PENDING', '분석 대기 중입니다'],
+    ['PROCESSING', '최신 자료를 분석 중입니다'],
+  ] as const)('distinguishes a real %s job from an unregistered analysis', async (status, message) => {
+    api.getAnalysis.mockResolvedValue({ data: { ...analysis, status } })
+    open()
+    await flushPromises()
+    expect(body()).toContain(message)
+    expect(body()).not.toContain('아직 분석 작업이 등록되지 않았습니다')
+  })
+
+  it('does not poll a synthetic PENDING response that has no queued job', async () => {
+    vi.useFakeTimers()
+    api.getAnalysis.mockResolvedValue({
+      data: {
+        tenderId: tender.id,
+        status: 'PENDING',
+        analysisFingerprint: null,
+        documents: [],
+        review: null,
+        reviewed: false,
+        priceAnalysis: null,
+      },
+    })
+    open()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(api.getAnalysis).toHaveBeenCalledTimes(1)
   })
 
   it('isolates out-of-order tender responses and ignores a response after closing', async () => {

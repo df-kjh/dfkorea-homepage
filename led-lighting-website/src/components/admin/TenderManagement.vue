@@ -410,7 +410,7 @@ onMounted(() => {
       </div>
       <div class="flex flex-wrap gap-2">
         <BaseButton data-test="open-profile" type="button" size="small" @click="profileOpen = true"
-          >회사 자격 설정</BaseButton
+          >회사 자격 설정 (선택)</BaseButton
         ><BaseButton
           data-test="collect-tenders"
           type="button"
