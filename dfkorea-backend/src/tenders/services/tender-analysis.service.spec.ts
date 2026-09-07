@@ -1099,6 +1099,75 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     expect(JSON.stringify(result)).not.toContain("textBlocks");
     expect(JSON.stringify(result)).not.toContain("processingToken");
   });
+
+  it("keeps specification and price analysis usable without a company profile while qualifications stay unknown", async () => {
+    const evidence = {
+      source: "G2B_API" as const,
+      operation: "fixture",
+      field: "value",
+    };
+    enrichment.purchaseItems[0].specification =
+      "소비전력 30W 이하, KC 인증 필수";
+    enrichment.licenses = [
+      {
+        code: "1468",
+        name: "전기공사업",
+        group: null,
+        required: true,
+        evidence,
+      },
+    ];
+    enrichment.basisAmount = { value: "100000000", evidence };
+    enrichment.lowerLimitRate = { value: "87.745", evidence };
+    enrichment.lawKind = { value: "LOCAL", evidence };
+    enrichment.pricingContext = {
+      contractKind: "TOTAL",
+      currency: "KRW",
+      formulaKind: "STANDARD",
+      awardMethod: "적격심사",
+    };
+    await db.getRepository(Product).save({
+      name: "private",
+      modelName: "private",
+      category: "LED",
+      dimensions: "10x20x30",
+      power: [30],
+      lifespan: 10000,
+      colorTemp: [6500],
+      certifications: ["KC"],
+      ledChipManufacturer: "private",
+      description: "private",
+    });
+
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+
+    expect(await db.getRepository(TenderCompanyProfile).count()).toBe(0);
+    const result = await service.getAnalysis(tender.id);
+    expect(result).toMatchObject({
+      status: "COMPLETED",
+      suitability: "REVIEW",
+      specificationScore: 100,
+      participationAnalysis: { profileMissing: true },
+      priceAnalysis: {
+        basisAmount: "100000000",
+        official: { status: "AVAILABLE" },
+      },
+    });
+    if (
+      !("certificationAnalysis" in result) ||
+      !("participationAnalysis" in result)
+    ) {
+      throw new Error("Expected a completed analysis detail");
+    }
+    expect(result.certificationAnalysis.evaluations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ state: "UNKNOWN" })]),
+    );
+    expect(result.participationAnalysis.evaluations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ state: "UNKNOWN" })]),
+    );
+  });
+
   it("claims once across two workers and fences an expired worker after another worker completes", async () => {
     expect(await service.reanalyze(tender.id, now)).toMatchObject({
       status: "PENDING",

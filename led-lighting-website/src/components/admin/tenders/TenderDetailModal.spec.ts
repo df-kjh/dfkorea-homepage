@@ -100,7 +100,8 @@ describe('TenderDetailModal', () => {
       },
     })
     await flushPromises()
-    expect(body()).toContain('회사 자격을 설정')
+    expect(body()).toContain('회사 자격은 선택 사항입니다')
+    expect(body()).toContain('사양과 가격 분석 결과는 그대로 이용할 수 있습니다')
     expect(body()).toContain('이전 검토')
     expect(body()).toContain('다시 검토')
   })

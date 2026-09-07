@@ -197,7 +197,8 @@ onUnmounted(() => {
       <template v-if="analysis && ready">
         <TenderAnalysisSummary :analysis="analysis" />
         <p v-if="analysis.participationAnalysis?.profileMissing" class="analysis-notice">
-          회사 자격을 설정해 주세요. 현재 회사 참가 자격은 확인 필요입니다.
+          회사 자격은 선택 사항입니다. 미등록 상태에서는 참가 조건과 인증만 확인 필요로 표시되며,
+          사양과 가격 분석 결과는 그대로 이용할 수 있습니다.
         </p>
         <p v-if="analysis.review && !analysis.reviewed" class="analysis-notice">
           이전 검토 이후 분석이 변경되었거나 검토가 완료되지 않았습니다. 다시 검토해 주세요.

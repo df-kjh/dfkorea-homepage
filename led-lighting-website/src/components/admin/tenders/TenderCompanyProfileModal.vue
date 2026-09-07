@@ -22,18 +22,20 @@ const empty = (): ReplaceTenderCompanyProfile => ({
   certifications: [],
   performanceRecords: [],
 })
-const groups = [
+const qualificationGroups = [
   { key: 'supplyProducts', label: '공급물품 분류' },
   { key: 'licenses', label: '업종·면허' },
   { key: 'companyTypes', label: '기업구분' },
   { key: 'directProduction', label: '직접생산확인' },
   { key: 'certifications', label: '보유 인증' },
 ] as const
+const editableGroups = qualificationGroups.filter(({ key }) => key !== 'supplyProducts')
 const draft = ref(empty()),
   loading = ref(false),
   saving = ref(false),
   loaded = ref(false),
   missing = ref(false),
+  advancedOpen = ref(false),
   error = ref(''),
   feedback = ref('')
 let generation = 0
@@ -73,7 +75,7 @@ const validate = (payload: ReplaceTenderCompanyProfile) => {
     return '회사명, 사업자번호 10자리, 본점 소재지를 입력해 주세요.'
   const now = new Date()
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  for (const group of groups) {
+  for (const group of qualificationGroups) {
     const rows = payload[group.key]
     if (rows.length > 100) return `${group.label}은 최대 100개까지 입력할 수 있습니다.`
     if (rows.some((row) => !row.code || !row.name))
@@ -113,7 +115,7 @@ const save = async () => {
   payload.businessNumber = payload.businessNumber.replace(/\D/g, '')
   payload.headquarters.sido = payload.headquarters.sido.trim()
   payload.headquarters.sigungu = payload.headquarters.sigungu.trim()
-  for (const group of groups)
+  for (const group of qualificationGroups)
     payload[group.key] = payload[group.key].map((row) => ({
       code: row.code.trim().toUpperCase(),
       name: row.name.trim(),
@@ -147,8 +149,10 @@ watch(
   (open) => {
     ++generation
     saving.value = false
-    if (open) void load()
-    else {
+    if (open) {
+      advancedOpen.value = false
+      void load()
+    } else {
       loaded.value = false
       loading.value = false
     }
@@ -163,14 +167,15 @@ onUnmounted(() => {
   <BaseModal
     :model-value="modelValue"
     title="회사 자격 설정"
-    subtitle="회사 전체에 공통으로 적용하는 입찰 참가 자격입니다."
+    subtitle="선택 사항 · 회사 정보 없이도 사양과 가격 분석을 이용할 수 있습니다."
     width="960px"
     max-width="95vw"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <p v-if="loading" role="status">회사 자격을 불러오는 중입니다.</p>
     <p v-if="missing" role="status" class="mb-4 text-sm text-gray-600">
-      등록된 회사 자격이 없습니다. 회사 정보와 보유 자격을 입력해 주세요.
+      등록하지 않아도 사양과 가격 분석을 이용할 수 있습니다. 참가 조건과 인증은 확인 필요로
+      표시됩니다.
     </p>
     <p v-if="error" role="alert" class="profile-error">
       {{ error }}
@@ -207,101 +212,129 @@ onUnmounted(() => {
             ><input v-model="draft.g2bRegistered" type="checkbox" />나라장터 조달업체 등록</label
           ></BaseCard
         >
-        <BaseCard v-for="group in groups" :key="group.key" :hoverable="false"
-          ><div class="profile-heading">
-            <h4 class="font-bold">{{ group.label }}</h4>
+        <BaseCard :hoverable="false">
+          <div class="profile-heading">
+            <div>
+              <h4 class="font-bold">자격·실적 상세 입력</h4>
+              <p class="mt-1 text-sm text-gray-500">참가 조건을 자동 확인할 때만 입력해 주세요.</p>
+            </div>
             <BaseButton
-              :data-test="`add-${group.key}`"
+              data-test="toggle-profile-details"
               type="button"
               size="small"
-              :disabled="draft[group.key].length >= 100"
-              @click="draft[group.key].push({ code: '', name: '', expiresAt: '' })"
-              >{{ group.label }} 추가</BaseButton
+              :aria-expanded="advancedOpen"
+              aria-controls="profile-advanced-fields"
+              @click="advancedOpen = !advancedOpen"
+              >{{ advancedOpen ? '상세 입력 접기' : '상세 입력 펼치기' }}</BaseButton
             >
           </div>
-          <p v-if="!draft[group.key].length" class="text-sm text-gray-500">
-            입력된 자격이 없습니다.
-          </p>
-          <fieldset v-for="(row, index) in draft[group.key]" :key="index" class="qualification-row">
-            <legend class="sr-only">{{ group.label }} {{ index + 1 }}</legend>
-            <label>코드<input v-model="row.code" :data-test="`${group.key}-${index}-code`" /></label
-            ><label
-              >명칭<input v-model="row.name" :data-test="`${group.key}-${index}-name`" /></label
-            ><label
-              >유효기간<input
-                :value="row.expiresAt?.slice(0, 10) ?? ''"
-                type="date"
-                :disabled="row.expiresAt === null"
-                :data-test="`${group.key}-${index}-expiry`"
-                @input="row.expiresAt = ($event.target as HTMLInputElement).value" /></label
-            ><label class="profile-check"
-              ><input
-                type="checkbox"
-                :checked="row.expiresAt === null"
-                :data-test="`${group.key}-${index}-no-expiry`"
-                @change="row.expiresAt = ($event.target as HTMLInputElement).checked ? null : ''"
-              />만료일 없음</label
-            ><BaseButton
-              :data-test="`remove-${group.key}-${index}`"
-              type="button"
-              size="small"
-              variant="text"
-              :aria-label="`${group.label} ${index + 1} 삭제`"
-              @click="draft[group.key].splice(index, 1)"
-              >삭제</BaseButton
+          <div v-if="advancedOpen" id="profile-advanced-fields" class="profile-advanced">
+            <BaseCard v-for="group in editableGroups" :key="group.key" :hoverable="false"
+              ><div class="profile-heading">
+                <h4 class="font-bold">{{ group.label }}</h4>
+                <BaseButton
+                  :data-test="`add-${group.key}`"
+                  type="button"
+                  size="small"
+                  :disabled="draft[group.key].length >= 100"
+                  @click="draft[group.key].push({ code: '', name: '', expiresAt: '' })"
+                  >{{ group.label }} 추가</BaseButton
+                >
+              </div>
+              <p v-if="!draft[group.key].length" class="text-sm text-gray-500">
+                입력된 자격이 없습니다.
+              </p>
+              <fieldset
+                v-for="(row, index) in draft[group.key]"
+                :key="index"
+                class="qualification-row"
+              >
+                <legend class="sr-only">{{ group.label }} {{ index + 1 }}</legend>
+                <label
+                  >코드<input v-model="row.code" :data-test="`${group.key}-${index}-code`" /></label
+                ><label
+                  >명칭<input v-model="row.name" :data-test="`${group.key}-${index}-name`" /></label
+                ><label
+                  >유효기간<input
+                    :value="row.expiresAt?.slice(0, 10) ?? ''"
+                    type="date"
+                    :disabled="row.expiresAt === null"
+                    :data-test="`${group.key}-${index}-expiry`"
+                    @input="row.expiresAt = ($event.target as HTMLInputElement).value" /></label
+                ><label class="profile-check"
+                  ><input
+                    type="checkbox"
+                    :checked="row.expiresAt === null"
+                    :data-test="`${group.key}-${index}-no-expiry`"
+                    @change="
+                      row.expiresAt = ($event.target as HTMLInputElement).checked ? null : ''
+                    "
+                  />만료일 없음</label
+                ><BaseButton
+                  :data-test="`remove-${group.key}-${index}`"
+                  type="button"
+                  size="small"
+                  variant="text"
+                  :aria-label="`${group.label} ${index + 1} 삭제`"
+                  @click="draft[group.key].splice(index, 1)"
+                  >삭제</BaseButton
+                >
+              </fieldset></BaseCard
             >
-          </fieldset></BaseCard
-        >
-        <BaseCard :hoverable="false"
-          ><div class="profile-heading">
-            <h4 class="font-bold">동종 물품 납품실적</h4>
-            <BaseButton
-              data-test="add-performance"
-              type="button"
-              size="small"
-              :disabled="draft.performanceRecords.length >= 100"
-              @click="draft.performanceRecords.push({ itemName: '', from: '', to: '', amount: '' })"
-              >실적 추가</BaseButton
+            <BaseCard :hoverable="false"
+              ><div class="profile-heading">
+                <h4 class="font-bold">동종 물품 납품실적</h4>
+                <BaseButton
+                  data-test="add-performance"
+                  type="button"
+                  size="small"
+                  :disabled="draft.performanceRecords.length >= 100"
+                  @click="
+                    draft.performanceRecords.push({ itemName: '', from: '', to: '', amount: '' })
+                  "
+                  >실적 추가</BaseButton
+                >
+              </div>
+              <p class="text-sm text-gray-500">
+                관리자 입력 정보입니다. 증빙자료는 별도 확인이 필요합니다.
+              </p>
+              <fieldset
+                v-for="(row, index) in draft.performanceRecords"
+                :key="index"
+                class="qualification-row"
+              >
+                <legend class="sr-only">납품실적 {{ index + 1 }}</legend>
+                <label
+                  >품목명<input
+                    v-model="row.itemName"
+                    :data-test="`performance-${index}-name`" /></label
+                ><label
+                  >시작일<input
+                    v-model="row.from"
+                    type="date"
+                    :data-test="`performance-${index}-from`" /></label
+                ><label
+                  >종료일<input
+                    v-model="row.to"
+                    type="date"
+                    :data-test="`performance-${index}-to`" /></label
+                ><label
+                  >금액 (원)<input
+                    v-model="row.amount"
+                    inputmode="decimal"
+                    :data-test="`performance-${index}-amount`" /></label
+                ><BaseButton
+                  type="button"
+                  size="small"
+                  variant="text"
+                  :aria-label="`납품실적 ${index + 1} 삭제`"
+                  @click="draft.performanceRecords.splice(index, 1)"
+                  >삭제</BaseButton
+                >
+              </fieldset></BaseCard
             >
           </div>
-          <p class="text-sm text-gray-500">
-            관리자 입력 정보입니다. 증빙자료는 별도 확인이 필요합니다.
-          </p>
-          <fieldset
-            v-for="(row, index) in draft.performanceRecords"
-            :key="index"
-            class="qualification-row"
-          >
-            <legend class="sr-only">납품실적 {{ index + 1 }}</legend>
-            <label
-              >품목명<input
-                v-model="row.itemName"
-                :data-test="`performance-${index}-name`" /></label
-            ><label
-              >시작일<input
-                v-model="row.from"
-                type="date"
-                :data-test="`performance-${index}-from`" /></label
-            ><label
-              >종료일<input
-                v-model="row.to"
-                type="date"
-                :data-test="`performance-${index}-to`" /></label
-            ><label
-              >금액 (원)<input
-                v-model="row.amount"
-                inputmode="decimal"
-                :data-test="`performance-${index}-amount`" /></label
-            ><BaseButton
-              type="button"
-              size="small"
-              variant="text"
-              :aria-label="`납품실적 ${index + 1} 삭제`"
-              @click="draft.performanceRecords.splice(index, 1)"
-              >삭제</BaseButton
-            >
-          </fieldset></BaseCard
-        >
+        </BaseCard>
       </fieldset>
       <div class="profile-actions">
         <BaseButton type="button" @click="emit('update:modelValue', false)">닫기</BaseButton
@@ -359,6 +392,12 @@ input:not([type='checkbox']) {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+.profile-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 .qualification-row {
   display: grid;
