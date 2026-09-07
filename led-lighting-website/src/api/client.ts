@@ -1,42 +1,38 @@
 import axios from 'axios'
 import { getApiBaseUrl } from '../utils/api-base'
 
-// 환경 변수에서 API URL 가져오기
 const apiClient = axios.create({
-  baseURL: getApiBaseUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: '/api/admin',
+  headers: { 'Content-Type': 'application/json' },
 })
 
-console.log('🌐 API Base URL:', apiClient.defaults.baseURL)
+apiClient.interceptors.request.use((config) => {
+  // Remove credentials left by older releases; authentication now lives only in
+  // the same-origin HttpOnly cookie and is verified by the backend on each use.
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_user')
+  }
+  config.headers.delete('Authorization')
+  const path = config.url || ''
+  const method = config.method?.toLowerCase() || 'get'
+  const publicRead = method === 'get' && /^\/(?:products|posts|certificates)(?:\/|$)/.test(path)
+  const publicView = method === 'post' && /^\/posts\/[A-Za-z0-9-]+\/view$/.test(path)
+  // These existing APIs also render public pages during SSR and must remain anonymous.
+  if (publicRead || publicView) config.baseURL = getApiBaseUrl()
+  return config
+})
 
-// 요청 인터셉터: 토큰 자동 추가
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = typeof localStorage === 'undefined' ? null : localStorage.getItem('admin_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  },
-)
-
-// 응답 인터셉터: 인증 에러 처리
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('admin_token')
-        localStorage.removeItem('admin_user')
-      }
-      if (typeof window !== 'undefined') {
-        window.location.href = '/admin/login'
-      }
+    if (
+      error.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      window.location.pathname.startsWith('/admin') &&
+      window.location.pathname !== '/admin/login'
+    ) {
+      window.location.href = '/admin/login'
     }
     return Promise.reject(error)
   },

@@ -130,19 +130,12 @@ const handleLogin = async (): Promise<void> => {
   try {
     loading.value = true
 
-    const { data } = await authAPI.login(loginForm)
-
-    // 토큰과 사용자 정보 저장
-    localStorage.setItem('admin_token', data.access_token)
-    localStorage.setItem('admin_user', JSON.stringify(data.user))
+    await authAPI.login(loginForm)
 
     toast.success('로그인 성공!')
 
-    // 라우터 가드가 localStorage를 확인할 수 있도록 약간의 딜레이 후 이동
-    await new Promise((resolve) => setTimeout(resolve, 100))
     await router.push('/admin/dashboard')
   } catch (error) {
-    console.error('Login error:', error)
     const err = error as { response?: { data?: { message?: string } } }
     toast.error(err.response?.data?.message || '로그인에 실패했습니다')
   } finally {

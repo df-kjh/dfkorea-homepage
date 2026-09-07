@@ -21,6 +21,8 @@ export { tendersAPI } from './tenders'
 // 인증 API
 export const authAPI = {
   login: (credentials: LoginDto) => apiClient.post<LoginResponse>('/auth/login', credentials),
+  session: () => apiClient.get<{ user: { username: string } }>('/auth/session'),
+  logout: () => apiClient.post<{ success: boolean }>('/auth/logout', {}),
 }
 
 // 제품 API
