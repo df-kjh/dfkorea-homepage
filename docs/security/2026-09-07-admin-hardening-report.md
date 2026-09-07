@@ -22,9 +22,9 @@ SameSite=Lax는 NAVER WORKS OAuth에서 홈페이지로 돌아오는 최상위 G
 
 ## 검증
 
-- Backend canonical CI: 72 suites/1,015 unit tests, 35 contract tests 통과. 린트·타입 검사·새 빌드·compiled startup/TypeORM discovery 통과.
-- 실제 disposable PostgreSQL이 필요한 107개 테스트는 실행하지 않았다. 운영 DB를 테스트 DB로 사용하지 않았다.
-- Frontend: 52 suites/420 tests, 타입 검사, 운영 빌드 및 G2B route·회사 소개/검색 메타데이터 검증 통과. OAuth 호환성 후속 검사의 최종 수치는 아래 배포 기록에 추가한다.
+- Backend canonical CI: 73 suites/1,017 unit tests, 35 contract tests 통과. 린트·타입 검사·새 빌드·compiled startup/TypeORM discovery 통과.
+- 실제 disposable PostgreSQL이 필요한 115개 테스트는 실행하지 않았다. 운영 DB를 테스트 DB로 사용하지 않았다.
+- Frontend: 55 suites/449 tests, 타입 검사, 운영 빌드 및 G2B route·회사 소개/검색 메타데이터 검증 통과. OAuth 왕복·긴 작업 타임아웃·관리자 업로드 한도·첨부 스트리밍 회귀 검사를 포함한다.
 - Node22.23.2에서 backend compiled startup/discovery와 HTTP/upload 59개 테스트 통과.
 - 빌드된 SSR 관리자 대시보드에 익명 접근하면 로그인 화면으로 이동함을 브라우저에서 확인했다. 로컬 4180은 운영 CORS 허용 대상이 아니므로 공개 API의 브라우저 호출은 운영 도메인에서 별도 확인한다.
 - 로컬 이중 기반 HTTP 테스트로 로그인 성공/실패·만료·위조·자격 변경, CSRF, multipart, JSON 삭제/본문 없는 관리자 동작, 비공개 첨부 바이너리를 검증했다.
@@ -37,7 +37,10 @@ SameSite=Lax는 NAVER WORKS OAuth에서 홈페이지로 돌아오는 최상위 G
 3. 로그인 제한은 프로세스별 메모리로 재시작 시 초기화되고 replica 간 공유되지 않는다. BFF/프록시 원천 IP가 함께 집계될 수 있다. 공유 제한 저장소/플랫폼 방화벽을 후속 적용할 수 있다.
 4. PDF 형식 검증은 악성코드 검사가 아니며 기존 공개 R2 자료의 헤더·내용을 일괄 재작성하지 않았다. CSP도 frame-ancestors만 적용했으며 script-src 확대는 별도 검증이 필요하다.
 5. 패키지 감사 `--omit=dev`: backend Critical/High 0, Moderate11/Low1; frontend Critical/High0, Moderate1. 이는 의존 경로를 포함한 package 개수이며 독립적인 취약점 개수가 아니다. Nest/Express major 업그레이드, 문서 파서 fflate/file-type, TypeORM 등의 추가 패치 검토가 남는다. frontend 잔여 항목은 Nuxt build checker→ESLint→@humanfs의 빌드 도구 경로다. 모든 취약점이 제거됐다는 의미가 아니다.
-6. bcrypt 기존 72바이트 처리 특성을 유지했고 로그인 입력만 1,024바이트로 제한했다. 기존 비밀번호를 임의로 변경하지 않았다.
+6. Vercel 호스팅의 4.5MB 요청 제한 때문에 관리자 업로드는 4MiB로 명시적으로 제한한다. 이미지/PDF의 기존 표시 한도보다 작으며, 대용량 파일 지원은 서명 업로드 기능이 필요하다. 수집/AI 동기 작업은 240초 이후 결과가 불확실할 수 있어 상태 확인 안내를 제공한다.
+7. bcrypt 기존 72바이트 처리 특성을 유지했고 로그인 입력만 1,024바이트로 제한했다. 기존 비밀번호를 임의로 변경하지 않았다.
+
+- [Vercel Functions 제한](https://vercel.com/docs/functions/limitations), [실행 시간 설정](https://vercel.com/docs/functions/configuring-functions/duration)
 
 ## 참고한 공식 자료
 
@@ -45,6 +48,6 @@ SameSite=Lax는 NAVER WORKS OAuth에서 홈페이지로 돌아오는 최상위 G
 - [Nuxt 보안 공지](https://github.com/nuxt/nuxt/security/advisories/GHSA-wm8w-6qjm-cv43), [Multer 공지](https://github.com/expressjs/multer/security/advisories/GHSA-72gw-mp4g-v24j), [Sharp 공지](https://github.com/lovell/sharp/security/advisories/GHSA-f88m-g3jw-g9cj)
 - [fast-xml-parser 공지](https://github.com/NaturalIntelligence/fast-xml-parser/security/advisories/GHSA-m7jm-9gc2-mpf2), [Axios1.20 release](https://github.com/axios/axios/releases/tag/v1.20.0), [Node 릴리스 지원](https://nodejs.org/en/about/previous-releases)
 
-## 배포 기록
+## 운영 반영 기록
 
 - 코드 검사 및 통합 중. 운영 적용 결과는 배포 후 기록한다.

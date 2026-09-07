@@ -51,8 +51,8 @@
 
 ### Verification record
 
-- Backend canonical CI: 72 suites/1,015 unit tests + 35 contract tests passed; 107 disposable-DB integration tests skipped. Lint, tsc, fresh build, compiled startup and TypeORM discovery passed.
-- Frontend: 52 suites/420 tests, typecheck and production build passed; G2B route, about metadata, search indexing artifact checks passed.
+- Backend canonical CI: 73 suites/1,017 unit tests + 35 contract tests passed; 115 disposable-DB integration tests skipped. Lint, tsc, fresh build, compiled startup and TypeORM discovery passed.
+- Frontend: 55 suites/449 tests, typecheck and production build passed; G2B route, about metadata, search indexing artifact checks passed.
 - Node22.23.2: compiled backend startup/TypeORM discovery and 59 HTTP/upload tests passed.
 - Browser built SSR `/admin/dashboard` redirects unauthenticated visitor to rendered login form.
-- Upload commit `56fc6e9`, auth `28a1c52`, boundary/dependency `33fe67e`; independent cross-review found OAuth cookie and long-operation timeout regressions; OAuth fixed in `58a7272`, timeout adaptation in progress.
+- Upload commit `56fc6e9`, auth `28a1c52`, boundary/dependency `33fe67e`; independent cross-review found OAuth cookie and long-operation timeout regressions; OAuth fixed in `58a7272`, timeout/streaming fixes in `ca0e9f9`, 4MiB upload compatibility in `428dcd7`; final full verification passed after merging current main `f21c3b8`.
