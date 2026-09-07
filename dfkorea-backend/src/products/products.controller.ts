@@ -15,7 +15,8 @@ import { ProductsService } from "./products.service";
 import { parseProductQuery } from "./product-filters";
 import { CreateProductDto, UpdateProductDto } from "./dto/product.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { AiService, ProductInfo } from "../ai/ai.service";
+import { AiService } from "../ai/ai.service";
+import type { ProductInfo } from "../ai/ai.service";
 
 @Controller("products")
 export class ProductsController {

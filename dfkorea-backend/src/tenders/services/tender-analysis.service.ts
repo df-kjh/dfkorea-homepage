@@ -36,6 +36,8 @@ import {
   G2B_TENDER_ENRICHMENT_ADAPTER,
   KAPT_TENDER_ENRICHMENT_ADAPTER,
   TENDER_DOCUMENT_FETCHER,
+} from "../domain/tender-enrichment";
+import type {
   TenderDocumentFetcherContract,
   TenderEnrichmentAdapter,
 } from "../domain/tender-enrichment";

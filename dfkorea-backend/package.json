@@ -60,7 +60,7 @@
     "fast-xml-parser": "5.11.1",
     "hwp-convert": "1.13.0",
     "mammoth": "1.12.2",
-    "multer": "^2.0.2",
+    "multer": "^2.2.0",
     "node-cron": "^4.2.1",
     "numfmt": "3.2.6",
     "passport": "^0.7.0",
@@ -69,7 +69,7 @@
     "pg": "^8.17.2",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
@@ -116,5 +116,16 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "@nestjs/platform-express": {
+      "multer": "$multer"
+    },
+    "@nestjs/config": {
+      "lodash": "4.18.1"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0"
   }
 }

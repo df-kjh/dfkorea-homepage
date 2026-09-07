@@ -20,6 +20,8 @@ export default defineNuxtConfig({
     dirs: [{ path: "@/components", ignore: ["home/parking-garage/**"] }],
   },
   runtimeConfig: {
+    adminApiBaseUrl: process.env.ADMIN_API_BASE_URL || "https://dfkorea-production.up.railway.app",
+    adminOrigin: process.env.ADMIN_ORIGIN || "https://dfkorealed.com",
     g2bRelaySharedSecret: process.env.G2B_RELAY_SHARED_SECRET || "",
     g2bTenderApiBaseUrl: process.env.G2B_TENDER_API_BASE_URL || "",
     // Vercel reserves PUBLIC_* for browser-exposed values, so the relay must
@@ -139,9 +141,30 @@ export default defineNuxtConfig({
     },
   },
   routeRules: {
+    "/**": {
+      headers: {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Content-Security-Policy": "frame-ancestors 'none'",
+      },
+    },
+    "/admin": {
+      headers: {
+        "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store",
+      },
+    },
     "/admin/**": {
       headers: {
         "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store",
+      },
+    },
+    "/api/admin/**": {
+      headers: {
+        "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store",
       },
     },
     "/tailwind-test": {

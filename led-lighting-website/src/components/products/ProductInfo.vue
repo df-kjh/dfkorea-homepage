@@ -53,10 +53,9 @@ const formatPrice = (price: number) => {
       </span>
 
       <!-- Product Name -->
-      <h1
-        class="text-text-main text-5xl font-bold tracking-tight mb-4 leading-tight"
-        v-html="productName"
-      ></h1>
+      <h1 class="text-text-main text-5xl font-bold tracking-tight mb-4 leading-tight">
+        {{ productName }}
+      </h1>
 
       <!-- Price -->
       <p v-if="price > 0" class="text-text-main text-3xl font-bold mb-10">

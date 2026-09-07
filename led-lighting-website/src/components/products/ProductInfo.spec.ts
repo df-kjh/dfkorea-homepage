@@ -3,6 +3,13 @@ import { describe, expect, it } from 'vitest'
 import ProductInfo from './ProductInfo.vue'
 
 describe('product information actions', () => {
+  it('renders API product names as text instead of executable HTML', () => {
+    const productName = '<img src=x onerror=alert(1)>조명'
+    const wrapper = mount(ProductInfo, { props: { productName, specs: [] } })
+    expect(wrapper.find('h1 img').exists()).toBe(false)
+    expect(wrapper.get('h1').text()).toBe(productName)
+  })
+
   it('renders the product action directly after the summary specifications', () => {
     const wrapper = mount(ProductInfo, {
       props: {

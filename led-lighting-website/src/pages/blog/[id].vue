@@ -82,10 +82,11 @@ const postTags = computed(() => {
   return [`#${post.value.category.replace(/\s+/g, "")}`, "#Innovation", "#Technology", "#Lighting"];
 });
 
+useHead({ meta: [{ name: "keywords", content: () => `${post.value!.category}, LED 조명, 디에프코리아, ${post.value!.title}` }] });
+
 useSeoMeta({
   title: () => `${post.value!.title} | 회사 소식 | ${COMPANY_NAME}`,
   description: () => post.value!.excerpt,
-  keywords: () => `${post.value!.category}, LED 조명, 디에프코리아, ${post.value!.title}`,
   ogTitle: () => post.value!.title,
   ogDescription: () => post.value!.excerpt,
   ogType: "article",

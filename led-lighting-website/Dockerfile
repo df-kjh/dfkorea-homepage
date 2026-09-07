@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22.18.0-alpine3.21 AS builder
+FROM node:22-alpine3.21 AS builder
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ RUN VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run build \
     && VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run verify:production-api
 
 # Production stage
-FROM node:22.18.0-alpine3.21 AS runner
+FROM node:22-alpine3.21 AS runner
 
 WORKDIR /app
 
