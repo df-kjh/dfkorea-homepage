@@ -225,6 +225,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
           detectedFormat,
           document.formatHint,
           response.headers.get("content-type"),
+          document.source,
         );
         return {
           bytes,
@@ -951,6 +952,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
     detected: TenderDocumentFormat,
     hint: TenderDocumentFormat | null,
     contentTypeHeader: string | null,
+    source: TenderDocumentReference["source"],
   ): void {
     if (hint && hint !== detected) {
       throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");
@@ -960,6 +962,10 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
       ?.trim()
       .toLowerCase();
     if (!contentType || contentType === "application/octet-stream") return;
+    // LH's public download endpoint has historically emitted this exact typo.
+    // Treat it as generic binary only after magic bytes and the issued hint agree.
+    if (source === "LH_PAGE" && contentType === "application/octect-stream")
+      return;
     const allowedMime: Record<TenderDocumentFormat, ReadonlySet<string>> = {
       PDF: new Set(["application/pdf"]),
       HWP: new Set(["application/x-hwp", "application/haansofthwp"]),

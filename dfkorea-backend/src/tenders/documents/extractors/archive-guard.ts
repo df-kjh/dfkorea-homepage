@@ -10,6 +10,23 @@ export const MAX_EXPANDED_BYTES = 40 * 1024 * 1024;
 const MAX_RATIO = 100;
 const corrupt = () => new TenderDocumentExtractionError("DOCUMENT_CORRUPT");
 const limit = () => new TenderDocumentExtractionError("DOCUMENT_ARCHIVE_LIMIT");
+
+export interface ArchiveBudget {
+  entries: number;
+  expandedBytes: number;
+  xmlBytes: number;
+}
+
+export const createArchiveBudget = (): ArchiveBudget => ({
+  entries: 0,
+  expandedBytes: 0,
+  xmlBytes: 0,
+});
+
+interface ReadBoundedZipOptions {
+  budget?: ArchiveBudget;
+  validatePackageXml?: boolean;
+}
 export function boundedInflate(
   data: Buffer,
   maximum = MAX_EXPANDED_BYTES,
@@ -45,8 +62,25 @@ const crc32 = (bytes: Buffer): number => {
   }
   return (crc ^ 0xffffffff) >>> 0;
 };
-export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
+export function validateBoundedZipXml(
+  files: Map<string, Buffer>,
+  budget: ArchiveBudget,
+): void {
+  for (const [name, contents] of files) {
+    if (!/\.(xml|rels|hpf)$/i.test(name)) continue;
+    budget.xmlBytes += contents.length;
+    if (budget.xmlBytes > MAX_TEXT_BYTES)
+      throw new TenderDocumentExtractionError("DOCUMENT_TEXT_LIMIT");
+    validateXml(contents);
+  }
+}
+
+export function readBoundedZip(
+  buffer: Buffer,
+  options: ReadBoundedZipOptions = {},
+): Map<string, Buffer> {
   try {
+    const budget = options.budget ?? createArchiveBudget();
     let end = -1;
     for (
       let i = buffer.length - 22;
@@ -61,7 +95,8 @@ export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
       throw corrupt();
     const count = buffer.readUInt16LE(end + 10),
       central = buffer.readUInt32LE(end + 16);
-    if (count > MAX_ENTRIES) throw limit();
+    if (count > MAX_ENTRIES || budget.entries + count > MAX_ENTRIES)
+      throw limit();
     if (
       !count ||
       buffer.readUInt16LE(end + 4) ||
@@ -70,10 +105,9 @@ export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
       central + buffer.readUInt32LE(end + 12) !== end
     )
       throw corrupt();
+    budget.entries += count;
     const files = new Map<string, Buffer>();
-    let offset = central,
-      total = 0,
-      xmlTotal = 0;
+    let offset = central;
     const ranges: Array<[number, number]> = [];
     for (let i = 0; i < count; i++) {
       if (offset + 46 > end || buffer.readUInt32LE(offset) !== 0x02014b50)
@@ -103,7 +137,7 @@ export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
         expanded > MAX_EXPANDED_BYTES ||
         compressed === 0xffffffff ||
         expanded > Math.max(1, compressed) * MAX_RATIO ||
-        total + expanded > MAX_EXPANDED_BYTES
+        budget.expandedBytes + expanded > MAX_EXPANDED_BYTES
       )
         throw limit();
       const name = buffer.toString(
@@ -156,13 +190,7 @@ export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
         crc32(contents) !== buffer.readUInt32LE(offset + 16)
       )
         throw corrupt();
-      total += contents.length;
-      if (/\.(xml|rels|hpf)$/i.test(name)) {
-        xmlTotal += contents.length;
-        if (xmlTotal > MAX_TEXT_BYTES)
-          throw new TenderDocumentExtractionError("DOCUMENT_TEXT_LIMIT");
-        validateXml(contents);
-      }
+      budget.expandedBytes += contents.length;
       files.set(name, contents);
       offset = next;
     }
@@ -172,6 +200,9 @@ export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
       ranges.some((r, i) => i > 0 && r[0] < ranges[i - 1][1])
     )
       throw corrupt();
+    if (options.validatePackageXml !== false) {
+      validateBoundedZipXml(files, budget);
+    }
     return files;
   } catch (error) {
     if (error instanceof TenderDocumentExtractionError) throw error;

@@ -1,6 +1,10 @@
 import { TenderDocumentFormat } from "../../domain/tender-enrichment";
 import { TenderDocumentExtractionError } from "../tender-document-extraction.types";
-import { readBoundedZip } from "./archive-guard";
+import {
+  ArchiveBudget,
+  readBoundedZip,
+  validateBoundedZipXml,
+} from "./archive-guard";
 import { DocxDocumentExtractor } from "./docx-document.extractor";
 import { ExtractionContext } from "./extraction-context";
 import { HwpDocumentExtractor } from "./hwp-document.extractor";
@@ -8,24 +12,29 @@ import { PdfDocumentExtractor } from "./pdf-document.extractor";
 import { XlsxDocumentExtractor } from "./xlsx-document.extractor";
 
 type ChildFormat = Exclude<TenderDocumentFormat, "ZIP">;
+interface DetectedChild {
+  format: ChildFormat | "ZIP" | null;
+  archive?: Map<string, Buffer>;
+}
 
 export class ZipDocumentExtractor {
   async extract(
     _bytes: Buffer,
     context: ExtractionContext,
     archive: Map<string, Buffer>,
+    budget: ArchiveBudget,
   ): Promise<void> {
     let supportedMembers = 0;
     let unsupportedMembers = 0;
     for (const [name, contents] of archive) {
       if (name.endsWith("/")) continue;
-      const detected = this.detect(contents);
-      if (detected === "ZIP") {
+      const detected = this.detect(contents, budget);
+      if (detected.format === "ZIP") {
         // Package formats are consumed as documents below. A generic ZIP inside
         // this outer bundle would require recursive archive expansion.
         throw new TenderDocumentExtractionError("DOCUMENT_UNSUPPORTED");
       }
-      if (detected === null) {
+      if (detected.format === null) {
         unsupportedMembers += 1;
         continue;
       }
@@ -51,62 +60,64 @@ export class ZipDocumentExtractor {
     if (unsupportedMembers > 0) context.partial();
   }
 
-  private detect(bytes: Buffer): ChildFormat | "ZIP" | null {
-    if (bytes.subarray(0, 5).toString("ascii") === "%PDF-") return "PDF";
+  private detect(bytes: Buffer, budget: ArchiveBudget): DetectedChild {
+    if (bytes.subarray(0, 5).toString("ascii") === "%PDF-")
+      return { format: "PDF" };
     if (
       bytes.length >= 8 &&
       bytes.subarray(0, 8).equals(
         Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
       )
     ) {
-      return "HWP";
+      return { format: "HWP" };
     }
     if (
       bytes.length < 4 ||
       !bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))
     ) {
-      return null;
+      return { format: null };
     }
-    const entries = readBoundedZip(bytes);
+    const archive = readBoundedZip(bytes, {
+      budget,
+      validatePackageXml: false,
+    });
+    let format: "HWPX" | "DOCX" | "XLSX" | "ZIP";
     if (
-      entries.has("META-INF/container.xml") &&
-      entries.has("Contents/content.hpf") &&
-      [...entries.keys()].some((entry) =>
+      archive.has("META-INF/container.xml") &&
+      archive.has("Contents/content.hpf") &&
+      [...archive.keys()].some((entry) =>
         /^Contents\/section\d+\.xml$/.test(entry),
       )
     ) {
-      return "HWPX";
-    }
-    if (
-      entries.has("[Content_Types].xml") &&
-      entries.has("word/document.xml")
+      format = "HWPX";
+    } else if (
+      archive.has("[Content_Types].xml") &&
+      archive.has("word/document.xml")
     ) {
-      return "DOCX";
-    }
-    if (
-      entries.has("[Content_Types].xml") &&
-      entries.has("xl/workbook.xml")
+      format = "DOCX";
+    } else if (
+      archive.has("[Content_Types].xml") &&
+      archive.has("xl/workbook.xml")
     ) {
-      return "XLSX";
+      format = "XLSX";
+    } else {
+      return { format: "ZIP", archive };
     }
-    return "ZIP";
+    validateBoundedZipXml(archive, budget);
+    return { format, archive };
   }
 
   private async extractChild(
-    format: ChildFormat,
+    detected: DetectedChild,
     bytes: Buffer,
     context: ExtractionContext,
   ): Promise<void> {
-    switch (format) {
+    switch (detected.format) {
       case "HWP":
         await new HwpDocumentExtractor().extract(bytes, context);
         return;
       case "HWPX":
-        await new HwpDocumentExtractor().extract(
-          bytes,
-          context,
-          readBoundedZip(bytes),
-        );
+        await new HwpDocumentExtractor().extract(bytes, context, detected.archive);
         return;
       case "PDF":
         await new PdfDocumentExtractor().extract(bytes, context);
@@ -115,14 +126,14 @@ export class ZipDocumentExtractor {
         await new DocxDocumentExtractor().extract(
           bytes,
           context,
-          readBoundedZip(bytes),
+          detected.archive!,
         );
         return;
       case "XLSX":
         await new XlsxDocumentExtractor().extract(
           bytes,
           context,
-          readBoundedZip(bytes),
+          detected.archive!,
         );
     }
   }

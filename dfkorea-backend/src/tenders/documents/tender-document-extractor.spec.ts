@@ -1,6 +1,7 @@
 import * as JSZip from "jszip";
 import * as CFB from "cfb";
 import { deflateRawSync } from "node:zlib";
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { TenderDocumentTextExtractor } from "./tender-document-extractor";
@@ -299,6 +300,48 @@ describe("TenderDocumentTextExtractor", () => {
       rows,
       location: "requirements.docx::body/table:1",
     });
+  });
+
+  it.each(["<note>valid</note>", "<note>"])(
+    "keeps a useful DOCX partial when an unsupported outer XML sibling is %s",
+    async (xml) => {
+      const bundle = await createZipBundle([
+        ["requirements.docx", Buffer.from(fixture("sample.docx").bytes)],
+        ["notes.xml", Buffer.from(xml)],
+      ]);
+
+      await expect(
+        extractor.extract({ bytes: bundle, detectedFormat: "ZIP" }),
+      ).resolves.toMatchObject({
+        status: "PARTIAL",
+        blocks: expect.arrayContaining([
+          expect.objectContaining({
+            text: "소비전력 50W 이하",
+            location: "requirements.docx::body/paragraph:1",
+          }),
+        ]),
+      });
+    },
+  );
+
+  it("applies one aggregate entry and expanded-byte budget across outer ZIP and child packages", async () => {
+    const child = await JSZip.loadAsync(fixture("sample.docx").bytes);
+    child.file("word/media/padding.bin", Buffer.alloc(12 * 1024 * 1024));
+    child.file("word/media/entropy.bin", randomBytes(160 * 1024));
+    const childBytes = await child.generateAsync({
+      type: "nodebuffer",
+      compression: "STORE",
+    });
+    const bundle = await createZipBundle([
+      ["requirements-1.docx", childBytes],
+      ["requirements-2.docx", childBytes],
+      ["requirements-3.docx", childBytes],
+    ]);
+    expect(bundle.byteLength).toBeLessThan(20 * 1024 * 1024);
+
+    await expect(
+      extractor.extract({ bytes: bundle, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_ARCHIVE_LIMIT" });
   });
 
   it("rejects a nested ZIP member instead of recursively expanding it", async () => {

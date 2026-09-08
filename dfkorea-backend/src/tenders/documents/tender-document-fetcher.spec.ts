@@ -287,6 +287,23 @@ const lhDocument = (
   });
 };
 
+const namedLhDocument = (
+  displayName: string,
+  savedName: string,
+  formatHint: TenderDocumentReference["formatHint"],
+): TenderDocumentReference => {
+  const base = lhDocument();
+  const url = new URL(base.url);
+  url.searchParams.set("displayName", displayName);
+  url.searchParams.set("savedName", savedName);
+  return issueTenderDocumentReference({
+    ...base,
+    url: url.toString(),
+    displayName,
+    formatHint,
+  });
+};
+
 describe("TenderDocumentFetcher", () => {
   let server: Server;
   let origin: string;
@@ -521,6 +538,47 @@ describe("TenderDocumentFetcher", () => {
       },
       body: "download.filespec=bidinfo&download.filename=%EA%B3%B5%EA%B3%A0%EB%AC%B8.zip&download.savedname=20260901_notice.zip&download.bidnum=",
     });
+  });
+
+  it.each([
+    ["HWP", createHwpCompoundFile(), "공고문.hwp", "saved.hwp"],
+    ["ZIP", createStoredZip(["readme.txt"]), "공고문.zip", "saved.zip"],
+  ] as const)(
+    "accepts LH %s after signature and hint validation with the exact live legacy MIME",
+    async (format, bytes, displayName, savedName) => {
+      const fetcher = new TenderDocumentFetcher({
+        resolveHost: async () => ["8.8.8.8"],
+        fetcher: async () =>
+          new Response(bytes, {
+            status: 200,
+            headers: {
+              "content-type": "application/octect-stream; charset=UTF-8",
+            },
+          }),
+      });
+
+      await expect(
+        fetcher.fetch(
+          namedLhDocument(displayName, savedName, format),
+          new AbortController().signal,
+        ),
+      ).resolves.toMatchObject({ detectedFormat: format });
+    },
+  );
+
+  it("does not broaden the LH legacy MIME exception to similar malformed values", async () => {
+    const fetcher = new TenderDocumentFetcher({
+      resolveHost: async () => ["8.8.8.8"],
+      fetcher: async () =>
+        new Response(createStoredZip(["readme.txt"]), {
+          status: 200,
+          headers: { "content-type": "application/octect-streams" },
+        }),
+    });
+
+    await expect(
+      fetcher.fetch(lhDocument(), new AbortController().signal),
+    ).rejects.toMatchObject({ code: "DOCUMENT_FORMAT_MISMATCH" });
   });
 
   it.each([
