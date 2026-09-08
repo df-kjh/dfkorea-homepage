@@ -129,30 +129,30 @@ Commit message: `feat: analyze LH tender documents`
 - Consumes: API source value `LH` and existing collection-summary response.
 - Produces: visible label `LH` and an LH source filter without changing query parameter names.
 
-- [ ] **Step 1: Write failing UI tests**
+- [x] **Step 1: Write failing UI tests**
 
 Add a collection result containing `LH`, select the LH filter, and render an LH tender. Assert the user sees `LH`, the source query is `LH`, and a failed LH source does not use the G2B-specific partial-failure copy.
 
-- [ ] **Step 2: Run the UI test and verify RED**
+- [x] **Step 2: Run the UI test and verify RED**
 
 Run `npm test -- src/components/admin/TenderManagement.spec.ts`. Expected failure: the LH source type, filter, or label is absent.
 
-- [ ] **Step 3: Implement the UI and operating configuration**
+- [x] **Step 3: Implement the UI and operating configuration**
 
 Extend the source union and shared labels/options. Add the three LH environment variables with safe defaults. Document enabling, request load, collection limits, direct-collection limitations, structured/ZIP document support, monitoring, and rollback by setting `LH_TENDER_ENABLED=false`.
 
-- [ ] **Step 4: Run frontend verification**
+- [x] **Step 4: Run frontend verification**
 
 Run `npm test -- src/components/admin/TenderManagement.spec.ts && npm run type-check && npm run build`. Expected: PASS.
 
-- [ ] **Step 5: Run backend verification**
+- [x] **Step 5: Run backend verification**
 
 Run `npm run test:ci`. Expected: PASS.
 
-- [ ] **Step 6: Perform a disabled live smoke test**
+- [x] **Step 6: Perform a disabled live smoke test**
 
 Instantiate the production adapter with `enabled=false` and confirm zero network calls and an empty successful result. Do not run repeated production-site collection in CI.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 Commit message: `feat: expose LH tenders in administration`
