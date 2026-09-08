@@ -23,6 +23,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY tsconfig*.json ./
+COPY certificates ./certificates
 
 # Install ALL dependencies (TypeORM CLI needs dev dependencies)
 RUN npm ci
@@ -41,6 +42,9 @@ EXPOSE 3000
 
 # Set environment to production
 ENV NODE_ENV=production
+# LH e-Bid currently omits its TuringSign intermediate from the served chain.
+# Add only that verified CA certificate while preserving normal TLS validation.
+ENV NODE_EXTRA_CA_CERTS=/app/certificates/lh-turingsign-rsa-secure-ca-2.pem
 
 # Start application with migration
 CMD ["sh", "-c", "npm run migration:run:prod && npm run start:prod"]
