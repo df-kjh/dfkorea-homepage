@@ -4,6 +4,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ThePagination from '@/components/common/ThePagination.vue'
 import TenderSuitabilityBadge from './TenderSuitabilityBadge.vue'
 import TenderRelevanceBadge from './TenderRelevanceBadge.vue'
+import { TENDER_SOURCE_LABELS } from '@/constants/tender-source'
 import type { PaginatedTenderResponse, Tender } from '@/types'
 import { formatKstDateTime, formatTenderAmount } from '@/utils/tender-format'
 
@@ -16,11 +17,6 @@ interface Props {
 defineProps<Props>()
 const emit = defineEmits<{ select: [tender: Tender]; retry: []; 'page-change': [page: number] }>()
 
-const sourceLabel: Record<Tender['source'], string> = {
-  G2B: '나라장터',
-  KAPT: 'K-apt',
-  KEPCO: '한전',
-}
 const procurementLabel: Record<Tender['procurementType'], string> = {
   GOODS: '물품',
   CONSTRUCTION: '공사',
@@ -89,7 +85,7 @@ const dateLabel = (value: string | null) => (value ? formatKstDateTime(value) : 
                 </button>
               </td>
               <td>{{ tender.orderingOrganization }}</td>
-              <td>{{ sourceLabel[tender.source] }}</td>
+              <td>{{ TENDER_SOURCE_LABELS[tender.source] }}</td>
               <td>{{ tender.region || '-' }}</td>
               <td>{{ procurementLabel[tender.procurementType] }}</td>
               <td>{{ dateLabel(tender.registeredAt) }}</td>
@@ -113,7 +109,7 @@ const dateLabel = (value: string | null) => (value ? formatKstDateTime(value) : 
               :status="tender.analysisSummary.status"
               :suitability="tender.analysisSummary.suitability"
               class="mt-1"
-            /><span class="text-xs text-gray-500">{{ sourceLabel[tender.source] }}</span>
+            /><span class="text-xs text-gray-500">{{ TENDER_SOURCE_LABELS[tender.source] }}</span>
           </div>
           <strong class="block mt-2 text-left">{{ tender.title }}</strong
           ><span class="block mt-2 text-left text-sm text-gray-600"

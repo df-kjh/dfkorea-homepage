@@ -338,6 +338,24 @@ npm run test:ci
 
 API 키와 원본 요청 URL은 로그, DB 원본 데이터, API 응답에 넣지 않는다.
 
+### LH 직접 수집 활성화
+
+LH 수집은 공개 전자조달 HTML에 직접 요청하므로 자동으로 운영 활성화하지 않는다. 처음 배포할 때는 아래 기본값을 그대로 두고, 스테이징에서 한 번의 수동 수집과 구조·부하 확인을 마친 뒤 운영 secret store에서 `LH_TENDER_ENABLED=true`로 명시적으로 바꾸고 backend를 재시작한다.
+
+```bash
+LH_TENDER_ENABLED=false
+LH_TENDER_BASE_URL=https://ebid.lh.or.kr
+LH_TENDER_REQUEST_INTERVAL_MS=1500
+```
+
+한 번의 LH 수집은 업무구분 `30`과 `40`의 목록 페이지를 조회하고 LED 조명 후보마다 상세를 추가 요청한다. 모든 요청은 순차 실행되고 기본 간격은 1,500ms지만, 조회 페이지와 후보가 늘면 전체 요청 수와 실행 시간도 함께 증가한다. 공급자와 합의하거나 별도 부하 검증을 하지 않았다면 간격을 줄이지 말고, 반복적인 운영 사이트 수집을 배포 검증이나 CI에 사용하지 않는다.
+
+활성화 후 첫 매시 수집 또는 관리자 단일 `즉시 수집`에서 다음 항목을 확인한다.
+
+1. `tender_sync_runs`의 LH 상태가 `SUCCEEDED`, 의도된 상한에 따른 `PARTIAL`, 또는 안전한 `FAILED`로 기록되는지 확인한다. `STRUCTURE_CHANGED`, HTTP 오류, 페이지·상세 상한과 수집 실행 시간을 함께 모니터링한다.
+2. 관리자 LH 필터의 공고 수, 공식 원문 링크, 기초금액 근거와 문서 상태를 표본 확인한다. LH에는 낙찰 통계 가격이 없어도 정상이다.
+3. 요청량 급증, 반복 오류, 로그인/보안문자 응답 또는 외부 마크업 변경이 보이면 `LH_TENDER_ENABLED=false`로 되돌리고 backend를 재시작한다. 이 롤백은 이후 LH 네트워크 수집을 중지하며 이미 저장된 공고에는 DB 변경이나 migration이 필요하지 않다.
+
 ### NAVER WORKS Mail API (OAuth/HTTPS)
 
 Railway Hobby 환경에서는 SMTP TCP 연결을 사용하지 않는다. 메일은 `https://www.worksapis.com/v1.0`의 NAVER WORKS Mail API로 전송한다.

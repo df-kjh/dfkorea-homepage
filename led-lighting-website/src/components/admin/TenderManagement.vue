@@ -11,6 +11,7 @@ import TenderCalendar from './tenders/TenderCalendar.vue'
 import TenderDetailModal from './tenders/TenderDetailModal.vue'
 import TenderFilterPanel from './tenders/TenderFilterPanel.vue'
 import TenderList from './tenders/TenderList.vue'
+import { TENDER_SOURCE_LABELS } from '@/constants/tender-source'
 import TenderSubscriptionModal from './tenders/TenderSubscriptionModal.vue'
 import type {
   PaginatedTenderResponse,
@@ -222,6 +223,7 @@ const collectTenders = async () => {
     }
 
     const partialSources = data.sources.filter(({ status }) => status === 'PARTIAL')
+    const partialSourceLabels = partialSources.map(({ source }) => TENDER_SOURCE_LABELS[source])
     collectionFeedback.value =
       data.failedSources.length > 0
         ? {
@@ -231,7 +233,7 @@ const collectTenders = async () => {
         : partialSources.length > 0
           ? {
               role: 'alert',
-              message: '나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.',
+              message: `${partialSourceLabels.join(', ')} 출처의 일부 공고 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.`,
             }
           : { role: 'status', message: '공고 수집이 완료되었습니다.' }
     await Promise.all([fetchCalendar(), fetchList(currentListPage.value)])

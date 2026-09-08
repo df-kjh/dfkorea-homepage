@@ -45,6 +45,17 @@ const tender = {
   relevanceReasons: [{ field: 'title', keyword: 'LED', score: 100 }],
 }
 
+const lhTender = {
+  ...tender,
+  id: 'lh-tender-1',
+  source: 'LH' as const,
+  sourceNoticeId: '2601234',
+  revision: '00',
+  title: 'LH LED 조명기구 구매',
+  orderingOrganization: '한국토지주택공사',
+  sourceUrl: 'https://ebid.lh.or.kr/ebid.et.tp.cmd.BidDetailCmd.dev',
+}
+
 const listResponse = {
   data: [tender],
   total: 1,
@@ -273,6 +284,27 @@ describe('TenderManagement', () => {
     )
   })
 
+  it('filters with the LH API value and labels an LH tender in desktop and mobile lists', async () => {
+    api.getAll.mockResolvedValue({
+      data: { ...listResponse, data: [lhTender] },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-filter"]').trigger('click')
+    const sourceSelect = wrapper
+      .findAll('select')
+      .find((select) => select.findAll('option').some((option) => option.text() === 'LH'))
+    expect(sourceSelect).toBeDefined()
+    await sourceSelect!.setValue('LH')
+    await wrapper.get('[data-test="apply-filter"]').trigger('click')
+    await flushPromises()
+
+    expect(api.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'LH' }))
+    expect(wrapper.get('table').text()).toContain('LH')
+    expect(wrapper.get('.tender-list__mobile-card').text()).toContain('LH')
+  })
+
   it('prevents a second immediate collection while the first request is loading and reports a held lock without refreshing', async () => {
     const collection = deferred<{
       data: { lockAcquired: boolean; collectedAt: string; sources: []; failedSources: [] }
@@ -403,8 +435,42 @@ describe('TenderManagement', () => {
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain(
-      '나라장터 일부 유형 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.',
+      '나라장터 출처의 일부 공고 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.',
     )
+    expect(api.getCalendar).toHaveBeenCalledTimes(2)
+    expect(api.getAll).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports an LH partial collection without G2B-specific wording', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-09-08T12:00:00.000Z',
+        sources: [
+          {
+            source: 'LH',
+            status: 'PARTIAL',
+            fetchedCount: 20,
+            createdCount: 2,
+            updatedCount: 1,
+            excludedCount: 17,
+            errorCode: 'DETAIL_LIMIT_EXCEEDED',
+          },
+        ],
+        failedSources: [],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    const message = wrapper.get('[role="alert"]').text()
+    expect(message).toContain(
+      'LH 출처의 일부 공고 수집에 실패했습니다. 다음 수집에서 다시 시도합니다.',
+    )
+    expect(message).not.toContain('나라장터 일부 유형')
     expect(api.getCalendar).toHaveBeenCalledTimes(2)
     expect(api.getAll).toHaveBeenCalledTimes(2)
   })

@@ -1,4 +1,4 @@
-export type TenderSource = 'G2B' | 'KAPT' | 'KEPCO'
+export type TenderSource = 'G2B' | 'KAPT' | 'KEPCO' | 'LH'
 
 export type TenderCollectionSourceStatus = 'SUCCEEDED' | 'PARTIAL' | 'FAILED'
 
