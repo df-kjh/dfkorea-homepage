@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { LhHtmlClient, LhHtmlRequest } from "./public-api-client";
+import {
+  BoundedLhHtmlClient,
+  LhHtmlClient,
+  LhHtmlRequest,
+} from "./public-api-client";
 import { LhTenderAdapter } from "./lh-tender.adapter";
+import { LhHtmlStructureError, parseLhListPage } from "./lh-html";
 import {
   ProcurementType,
   SyncRunStatus,
@@ -12,9 +17,10 @@ const fixtures = (name: string) =>
   readFileSync(join(__dirname, "fixtures", name), "utf8");
 
 const noticesHtml = fixtures("lh-notices.html");
+const materialNoticesHtml = fixtures("lh-notices-material.html");
 const detailHtml = fixtures("lh-detail-material.html");
 const emptyNoticesHtml = noticesHtml.replace(
-  /<tr>\s*<td>1[\s\S]*?<\/tr>\s*<tr>\s*<td>2[\s\S]*?<\/tr>\s*<tr>\s*<td>3[\s\S]*?<\/tr>/,
+  /<tr onclick="fn_dds_open\('[\s\S]*?<\/tr>\s*<tr onclick="fn_dds_open\('[\s\S]*?<\/tr>\s*<tr onclick="fn_dds_open\('[\s\S]*?<\/tr>/,
   "",
 );
 
@@ -56,10 +62,13 @@ describe("LhTenderAdapter", () => {
     expect(client.requests).toEqual([]);
   });
 
-  it("posts both LH work types, deduplicates candidates, and maps a lighting detail", async () => {
-    const client = new StubLhHtmlClient((request) =>
-      request.operation === "detail" ? detailHtml : noticesHtml,
-    );
+  it("uses the collection-time deadline window, validates work types, and maps a lighting detail", async () => {
+    const client = new StubLhHtmlClient((request) => {
+      if (request.operation === "detail") return detailHtml;
+      return request.form?.s_cstrtnJobGbCd === "30"
+        ? noticesHtml
+        : materialNoticesHtml;
+    });
     const adapter = new LhTenderAdapter(client, {
       enabled: true,
       baseUrl: "https://ebid.lh.or.kr",
@@ -71,8 +80,27 @@ describe("LhTenderAdapter", () => {
     expect(
       client.requests
         .filter((request) => request.operation === "list")
-        .map((request) => request.form?.workTypeCode),
-    ).toEqual(["30", "40"]);
+        .map((request) => request.form),
+    ).toEqual([
+      {
+        s_cstrtnJobGbCd: "30",
+        s_bidnm: "",
+        s_tndrdocAcptOpenDtm: "2026/09/03",
+        s_tndrdocAcptEndDtm: "2027/03/09",
+        targetRow: "1",
+        pageSpec: "default",
+        devonOrderBy: "",
+      },
+      {
+        s_cstrtnJobGbCd: "40",
+        s_bidnm: "",
+        s_tndrdocAcptOpenDtm: "2026/09/03",
+        s_tndrdocAcptEndDtm: "2027/03/09",
+        targetRow: "1",
+        pageSpec: "default",
+        devonOrderBy: "",
+      },
+    ]);
     expect(
       client.requests.filter((request) => request.operation === "detail"),
     ).toHaveLength(1);
@@ -83,11 +111,11 @@ describe("LhTenderAdapter", () => {
       notices: [
         expect.objectContaining({
           source: TenderSource.LH,
-          sourceNoticeId: "LH-2026-1001",
+          sourceNoticeId: "2603251",
           revision: "00",
           title: "LED 가로등 구매",
           orderingOrganization: "한국토지주택공사 경기남부지역본부",
-          demandOrganization: "한국토지주택공사",
+          demandOrganization: null,
           registeredAt: new Date("2026-08-31T15:00:00.000Z"),
           bidStartedAt: new Date("2026-09-08T01:00:00.000Z"),
           bidEndedAt: new Date("2026-09-10T05:00:00.000Z"),
@@ -96,22 +124,24 @@ describe("LhTenderAdapter", () => {
           contractMethod: "제한경쟁",
           estimatedAmount: "12345000",
           region: "경기도 화성시",
+          sourceUrl:
+            "https://ebid.lh.or.kr/ebid.et.tp.cmd.BidgdsDetailListCmd.dev?bidNum=2603251&bidDegree=00&cstrtnJobGbCd=30&emrgncyOrder=Y",
           attachmentNames: ["공고문.pdf", "물량내역.xlsx"],
           rawData: {
             lh: {
               workTypeCode: "30",
               emergencyOrder: "Y",
               detailPath:
-                "/ebid.et.tp.cmd.BidMasterDetailCmd.dev?bidNum=LH-2026-1001&bidSeq=00",
+                "/ebid.et.tp.cmd.BidgdsDetailListCmd.dev?bidNum=2603251&bidDegree=00&cstrtnJobGbCd=30&emrgncyOrder=Y",
               basisAmount: "12345000",
               attachments: [
                 {
-                  sequence: "1",
+                  sequence: "10",
                   displayName: "공고문.pdf",
                   savedName: "20260901_notice.pdf",
                 },
                 {
-                  sequence: "2",
+                  sequence: "20",
                   displayName: "물량내역.xlsx",
                   savedName: "20260901_items.xlsx",
                 },
@@ -123,18 +153,25 @@ describe("LhTenderAdapter", () => {
     });
   });
 
-  it("requests list pages sequentially before collecting a candidate detail", async () => {
+  it("uses targetRow pagination sequentially before collecting a candidate detail", async () => {
     const secondPage = emptyNoticesHtml.replace(
-      'data-total-pages="1"',
-      'data-total-pages="2"',
+      'name="targetRow" value="1"',
+      'name="targetRow" value="11"',
     );
     const firstPage = noticesHtml.replace(
-      'data-total-pages="1"',
-      'data-total-pages="2"',
+      '<option value="1" selected>1</option>',
+      '<option value="1" selected>1</option><option value="11">2</option>',
+    );
+    const materialFirstPage = materialNoticesHtml.replace(
+      '<option value="1" selected>1</option>',
+      '<option value="1" selected>1</option><option value="11">2</option>',
     );
     const client = new StubLhHtmlClient((request) => {
       if (request.operation === "detail") return detailHtml;
-      return request.form?.pageNo === "1" ? firstPage : secondPage;
+      if (request.form?.targetRow === "11") return secondPage;
+      return request.form?.s_cstrtnJobGbCd === "30"
+        ? firstPage
+        : materialFirstPage;
     });
     const adapter = new LhTenderAdapter(client, {
       enabled: true,
@@ -147,9 +184,59 @@ describe("LhTenderAdapter", () => {
     expect(
       client.requests.map(
         (request) =>
-          `${request.operation}:${request.form?.workTypeCode ?? ""}:${request.form?.pageNo ?? ""}`,
+          `${request.operation}:${request.form?.s_cstrtnJobGbCd ?? ""}:${request.form?.targetRow ?? ""}`,
       ),
-    ).toEqual(["list:30:1", "list:30:2", "list:40:1", "list:40:2", "detail::"]);
+    ).toEqual([
+      "list:30:1",
+      "list:30:11",
+      "list:40:1",
+      "list:40:11",
+      "detail::",
+    ]);
+  });
+
+  it("rejects mismatched work types and ambiguous detail identities", () => {
+    expect(() => parseLhListPage(materialNoticesHtml, "30")).toThrow(
+      LhHtmlStructureError,
+    );
+    expect(() =>
+      parseLhListPage(
+        noticesHtml.replace(
+          "fn_dds_open('2603251','00','30','Y')",
+          "fn_dds_open('2603251','00','30','Y','extra')",
+        ),
+        "30",
+      ),
+    ).toThrow(LhHtmlStructureError);
+  });
+
+  it("rejects a detail page whose tender identity differs from its list row", async () => {
+    const client = new StubLhHtmlClient((request) => {
+      if (request.operation === "detail") {
+        return detailHtml.replace("<td>2603251</td>", "<td>2603999</td>");
+      }
+      return request.form?.s_cstrtnJobGbCd === "30"
+        ? noticesHtml
+        : materialNoticesHtml;
+    });
+    const adapter = new LhTenderAdapter(client, {
+      enabled: true,
+      baseUrl: "https://ebid.lh.or.kr",
+      requestIntervalMs: 0,
+    });
+
+    await expect(adapter.fetchNotices(window)).resolves.toEqual(
+      expect.objectContaining({
+        notices: [],
+        status: SyncRunStatus.PARTIAL,
+        failures: expect.arrayContaining([
+          expect.objectContaining({
+            operation: "detail",
+            errorCode: "STRUCTURE_CHANGED",
+          }),
+        ]),
+      }),
+    );
   });
 
   it("reports a structure change instead of treating malformed list HTML as empty", async () => {
@@ -173,12 +260,16 @@ describe("LhTenderAdapter", () => {
   });
 
   it("returns a bounded partial result when the configured page cap is reached", async () => {
-    const oversizedPage = noticesHtml.replace(
-      'data-total-pages="1"',
-      'data-total-pages="2"',
+    const paginatedPage = noticesHtml.replace(
+      '<option value="1" selected>1</option>',
+      '<option value="1" selected>1</option><option value="11">2</option>',
     );
     const client = new StubLhHtmlClient((request) =>
-      request.operation === "detail" ? detailHtml : oversizedPage,
+      request.operation === "detail"
+        ? detailHtml
+        : request.form?.s_cstrtnJobGbCd === "30"
+          ? paginatedPage
+          : materialNoticesHtml,
     );
     const adapter = new LhTenderAdapter(client, {
       enabled: true,
@@ -196,5 +287,105 @@ describe("LhTenderAdapter", () => {
         ]),
       }),
     );
+  });
+});
+
+const htmlRequest: LhHtmlRequest = {
+  source: TenderSource.LH,
+  operation: "list",
+  baseUrl: "https://ebid.lh.or.kr",
+  path: "/ebid.et.tp.cmd.BidMasterListCmd.dev",
+  method: "POST",
+  form: { targetRow: "1" },
+};
+
+describe("BoundedLhHtmlClient", () => {
+  const response = (
+    body: string,
+    status = 200,
+    headers?: Record<string, string>,
+  ) => new Response(body, { status, headers });
+
+  it("follows same-host redirects and converts POST to GET for 302", async () => {
+    const fetcher = jest
+      .fn<Promise<Response>, [string, RequestInit?]>()
+      .mockResolvedValueOnce(response("", 302, { location: "/next" }))
+      .mockResolvedValueOnce(response("ok"));
+    const client = new BoundedLhHtmlClient(fetcher);
+
+    await expect(client.request(htmlRequest)).resolves.toBe("ok");
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      "https://ebid.lh.or.kr/ebid.et.tp.cmd.BidMasterListCmd.dev",
+      "https://ebid.lh.or.kr/next",
+    ]);
+    expect(fetcher.mock.calls[1][1]).toEqual(
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetcher.mock.calls[1][1]?.body).toBeUndefined();
+  });
+
+  it.each(["https://evil.example/path", "http://ebid.lh.or.kr/path", "%"])(
+    "rejects an unsafe redirect target %s",
+    async (location) => {
+      const client = new BoundedLhHtmlClient(() =>
+        Promise.resolve(response("", 302, { location })),
+      );
+      await expect(client.request(htmlRequest)).rejects.toEqual(
+        expect.objectContaining({ code: "UNSAFE_REDIRECT" }),
+      );
+    },
+  );
+
+  it("rejects more than five redirects", async () => {
+    const client = new BoundedLhHtmlClient(() =>
+      Promise.resolve(response("", 302, { location: "/again" })),
+    );
+    await expect(client.request(htmlRequest)).rejects.toEqual(
+      expect.objectContaining({ code: "UNSAFE_REDIRECT" }),
+    );
+  });
+
+  it.each([
+    ["content length", response("ok", 200, { "content-length": "3" })],
+    ["actual bytes", response("abc")],
+  ])("caps HTML responses by %s", async (_caseName, value) => {
+    const client = new BoundedLhHtmlClient(() => Promise.resolve(value), {
+      maximumBodyBytes: 2,
+    });
+    await expect(client.request(htmlRequest)).rejects.toEqual(
+      expect.objectContaining({ code: "RESPONSE_TOO_LARGE" }),
+    );
+  });
+
+  it("rejects unsafe base and request path hosts", async () => {
+    const client = new BoundedLhHtmlClient(() =>
+      Promise.resolve(response("ok")),
+    );
+    await expect(
+      client.request({ ...htmlRequest, baseUrl: "https://evil.example" }),
+    ).rejects.toEqual(expect.objectContaining({ code: "CONFIGURATION_ERROR" }));
+    await expect(
+      client.request({ ...htmlRequest, path: "https://evil.example/path" }),
+    ).rejects.toEqual(expect.objectContaining({ code: "CONFIGURATION_ERROR" }));
+  });
+
+  it("aborts a request at the configured timeout", async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn<Promise<Response>, [string, RequestInit?]>(
+      (_url, init) =>
+        new Promise((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () =>
+            reject(new Error("aborted")),
+          ),
+        ),
+    );
+    const client = new BoundedLhHtmlClient(fetcher, { timeoutMs: 10 });
+    const pending = expect(client.request(htmlRequest)).rejects.toMatchObject({
+      code: "REQUEST_TIMEOUT",
+    });
+    await jest.advanceTimersByTimeAsync(10);
+    await pending;
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 });

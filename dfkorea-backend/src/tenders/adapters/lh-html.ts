@@ -1,17 +1,17 @@
 export interface LhListRow {
-  workTypeCode: string;
+  workTypeCode: "30" | "40";
   sourceNoticeId: string;
   revision: string;
   title: string;
   bidEndedAt: Date | null;
   orderingOrganization: string;
-  emergencyOrder: string;
+  emergencyOrder: "N" | "Y";
   detailPath: string;
 }
 
 export interface LhListPage {
   rows: LhListRow[];
-  totalPages: number;
+  nextTargetRow: string | null;
 }
 
 export interface LhAttachment {
@@ -23,27 +23,41 @@ export interface LhAttachment {
 export interface LhTenderDetail {
   registeredAt: Date;
   orderingOrganization: string;
-  demandOrganization: string | null;
-  contractMethod: string | null;
-  bidStartedAt: Date | null;
+  demandOrganization: null;
+  contractMethod: string;
+  bidStartedAt: Date;
   bidEndedAt: Date;
-  openedAt: Date | null;
+  openedAt: Date;
   basisAmount: string | null;
   region: string | null;
   attachments: LhAttachment[];
 }
 
+interface HtmlRow {
+  attributes: string;
+  cells: string[];
+}
+
 const REQUIRED_LIST_HEADERS = [
-  "업무구분",
   "공고번호",
-  "공고차수",
-  "공고명",
-  "입찰마감일시",
-  "공고기관",
-  "긴급입찰",
+  "업무",
+  "분류",
+  "입찰건명",
+  "계약방법",
+  "입찰마감일자",
+  "지역본부",
+  "현황",
 ] as const;
 
-const REQUIRED_DETAIL_LABELS = ["공고일", "발주기관", "입찰마감일시"] as const;
+const WORK_TYPE_BY_LABEL: Record<string, "30" | "40"> = {
+  물품: "30",
+  지급자재: "40",
+};
+
+const DETAIL_PATH_BY_WORK_TYPE: Record<"30" | "40", string> = {
+  "30": "/ebid.et.tp.cmd.BidgdsDetailListCmd.dev",
+  "40": "/ebid.et.tp.cmd.BidctrctgdsDetailListCmd.dev",
+};
 
 export class LhHtmlStructureError extends Error {
   constructor() {
@@ -54,160 +68,214 @@ export class LhHtmlStructureError extends Error {
 
 export const parseLhListPage = (
   html: string,
-  workTypeCode: string,
+  requestedWorkTypeCode: "30" | "40",
 ): LhListPage => {
-  const table = requiredTable(html, "bidMasterList");
-  const rows = tableRows(table);
+  const rows = tableRows(requiredTableBySummary(html, "목록정보"));
   const header = rows.shift();
   if (!header) throw new LhHtmlStructureError();
   const columnByHeader = new Map(
-    header.map((cell, index) => [plainText(cell), index]),
+    header.cells.map((cell, index) => [plainText(cell), index]),
   );
   if (REQUIRED_LIST_HEADERS.some((name) => !columnByHeader.has(name))) {
     throw new LhHtmlStructureError();
   }
 
-  const totalPages = attributeValue(
-    requiredElement(html, "pagination"),
-    "data-total-pages",
-  );
-  const totalPagesNumber = totalPages === null ? NaN : Number(totalPages);
-  if (
-    !Number.isSafeInteger(totalPagesNumber) ||
-    totalPagesNumber < 1 ||
-    totalPagesNumber > 10_000
-  ) {
-    throw new LhHtmlStructureError();
-  }
-
   return {
-    totalPages: totalPagesNumber,
-    rows: rows.map((cells) => {
+    rows: rows.map((row) => {
       const value = (name: (typeof REQUIRED_LIST_HEADERS)[number]) => {
         const index = columnByHeader.get(name);
-        const cell = index === undefined ? null : cells[index];
         const text =
-          cell === undefined || cell === null ? null : plainText(cell);
+          index === undefined ? "" : plainText(row.cells[index] ?? "");
         if (!text) throw new LhHtmlStructureError();
         return text;
       };
-      const titleCell = cells[columnByHeader.get("공고명")!];
-      const detailPath = titleCell === undefined ? null : linkPath(titleCell);
+      const workTypeCode = WORK_TYPE_BY_LABEL[value("업무")];
+      if (!workTypeCode || workTypeCode !== requestedWorkTypeCode) {
+        throw new LhHtmlStructureError();
+      }
+      const identity = parseOpenArguments(
+        attributeValue(row.attributes, "onclick"),
+      );
+      const sourceNoticeId = value("공고번호");
       if (
-        !detailPath ||
-        !detailPath.startsWith("/") ||
-        detailPath.startsWith("//")
+        identity.bidNum !== sourceNoticeId ||
+        identity.workTypeCode !== workTypeCode
       ) {
         throw new LhHtmlStructureError();
       }
       return {
         workTypeCode,
-        sourceNoticeId: value("공고번호"),
-        revision: value("공고차수"),
-        title: value("공고명"),
-        bidEndedAt: parseLhDate(value("입찰마감일시")),
-        orderingOrganization: value("공고기관"),
-        emergencyOrder: value("긴급입찰"),
-        detailPath,
+        sourceNoticeId,
+        revision: identity.revision,
+        title: value("입찰건명"),
+        bidEndedAt: parseLhDate(value("입찰마감일자")),
+        orderingOrganization: value("지역본부"),
+        emergencyOrder: identity.emergencyOrder,
+        detailPath: canonicalLhDetailPath(identity),
       };
     }),
+    nextTargetRow: nextTargetRow(html),
   };
 };
 
-export const parseLhTenderDetail = (html: string): LhTenderDetail => {
-  const fields = new Map<string, string>();
-  for (const row of tableRows(requiredTable(html, "bidDetail"))) {
-    const [label, value] = row;
-    const normalizedLabel = label === undefined ? "" : plainText(label);
-    const normalizedValue = value === undefined ? "" : plainText(value);
-    if (normalizedLabel && normalizedValue)
-      fields.set(normalizedLabel, normalizedValue);
-  }
-  if (REQUIRED_DETAIL_LABELS.some((name) => !fields.get(name))) {
+export const parseLhTenderDetail = (
+  html: string,
+  expectedNoticeId: string,
+): LhTenderDetail => {
+  const general = labelValues(requiredTableBySummary(html, "공고일반정보"));
+  const contract = labelValues(
+    requiredTableBySummary(html, "계약및입찰방식정보"),
+  );
+  const progress = labelValues(requiredTableBySummary(html, "입찰진행정보"));
+  const files = requiredTableBySummary(html, "파일정보");
+  const requiredGeneral = ["입찰공고번호", "입찰공고일", "공고부서"];
+  const requiredProgress = [
+    "입찰서접수개시일시",
+    "입찰서접수마감일시",
+    "개찰일시",
+    "기초금액",
+  ];
+  if (
+    requiredGeneral.some((label) => !general.get(label)) ||
+    !contract.get("계약방법") ||
+    requiredProgress.some((label) => !progress.get(label)) ||
+    general.get("입찰공고번호") !== expectedNoticeId
+  ) {
     throw new LhHtmlStructureError();
   }
 
-  const registeredAt = parseLhDate(fields.get("공고일")!);
-  const bidEndedAt = parseLhDate(fields.get("입찰마감일시")!);
-  if (!registeredAt || !bidEndedAt) throw new LhHtmlStructureError();
+  const registeredAt = parseLhDate(general.get("입찰공고일")!);
+  const bidStartedAt = parseLhDate(progress.get("입찰서접수개시일시")!);
+  const bidEndedAt = parseLhDate(progress.get("입찰서접수마감일시")!);
+  const openedAt = parseLhDate(progress.get("개찰일시")!);
+  if (!registeredAt || !bidStartedAt || !bidEndedAt || !openedAt) {
+    throw new LhHtmlStructureError();
+  }
 
-  const attachmentTable = tableById(html, "attachmentList");
   return {
     registeredAt,
-    orderingOrganization: fields.get("발주기관")!,
-    demandOrganization: nullableField(fields.get("수요기관")),
-    contractMethod: nullableField(fields.get("계약방법")),
-    bidStartedAt: parseOptionalLhDate(fields.get("입찰개시일시")),
+    orderingOrganization: general.get("공고부서")!,
+    demandOrganization: null,
+    contractMethod: contract.get("계약방법")!,
+    bidStartedAt,
     bidEndedAt,
-    openedAt: parseOptionalLhDate(fields.get("개찰일시")),
-    basisAmount: normalizeAmount(fields.get("기초금액")),
-    region: nullableField(fields.get("납품지역")),
-    attachments: attachmentTable ? parseAttachments(attachmentTable) : [],
+    openedAt,
+    basisAmount: normalizeAmount(progress.get("기초금액")),
+    region: nullableField(general.get("납품지역")),
+    attachments: parseAttachments(files),
   };
 };
 
-const parseAttachments = (table: string): LhAttachment[] => {
-  const rows = tableRows(table);
-  const header = rows.shift();
-  if (!header) throw new LhHtmlStructureError();
-  const columns = new Map(
-    header.map((cell, index) => [plainText(cell), index]),
-  );
-  for (const name of ["순번", "첨부파일명", "저장파일명"]) {
-    if (!columns.has(name)) throw new LhHtmlStructureError();
-  }
-  return rows.map((cells) => {
-    const value = (name: string) => {
-      const cell = cells[columns.get(name)!];
-      const text = cell === undefined ? "" : plainText(cell);
-      if (!text) throw new LhHtmlStructureError();
-      return text;
-    };
-    return {
-      sequence: value("순번"),
-      displayName: value("첨부파일명"),
-      savedName: value("저장파일명"),
-    };
+const parseAttachments = (table: string): LhAttachment[] =>
+  tableRows(table).flatMap((row) => {
+    const match = row.cells
+      .join(" ")
+      .match(
+        /javascript:\s*fn_dds_open\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']*)'\s*,\s*'([^']+)'\s*\)/i,
+      );
+    if (!match) return [];
+    const [, sequence, savedName, clientPath, displayName] = match;
+    if (!clientPath.startsWith("/attachEBID/bidinfo/")) {
+      throw new LhHtmlStructureError();
+    }
+    return [{ sequence, displayName, savedName }];
   });
+
+const parseOpenArguments = (
+  value: string | null,
+): {
+  bidNum: string;
+  revision: string;
+  workTypeCode: "30" | "40";
+  emergencyOrder: "N" | "Y";
+} => {
+  const match = value?.match(
+    /^\s*fn_dds_open\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'(30|40)'\s*,\s*'([NY])'\s*\)\s*;?\s*$/,
+  );
+  if (!match) throw new LhHtmlStructureError();
+  const [, bidNum, revision, workTypeCode, emergencyOrder] = match;
+  return {
+    bidNum,
+    revision,
+    workTypeCode: workTypeCode as "30" | "40",
+    emergencyOrder: emergencyOrder as "N" | "Y",
+  };
 };
 
-const requiredTable = (html: string, id: string): string => {
-  const table = tableById(html, id);
-  if (!table) throw new LhHtmlStructureError();
-  return table;
+const canonicalLhDetailPath = (identity: {
+  bidNum: string;
+  revision: string;
+  workTypeCode: "30" | "40";
+  emergencyOrder: "N" | "Y";
+}): string => {
+  const query = new URLSearchParams({
+    bidNum: identity.bidNum,
+    bidDegree: identity.revision,
+    cstrtnJobGbCd: identity.workTypeCode,
+    emrgncyOrder: identity.emergencyOrder,
+  });
+  return `${DETAIL_PATH_BY_WORK_TYPE[identity.workTypeCode]}?${query.toString()}`;
 };
 
-const tableById = (html: string, id: string): string | null => {
-  const escapedId = escapeRegExp(id);
+const nextTargetRow = (html: string): string | null => {
+  const current = attributeValue(requiredInput(html, "targetRow"), "value");
+  if (!current || !isTargetRow(current)) throw new LhHtmlStructureError();
+  const offsets = Array.from(
+    html.matchAll(/<option\b[^>]*\bvalue\s*=\s*(["'])(\d+)\1[^>]*>/gi),
+  )
+    .map((match) => match[2])
+    .filter(isTargetRow)
+    .map(Number)
+    .filter((offset) => offset > Number(current))
+    .sort((left, right) => left - right);
+  return offsets.length === 0 ? null : String(offsets[0]);
+};
+
+const isTargetRow = (value: string): boolean =>
+  /^(?:[1-9]\d*)$/.test(value) && Number.isSafeInteger(Number(value));
+
+const labelValues = (table: string): Map<string, string> => {
+  const values = new Map<string, string>();
+  for (const row of tableRows(table)) {
+    const label = plainText(row.cells[0] ?? "");
+    const value = plainText(row.cells[1] ?? "");
+    if (label && value) values.set(label, value);
+  }
+  return values;
+};
+
+const requiredTableBySummary = (html: string, summary: string): string => {
+  const escaped = escapeRegExp(summary);
   const match = html.match(
     new RegExp(
-      `<table\\b[^>]*\\bid\\s*=\\s*(["'])${escapedId}\\1[^>]*>([\\s\\S]*?)<\\/table>`,
+      `<table\\b[^>]*\\bsummary\\s*=\\s*(["'])${escaped}\\1[^>]*>([\\s\\S]*?)<\\/table>`,
       "i",
     ),
   );
-  return match?.[2] ?? null;
+  if (!match) throw new LhHtmlStructureError();
+  return match[2];
 };
 
-const requiredElement = (html: string, id: string): string => {
-  const escapedId = escapeRegExp(id);
+const requiredInput = (html: string, name: string): string => {
   const match = html.match(
-    new RegExp(`<[^>]+\\bid\\s*=\\s*(["'])${escapedId}\\1[^>]*>`, "i"),
+    new RegExp(
+      `<input\\b[^>]*\\bname\\s*=\\s*(["'])${escapeRegExp(name)}\\1[^>]*>`,
+      "i",
+    ),
   );
   if (!match) throw new LhHtmlStructureError();
   return match[0];
 };
 
-const tableRows = (table: string): string[][] =>
-  Array.from(table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)).map((match) =>
-    Array.from(
-      match[1].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/gi),
-    ).map((cell) => cell[1]),
+const tableRows = (table: string): HtmlRow[] =>
+  Array.from(table.matchAll(/<tr\b([^>]*)>([\s\S]*?)<\/tr>/gi)).map(
+    (match) => ({
+      attributes: match[1],
+      cells: Array.from(
+        match[2].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/gi),
+      ).map((cell) => cell[1]),
+    }),
   );
-
-const linkPath = (cell: string): string | null => {
-  const match = cell.match(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>/i);
-  return match?.[2] ? decodeHtml(match[2]).trim() : null;
-};
 
 const attributeValue = (element: string, name: string): string | null => {
   const match = element.match(
@@ -235,12 +303,9 @@ const nullableField = (value: string | undefined): string | null => {
   return normalized || null;
 };
 
-const parseOptionalLhDate = (value: string | undefined): Date | null =>
-  value ? parseLhDate(value) : null;
-
 export const parseLhDate = (value: string): Date | null => {
   const match = value.match(
-    /^(\d{4})\.(\d{2})\.(\d{2})(?:\s+(\d{2}):(\d{2}))?$/,
+    /^(\d{4})[./](\d{2})[./](\d{2})(?:\s+(\d{2}):(\d{2}))?$/,
   );
   if (!match) return null;
   const [, year, month, day, hour = "00", minute = "00"] = match;

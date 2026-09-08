@@ -109,7 +109,10 @@ export class LhTenderAdapter implements TenderSourceAdapter {
           method: "GET",
         });
         notices.push(
-          this.normalize(candidate, parseLhTenderDetail(detailHtml)),
+          this.normalize(
+            candidate,
+            parseLhTenderDetail(detailHtml, candidate.sourceNoticeId),
+          ),
         );
       } catch (error) {
         failures.push(this.toOperationFailure("detail", error));
@@ -124,7 +127,7 @@ export class LhTenderAdapter implements TenderSourceAdapter {
     window: TenderFetchWindow,
   ): Promise<LhListRow[]> {
     const rows: LhListRow[] = [];
-    let totalPages: number | null = null;
+    let targetRow = "1";
     for (let pageNo = 1; pageNo <= this.maximumPages; pageNo += 1) {
       const html = await this.request({
         source: this.source,
@@ -133,19 +136,19 @@ export class LhTenderAdapter implements TenderSourceAdapter {
         path: LIST_PATH,
         method: "POST",
         form: {
-          workTypeCode,
-          pageNo: String(pageNo),
-          bidClseDtFrom: this.formatDate(this.addDays(window.from, -7)),
-          bidClseDtTo: this.formatDate(this.addDays(window.to, 180)),
+          s_cstrtnJobGbCd: workTypeCode,
+          s_bidnm: "",
+          s_tndrdocAcptOpenDtm: this.formatDate(this.addDays(window.to, -7)),
+          s_tndrdocAcptEndDtm: this.formatDate(this.addDays(window.to, 180)),
+          targetRow,
+          pageSpec: "default",
+          devonOrderBy: "",
         },
       });
       const page = parseLhListPage(html, workTypeCode);
-      totalPages ??= page.totalPages;
-      if (page.totalPages !== totalPages || pageNo > totalPages) {
-        throw new LhHtmlStructureError();
-      }
       rows.push(...page.rows);
-      if (pageNo === totalPages) return rows;
+      if (page.nextTargetRow === null) return rows;
+      targetRow = page.nextTargetRow;
     }
     throw new TenderSourceError(
       this.source,
@@ -297,6 +300,6 @@ export class LhTenderAdapter implements TenderSourceAdapter {
 
   private formatDate(value: Date): string {
     const kst = new Date(value.getTime() + 9 * 60 * 60 * 1_000);
-    return `${kst.getUTCFullYear()}${String(kst.getUTCMonth() + 1).padStart(2, "0")}${String(kst.getUTCDate()).padStart(2, "0")}`;
+    return `${kst.getUTCFullYear()}/${String(kst.getUTCMonth() + 1).padStart(2, "0")}/${String(kst.getUTCDate()).padStart(2, "0")}`;
   }
 }

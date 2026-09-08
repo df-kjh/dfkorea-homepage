@@ -89,6 +89,11 @@ export interface LhHtmlClient {
 const LH_HOST = "ebid.lh.or.kr";
 const DEFAULT_LH_HTML_BODY_LIMIT_BYTES = 1_000_000;
 
+export interface BoundedLhHtmlClientOptions {
+  maximumBodyBytes?: number;
+  timeoutMs?: number;
+}
+
 /**
  * Fetches only the public LH host and buffers a bounded HTML body. Redirects
  * are followed manually so every hop can be checked before its body is read.
@@ -96,15 +101,24 @@ const DEFAULT_LH_HTML_BODY_LIMIT_BYTES = 1_000_000;
 export class BoundedLhHtmlClient implements LhHtmlClient {
   constructor(
     private readonly fetcher: Fetcher = globalThis.fetch,
-    maximumBodyBytes = DEFAULT_LH_HTML_BODY_LIMIT_BYTES,
+    options: BoundedLhHtmlClientOptions = {},
   ) {
     this.maximumBodyBytes =
-      Number.isSafeInteger(maximumBodyBytes) && maximumBodyBytes > 0
-        ? maximumBodyBytes
+      Number.isSafeInteger(options.maximumBodyBytes) &&
+      options.maximumBodyBytes !== undefined &&
+      options.maximumBodyBytes > 0
+        ? options.maximumBodyBytes
         : DEFAULT_LH_HTML_BODY_LIMIT_BYTES;
+    this.timeoutMs =
+      Number.isSafeInteger(options.timeoutMs) &&
+      options.timeoutMs !== undefined &&
+      options.timeoutMs > 0
+        ? options.timeoutMs
+        : DEFAULT_REQUEST_TIMEOUT_MS;
   }
 
   private readonly maximumBodyBytes: number;
+  private readonly timeoutMs: number;
 
   async request(request: LhHtmlRequest): Promise<string> {
     let url = this.safeUrl(request);
@@ -113,11 +127,13 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
     for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
       let response: Response;
       try {
-        response = await this.fetcher(
-          url.toString(),
+        response = await this.fetchWithTimeout(
+          url,
           this.requestInit(method, request),
+          request.operation,
         );
       } catch (error) {
+        if (error instanceof TenderSourceError) throw error;
         throw new TenderSourceError(
           TenderSource.LH,
           "NETWORK_ERROR",
@@ -185,6 +201,41 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
           }
         : {}),
     };
+  }
+
+  private async fetchWithTimeout(
+    url: URL,
+    init: RequestInit,
+    operation: LhHtmlRequest["operation"],
+  ): Promise<Response> {
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutError = new TenderSourceError(
+      TenderSource.LH,
+      "REQUEST_TIMEOUT",
+      null,
+      undefined,
+      operation,
+    );
+    try {
+      const pending = this.fetcher(url.toString(), {
+        ...init,
+        signal: controller.signal,
+      });
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(timeoutError);
+        }, this.timeoutMs);
+      });
+      return await Promise.race([pending, timeoutPromise]);
+    } catch (error) {
+      if (error instanceof TenderSourceError) throw error;
+      if (controller.signal.aborted) throw timeoutError;
+      throw error;
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
   }
 
   private isRedirect(status: number): boolean {
