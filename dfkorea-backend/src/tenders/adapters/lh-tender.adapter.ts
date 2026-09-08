@@ -111,7 +111,11 @@ export class LhTenderAdapter implements TenderSourceAdapter {
         notices.push(
           this.normalize(
             candidate,
-            parseLhTenderDetail(detailHtml, candidate.sourceNoticeId),
+            parseLhTenderDetail(
+              detailHtml,
+              candidate.sourceNoticeId,
+              candidate.revision,
+            ),
           ),
         );
       } catch (error) {

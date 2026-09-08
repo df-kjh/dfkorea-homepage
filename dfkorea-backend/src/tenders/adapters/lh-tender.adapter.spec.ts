@@ -6,7 +6,11 @@ import {
   LhHtmlRequest,
 } from "./public-api-client";
 import { LhTenderAdapter } from "./lh-tender.adapter";
-import { LhHtmlStructureError, parseLhListPage } from "./lh-html";
+import {
+  LhHtmlStructureError,
+  parseLhListPage,
+  parseLhTenderDetail,
+} from "./lh-html";
 import {
   ProcurementType,
   SyncRunStatus,
@@ -22,6 +26,10 @@ const detailHtml = fixtures("lh-detail-material.html");
 const emptyNoticesHtml = noticesHtml.replace(
   /<tr onclick="fn_dds_open\('[\s\S]*?<\/tr>\s*<tr onclick="fn_dds_open\('[\s\S]*?<\/tr>\s*<tr onclick="fn_dds_open\('[\s\S]*?<\/tr>/,
   "",
+);
+const normalEmptyNoticesHtml = emptyNoticesHtml.replace(
+  "</tbody>",
+  '<tr><td colspan="8">해당 자료가 없음</td></tr></tbody>',
 );
 
 const window = {
@@ -154,17 +162,19 @@ describe("LhTenderAdapter", () => {
   });
 
   it("uses targetRow pagination sequentially before collecting a candidate detail", async () => {
-    const secondPage = emptyNoticesHtml.replace(
-      'name="targetRow" value="1"',
-      'name="targetRow" value="11"',
-    );
+    const secondPage = normalEmptyNoticesHtml
+      .replace('name="targetRow" value="1"', 'name="targetRow" value="11"')
+      .replace(
+        "<option value=1 selected>1</option>",
+        "<option value=11 selected>2</option>",
+      );
     const firstPage = noticesHtml.replace(
-      '<option value="1" selected>1</option>',
-      '<option value="1" selected>1</option><option value="11">2</option>',
+      "<option value=1 selected>1</option>",
+      "<option value=1 selected>1</option><option value=11>2</option>",
     );
     const materialFirstPage = materialNoticesHtml.replace(
-      '<option value="1" selected>1</option>',
-      '<option value="1" selected>1</option><option value="11">2</option>',
+      "<option value=1 selected>1</option>",
+      "<option value=1 selected>1</option><option value=11>2</option>",
     );
     const client = new StubLhHtmlClient((request) => {
       if (request.operation === "detail") return detailHtml;
@@ -210,10 +220,51 @@ describe("LhTenderAdapter", () => {
     ).toThrow(LhHtmlStructureError);
   });
 
+  it("accepts only the known normal empty list row", () => {
+    expect(parseLhListPage(normalEmptyNoticesHtml, "30")).toEqual({
+      rows: [],
+      nextTargetRow: null,
+    });
+    expect(() => parseLhListPage(emptyNoticesHtml, "30")).toThrow(
+      LhHtmlStructureError,
+    );
+  });
+
+  it("accepts quoted paginator offsets while ignoring numeric filter options", () => {
+    const quotedPaginator = noticesHtml.replace(
+      "<option value=1 selected>1</option>",
+      '<option value="1" selected>1</option><option value="11">2</option>',
+    );
+    expect(parseLhListPage(quotedPaginator, "30").nextTargetRow).toBe("11");
+  });
+
+  it("requires every public detail identity part and fails malformed attachment rows", () => {
+    expect(() => parseLhTenderDetail(detailHtml, "2603251", "01")).toThrow(
+      LhHtmlStructureError,
+    );
+    expect(() =>
+      parseLhTenderDetail(
+        detailHtml.replace("javascript:fn_dds_open", "javascript:unknown"),
+        "2603251",
+        "00",
+      ),
+    ).toThrow(LhHtmlStructureError);
+  });
+
+  it("allows the known no-file row without accepting malformed attachment data", () => {
+    const noFileDetail = detailHtml.replace(
+      /<tr><th>첨부파일<\/th>[\s\S]*?<\/tr>\s*<tr><th>첨부파일<\/th>[\s\S]*?<\/tr>/,
+      "<tr><td>첨부파일이 없습니다.</td></tr>",
+    );
+    expect(
+      parseLhTenderDetail(noFileDetail, "2603251", "00").attachments,
+    ).toEqual([]);
+  });
+
   it("rejects a detail page whose tender identity differs from its list row", async () => {
     const client = new StubLhHtmlClient((request) => {
       if (request.operation === "detail") {
-        return detailHtml.replace("<td>2603251</td>", "<td>2603999</td>");
+        return detailHtml.replace("2603251 - 00", "2603999 - 00");
       }
       return request.form?.s_cstrtnJobGbCd === "30"
         ? noticesHtml
@@ -261,8 +312,8 @@ describe("LhTenderAdapter", () => {
 
   it("returns a bounded partial result when the configured page cap is reached", async () => {
     const paginatedPage = noticesHtml.replace(
-      '<option value="1" selected>1</option>',
-      '<option value="1" selected>1</option><option value="11">2</option>',
+      "<option value=1 selected>1</option>",
+      "<option value=1 selected>1</option><option value=11>2</option>",
     );
     const client = new StubLhHtmlClient((request) =>
       request.operation === "detail"

@@ -36,6 +36,7 @@ export interface LhTenderDetail {
 interface HtmlRow {
   attributes: string;
   cells: string[];
+  content: string;
 }
 
 const REQUIRED_LIST_HEADERS = [
@@ -79,9 +80,15 @@ export const parseLhListPage = (
   if (REQUIRED_LIST_HEADERS.some((name) => !columnByHeader.has(name))) {
     throw new LhHtmlStructureError();
   }
+  const dataRows = rows;
+  if (dataRows.length === 0) throw new LhHtmlStructureError();
+  if (dataRows.length === 1 && isKnownEmptyListRow(dataRows[0])) {
+    return { rows: [], nextTargetRow: nextTargetRow(html) };
+  }
+  if (dataRows.some(isKnownEmptyListRow)) throw new LhHtmlStructureError();
 
   return {
-    rows: rows.map((row) => {
+    rows: dataRows.map((row) => {
       const value = (name: (typeof REQUIRED_LIST_HEADERS)[number]) => {
         const index = columnByHeader.get(name);
         const text =
@@ -121,6 +128,7 @@ export const parseLhListPage = (
 export const parseLhTenderDetail = (
   html: string,
   expectedNoticeId: string,
+  expectedRevision: string,
 ): LhTenderDetail => {
   const general = labelValues(requiredTableBySummary(html, "공고일반정보"));
   const contract = labelValues(
@@ -128,18 +136,26 @@ export const parseLhTenderDetail = (
   );
   const progress = labelValues(requiredTableBySummary(html, "입찰진행정보"));
   const files = requiredTableBySummary(html, "파일정보");
-  const requiredGeneral = ["입찰공고번호", "입찰공고일", "공고부서"];
+  const requiredGeneral = [
+    "입찰공고번호",
+    "입찰공고일",
+    "공고부서",
+    "기초금액",
+  ];
   const requiredProgress = [
     "입찰서접수개시일시",
     "입찰서접수마감일시",
     "개찰일시",
-    "기초금액",
   ];
   if (
     requiredGeneral.some((label) => !general.get(label)) ||
     !contract.get("계약방법") ||
     requiredProgress.some((label) => !progress.get(label)) ||
-    general.get("입찰공고번호") !== expectedNoticeId
+    !matchesPublicTenderIdentity(
+      general.get("입찰공고번호")!,
+      expectedNoticeId,
+      expectedRevision,
+    )
   ) {
     throw new LhHtmlStructureError();
   }
@@ -160,26 +176,39 @@ export const parseLhTenderDetail = (
     bidStartedAt,
     bidEndedAt,
     openedAt,
-    basisAmount: normalizeAmount(progress.get("기초금액")),
+    basisAmount: normalizeAmount(general.get("기초금액")),
     region: nullableField(general.get("납품지역")),
     attachments: parseAttachments(files),
   };
 };
 
-const parseAttachments = (table: string): LhAttachment[] =>
-  tableRows(table).flatMap((row) => {
+const parseAttachments = (table: string): LhAttachment[] => {
+  const rows = tableRows(table);
+  if (rows.length === 1 && isKnownEmptyFileRow(rows[0])) return [];
+  return rows.flatMap((row) => {
+    if (!/<td\b/i.test(row.content)) return [];
     const match = row.cells
       .join(" ")
       .match(
         /javascript:\s*fn_dds_open\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']*)'\s*,\s*'([^']+)'\s*\)/i,
       );
-    if (!match) return [];
+    if (!match) throw new LhHtmlStructureError();
     const [, sequence, savedName, clientPath, displayName] = match;
     if (!clientPath.startsWith("/attachEBID/bidinfo/")) {
       throw new LhHtmlStructureError();
     }
     return [{ sequence, displayName, savedName }];
   });
+};
+
+const matchesPublicTenderIdentity = (
+  value: string,
+  expectedNoticeId: string,
+  expectedRevision: string,
+): boolean => {
+  const match = value.match(/^(.+?)\s*-\s*(.+?)$/);
+  return match?.[1] === expectedNoticeId && match[2] === expectedRevision;
+};
 
 const parseOpenArguments = (
   value: string | null,
@@ -220,15 +249,26 @@ const canonicalLhDetailPath = (identity: {
 const nextTargetRow = (html: string): string | null => {
   const current = attributeValue(requiredInput(html, "targetRow"), "value");
   if (!current || !isTargetRow(current)) throw new LhHtmlStructureError();
+  const paginator = Array.from(
+    html.matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/gi),
+  ).find((match) =>
+    /^\s*changePage\(\s*this\s*\)\s*$/i.test(
+      attributeValue(match[1], "onchange") ?? "",
+    ),
+  );
+  if (!paginator) throw new LhHtmlStructureError();
   const offsets = Array.from(
-    html.matchAll(/<option\b[^>]*\bvalue\s*=\s*(["'])(\d+)\1[^>]*>/gi),
+    paginator[2].matchAll(
+      /<option\b[^>]*\bvalue\s*=\s*(?:(["'])(\d+)\1|(\d+))[^>]*>/gi,
+    ),
   )
-    .map((match) => match[2])
+    .map((match) => match[2] ?? match[3])
     .filter(isTargetRow)
     .map(Number)
-    .filter((offset) => offset > Number(current))
     .sort((left, right) => left - right);
-  return offsets.length === 0 ? null : String(offsets[0]);
+  if (!offsets.includes(Number(current))) throw new LhHtmlStructureError();
+  const next = offsets.filter((offset) => offset > Number(current));
+  return next.length === 0 ? null : String(next[0]);
 };
 
 const isTargetRow = (value: string): boolean =>
@@ -237,9 +277,11 @@ const isTargetRow = (value: string): boolean =>
 const labelValues = (table: string): Map<string, string> => {
   const values = new Map<string, string>();
   for (const row of tableRows(table)) {
-    const label = plainText(row.cells[0] ?? "");
-    const value = plainText(row.cells[1] ?? "");
-    if (label && value) values.set(label, value);
+    for (let index = 0; index + 1 < row.cells.length; index += 2) {
+      const label = plainText(row.cells[index]);
+      const value = plainText(row.cells[index + 1]);
+      if (label && value) values.set(label, value);
+    }
   }
   return values;
 };
@@ -274,8 +316,17 @@ const tableRows = (table: string): HtmlRow[] =>
       cells: Array.from(
         match[2].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/gi),
       ).map((cell) => cell[1]),
+      content: match[2],
     }),
   );
+
+const isKnownEmptyListRow = (row: HtmlRow): boolean =>
+  /^\s*<td\b[^>]*\bcolspan\s*=\s*(["'])8\1[^>]*>\s*해당 자료가 없음\s*<\/td>\s*$/i.test(
+    row.content,
+  );
+
+const isKnownEmptyFileRow = (row: HtmlRow): boolean =>
+  /^\s*<td\b[^>]*>\s*첨부파일이 없습니다\.?\s*<\/td>\s*$/i.test(row.content);
 
 const attributeValue = (element: string, name: string): string | null => {
   const match = element.match(
