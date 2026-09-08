@@ -259,6 +259,34 @@ const document = (
   });
 };
 
+const lhDocument = (
+  overrides: Partial<TenderDocumentReference> = {},
+): TenderDocumentReference => {
+  const url = new URL(
+    "https://ebid.lh.or.kr/ebid.framework.download.dev",
+  );
+  url.searchParams.set("noticeId", "2603251");
+  url.searchParams.set("revision", "00");
+  url.searchParams.set("sequence", "10");
+  url.searchParams.set("displayName", "공고문.zip");
+  url.searchParams.set("savedName", "20260901_notice.zip");
+  return issueTenderDocumentReference({
+    identity: "LH:2603251:00:10",
+    url: url.toString(),
+    displayName: "공고문.zip",
+    formatHint: "ZIP",
+    source: "LH_PAGE",
+    sourceNoticeId: "2603251",
+    revision: "00",
+    evidence: {
+      source: "LH_PAGE",
+      operation: "LH_NOTICE_DOCUMENTS",
+      field: "attachment:10",
+    },
+    ...overrides,
+  });
+};
+
 describe("TenderDocumentFetcher", () => {
   let server: Server;
   let origin: string;
@@ -461,6 +489,88 @@ describe("TenderDocumentFetcher", () => {
       "detectedFormat",
       "sha256",
     ]);
+  });
+
+  it("POSTs the exact LH form body after validating issued query metadata", async () => {
+    let requestedUrl = "";
+    let requestedInit: RequestInit | undefined;
+    const zipBytes = createStoredZip(["readme.txt"]);
+    const fetcher = new TenderDocumentFetcher({
+      resolveHost: async () => ["8.8.8.8"],
+      fetcher: async (url, init) => {
+        requestedUrl = url;
+        requestedInit = init;
+        return new Response(zipBytes, {
+          status: 200,
+          headers: { "content-type": "application/zip" },
+        });
+      },
+    });
+
+    await expect(
+      fetcher.fetch(lhDocument(), new AbortController().signal),
+    ).resolves.toMatchObject({ detectedFormat: "ZIP" });
+    expect(requestedUrl).toBe(
+      "https://ebid.lh.or.kr/ebid.framework.download.dev",
+    );
+    expect(requestedInit).toMatchObject({
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: "download.filespec=bidinfo&download.filename=%EA%B3%B5%EA%B3%A0%EB%AC%B8.zip&download.savedname=20260901_notice.zip&download.bidnum=",
+    });
+  });
+
+  it.each([
+    ["host", { url: lhDocument().url.replace("ebid.lh.or.kr", "evil.example") }],
+    ["path", { url: lhDocument().url.replace("download.dev", "download2.dev") }],
+    ["identity", { identity: "LH:2603251:00:11" }],
+    ["evidence", { evidence: { source: "LH_PAGE", operation: "LH_NOTICE_DOCUMENTS", field: "attachment:11" } }],
+    ["display name", { displayName: "다른파일.zip" }],
+    ["format hint", { formatHint: "PDF" }],
+    [
+      "unsafe display metadata",
+      (() => {
+        const url = new URL(lhDocument().url);
+        url.searchParams.set("displayName", "bad\r\nname.zip");
+        return { url: url.toString(), displayName: "bad\r\nname.zip" };
+      })(),
+    ],
+    ["query key", { url: `${lhDocument().url}&method=GET` }],
+    ["duplicate query", { url: `${lhDocument().url}&sequence=10` }],
+  ] as const)("rejects an LH reference with mismatched %s before transport", async (_label, overrides) => {
+    const transport = jest.fn();
+    const fetcher = new TenderDocumentFetcher({
+      resolveHost: async () => ["8.8.8.8"],
+      fetcher: transport,
+    });
+
+    await expect(
+      fetcher.fetch(
+        lhDocument(overrides as Partial<TenderDocumentReference>),
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it("rejects a method-changing LH redirect without replaying the request", async () => {
+    const transport = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: lhDocument().url } }),
+      );
+    const fetcher = new TenderDocumentFetcher({
+      resolveHost: async () => ["8.8.8.8"],
+      fetcher: transport,
+    });
+
+    await expect(
+      fetcher.fetch(lhDocument(), new AbortController().signal),
+    ).rejects.toMatchObject({ code: "DOCUMENT_OFF_ALLOWLIST" });
+    expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it.each([

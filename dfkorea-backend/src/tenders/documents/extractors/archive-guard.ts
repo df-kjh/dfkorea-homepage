@@ -114,6 +114,9 @@ export function readBoundedZip(buffer: Buffer): Map<string, Buffer> {
       if (
         files.has(name) ||
         name.includes("\0") ||
+        name.includes("\\") ||
+        Buffer.byteLength(name, "utf8") > 512 ||
+        /^[A-Za-z]:\//.test(name) ||
         name.split("/").includes("..") ||
         name.startsWith("/")
       )

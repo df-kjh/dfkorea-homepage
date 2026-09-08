@@ -8,10 +8,22 @@ export const G2B_TENDER_ENRICHMENT_ADAPTER = Symbol(
 export const KAPT_TENDER_ENRICHMENT_ADAPTER = Symbol(
   "KAPT_TENDER_ENRICHMENT_ADAPTER",
 );
+export const LH_TENDER_ENRICHMENT_ADAPTER = Symbol(
+  "LH_TENDER_ENRICHMENT_ADAPTER",
+);
 export const TENDER_DOCUMENT_FETCHER = Symbol("TENDER_DOCUMENT_FETCHER");
 
-export type TenderEnrichmentEvidenceSource = "G2B_API" | "KAPT_PAGE";
-export type TenderDocumentFormat = "PDF" | "HWP" | "HWPX" | "DOCX" | "XLSX";
+export type TenderEnrichmentEvidenceSource =
+  | "G2B_API"
+  | "KAPT_PAGE"
+  | "LH_PAGE";
+export type TenderDocumentFormat =
+  | "PDF"
+  | "HWP"
+  | "HWPX"
+  | "DOCX"
+  | "XLSX"
+  | "ZIP";
 export type TenderLawKind = "NATIONAL" | "LOCAL" | "OTHER";
 
 export interface EvidenceRef {

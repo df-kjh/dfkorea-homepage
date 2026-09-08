@@ -35,12 +35,14 @@ import {
   emptyTenderEnrichment,
   G2B_TENDER_ENRICHMENT_ADAPTER,
   KAPT_TENDER_ENRICHMENT_ADAPTER,
+  LH_TENDER_ENRICHMENT_ADAPTER,
   TENDER_DOCUMENT_FETCHER,
 } from "../domain/tender-enrichment";
 import type {
   TenderDocumentFetcherContract,
   TenderEnrichmentAdapter,
 } from "../domain/tender-enrichment";
+import type { TenderPricingContext } from "../domain/tender-price-analyzer";
 import { TenderDocumentTextExtractor } from "../documents/tender-document-extractor";
 import { TenderDocumentExtractionError } from "../documents/tender-document-extraction.types";
 import { TenderRequirementParser } from "../domain/tender-requirement-parser";
@@ -81,6 +83,35 @@ const productSelection = {
   colorRendering: true,
 } as const;
 
+interface TenderEnrichmentAdapters {
+  g2b: TenderEnrichmentAdapter;
+  kapt: TenderEnrichmentAdapter;
+  lh: TenderEnrichmentAdapter;
+}
+
+export const selectTenderEnrichmentAdapter = (
+  source: TenderSource,
+  adapters: TenderEnrichmentAdapters,
+): TenderEnrichmentAdapter | null =>
+  source === TenderSource.G2B
+    ? adapters.g2b
+    : source === TenderSource.KAPT
+      ? adapters.kapt
+      : source === TenderSource.LH
+        ? adapters.lh
+        : null;
+
+export const canLoadTenderAwardHistory = (
+  source: TenderSource,
+  context: Omit<TenderPricingContext, "source" | "now"> | undefined,
+  itemCount: number,
+): boolean =>
+  source !== TenderSource.LH &&
+  context?.contractKind === "TOTAL" &&
+  context.currency === "KRW" &&
+  Boolean(context.awardMethod) &&
+  itemCount === 1;
+
 @Injectable()
 export class TenderAnalysisService {
   constructor(
@@ -89,6 +120,8 @@ export class TenderAnalysisService {
     private readonly g2b: TenderEnrichmentAdapter,
     @Inject(KAPT_TENDER_ENRICHMENT_ADAPTER)
     private readonly kapt: TenderEnrichmentAdapter,
+    @Inject(LH_TENDER_ENRICHMENT_ADAPTER)
+    private readonly lh: TenderEnrichmentAdapter,
     @Inject(TENDER_DOCUMENT_FETCHER)
     private readonly fetcher: TenderDocumentFetcherContract,
     private readonly extractor: TenderDocumentTextExtractor,
@@ -154,9 +187,10 @@ export class TenderAnalysisService {
         .createQueryBuilder("tender")
         .where("tender.registeredAt >= :since", { since })
         .andWhere(
-          "(tender.source = :kapt OR (tender.source = :g2b AND tender.procurementType = :goods))",
+          "(tender.source = :kapt OR tender.source = :lh OR (tender.source = :g2b AND tender.procurementType = :goods))",
           {
             kapt: TenderSource.KAPT,
+            lh: TenderSource.LH,
             g2b: TenderSource.G2B,
             goods: ProcurementType.GOODS,
           },
@@ -431,12 +465,11 @@ export class TenderAnalysisService {
     let failed = false;
     let enrichment = emptyTenderEnrichment();
     try {
-      const adapter =
-        tender.source === TenderSource.G2B
-          ? this.g2b
-          : tender.source === TenderSource.KAPT
-            ? this.kapt
-            : null;
+      const adapter = selectTenderEnrichmentAdapter(tender.source, {
+        g2b: this.g2b,
+        kapt: this.kapt,
+        lh: this.lh,
+      });
       if (!adapter) failed = true;
       else
         enrichment = await adapter.enrich(
@@ -612,10 +645,11 @@ export class TenderAnalysisService {
       // absent or ambiguous metadata still cannot enable calculation.
       const context = enrichment.pricingContext;
       const history =
-        context?.contractKind === "TOTAL" &&
-        context.currency === "KRW" &&
-        context.awardMethod &&
-        requirements.items.length === 1
+        canLoadTenderAwardHistory(
+          tender.source,
+          context,
+          requirements.items.length,
+        )
           ? await this.db.getRepository(TenderAwardResult).find({
               where: {
                 source: tender.source,
@@ -639,7 +673,12 @@ export class TenderAnalysisService {
             currency: "UNKNOWN",
             formulaKind: "UNKNOWN",
             ...context,
-            source: tender.source === TenderSource.KAPT ? "KAPT" : "G2B",
+            source:
+              tender.source === TenderSource.KAPT
+                ? "KAPT"
+                : tender.source === TenderSource.LH
+                  ? "LH"
+                  : "G2B",
             now,
           },
         },

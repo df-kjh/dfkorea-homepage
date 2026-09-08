@@ -1,7 +1,7 @@
 import { ParsedTenderRequirements } from "./tender-requirement";
 import { TenderAwardResult } from "../entities/tender-award-result.entity";
 export interface TenderPricingContext {
-  source: "G2B" | "KAPT";
+  source: "G2B" | "KAPT" | "LH";
   contractKind: "TOTAL" | "UNIT" | "MIXED" | "UNKNOWN";
   currency: "KRW" | "UNKNOWN";
   formulaKind: "STANDARD" | "A_VALUE" | "SPECIAL" | "UNKNOWN";

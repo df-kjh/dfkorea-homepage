@@ -18,6 +18,8 @@ const MAX_REDIRECTS = 3;
 const MAX_CONTAINER_ENTRIES = 4_096;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const KAPT_HOSTS = new Set(["k-apt.go.kr", "www.k-apt.go.kr"]);
+const LH_HOST = "ebid.lh.or.kr";
+const LH_DOWNLOAD_PATH = "/ebid.framework.download.dev";
 const ZIP_COMMON_FLAGS = 0x0808;
 // PKWARE APPNOTE 4.4.4 assigns bits 1-2 to compression-speed hints only
 // for Deflate. The same bits describe unsupported features for other methods.
@@ -59,6 +61,18 @@ export interface TenderDocumentFetcherOptions {
 const offAllowlist = () =>
   new TenderDocumentFetchError("DOCUMENT_OFF_ALLOWLIST");
 
+const formatFromName = (name: string): TenderDocumentFormat | null => {
+  const extension = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toUpperCase();
+  return extension === "PDF" ||
+    extension === "HWP" ||
+    extension === "HWPX" ||
+    extension === "DOCX" ||
+    extension === "XLSX" ||
+    extension === "ZIP"
+    ? extension
+    : null;
+};
+
 const defaultResolveHost: ResolveHost = async (hostname) =>
   (await dns.lookup(hostname, { all: true, verbatim: true })).map(
     ({ address }) => address,
@@ -67,11 +81,12 @@ const defaultResolveHost: ResolveHost = async (hostname) =>
 const defaultFetcher: Fetcher = (urlText, init, validatedAddress) =>
   new Promise<Response>((resolve, reject) => {
     const url = new URL(urlText);
+    const headers = new Headers(init.headers);
     const request = httpsRequest(
       url,
       {
-        method: "GET",
-        headers: { accept: "*/*" },
+        method: init.method ?? "GET",
+        headers: Object.fromEntries(headers.entries()),
         signal: init.signal ?? undefined,
         servername: url.hostname,
         lookup: (_hostname, options, callback) => {
@@ -115,6 +130,7 @@ const defaultFetcher: Fetcher = (urlText, init, validatedAddress) =>
       },
     );
     request.once("error", reject);
+    if (typeof init.body === "string") request.write(init.body);
     request.end();
   });
 
@@ -152,9 +168,10 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         );
         let response: Response;
         try {
+          const init = this.requestInit(document, controller.signal);
           response = await this.fetcher(
-            currentUrl.toString(),
-            { method: "GET", redirect: "manual", signal: controller.signal },
+            this.transportUrl(currentUrl, document),
+            init,
             address,
           );
         } catch (error) {
@@ -177,6 +194,14 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
           await response.body?.cancel().catch(() => undefined);
           if (!location) {
             throw new TenderDocumentFetchError("DOCUMENT_HTTP_ERROR");
+          }
+          if (
+            document.source === "LH_PAGE" &&
+            (response.status === 301 ||
+              response.status === 302 ||
+              response.status === 303)
+          ) {
+            throw offAllowlist();
           }
           try {
             currentUrl = this.validateUrl(
@@ -265,6 +290,8 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         ) {
           throw offAllowlist();
         }
+      } else if (document.source === "LH_PAGE") {
+        this.validateLhReference(url, document);
       } else {
         throw offAllowlist();
       }
@@ -273,6 +300,88 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
       if (error instanceof TenderDocumentFetchError) throw error;
       throw offAllowlist();
     }
+  }
+
+  private validateLhReference(
+    url: URL,
+    document: TenderDocumentReference,
+  ): void {
+    const sequence = /^attachment:([1-9]\d{0,31})$/.exec(
+      document.evidence.field,
+    )?.[1];
+    const keys = [
+      "noticeId",
+      "revision",
+      "sequence",
+      "displayName",
+      "savedName",
+    ];
+    const savedName = url.searchParams.get("savedName");
+    if (
+      url.hostname !== LH_HOST ||
+      url.pathname !== LH_DOWNLOAD_PATH ||
+      document.evidence.source !== "LH_PAGE" ||
+      document.evidence.operation !== "LH_NOTICE_DOCUMENTS" ||
+      !sequence ||
+      document.identity !==
+        `LH:${document.sourceNoticeId}:${document.revision}:${sequence}` ||
+      [...url.searchParams.keys()].length !== keys.length ||
+      [...url.searchParams.keys()].some(
+        (key) => !keys.includes(key) || url.searchParams.getAll(key).length !== 1,
+      ) ||
+      url.searchParams.get("noticeId") !== document.sourceNoticeId ||
+      url.searchParams.get("revision") !== document.revision ||
+      url.searchParams.get("sequence") !== sequence ||
+      url.searchParams.get("displayName") !== document.displayName ||
+      document.displayName.length === 0 ||
+      document.displayName.length > 512 ||
+      /[\0\r\n]/.test(document.displayName) ||
+      document.formatHint !== formatFromName(document.displayName) ||
+      !savedName ||
+      savedName.length > 512 ||
+      /[\0\r\n\\/]/.test(savedName) ||
+      savedName === "." ||
+      savedName === ".."
+    ) {
+      throw offAllowlist();
+    }
+  }
+
+  private requestInit(
+    document: TenderDocumentReference,
+    signal: AbortSignal,
+  ): RequestInit {
+    if (document.source !== "LH_PAGE") {
+      return {
+        method: "GET",
+        headers: { accept: "*/*" },
+        redirect: "manual",
+        signal,
+      };
+    }
+    const metadata = new URL(document.url).searchParams;
+    const body = new URLSearchParams();
+    body.set("download.filespec", "bidinfo");
+    body.set("download.filename", metadata.get("displayName")!);
+    body.set("download.savedname", metadata.get("savedName")!);
+    body.set("download.bidnum", "");
+    return {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: body.toString(),
+      redirect: "manual",
+      signal,
+    };
+  }
+
+  private transportUrl(
+    url: URL,
+    document: TenderDocumentReference,
+  ): string {
+    if (document.source !== "LH_PAGE") return url.toString();
+    return `${url.origin}${url.pathname}`;
   }
 
   private async resolveAndValidate(
@@ -409,6 +518,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
       ) {
         return "XLSX";
       }
+      return "ZIP";
     }
     throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");
   }
@@ -862,6 +972,7 @@ export class TenderDocumentFetcher implements TenderDocumentFetcherContract {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/zip",
       ]),
+      ZIP: new Set(["application/zip", "application/x-zip-compressed"]),
     };
     if (!allowedMime[detected].has(contentType)) {
       throw new TenderDocumentFetchError("DOCUMENT_FORMAT_MISMATCH");

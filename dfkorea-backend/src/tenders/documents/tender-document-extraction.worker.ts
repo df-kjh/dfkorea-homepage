@@ -9,13 +9,16 @@ import { HwpDocumentExtractor } from "./extractors/hwp-document.extractor";
 import { PdfDocumentExtractor } from "./extractors/pdf-document.extractor";
 import { DocxDocumentExtractor } from "./extractors/docx-document.extractor";
 import { XlsxDocumentExtractor } from "./extractors/xlsx-document.extractor";
+import { ZipDocumentExtractor } from "./extractors/zip-document.extractor";
 
 async function run(): Promise<void> {
   const input = workerData as ExtractionInput,
     bytes = Buffer.from(input.bytes),
     context = new ExtractionContext();
   try {
-    const archive = ["HWPX", "DOCX", "XLSX"].includes(input.detectedFormat)
+    const archive = ["HWPX", "DOCX", "XLSX", "ZIP"].includes(
+      input.detectedFormat,
+    )
       ? readBoundedZip(bytes)
       : undefined;
     switch (input.detectedFormat) {
@@ -31,6 +34,9 @@ async function run(): Promise<void> {
         break;
       case "XLSX":
         await new XlsxDocumentExtractor().extract(bytes, context, archive!);
+        break;
+      case "ZIP":
+        await new ZipDocumentExtractor().extract(bytes, context, archive!);
         break;
       default:
         throw new TenderDocumentExtractionError("DOCUMENT_UNSUPPORTED");

@@ -23,6 +23,37 @@ const rows = [
   ["광효율", "130 lm/W 이상"],
 ];
 
+const createZipBundle = async (
+  entries: Array<[string, Buffer]>,
+): Promise<Buffer> => {
+  const zip = new JSZip();
+  for (const [name, contents] of entries) zip.file(name, contents);
+  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+};
+
+const replaceZipName = (zip: Buffer, from: string, to: string): Buffer => {
+  if (Buffer.byteLength(from) !== Buffer.byteLength(to)) throw new Error();
+  const copy = Buffer.from(zip);
+  let offset = 0;
+  let replaced = 0;
+  while ((offset = copy.indexOf(from, offset, "utf8")) >= 0) {
+    copy.write(to, offset, "utf8");
+    offset += Buffer.byteLength(to);
+    replaced += 1;
+  }
+  if (replaced !== 2) throw new Error(`unexpected ZIP name count: ${replaced}`);
+  return copy;
+};
+
+const markFirstZipEntryEncrypted = (zip: Buffer): Buffer => {
+  const copy = Buffer.from(zip);
+  const end = copy.length - 22;
+  const central = copy.readUInt32LE(end + 16);
+  copy.writeUInt16LE(copy.readUInt16LE(6) | 1, 6);
+  copy.writeUInt16LE(copy.readUInt16LE(central + 8) | 1, central + 8);
+  return copy;
+};
+
 describe("TenderDocumentTextExtractor", () => {
   jest.setTimeout(30_000);
   const extractor = new TenderDocumentTextExtractor();
@@ -243,6 +274,91 @@ describe("TenderDocumentTextExtractor", () => {
       code: "DOCUMENT_OCR_REQUIRED",
       status: "UNSUPPORTED",
     });
+  });
+
+  it("extracts supported top-level ZIP members with member-prefixed locations and marks unsupported siblings partial", async () => {
+    const bundle = await createZipBundle([
+      ["requirements.docx", Buffer.from(fixture("sample.docx").bytes)],
+      ["notes.txt", Buffer.from("unsupported")],
+    ]);
+
+    const result = await extractor.extract({
+      bytes: bundle,
+      detectedFormat: "ZIP",
+    });
+
+    expect(result.status).toBe("PARTIAL");
+    expect(result.blocks).toHaveLength(4);
+    expect(result.blocks[0]).toMatchObject({
+      kind: "text",
+      text: "소비전력 50W 이하",
+      location: "requirements.docx::body/paragraph:1",
+    });
+    expect(result.blocks[3]).toMatchObject({
+      kind: "table",
+      rows,
+      location: "requirements.docx::body/table:1",
+    });
+  });
+
+  it("rejects a nested ZIP member instead of recursively expanding it", async () => {
+    const inner = await createZipBundle([
+      ["requirements.docx", Buffer.from(fixture("sample.docx").bytes)],
+    ]);
+    const outer = await createZipBundle([["nested.zip", inner]]);
+
+    await expect(
+      extractor.extract({ bytes: outer, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_UNSUPPORTED" });
+  });
+
+  it("rejects ZIP traversal and encrypted members with stable bounded errors", async () => {
+    const safe = await createZipBundle([["safe.txt", Buffer.from("fixture")]]);
+    const traversal = replaceZipName(safe, "safe.txt", "../x.txt");
+    const windowsTraversal = replaceZipName(safe, "safe.txt", "..\\x.txt");
+    const driveTraversal = replaceZipName(safe, "safe.txt", "C:/x.txt");
+    const encrypted = markFirstZipEntryEncrypted(safe);
+
+    await expect(
+      extractor.extract({ bytes: traversal, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_CORRUPT" });
+    await expect(
+      extractor.extract({ bytes: windowsTraversal, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_CORRUPT" });
+    await expect(
+      extractor.extract({ bytes: driveTraversal, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_CORRUPT" });
+    await expect(
+      extractor.extract({ bytes: encrypted, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_ENCRYPTED" });
+  });
+
+  it("rejects overlong ZIP member locations before document parsing", async () => {
+    const archive = await createZipBundle([
+      [`${"a".repeat(513)}.txt`, Buffer.from("fixture")],
+    ]);
+
+    await expect(
+      extractor.extract({ bytes: archive, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_CORRUPT" });
+  });
+
+  it("rejects ZIP entry-count and expanded-byte limit violations", async () => {
+    const entries = new JSZip();
+    for (let index = 0; index < 4097; index += 1) {
+      entries.file(`entry-${index}.txt`, "");
+    }
+    const tooMany = await entries.generateAsync({ type: "nodebuffer" });
+    const expanded = await createZipBundle([
+      ["large.bin", Buffer.alloc(40 * 1024 * 1024 + 1)],
+    ]);
+
+    await expect(
+      extractor.extract({ bytes: tooMany, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_ARCHIVE_LIMIT" });
+    await expect(
+      extractor.extract({ bytes: expanded, detectedFormat: "ZIP" }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_ARCHIVE_LIMIT" });
   });
   it("preserves text from mixed text/image pages as a partial result", async () => {
     const result = await extractor.extract(fixture("partial.pdf"));

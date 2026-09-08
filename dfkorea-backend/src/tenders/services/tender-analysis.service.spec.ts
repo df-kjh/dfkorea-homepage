@@ -19,7 +19,11 @@ import { TenderDocument } from "../entities/tender-document.entity";
 import { TenderCompanyProfile } from "../entities/tender-company-profile.entity";
 import { TenderAwardResult } from "../entities/tender-award-result.entity";
 import { TenderCompanyProfileService } from "./tender-company-profile.service";
-import { TenderAnalysisService } from "./tender-analysis.service";
+import {
+  canLoadTenderAwardHistory,
+  selectTenderEnrichmentAdapter,
+  TenderAnalysisService,
+} from "./tender-analysis.service";
 import { TenderPriceAnalyzer } from "../domain/tender-price-analyzer";
 import {
   emptyTenderEnrichment,
@@ -31,6 +35,33 @@ import {
   TenderSource,
 } from "../domain/tender.enums";
 
+describe("LH analysis routing", () => {
+  it("selects the LH enrichment adapter by exact source", () => {
+    const g2b = { enrich: jest.fn() };
+    const kapt = { enrich: jest.fn() };
+    const lh = { enrich: jest.fn() };
+
+    expect(
+      selectTenderEnrichmentAdapter(TenderSource.LH, { g2b, kapt, lh }),
+    ).toBe(lh);
+  });
+
+  it("never enables award history for LH even with otherwise comparable metadata", () => {
+    expect(
+      canLoadTenderAwardHistory(
+        TenderSource.LH,
+        {
+          contractKind: "TOTAL",
+          currency: "KRW",
+          formulaKind: "STANDARD",
+          awardMethod: "적격심사",
+        },
+        1,
+      ),
+    ).toBe(false);
+  });
+});
+
 const databaseUrl = process.env.TASK7_TEST_DATABASE_URL;
 const postgres = databaseUrl ? describe : describe.skip;
 postgres("analysis PostgreSQL leases and input invalidation", () => {
@@ -39,6 +70,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
   let tender: Tender;
   let enrichment: TenderEnrichment;
   let enrich: jest.Mock;
+  let lhEnrich: jest.Mock;
   let fetch: jest.Mock;
   let extract: jest.Mock;
   let profile: TenderCompanyProfileService;
@@ -141,6 +173,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       },
     ];
     enrich = jest.fn(async () => enrichment);
+    lhEnrich = jest.fn(async () => enrichment);
     fetch = jest.fn(async () => ({
       bytes: new Uint8Array([1]),
       detectedFormat: "DOCX",
@@ -158,6 +191,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       db,
       { enrich } as never,
       { enrich } as never,
+      { enrich: lhEnrich } as never,
       { fetch },
       { extract } as never,
       profile,
@@ -196,6 +230,12 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       TenderSource.KAPT,
       ProcurementType.SERVICE,
     );
+    const includedLh = await saveHistoricalTender(
+      "included-lh",
+      new Date(cutoff.getTime() + 2),
+      TenderSource.LH,
+      ProcurementType.GOODS,
+    );
     await saveHistoricalTender(
       "before-cutoff",
       new Date(cutoff.getTime() - 1),
@@ -214,13 +254,13 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     );
 
     await expect(service.queueMissingAnalysesSince(cutoff, 50)).resolves.toEqual(
-      { queuedCount: 2 },
+      { queuedCount: 3 },
     );
     const queued = await db.getRepository(TenderAnalysis).find({
       order: { createdAt: "ASC", id: "ASC" },
     });
     expect(new Set(queued.map(({ tenderId }) => tenderId))).toEqual(
-      new Set([includedG2b.id, includedKapt.id]),
+      new Set([includedG2b.id, includedKapt.id, includedLh.id]),
     );
   });
 
@@ -419,6 +459,61 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
     }
   });
 
+  it("routes LH through its enrichment adapter without loading LH award history", async () => {
+    await db.getRepository(Tender).update(tender.id, {
+      source: TenderSource.LH,
+      sourceNoticeId: "2603251",
+      revision: "00",
+    });
+    enrichment.basisAmount = {
+      value: "100000000",
+      evidence: {
+        source: "LH_PAGE",
+        operation: "LH_NOTICE_DETAIL",
+        field: "basisAmount",
+      },
+    };
+    enrichment.pricingContext = {
+      contractKind: "TOTAL",
+      currency: "KRW",
+      formulaKind: "STANDARD",
+      awardMethod: "적격심사",
+    };
+    await db.getRepository(TenderAwardResult).save(
+      Array.from({ length: 15 }, (_, index) => ({
+        source: TenderSource.LH,
+        sourceNoticeId: `lh-award-${index}`,
+        revision: "00",
+        productClassification: "3911210201",
+        productGroup: "LED",
+        awardMethod: "적격심사",
+        region: null,
+        openedAt: new Date(now.getTime() - 86_400_000),
+        basisAmount: "100000000",
+        expectedPrice: "100000000",
+        winningAmount: "90000000",
+        adjustmentRate: "1",
+        winningRate: "0.9",
+        isFinalAward: true,
+        isFailedBid: false,
+      })),
+    );
+
+    await service.reanalyze(tender.id, now);
+    await service.processDue(now, 1);
+
+    expect(lhEnrich).toHaveBeenCalledTimes(1);
+    expect(enrich).not.toHaveBeenCalled();
+    expect(await service.getAnalysis(tender.id)).toMatchObject({
+      priceAnalysis: {
+        statistics: {
+          status: "INSUFFICIENT_SAMPLES",
+          sampleCount: 0,
+        },
+      },
+    });
+  });
+
   it("loads stored awards and computes AVAILABLE prices through the actual G2B adapter", async () => {
     const fixture = JSON.parse(
       readFileSync(
@@ -444,6 +539,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
       db,
       adapter,
       { enrich } as never,
+      { enrich: lhEnrich } as never,
       { fetch },
       { extract } as never,
       profile,
@@ -531,6 +627,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
         serviceKey: "fixture",
       }),
       { enrich } as never,
+      { enrich: lhEnrich } as never,
       { fetch },
       { extract } as never,
       profile,
@@ -612,6 +709,7 @@ postgres("analysis PostgreSQL leases and input invalidation", () => {
           serviceKey: "fixture",
         }),
         { enrich } as never,
+        { enrich: lhEnrich } as never,
         { fetch },
         { extract } as never,
         profile,

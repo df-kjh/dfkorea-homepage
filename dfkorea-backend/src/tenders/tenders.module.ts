@@ -25,11 +25,13 @@ import { KepcoTenderAdapter } from "./adapters/kepco-tender.adapter";
 import { LhTenderAdapter } from "./adapters/lh-tender.adapter";
 import { G2bEnrichmentAdapter } from "./adapters/g2b-enrichment.adapter";
 import { KaptEnrichmentAdapter } from "./adapters/kapt-enrichment.adapter";
+import { LhEnrichmentAdapter } from "./adapters/lh-enrichment.adapter";
 import { TenderClassifier } from "./domain/tender-classifier";
 import { TENDER_SOURCE_ADAPTERS } from "./domain/tender-source.adapter";
 import {
   G2B_TENDER_ENRICHMENT_ADAPTER,
   KAPT_TENDER_ENRICHMENT_ADAPTER,
+  LH_TENDER_ENRICHMENT_ADAPTER,
   TENDER_DOCUMENT_FETCHER,
   TENDER_ENRICHMENT_ADAPTERS,
   toSafeProviderResultCode,
@@ -258,9 +260,17 @@ const createSafeRetryLogger = (context: string) => {
       useFactory: () => new KaptEnrichmentAdapter(),
     },
     {
+      provide: LH_TENDER_ENRICHMENT_ADAPTER,
+      useFactory: () => new LhEnrichmentAdapter(),
+    },
+    {
       provide: TENDER_ENRICHMENT_ADAPTERS,
-      inject: [G2B_TENDER_ENRICHMENT_ADAPTER, KAPT_TENDER_ENRICHMENT_ADAPTER],
-      useFactory: (g2b, kapt) => [g2b, kapt],
+      inject: [
+        G2B_TENDER_ENRICHMENT_ADAPTER,
+        KAPT_TENDER_ENRICHMENT_ADAPTER,
+        LH_TENDER_ENRICHMENT_ADAPTER,
+      ],
+      useFactory: (g2b, kapt, lh) => [g2b, kapt, lh],
     },
     {
       provide: TENDER_DOCUMENT_FETCHER,
@@ -295,6 +305,7 @@ const createSafeRetryLogger = (context: string) => {
     TenderCompanyProfileService,
     G2B_TENDER_ENRICHMENT_ADAPTER,
     KAPT_TENDER_ENRICHMENT_ADAPTER,
+    LH_TENDER_ENRICHMENT_ADAPTER,
     TENDER_ENRICHMENT_ADAPTERS,
     TENDER_DOCUMENT_FETCHER,
   ],
