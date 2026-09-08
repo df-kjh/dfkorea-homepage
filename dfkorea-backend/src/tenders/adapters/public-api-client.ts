@@ -6,6 +6,7 @@ export type { TenderResponseShape } from "../domain/tender-source.adapter";
 export const G2B_TENDER_ADAPTER = Symbol("G2B_TENDER_ADAPTER");
 export const KAPT_TENDER_ADAPTER = Symbol("KAPT_TENDER_ADAPTER");
 export const KEPCO_TENDER_ADAPTER = Symbol("KEPCO_TENDER_ADAPTER");
+export const LH_TENDER_ADAPTER = Symbol("LH_TENDER_ADAPTER");
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
@@ -21,7 +22,9 @@ export type TenderSourceErrorCode =
   | "HTTP_ERROR"
   | "INVALID_RESPONSE"
   | "PROVIDER_RESULT_ERROR"
-  | "PAGINATION_LIMIT";
+  | "PAGINATION_LIMIT"
+  | "RESPONSE_TOO_LARGE"
+  | "UNSAFE_REDIRECT";
 
 /**
  * Error details intentionally exclude URLs, query strings, and provider bodies
@@ -67,6 +70,217 @@ export interface TenderApiClient {
   getAllPages<T extends Record<string, unknown>>(
     request: PublicApiRequest,
   ): Promise<T[]>;
+}
+
+export interface LhHtmlRequest {
+  source: TenderSource.LH;
+  operation: "list" | "detail";
+  baseUrl: string;
+  path: string;
+  method: "GET" | "POST";
+  form?: Record<string, string>;
+}
+
+/** The adapter depends on this narrow boundary so its parser can be tested without HTTP. */
+export interface LhHtmlClient {
+  request(request: LhHtmlRequest): Promise<string>;
+}
+
+const LH_HOST = "ebid.lh.or.kr";
+const DEFAULT_LH_HTML_BODY_LIMIT_BYTES = 1_000_000;
+
+/**
+ * Fetches only the public LH host and buffers a bounded HTML body. Redirects
+ * are followed manually so every hop can be checked before its body is read.
+ */
+export class BoundedLhHtmlClient implements LhHtmlClient {
+  constructor(
+    private readonly fetcher: Fetcher = globalThis.fetch,
+    maximumBodyBytes = DEFAULT_LH_HTML_BODY_LIMIT_BYTES,
+  ) {
+    this.maximumBodyBytes =
+      Number.isSafeInteger(maximumBodyBytes) && maximumBodyBytes > 0
+        ? maximumBodyBytes
+        : DEFAULT_LH_HTML_BODY_LIMIT_BYTES;
+  }
+
+  private readonly maximumBodyBytes: number;
+
+  async request(request: LhHtmlRequest): Promise<string> {
+    let url = this.safeUrl(request);
+    let method = request.method;
+
+    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+      let response: Response;
+      try {
+        response = await this.fetcher(
+          url.toString(),
+          this.requestInit(method, request),
+        );
+      } catch (error) {
+        throw new TenderSourceError(
+          TenderSource.LH,
+          "NETWORK_ERROR",
+          null,
+          error,
+          request.operation,
+        );
+      }
+
+      if (this.isRedirect(response.status)) {
+        const location = response.headers.get("location");
+        if (!location || redirectCount === 5) {
+          throw this.unsafeRedirect(request.operation, response.status);
+        }
+        url = this.redirectUrl(
+          location,
+          url,
+          request.operation,
+          response.status,
+        );
+        // Fetch switches POST to GET for 301, 302, and 303. Preserve POST only
+        // for the status codes that explicitly require replaying its form body.
+        if (
+          method === "POST" &&
+          (response.status === 301 ||
+            response.status === 302 ||
+            response.status === 303)
+        ) {
+          method = "GET";
+        }
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new TenderSourceError(
+          TenderSource.LH,
+          "HTTP_ERROR",
+          response.status,
+          undefined,
+          request.operation,
+        );
+      }
+      if (response.url) {
+        this.redirectUrl(response.url, url, request.operation, response.status);
+      }
+      return this.readBoundedBody(response, request.operation);
+    }
+
+    throw this.unsafeRedirect(request.operation, null);
+  }
+
+  private requestInit(
+    method: "GET" | "POST",
+    request: LhHtmlRequest,
+  ): RequestInit {
+    return {
+      method,
+      redirect: "manual",
+      ...(method === "POST"
+        ? {
+            headers: {
+              "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+            },
+            body: new URLSearchParams(request.form ?? {}).toString(),
+          }
+        : {}),
+    };
+  }
+
+  private isRedirect(status: number): boolean {
+    return (
+      status === 301 ||
+      status === 302 ||
+      status === 303 ||
+      status === 307 ||
+      status === 308
+    );
+  }
+
+  private redirectUrl(
+    location: string,
+    baseUrl: URL,
+    operation: LhHtmlRequest["operation"],
+    status: number | null,
+  ): URL {
+    try {
+      const url = new URL(location, baseUrl);
+      if (url.protocol !== "https:" || url.hostname !== LH_HOST) {
+        throw new Error("unsafe LH redirect");
+      }
+      return url;
+    } catch {
+      throw this.unsafeRedirect(operation, status);
+    }
+  }
+
+  private unsafeRedirect(
+    operation: LhHtmlRequest["operation"],
+    status: number | null,
+  ): TenderSourceError {
+    return new TenderSourceError(
+      TenderSource.LH,
+      "UNSAFE_REDIRECT",
+      status,
+      undefined,
+      operation,
+    );
+  }
+
+  private async readBoundedBody(
+    response: Response,
+    operation: LhHtmlRequest["operation"],
+  ): Promise<string> {
+    const contentLength = Number(response.headers.get("content-length"));
+    if (
+      Number.isFinite(contentLength) &&
+      contentLength > this.maximumBodyBytes
+    ) {
+      throw new TenderSourceError(
+        TenderSource.LH,
+        "RESPONSE_TOO_LARGE",
+        response.status,
+        undefined,
+        operation,
+      );
+    }
+
+    const body = await response.arrayBuffer();
+    if (body.byteLength > this.maximumBodyBytes) {
+      throw new TenderSourceError(
+        TenderSource.LH,
+        "RESPONSE_TOO_LARGE",
+        response.status,
+        undefined,
+        operation,
+      );
+    }
+    return new TextDecoder("utf-8").decode(body);
+  }
+
+  private safeUrl(request: LhHtmlRequest): URL {
+    try {
+      const baseUrl = new URL(request.baseUrl);
+      const url = new URL(request.path, baseUrl);
+      if (
+        baseUrl.protocol !== "https:" ||
+        baseUrl.hostname !== LH_HOST ||
+        url.protocol !== "https:" ||
+        url.hostname !== LH_HOST
+      ) {
+        throw new Error("unsafe LH host");
+      }
+      return url;
+    } catch (error) {
+      throw new TenderSourceError(
+        TenderSource.LH,
+        "CONFIGURATION_ERROR",
+        null,
+        error,
+        request.operation,
+      );
+    }
+  }
 }
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;

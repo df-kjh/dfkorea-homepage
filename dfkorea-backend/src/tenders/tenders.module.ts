@@ -13,6 +13,8 @@ import {
   G2B_TENDER_ADAPTER,
   KAPT_TENDER_ADAPTER,
   KEPCO_TENDER_ADAPTER,
+  LH_TENDER_ADAPTER,
+  BoundedLhHtmlClient,
   PublicApiClient,
   PublicApiRetryEvent,
 } from "./adapters/public-api-client";
@@ -20,6 +22,7 @@ import { G2bTenderAdapter } from "./adapters/g2b-tender.adapter";
 import { createG2bRelayFetcher } from "./adapters/g2b-relay.fetcher";
 import { KaptTenderAdapter } from "./adapters/kapt-tender.adapter";
 import { KepcoTenderAdapter } from "./adapters/kepco-tender.adapter";
+import { LhTenderAdapter } from "./adapters/lh-tender.adapter";
 import { G2bEnrichmentAdapter } from "./adapters/g2b-enrichment.adapter";
 import { KaptEnrichmentAdapter } from "./adapters/kapt-enrichment.adapter";
 import { TenderClassifier } from "./domain/tender-classifier";
@@ -192,9 +195,27 @@ const createSafeRetryLogger = (context: string) => {
         }),
     },
     {
+      provide: LH_TENDER_ADAPTER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        new LhTenderAdapter(new BoundedLhHtmlClient(), {
+          enabled: config.get<string>("LH_TENDER_ENABLED") === "true",
+          baseUrl:
+            config.get<string>("LH_TENDER_BASE_URL") ?? "https://ebid.lh.or.kr",
+          requestIntervalMs: Number(
+            config.get<string>("LH_TENDER_REQUEST_INTERVAL_MS") ?? "1500",
+          ),
+        }),
+    },
+    {
       provide: TENDER_SOURCE_ADAPTERS,
-      inject: [G2B_TENDER_ADAPTER, KAPT_TENDER_ADAPTER, KEPCO_TENDER_ADAPTER],
-      useFactory: (g2b, kapt, kepco) => [g2b, kapt, kepco],
+      inject: [
+        G2B_TENDER_ADAPTER,
+        KAPT_TENDER_ADAPTER,
+        KEPCO_TENDER_ADAPTER,
+        LH_TENDER_ADAPTER,
+      ],
+      useFactory: (g2b, kapt, kepco, lh) => [g2b, kapt, kepco, lh],
     },
     {
       provide: G2B_TENDER_ENRICHMENT_ADAPTER,

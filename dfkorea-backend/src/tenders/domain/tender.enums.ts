@@ -2,6 +2,7 @@ export enum TenderSource {
   G2B = "G2B",
   KAPT = "KAPT",
   KEPCO = "KEPCO",
+  LH = "LH",
 }
 
 export enum ProcurementType {
