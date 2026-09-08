@@ -185,8 +185,9 @@ export const parseLhTenderDetail = (
 const parseAttachments = (table: string): LhAttachment[] => {
   const rows = tableRows(table);
   if (rows.length === 1 && isKnownEmptyFileRow(rows[0])) return [];
+  if (rows.length === 0) throw new LhHtmlStructureError();
   return rows.flatMap((row) => {
-    if (!/<td\b/i.test(row.content)) return [];
+    if (!/<td\b/i.test(row.content)) throw new LhHtmlStructureError();
     const match = row.cells
       .join(" ")
       .match(

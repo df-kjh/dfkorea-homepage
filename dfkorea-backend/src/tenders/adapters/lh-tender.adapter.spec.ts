@@ -261,6 +261,29 @@ describe("LhTenderAdapter", () => {
     ).toEqual([]);
   });
 
+  it.each([
+    ["an empty tbody", '<table summary="파일정보"><tbody></tbody></table>'],
+    [
+      "a header-only table",
+      '<table summary="파일정보"><tbody><tr><th>첨부파일</th></tr></tbody></table>',
+    ],
+    [
+      "a th-only unknown row",
+      '<table summary="파일정보"><tbody><tr><th>알 수 없는 파일</th></tr></tbody></table>',
+    ],
+  ])(
+    "rejects %s instead of silently dropping attachments",
+    (_caseName, fileTable) => {
+      const malformedDetail = detailHtml.replace(
+        /<table summary="파일정보">[\s\S]*?<\/table>/,
+        fileTable,
+      );
+      expect(() =>
+        parseLhTenderDetail(malformedDetail, "2603251", "00"),
+      ).toThrow(LhHtmlStructureError);
+    },
+  );
+
   it("rejects a detail page whose tender identity differs from its list row", async () => {
     const client = new StubLhHtmlClient((request) => {
       if (request.operation === "detail") {
