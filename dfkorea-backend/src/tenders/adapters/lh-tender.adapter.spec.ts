@@ -262,10 +262,13 @@ describe("LhTenderAdapter", () => {
   });
 
   it.each([
-    ["an empty tbody", '<table summary="파일정보"><tbody></tbody></table>'],
+    [
+      "an empty tbody",
+      '<table summary="파일정보"><thead><tr><th>문서명</th><th>공고파일명</th></tr></thead><tbody></tbody></table>',
+    ],
     [
       "a header-only table",
-      '<table summary="파일정보"><tbody><tr><th>첨부파일</th></tr></tbody></table>',
+      '<table summary="파일정보"><thead><tr><th>문서명</th><th>공고파일명</th></tr></thead><tbody></tbody></table>',
     ],
     [
       "a th-only unknown row",
@@ -278,6 +281,28 @@ describe("LhTenderAdapter", () => {
         /<table summary="파일정보">[\s\S]*?<\/table>/,
         fileTable,
       );
+      expect(() =>
+        parseLhTenderDetail(malformedDetail, "2603251", "00"),
+      ).toThrow(LhHtmlStructureError);
+    },
+  );
+
+  it.each([
+    ["a missing header", /<thead>[\s\S]*?<\/thead>\s*/],
+    [
+      "a duplicate header",
+      /<tbody>\s*<tr><th>첨부파일/,
+      "<tbody><tr><th>문서명</th><th>공고파일명</th></tr><tr><th>첨부파일",
+    ],
+    [
+      "a header in a data position",
+      /<tr><th>첨부파일<\/th>/,
+      "<tr><th>문서명</th><th>공고파일명</th></tr><tr><th>첨부파일</th>",
+    ],
+  ])(
+    "rejects %s in the public file table",
+    (_caseName, pattern, replacement = "") => {
+      const malformedDetail = detailHtml.replace(pattern, replacement);
       expect(() =>
         parseLhTenderDetail(malformedDetail, "2603251", "00"),
       ).toThrow(LhHtmlStructureError);
@@ -404,24 +429,69 @@ describe("BoundedLhHtmlClient", () => {
     expect(fetcher.mock.calls[1][1]?.body).toBeUndefined();
   });
 
-  it.each(["https://evil.example/path", "http://ebid.lh.or.kr/path", "%"])(
-    "rejects an unsafe redirect target %s",
-    async (location) => {
-      const client = new BoundedLhHtmlClient(() =>
-        Promise.resolve(response("", 302, { location })),
-      );
-      await expect(client.request(htmlRequest)).rejects.toEqual(
-        expect.objectContaining({ code: "UNSAFE_REDIRECT" }),
-      );
-    },
-  );
-
-  it("rejects more than five redirects", async () => {
+  it.each([
+    "https://evil.example/path",
+    "http://ebid.lh.or.kr/path",
+    "http://[::1",
+  ])("rejects an unsafe redirect target %s", async (location) => {
     const client = new BoundedLhHtmlClient(() =>
-      Promise.resolve(response("", 302, { location: "/again" })),
+      Promise.resolve(response("", 302, { location })),
     );
     await expect(client.request(htmlRequest)).rejects.toEqual(
       expect.objectContaining({ code: "UNSAFE_REDIRECT" }),
+    );
+  });
+
+  it.each([
+    "https://evil.example/path",
+    "http://ebid.lh.or.kr/path",
+    "http://[::1",
+  ])("cancels an unsafe redirect response for %s", async (location) => {
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    const unsafeRedirect = {
+      status: 302,
+      ok: false,
+      headers: new Headers({ location }),
+      url: "",
+      body: { cancel },
+    } as unknown as Response;
+
+    await expect(
+      new BoundedLhHtmlClient(() => Promise.resolve(unsafeRedirect)).request(
+        htmlRequest,
+      ),
+    ).rejects.toMatchObject({ code: "UNSAFE_REDIRECT" });
+    await Promise.resolve();
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects more than five redirects", async () => {
+    const cancels = Array.from({ length: 6 }, () =>
+      jest.fn().mockResolvedValue(undefined),
+    );
+    let call = 0;
+    const client = new BoundedLhHtmlClient(() =>
+      Promise.resolve({
+        status: 302,
+        ok: false,
+        headers: new Headers({ location: "/again" }),
+        url: "",
+        body: { cancel: cancels[call++] },
+      } as unknown as Response),
+    );
+    await expect(client.request(htmlRequest)).rejects.toEqual(
+      expect.objectContaining({ code: "UNSAFE_REDIRECT" }),
+    );
+    await Promise.resolve();
+    expect(cancels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          mock: expect.objectContaining({ calls: [[]] }),
+        }),
+      ]),
+    );
+    expect(cancels.every((cancel) => cancel.mock.calls.length === 1)).toBe(
+      true,
     );
   });
 

@@ -183,7 +183,11 @@ export const parseLhTenderDetail = (
 };
 
 const parseAttachments = (table: string): LhAttachment[] => {
-  const rows = tableRows(table).filter((row) => !isKnownFileHeaderRow(row));
+  const [header, ...rows] = tableRows(table);
+  if (!header || !isKnownFileHeaderRow(header)) {
+    throw new LhHtmlStructureError();
+  }
+  if (rows.some(isKnownFileHeaderRow)) throw new LhHtmlStructureError();
   if (rows.length === 1 && isKnownEmptyFileRow(rows[0])) return [];
   if (rows.length === 0) throw new LhHtmlStructureError();
   return rows.flatMap((row) => {

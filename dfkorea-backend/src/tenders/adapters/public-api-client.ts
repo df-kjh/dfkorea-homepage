@@ -156,12 +156,18 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
             this.cancelBody(response);
             throw this.unsafeRedirect(request.operation, response.status);
           }
-          url = this.redirectUrl(
-            location,
-            url,
-            request.operation,
-            response.status,
-          );
+          try {
+            url = this.redirectUrl(
+              location,
+              url,
+              request.operation,
+              response.status,
+            );
+          } finally {
+            // Redirect targets are untrusted. Dispose of every redirect body,
+            // including a target that fails hostname or scheme validation.
+            this.cancelBody(response);
+          }
           // Fetch switches POST to GET for 301, 302, and 303. Preserve POST only
           // for the status codes that explicitly require replaying its form body.
           if (
@@ -172,7 +178,6 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
           ) {
             method = "GET";
           }
-          this.cancelBody(response);
           continue;
         }
 
