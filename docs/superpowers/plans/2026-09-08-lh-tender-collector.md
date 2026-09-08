@@ -82,35 +82,35 @@ Commit message: `feat: collect LH lighting tender notices`
 - Produces: issued identities `LH:<noticeId>:<revision>:<sequence>` and canonical attachment URL metadata.
 - Produces: `TenderDocumentFormat` member `ZIP` and one-level extraction into the existing `ExtractedDocument` shape.
 
-- [ ] **Step 1: Write failing enrichment and downloader tests**
+- [x] **Step 1: Write failing enrichment and downloader tests**
 
 Prove LH enrichment rejects non-LH and malformed raw metadata without network access, emits basis amount evidence and exact document identities, and never invents a lower-limit rate or pricing context. Prove the shared fetcher sends the exact form POST only for a valid issued LH reference and rejects host, path, identity, query-key, or method-confusion variants.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run `npm test -- --runInBand src/tenders/adapters/lh-enrichment.adapter.spec.ts src/tenders/documents/tender-document-fetcher.spec.ts`. Expected failure: LH enrichment/source support is absent.
 
-- [ ] **Step 3: Implement enrichment and secure form download**
+- [x] **Step 3: Implement enrichment and secure form download**
 
 Add `LH_PAGE` to evidence/document source unions. Encode only `filespec=bidinfo`, `filename`, `savedname`, and an empty `bidnum` in the form body. Keep query metadata in the issued reference for validation but do not send it as a GET query to LH.
 
-- [ ] **Step 4: Write failing ZIP extraction tests**
+- [x] **Step 4: Write failing ZIP extraction tests**
 
 Use in-memory literal fixture archives to prove a top-level supported document contributes text/table blocks, while nested ZIP, traversal names, encrypted members, too many entries, and expanded-byte excess fail with existing bounded error codes.
 
-- [ ] **Step 5: Run ZIP tests and verify RED**
+- [x] **Step 5: Run ZIP tests and verify RED**
 
 Run `npm test -- --runInBand src/tenders/documents/tender-document-extractor.spec.ts`. Expected failure: generic ZIP is unsupported.
 
-- [ ] **Step 6: Implement one-level ZIP extraction and LH analysis routing**
+- [x] **Step 6: Implement one-level ZIP extraction and LH analysis routing**
 
 Reuse `readBoundedZip`, detect supported inner document signatures, extract into bounded child contexts, prefix locations with the archive member name, and mark partial when unsupported members coexist with useful supported documents. Inject and select the LH enrichment adapter; include LH tenders in catch-up analysis queries. Keep award-history queries empty for LH.
 
-- [ ] **Step 7: Run focused document and analysis tests**
+- [x] **Step 7: Run focused document and analysis tests**
 
 Run `npm test -- --runInBand src/tenders/adapters/lh-enrichment.adapter.spec.ts src/tenders/documents/tender-document-fetcher.spec.ts src/tenders/documents/tender-document-extractor.spec.ts src/tenders/services/tender-analysis.service.spec.ts`. Expected: PASS.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 Commit message: `feat: analyze LH tender documents`
 
