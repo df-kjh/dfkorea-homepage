@@ -116,6 +116,12 @@
 
 - `dfkorea-backend/.env.example`
 - `database-schema.md`
+- `dfkorea-backend/src/tenders/adapters/lh-html.ts`
+- `dfkorea-backend/src/tenders/adapters/lh-tender.adapter.ts`
+- `dfkorea-backend/src/tenders/adapters/lh-enrichment.adapter.ts`
+- `dfkorea-backend/src/tenders/documents/tender-document-fetcher.ts`
+- `dfkorea-backend/src/tenders/documents/extractors/zip-document.extractor.ts`
+- `dfkorea-backend/src/tenders/documents/tender-document-extraction.worker.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis.service.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis-queue.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis-evidence.ts`
@@ -135,13 +141,15 @@
 - `dfkorea-backend/src/tenders/domain/tender-price-analyzer.ts`
 
 - `dfkorea-backend/src/tenders/documents/tender-document-extractor.ts`
-- `dfkorea-backend/src/tenders/documents/tender-document-extraction.worker.ts`
 - `dfkorea-backend/src/tenders/documents/extractors/`
 - `dfkorea-backend/src/tenders/documents/fixtures/`
 
 - `led-lighting-website/src/views/admin/AdminDashboard.vue`
 - `led-lighting-website/src/components/admin/TenderManagement.vue`
+- `led-lighting-website/src/components/admin/tenders/TenderFilterPanel.vue`
+- `led-lighting-website/src/components/admin/tenders/TenderList.vue`
 - `led-lighting-website/src/components/admin/tenders/`
+- `led-lighting-website/src/constants/tender-source.ts`
 - `led-lighting-website/src/api/tenders.ts`
 - `led-lighting-website/src/types/tender.ts`
 - `led-lighting-website/src/utils/tender-calendar.ts`
