@@ -40,23 +40,23 @@
 - Produces: `LhTenderAdapterConfig { enabled: boolean; baseUrl: string; requestIntervalMs: number; maximumPages?: number; maximumDetails?: number }`.
 - Produces: persisted `rawData.lh` containing `workTypeCode`, `emergencyOrder`, `detailPath`, `basisAmount`, and `attachments: Array<{ sequence: string; displayName: string; savedName: string }>`.
 
-- [ ] **Step 1: Write failing adapter tests**
+- [x] **Step 1: Write failing adapter tests**
 
 Add tests proving disabled configuration returns a successful empty result without a request; enabled collection posts work types 30 and 40, parses and deduplicates rows, skips non-lighting titles before detail requests, maps a valid detail to literal normalized fields, paginates sequentially, and reports `STRUCTURE_CHANGED` or bounded partial failures for malformed/oversized input.
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run `npm test -- --runInBand src/tenders/adapters/lh-tender.adapter.spec.ts`. Expected failure: the LH adapter module and enum member do not exist.
 
-- [ ] **Step 3: Implement the bounded HTML client and adapter**
+- [x] **Step 3: Implement the bounded HTML client and adapter**
 
 Use strict table/header and label/value parsing rather than arbitrary DOM evaluation. POST URL-encoded search forms, use GET detail URLs, cap every body, validate every redirect stays on `ebid.lh.or.kr`, and wait between sequential requests. Emit sanitized `TenderOperationFailure` entries without URLs or HTML.
 
-- [ ] **Step 4: Run focused and existing adapter tests**
+- [x] **Step 4: Run focused and existing adapter tests**
 
 Run `npm test -- --runInBand src/tenders/adapters/lh-tender.adapter.spec.ts src/tenders/adapters/tender-adapters.spec.ts`. Expected: PASS.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 Commit message: `feat: collect LH lighting tender notices`
 
