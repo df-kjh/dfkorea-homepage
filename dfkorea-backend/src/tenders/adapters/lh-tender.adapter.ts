@@ -79,13 +79,18 @@ export class LhTenderAdapter implements TenderSourceAdapter {
 
     for (const workTypeCode of LH_WORK_TYPES) {
       try {
-        const rows = await this.collectList(workTypeCode, window);
+        const collection = await this.collectList(workTypeCode, window);
         successfulListOperations += 1;
-        for (const row of rows) {
+        for (const row of collection.rows) {
           const identity = `${row.sourceNoticeId}:${row.revision}`;
           if (LIGHTING_TITLE.test(row.title) && !candidates.has(identity)) {
             candidates.set(identity, row);
           }
+        }
+        if (collection.truncated) {
+          failures.push(
+            this.limitFailure(`list:${workTypeCode}`, "PAGINATION_LIMIT"),
+          );
         }
       } catch (error) {
         failures.push(this.toOperationFailure(`list:${workTypeCode}`, error));
@@ -129,7 +134,7 @@ export class LhTenderAdapter implements TenderSourceAdapter {
   private async collectList(
     workTypeCode: (typeof LH_WORK_TYPES)[number],
     window: TenderFetchWindow,
-  ): Promise<LhListRow[]> {
+  ): Promise<{ rows: LhListRow[]; truncated: boolean }> {
     const rows: LhListRow[] = [];
     let targetRow = "1";
     for (let pageNo = 1; pageNo <= this.maximumPages; pageNo += 1) {
@@ -151,17 +156,10 @@ export class LhTenderAdapter implements TenderSourceAdapter {
       });
       const page = parseLhListPage(html, workTypeCode);
       rows.push(...page.rows);
-      if (page.nextTargetRow === null) return rows;
+      if (page.nextTargetRow === null) return { rows, truncated: false };
       targetRow = page.nextTargetRow;
     }
-    throw new TenderSourceError(
-      this.source,
-      "PAGINATION_LIMIT",
-      null,
-      undefined,
-      `list:${workTypeCode}`,
-      this.maximumPages,
-    );
+    return { rows, truncated: true };
   }
 
   private normalize(

@@ -123,66 +123,98 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
   async request(request: LhHtmlRequest): Promise<string> {
     let url = this.safeUrl(request);
     let method = request.method;
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutError = new TenderSourceError(
+      TenderSource.LH,
+      "REQUEST_TIMEOUT",
+      null,
+      undefined,
+      request.operation,
+    );
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(timeoutError);
+      }, this.timeoutMs);
+    });
+    const withinDeadline = <T>(pending: Promise<T>): Promise<T> =>
+      Promise.race([pending, timeoutPromise]);
 
-    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
-      let response: Response;
-      try {
-        response = await this.fetchWithTimeout(
-          url,
-          this.requestInit(method, request),
-          request.operation,
+    try {
+      for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+        const response = await withinDeadline(
+          this.fetcher(url.toString(), {
+            ...this.requestInit(method, request),
+            signal: controller.signal,
+          }),
         );
-      } catch (error) {
-        if (error instanceof TenderSourceError) throw error;
-        throw new TenderSourceError(
-          TenderSource.LH,
-          "NETWORK_ERROR",
-          null,
-          error,
-          request.operation,
-        );
-      }
 
-      if (this.isRedirect(response.status)) {
-        const location = response.headers.get("location");
-        if (!location || redirectCount === 5) {
-          throw this.unsafeRedirect(request.operation, response.status);
+        if (this.isRedirect(response.status)) {
+          const location = response.headers.get("location");
+          if (!location || redirectCount === 5) {
+            this.cancelBody(response);
+            throw this.unsafeRedirect(request.operation, response.status);
+          }
+          url = this.redirectUrl(
+            location,
+            url,
+            request.operation,
+            response.status,
+          );
+          // Fetch switches POST to GET for 301, 302, and 303. Preserve POST only
+          // for the status codes that explicitly require replaying its form body.
+          if (
+            method === "POST" &&
+            (response.status === 301 ||
+              response.status === 302 ||
+              response.status === 303)
+          ) {
+            method = "GET";
+          }
+          this.cancelBody(response);
+          continue;
         }
-        url = this.redirectUrl(
-          location,
-          url,
-          request.operation,
-          response.status,
-        );
-        // Fetch switches POST to GET for 301, 302, and 303. Preserve POST only
-        // for the status codes that explicitly require replaying its form body.
-        if (
-          method === "POST" &&
-          (response.status === 301 ||
-            response.status === 302 ||
-            response.status === 303)
-        ) {
-          method = "GET";
+
+        if (!response.ok) {
+          this.cancelBody(response);
+          throw new TenderSourceError(
+            TenderSource.LH,
+            "HTTP_ERROR",
+            response.status,
+            undefined,
+            request.operation,
+          );
         }
-        continue;
+        if (response.url) {
+          this.redirectUrl(
+            response.url,
+            url,
+            request.operation,
+            response.status,
+          );
+        }
+        return await this.readBoundedBody(
+          response,
+          request.operation,
+          withinDeadline,
+        );
       }
 
-      if (!response.ok) {
-        throw new TenderSourceError(
-          TenderSource.LH,
-          "HTTP_ERROR",
-          response.status,
-          undefined,
-          request.operation,
-        );
-      }
-      if (response.url) {
-        this.redirectUrl(response.url, url, request.operation, response.status);
-      }
-      return this.readBoundedBody(response, request.operation);
+      throw this.unsafeRedirect(request.operation, null);
+    } catch (error) {
+      if (error instanceof TenderSourceError) throw error;
+      if (controller.signal.aborted) throw timeoutError;
+      throw new TenderSourceError(
+        TenderSource.LH,
+        "NETWORK_ERROR",
+        null,
+        error,
+        request.operation,
+      );
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
     }
-
-    throw this.unsafeRedirect(request.operation, null);
   }
 
   private requestInit(
@@ -201,41 +233,6 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
           }
         : {}),
     };
-  }
-
-  private async fetchWithTimeout(
-    url: URL,
-    init: RequestInit,
-    operation: LhHtmlRequest["operation"],
-  ): Promise<Response> {
-    const controller = new AbortController();
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const timeoutError = new TenderSourceError(
-      TenderSource.LH,
-      "REQUEST_TIMEOUT",
-      null,
-      undefined,
-      operation,
-    );
-    try {
-      const pending = this.fetcher(url.toString(), {
-        ...init,
-        signal: controller.signal,
-      });
-      const timeoutPromise = new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => {
-          controller.abort();
-          reject(timeoutError);
-        }, this.timeoutMs);
-      });
-      return await Promise.race([pending, timeoutPromise]);
-    } catch (error) {
-      if (error instanceof TenderSourceError) throw error;
-      if (controller.signal.aborted) throw timeoutError;
-      throw error;
-    } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
-    }
   }
 
   private isRedirect(status: number): boolean {
@@ -281,12 +278,14 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
   private async readBoundedBody(
     response: Response,
     operation: LhHtmlRequest["operation"],
+    withinDeadline: <T>(pending: Promise<T>) => Promise<T>,
   ): Promise<string> {
     const contentLength = Number(response.headers.get("content-length"));
     if (
       Number.isFinite(contentLength) &&
       contentLength > this.maximumBodyBytes
     ) {
+      this.cancelBody(response);
       throw new TenderSourceError(
         TenderSource.LH,
         "RESPONSE_TOO_LARGE",
@@ -296,17 +295,42 @@ export class BoundedLhHtmlClient implements LhHtmlClient {
       );
     }
 
-    const body = await response.arrayBuffer();
-    if (body.byteLength > this.maximumBodyBytes) {
-      throw new TenderSourceError(
-        TenderSource.LH,
-        "RESPONSE_TOO_LARGE",
-        response.status,
-        undefined,
-        operation,
-      );
+    const reader = response.body?.getReader();
+    if (!reader) return "";
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const next = await withinDeadline(reader.read());
+        if (next.done) break;
+        totalBytes += next.value.byteLength;
+        if (totalBytes > this.maximumBodyBytes) {
+          throw new TenderSourceError(
+            TenderSource.LH,
+            "RESPONSE_TOO_LARGE",
+            response.status,
+            undefined,
+            operation,
+          );
+        }
+        chunks.push(next.value);
+      }
+      const body = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return new TextDecoder("utf-8").decode(body);
+    } catch (error) {
+      void reader.cancel().catch(() => undefined);
+      throw error;
     }
-    return new TextDecoder("utf-8").decode(body);
+  }
+
+  private cancelBody(response: Response): void {
+    // Do not await cleanup: a hostile stream must not extend the request deadline.
+    void response.body?.cancel().catch(() => undefined);
   }
 
   private safeUrl(request: LhHtmlRequest): URL {

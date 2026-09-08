@@ -354,6 +354,12 @@ describe("LhTenderAdapter", () => {
 
     await expect(adapter.fetchNotices(window)).resolves.toEqual(
       expect.objectContaining({
+        notices: [
+          expect.objectContaining({
+            sourceNoticeId: "2603251",
+            revision: "00",
+          }),
+        ],
         status: SyncRunStatus.PARTIAL,
         errorCode: "PARTIAL_PROVIDER_FAILURE",
         failures: expect.arrayContaining([
@@ -431,6 +437,78 @@ describe("BoundedLhHtmlClient", () => {
     );
   });
 
+  it("cancels redirect, HTTP error, and oversized response bodies", async () => {
+    const redirectCancel = jest.fn().mockResolvedValue(undefined);
+    const errorCancel = jest.fn().mockResolvedValue(undefined);
+    const oversizedCancel = jest.fn().mockResolvedValue(undefined);
+    const body = (cancel: jest.Mock) => ({ cancel });
+    const redirect = {
+      status: 302,
+      ok: false,
+      headers: new Headers({ location: "/next" }),
+      url: "",
+      body: body(redirectCancel),
+    } as unknown as Response;
+    const failure = {
+      status: 500,
+      ok: false,
+      headers: new Headers(),
+      url: "",
+      body: body(errorCancel),
+    } as unknown as Response;
+    const oversized = {
+      status: 200,
+      ok: true,
+      headers: new Headers({ "content-length": "3" }),
+      url: "",
+      body: body(oversizedCancel),
+    } as unknown as Response;
+    const fetcher = jest
+      .fn<Promise<Response>, [string, RequestInit?]>()
+      .mockResolvedValueOnce(redirect)
+      .mockResolvedValueOnce(response("ok"));
+
+    await expect(
+      new BoundedLhHtmlClient(fetcher).request(htmlRequest),
+    ).resolves.toBe("ok");
+    await expect(
+      new BoundedLhHtmlClient(() => Promise.resolve(failure)).request(
+        htmlRequest,
+      ),
+    ).rejects.toMatchObject({ code: "HTTP_ERROR" });
+    await expect(
+      new BoundedLhHtmlClient(() => Promise.resolve(oversized), {
+        maximumBodyBytes: 2,
+      }).request(htmlRequest),
+    ).rejects.toMatchObject({ code: "RESPONSE_TOO_LARGE" });
+    await Promise.resolve();
+    expect(redirectCancel).toHaveBeenCalledTimes(1);
+    expect(errorCancel).toHaveBeenCalledTimes(1);
+    expect(oversizedCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps a content-length-less streamed body before buffering it all", async () => {
+    const cancel = jest.fn();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+      },
+      cancel,
+    });
+    const client = new BoundedLhHtmlClient(
+      () => Promise.resolve(new Response(stream)),
+      {
+        maximumBodyBytes: 2,
+      },
+    );
+
+    await expect(client.request(htmlRequest)).rejects.toMatchObject({
+      code: "RESPONSE_TOO_LARGE",
+    });
+    await Promise.resolve();
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unsafe base and request path hosts", async () => {
     const client = new BoundedLhHtmlClient(() =>
       Promise.resolve(response("ok")),
@@ -460,6 +538,39 @@ describe("BoundedLhHtmlClient", () => {
     await jest.advanceTimersByTimeAsync(10);
     await pending;
     expect(fetcher).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it("keeps the deadline through a slow response body and cancels it", async () => {
+    jest.useFakeTimers();
+    const cancel = jest.fn();
+    const stalledResponse = {
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      url: "",
+      body: {
+        getReader: () => ({
+          read: () => new Promise<never>(() => undefined),
+          cancel: () => {
+            cancel();
+            return Promise.resolve();
+          },
+        }),
+      },
+    } as unknown as Response;
+    const client = new BoundedLhHtmlClient(
+      () => Promise.resolve(stalledResponse),
+      { timeoutMs: 10 },
+    );
+    const pending = expect(client.request(htmlRequest)).rejects.toMatchObject({
+      code: "REQUEST_TIMEOUT",
+    });
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(10);
+    await pending;
+    await Promise.resolve();
+    expect(cancel).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
   });
 });

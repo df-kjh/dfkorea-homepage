@@ -183,7 +183,7 @@ export const parseLhTenderDetail = (
 };
 
 const parseAttachments = (table: string): LhAttachment[] => {
-  const rows = tableRows(table);
+  const rows = tableRows(table).filter((row) => !isKnownFileHeaderRow(row));
   if (rows.length === 1 && isKnownEmptyFileRow(rows[0])) return [];
   if (rows.length === 0) throw new LhHtmlStructureError();
   return rows.flatMap((row) => {
@@ -329,10 +329,17 @@ const isKnownEmptyListRow = (row: HtmlRow): boolean =>
 const isKnownEmptyFileRow = (row: HtmlRow): boolean =>
   /^\s*<td\b[^>]*>\s*첨부파일이 없습니다\.?\s*<\/td>\s*$/i.test(row.content);
 
+/** The public file table always starts with these two column headings. */
+const isKnownFileHeaderRow = (row: HtmlRow): boolean =>
+  /^\s*<th\b[^>]*>\s*문서명\s*<\/th>\s*<th\b[^>]*>\s*공고파일명\s*<\/th>\s*$/i.test(
+    row.content,
+  );
+
 const attributeValue = (element: string, name: string): string | null => {
   const match = element.match(
     new RegExp(`\\b${escapeRegExp(name)}\\s*=\\s*(["'])(.*?)\\1`, "i"),
   );
+
   return match?.[2] ? decodeHtml(match[2]).trim() : null;
 };
 
