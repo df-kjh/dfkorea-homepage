@@ -56,6 +56,7 @@
 - Vercel 릴레이의 upstream은 `https://apis.data.go.kr/1230000/ad/BidPublicInfoService` 공식 경계만 허용하고 자동 리다이렉트를 거부한다. 공공데이터포털이 반환한 4xx·5xx 상태는 본문을 읽거나 노출하지 않은 채 그대로 백엔드에 전달하므로, 영구 4xx는 한 번만 시도하고 기존 일시 오류 상태만 제한적으로 재시도한다. 프로덕션 빌드는 `/api/internal/g2b-relay`가 Nitro 서버 산출물에 실제 등록됐는지 검사하며 누락되면 배포 빌드를 실패시킨다.
 - K-apt 신규 공고의 공식 원문은 현재 상세 경로인 `https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=...`로 저장한다. 기존 `/web/bid/bidDetail.do` 링크는 데이터 마이그레이션으로 K-apt 행의 `sourceUrl`만 비파괴적으로 보정하며 공고·수집·메일 이력은 유지한다.
 - LH는 공식 API 대신 공개 전자조달 목록·상세 HTML을 직접 수집한다. 업무구분 `30`(물품)과 `40`(지급자재)의 입찰 마감일을 실행 시각 기준 7일 전부터 180일 후까지 조회하고, LED 조명 후보만 상세를 확인한다. 목록 페이지와 상세 요청은 기본 1,500ms 간격으로 모두 순차 실행하며, 필수 헤더·필드가 사라진 응답은 빈 결과로 저장하지 않고 `STRUCTURE_CHANGED`로 실패 처리한다.
+- LH가 운영 설정에서 비활성화되어 있으면 외부 요청을 보내지 않고 `tender_sync_runs`에 `SKIPPED`와 안전한 코드 `FEATURE_DISABLED`를 남긴다. 즉시 수집 화면은 이를 무공고 `SUCCEEDED`로 표현하지 않고 `LH_TENDER_ENABLED=true` 설정과 재배포가 필요하다고 안내한다. 이 진단은 기본값을 활성화하거나 설정값을 표시하지 않는다.
 - 저장된 LH 공고는 관리자 목록·캘린더·메일·분석 큐와 누락 분석 catch-up에 포함되며 출처 필터와 데스크톱·모바일 목록에서 `LH`로 표시한다. 상세에서 검증해 저장한 기초금액과 첨부 식별자만 분석에 사용하고 LH 상세를 다시 가져오지 않는다. LH 낙찰 공개 corpus는 연결하지 않으므로 낙찰 통계 가격은 제공하지 않으며, 구조화된 기초금액과 문서 요구조건만 표시한다.
 - LH 첨부는 발급된 `LH_PAGE` 참조의 HTTPS 호스트·경로·공고 identity·표시/저장 파일명이 모두 일치할 때만 고정 폼 POST로 받는다. HWP/HWPX/PDF/DOCX/XLSX와 일반 ZIP을 분석하며, ZIP은 최상위 지원 문서만 한 번 풀고 중첩 ZIP·암호화·경로 이탈을 거부한다. 문서 입력 20 MiB, 전체 압축 해제 40 MiB, 4,096개 entry 제한을 공유한다.
 - 수신 주소를 제거하면 비활성화하고, 다시 추가하면 같은 ID와 발송 이력을 복원한다. 설정 모달은 열 때마다 새 세대로 최신값을 조회하고, 늦게 도착한 이전 요청은 상태를 덮어쓰지 못한다. 최신 조회 실패 상태에서는 저장할 수 없으며 모달 안의 `다시 시도`로 새 요청을 실행한다.
@@ -79,7 +80,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
-- LH 직접 수집은 외부 공개 HTML 구조와 가용성에 의존한다. `LH_TENDER_ENABLED=false`가 기본이며 운영자는 스테이징 단일 수집으로 `SUCCEEDED`/`PARTIAL`/`FAILED`, `STRUCTURE_CHANGED`, 페이지·후보 상세 상한, 요청 시간과 공고 수를 확인한 뒤에만 활성화한다. 배포 후 `tender_sync_runs`의 LH 결과와 관리자 원문 링크·분석 문서 상태를 모니터링하고, 구조 변경이나 비정상 요청 증가가 보이면 즉시 플래그를 `false`로 되돌려 다음 수집부터 중지한다.
+- LH 직접 수집은 외부 공개 HTML 구조와 가용성에 의존한다. `LH_TENDER_ENABLED=false`가 기본이며, 프로덕션은 개발 환경 파일을 읽지 않으므로 운영 환경에 정확히 `LH_TENDER_ENABLED=true`를 주입한 뒤 재배포해야 한다. 운영 순서는 (1) 해당 환경 변수 설정, (2) 인증서가 포함된 이미지 재배포, (3) 관리자에서 한 번만 즉시 수집, (4) `tender_sync_runs`의 LH 상태를 확인하는 것이다. `SKIPPED`/`FEATURE_DISABLED`면 변수 주입 또는 재배포가 적용되지 않은 것이며 외부 요청은 발생하지 않았다. `SUCCEEDED`/`PARTIAL`/`FAILED`와 `STRUCTURE_CHANGED`, 페이지·후보 상세 상한, 요청 시간·공고 수, 관리자 원문 링크·분석 문서 상태를 함께 모니터링한다. 구조 변경·비정상 요청 증가·인증서 문제 시 플래그를 `false`로 되돌리고 재배포해 다음 수집부터 중지한다. 실제 LH 응답 검증은 배포 네트워크에서만 한 번 수행하며, 테스트 fixture 성공을 실운영 검증으로 간주하지 않는다.
+- LH 수집은 업무구분별 최대 50페이지와 후보 최대 200건을 1,500ms 간격으로 순차 요청한다. 이 안전 상한은 유지하지만 최댓값에서는 관리자 릴레이의 240초 대기 시간을 넘을 수 있다. 화면 요청이 시간 초과되면 즉시 재시도하지 말고 안전한 LH 동기화 상태를 확인하고, 실제로 반복되면 비동기 실행 전환을 별도 작업으로 검토해야 한다.
 - LH 서버가 누락한 `TuringSign RSA Secure CA 2` 중간 인증서는 백엔드 이미지에 검증된 PEM으로 포함한다. 일반 TLS 검증은 유지하며 인증서 지문과 Docker 포함 경로를 자동 검사한다. 인증서 만료 또는 발급 체인 교체 때는 LH 서버의 실제 체인을 다시 확인해 PEM과 문서를 함께 갱신한다.
 - 실제 가격 표시는 공급자 응답에서 검증된 총액/통화/낙찰 방식/산식 metadata를 확보하고, 낙찰정보서비스 공개 corpus가 동일 기준의 최종 낙찰로 보수적 필터를 통과할 때만 가능하다. G2B 물품 공식 스키마에는 총액/통화/A값 적용 여부 전용 필드가 없어 공식 공고명의 명시적 선언으로 검증하는 제한된 경로만 지원한다. 해당 문구가 없는 공고는 `FORMULA_REVIEW_REQUIRED` 또는 `INCOMPARABLE_CONTRACT`로 남는다. 가격 fixture는 공식 필드 구조를 따르는 합성 예제이며 실공고에서의 가용성을 증명하지 않는다. 공개 corpus도 입찰 분류 식별자·단가/총액·지역 필드가 제한되어 많은 결과가 제외되며, 통계는 15개 미만이면 제공하지 않는다.
 - 운영 전 기존 `PUBLIC_DATA_SERVICE_KEY`에 나라장터 낙찰정보서비스 `ScsbidInfoService`의 별도 활용 승인이 필요하다. 별도 secret이나 필수 환경변수는 없고 공식 base URL이 내장되어 있으며, `G2B_AWARD_API_BASE_URL`은 선택 override다. migration과 애플리케이션을 먼저 배포하고 health 및 실제 나라장터 분석 한 건을 확인한 뒤 관리자가 백필을 시작·모니터링해야 한다.
@@ -119,11 +121,13 @@
 - `database-schema.md`
 - `dfkorea-backend/src/tenders/adapters/lh-html.ts`
 - `dfkorea-backend/src/tenders/adapters/lh-tender.adapter.ts`
+- `dfkorea-backend/src/tenders/domain/tender.enums.ts`
 - `dfkorea-backend/src/tenders/adapters/lh-enrichment.adapter.ts`
 - `dfkorea-backend/src/tenders/documents/tender-document-fetcher.ts`
 - `dfkorea-backend/src/tenders/documents/extractors/zip-document.extractor.ts`
 - `dfkorea-backend/src/tenders/documents/tender-document-extraction.worker.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis.service.ts`
+- `dfkorea-backend/src/tenders/services/tender-ingestion.service.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis-queue.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis-evidence.ts`
 - `dfkorea-backend/src/tenders/services/tender-analysis-detail.ts`

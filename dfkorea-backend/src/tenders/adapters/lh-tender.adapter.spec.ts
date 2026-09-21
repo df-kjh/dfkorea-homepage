@@ -53,7 +53,7 @@ class StubLhHtmlClient implements LhHtmlClient {
 }
 
 describe("LhTenderAdapter", () => {
-  it("returns an empty successful result without requesting LH when disabled", async () => {
+  it("reports explicitly disabled LH configuration without requesting the provider", async () => {
     const client = new StubLhHtmlClient(() => noticesHtml);
     const adapter = new LhTenderAdapter(client, {
       enabled: false,
@@ -63,8 +63,8 @@ describe("LhTenderAdapter", () => {
 
     await expect(adapter.fetchNotices(window)).resolves.toEqual({
       notices: [],
-      status: SyncRunStatus.SUCCEEDED,
-      errorCode: null,
+      status: "SKIPPED",
+      errorCode: "FEATURE_DISABLED",
       failures: [],
     });
     expect(client.requests).toEqual([]);

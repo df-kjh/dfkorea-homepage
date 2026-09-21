@@ -31,6 +31,7 @@ const isTenderResponseShape = (value: unknown): value is TenderResponseShape =>
 export interface SourceCollectionSummary {
   source: TenderSource;
   status:
+    | SyncRunStatus.SKIPPED
     | SyncRunStatus.SUCCEEDED
     | SyncRunStatus.PARTIAL
     | SyncRunStatus.FAILED;

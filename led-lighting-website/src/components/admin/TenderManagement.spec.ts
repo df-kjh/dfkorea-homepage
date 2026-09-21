@@ -475,6 +475,36 @@ describe('TenderManagement', () => {
     expect(api.getAll).toHaveBeenCalledTimes(2)
   })
 
+  it('reports an LH disabled collection with the required opt-in action', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-09-21T01:00:00.000Z',
+        sources: [
+          {
+            source: 'LH',
+            status: 'SKIPPED',
+            fetchedCount: 0,
+            createdCount: 0,
+            updatedCount: 0,
+            excludedCount: 0,
+            errorCode: 'FEATURE_DISABLED',
+          },
+        ],
+        failedSources: [],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    const message = wrapper.get('[role="alert"]').text()
+    expect(message).toContain('LH 수집은 운영 설정에서 비활성화되어 있습니다.')
+    expect(message).toContain('LH_TENDER_ENABLED=true')
+  })
+
   it('prioritizes a failed source warning when the response also contains a partial source', async () => {
     api.collect.mockResolvedValueOnce({
       data: {

@@ -70,7 +70,14 @@ export class LhTenderAdapter implements TenderSourceAdapter {
     window: TenderFetchWindow,
   ): Promise<TenderSourceFetchResult> {
     if (!this.config.enabled) {
-      return this.result([], []);
+      // Opt-in must stop before any provider request, but it is not a completed
+      // collection: callers need a safe, actionable distinction from zero rows.
+      return {
+        notices: [],
+        status: SyncRunStatus.SKIPPED,
+        errorCode: "FEATURE_DISABLED",
+        failures: [],
+      };
     }
 
     const failures: TenderOperationFailure[] = [];

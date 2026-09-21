@@ -19,6 +19,7 @@ export enum TenderRelevance {
 
 export enum SyncRunStatus {
   RUNNING = "RUNNING",
+  SKIPPED = "SKIPPED",
   SUCCEEDED = "SUCCEEDED",
   PARTIAL = "PARTIAL",
   FAILED = "FAILED",

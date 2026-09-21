@@ -88,9 +88,9 @@ Index: `IDX_tender_recipient_subscription_active` on (`subscriptionId`, `isActiv
 | Column                                                          | Type          | Notes                                            |
 | --------------------------------------------------------------- | ------------- | ------------------------------------------------ |
 | `id`                                                            | UUID          | Primary key                                      |
-| `source`                                                        | varchar       | `G2B`, `KAPT`, or `KEPCO`                        |
+| `source`                                                        | varchar       | `G2B`, `KAPT`, `KEPCO`, or `LH`                  |
 | `scheduledAt`, `startedAt`, `finishedAt`                        | timestamptz   | Start/end timestamps are nullable until recorded |
-| `status`                                                        | varchar       | `RUNNING`, `SUCCEEDED`, `PARTIAL`, or `FAILED`   |
+| `status`                                                        | varchar       | `RUNNING`, `SKIPPED`, `SUCCEEDED`, `PARTIAL`, or `FAILED`; `SKIPPED` is a safe no-request opt-in diagnostic, not a completed collection watermark |
 | `fetchedCount`, `createdCount`, `updatedCount`, `excludedCount` | integer       | Per-run totals, default `0`                      |
 | `errorCode`, `errorMessage`                                     | varchar, text | Safe failure diagnostics, both nullable          |
 | `createdAt`                                                     | timestamptz   | Creation timestamp                               |

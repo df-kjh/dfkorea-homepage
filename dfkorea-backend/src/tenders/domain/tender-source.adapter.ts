@@ -26,6 +26,7 @@ export interface TenderOperationFailure {
 export interface TenderSourceFetchResult {
   notices: NormalizedTender[];
   status:
+    | SyncRunStatus.SKIPPED
     | SyncRunStatus.SUCCEEDED
     | SyncRunStatus.PARTIAL
     | SyncRunStatus.FAILED;
