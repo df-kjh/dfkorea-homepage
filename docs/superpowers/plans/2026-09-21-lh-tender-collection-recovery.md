@@ -93,8 +93,8 @@
 - [x] Run the impacted backend suites, the backend CI script, and the Docker build-context/certificate regression; record environment-specific non-LH CI outcomes below.
 - [x] Run the affected Vitest suite, frontend type-check script, and production build script; record the safe example-API artifact-check limitation below.
 - [x] Inspect `git diff` and `git status` for scope; update the tender menu document’s required sections with root cause, constraints, monitoring, safe rollback, and operator sequence.
-- [ ] Conduct an independent whole-branch review; route Critical/Important findings through a fresh RED→GREEN fix pass and ledger deferred minor findings.
-- [ ] Commit the bounded implementation and documentation with a conventional, focused message. Do not push, open a PR, or merge.
+- [x] Conduct an independent whole-branch review; route Critical/Important findings through a fresh RED→GREEN fix pass and ledger deferred minor findings.
+- [x] Commit the bounded implementation and documentation with a conventional, focused message. Do not push, open a PR, or merge.
 - [ ] Record the final commit SHA, red/green commands/results, full verification results, required environment/redeploy/one-shot collection/monitoring steps, and residual risks.
 
 ## Progress and Evidence
@@ -133,7 +133,18 @@ Verified non-causes and bounded follow-ups:
 - After the first GREEN pass, the production-environment probe exposed an omitted common contract: `TenderSourceFetchResult` did not admit `SKIPPED`. Adding that one union member restored the TypeScript production probe; the same 60 backend tests and `npx tsc --noEmit` passed again.
 - Final backend CI evidence: the Node 22 Alpine Docker builder compiled successfully and the LH CA bundle test passed. The isolated full CI reached 75 passing suites / 1,076 passing tests before the pre-existing quote-mail test failed because this Alpine Node image formats a Korean default day period as `AM` rather than `오전`; it is unrelated to LH and reproduces with the unmodified quote-mail test. Local Node 24 full-CI attempts likewise reached the LH suites but stopped in unrelated HTTP authorization tests that varied between attempts, while the focused affected suites stayed green. No unrelated production code was changed to mask these runner-dependent failures.
 - Final frontend evidence: `TenderManagement.spec.ts` passed 27 tests and `nuxt typecheck` passed. A production build with safe `https://api.example.test` completed Nuxt compilation plus the G2B relay and About metadata checks, then the existing search-index verifier rejected the example API's zero product-detail anchors. No production API value was read or written; this external-data check does not exercise the changed LH alert.
+- Review-remediation RED→GREEN: the independent reviewer found that an LH `SKIPPED` result hid a simultaneous real failed source. The new mixed-result UI test first failed because the rendered alert omitted the failed-source warning; after combining the safe LH enablement instruction with the actual failure message, the TenderManagement suite passed 28 tests and `nuxt typecheck` passed. The safe example-API production build repeated the same non-LH product-anchor verifier limitation after Nuxt compilation and the two preceding artifact checks passed.
+
+### Independent review record
+
+- Read-only review of `978abf4..e35213d` found no Critical issue and one Important issue: `TenderManagement.vue` prioritized the LH disabled alert over `failedSources`, so a concurrent G2B/K-apt failure could be hidden. The follow-up test/fix above resolved it without changing backend request behavior or the security boundary.
+- The reviewer confirmed that `SKIPPED` does not join `failedSources` and does not advance the `SUCCEEDED` watermark query; the existing `varchar` status column needs no migration. It also confirmed that TLS, SSRF/redirect allowlists, request bounds, sequential pacing, and the default opt-in configuration were untouched.
+- Deferred minor findings: none. Live provider availability, deployed variable injection, and live TLS/redirect behavior remain explicitly outside this repository-local review and require the operator follow-up below.
 
 ### Operational follow-up record
 
-Pending Task 3.
+1. Set the deployed runtime variable `LH_TENDER_ENABLED=true`; do not change the repository default and do not expose or copy unrelated secrets.
+2. Rebuild and redeploy the image containing the verified supplemental CA; run one administrator immediate collection only after deployment is healthy.
+3. Monitor the LH `tender_sync_runs` row and administrator result: `SKIPPED`/`FEATURE_DISABLED` means the opt-in value was not effective and no provider request was made. For `SUCCEEDED`/`PARTIAL`/`FAILED`, inspect only safe status/counts, request duration, bounded-page/detail indicators, and stored official-link/document state.
+4. On structure change, certificate trouble, unexpected request growth, or an unsafe result, set the flag back to `false` and redeploy. Do not bypass TLS, relax allowlists/limits, or blindly repeat a timed-out manual request.
+5. Residual risks: the runner could not reach the public LH endpoint (DNS/20-second timeout) and the maximum sequential request set can exceed the 240-second administrator relay budget. Validate one low-load collection from the deployed network; consider a separately designed asynchronous path only if observed metrics require it.

@@ -505,6 +505,45 @@ describe('TenderManagement', () => {
     expect(message).toContain('LH_TENDER_ENABLED=true')
   })
 
+  it('keeps a failed-source warning visible with the LH disabled instruction', async () => {
+    api.collect.mockResolvedValueOnce({
+      data: {
+        lockAcquired: true,
+        collectedAt: '2026-09-21T01:00:00.000Z',
+        sources: [
+          {
+            source: 'G2B',
+            status: 'FAILED',
+            fetchedCount: 0,
+            createdCount: 0,
+            updatedCount: 0,
+            excludedCount: 0,
+            errorCode: 'HTTP_ERROR',
+          },
+          {
+            source: 'LH',
+            status: 'SKIPPED',
+            fetchedCount: 0,
+            createdCount: 0,
+            updatedCount: 0,
+            excludedCount: 0,
+            errorCode: 'FEATURE_DISABLED',
+          },
+        ],
+        failedSources: ['G2B'],
+      },
+    })
+    const wrapper = mountTenderManagement()
+    await flushPromises()
+
+    await wrapper.get('[data-test="collect-tenders"]').trigger('click')
+    await flushPromises()
+
+    const message = wrapper.get('[role="alert"]').text()
+    expect(message).toContain('일부 출처 수집에 실패했습니다.')
+    expect(message).toContain('LH_TENDER_ENABLED=true')
+  })
+
   it('prioritizes a failed source warning when the response also contains a partial source', async () => {
     api.collect.mockResolvedValueOnce({
       data: {
