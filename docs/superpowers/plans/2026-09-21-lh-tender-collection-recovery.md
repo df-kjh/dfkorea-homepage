@@ -95,14 +95,14 @@
 - [x] Inspect `git diff` and `git status` for scope; update the tender menu document’s required sections with root cause, constraints, monitoring, safe rollback, and operator sequence.
 - [x] Conduct an independent whole-branch review; route Critical/Important findings through a fresh RED→GREEN fix pass and ledger deferred minor findings.
 - [x] Commit the bounded implementation and documentation with a conventional, focused message. Do not push, open a PR, or merge.
-- [ ] Record the final commit SHA, red/green commands/results, full verification results, required environment/redeploy/one-shot collection/monitoring steps, and residual risks.
+- [x] Record the final commit SHA, red/green commands/results, full verification results, required environment/redeploy/one-shot collection/monitoring steps, and residual risks.
 
 ## Progress and Evidence
 
 - [x] Saved the approved recovery plan before investigation.
 - [x] Task 1 evidence baseline and root-cause hypothesis.
 - [x] Task 2 regression RED→GREEN and minimal correction.
-- [ ] Task 3 full verification, documentation, review, and commit.
+- [x] Task 3 full verification, documentation, review, and commit.
 
 ### Root-cause record
 
@@ -140,6 +140,11 @@ Verified non-causes and bounded follow-ups:
 - Read-only review of `978abf4..e35213d` found no Critical issue and one Important issue: `TenderManagement.vue` prioritized the LH disabled alert over `failedSources`, so a concurrent G2B/K-apt failure could be hidden. The follow-up test/fix above resolved it without changing backend request behavior or the security boundary.
 - The reviewer confirmed that `SKIPPED` does not join `failedSources` and does not advance the `SUCCEEDED` watermark query; the existing `varchar` status column needs no migration. It also confirmed that TLS, SSRF/redirect allowlists, request bounds, sequential pacing, and the default opt-in configuration were untouched.
 - Deferred minor findings: none. Live provider availability, deployed variable injection, and live TLS/redirect behavior remain explicitly outside this repository-local review and require the operator follow-up below.
+
+### Commit record
+
+- `e35213d` — `fix: surface disabled lh tender collection`: source-boundary diagnostic, type contracts, regression tests, tender menu/schema documentation, and recovery plan.
+- `116274c` — `fix: preserve tender failure warning`: reviewer-required mixed-result alert regression test and correction. Neither commit was pushed, merged, or used to open a pull request.
 
 ### Operational follow-up record
 
