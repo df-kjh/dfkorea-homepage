@@ -124,10 +124,15 @@ onBeforeUnmount(() => {
 <template>
   <header ref="navigation" class="public-nav" data-site-header :data-tone="tone">
     <div class="public-nav__bar">
-      <NuxtLink to="/" class="public-brand" aria-label="DF KOREA, 홈" @click="closeMobileMenu()"
-        ><span>DF KOREA<span class="public-brand__dot" aria-hidden="true">.</span></span
-        ><small>LED LIGHTING</small></NuxtLink
-      >
+      <NuxtLink to="/" class="public-brand" aria-label="DF KOREA, 홈" @click="closeMobileMenu()">
+        <img
+          class="public-brand__logo"
+          src="/branding/df-korea-logo-white.png"
+          alt="DF KOREA — DEAR FRIEND KOREA"
+          width="128"
+          height="64"
+        />
+      </NuxtLink>
       <nav class="public-nav__desktop" aria-label="주요 메뉴">
         <NuxtLink
           v-for="item in menuItems"
@@ -204,27 +209,24 @@ onBeforeUnmount(() => {
 }
 .public-brand {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: inherit;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  height: 64px;
+  border-radius: 4px;
+  /* Keep the requested white logo legible when the header switches to paper. */
+  background: #080906;
   text-decoration: none;
   flex-shrink: 0;
 }
-.public-brand > span {
-  font-family: Arial, sans-serif;
-  font-size: 24px;
-  font-weight: 750;
-  line-height: 1;
-  letter-spacing: -0.06em;
+.public-nav[data-tone='ink'] .public-brand {
+  background: transparent;
 }
-.public-brand__dot {
-  color: #b59969;
-}
-.public-brand small {
-  font-family: Arial, sans-serif;
-  font-size: 7px;
-  line-height: 1.4;
-  letter-spacing: 0.3em;
+.public-brand__logo {
+  display: block;
+  width: 128px;
+  height: 64px;
+  object-fit: contain;
 }
 .public-nav__desktop {
   display: flex;
@@ -313,11 +315,13 @@ onBeforeUnmount(() => {
     padding-inline: 24px;
     gap: 20px;
   }
-  .public-brand > span {
-    font-size: 21px;
+  .public-brand {
+    width: 122px;
+    height: 58px;
   }
-  .public-brand small {
-    font-size: 6px;
+  .public-brand__logo {
+    width: 112px;
+    height: 58px;
   }
   .public-nav__desktop {
     display: none;

@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 주석 반영: 공통 헤더에 첨부한 회사 로고의 배경 제거·흰색 PNG를 적용했다. 밝은 헤더에는 로고 영역만 어두운 바탕을 두며 홈 링크·회사소개/제품/인증/소식 경로와 모바일 메뉴를 유지한다. 공통 푸터의 상단 문의 문구·전화·메일 영역을 제거하고 하단 메뉴·회사 주소·FAX·저작권은 유지한다.
+
 - 2026-10-04 통합: 별도 `codex/liquid-light-site` 브랜치의 `e106a16`을 로컬 `main`에 병합했고 병합 후 소스 491개를 재검증했다. 기존 미커밋 시안 기록은 보존하며 원격 push·운영 배포는 하지 않았다.
 
 - 2026-10-04 최종 통합 검수: 소스 Vitest 64개 파일/491개, Nuxt 타입 검사, 운영 API를 지정한 빌드와 SEO/상세 앵커 검증을 통과했다. 실제 Chrome에서 기존 네 메뉴와 상세 경로·320px 가로 넘침·Hero/원본 자료를 확인했다. 로컬 검수 증거는 `output/site-redesign-20261004/README.md`를 따른다. 운영 배포와 실제 견적 접수는 수행하지 않았다.
@@ -76,6 +78,9 @@
 - 이미지가 로딩되기 전에는 고유 비율을 알 수 없어 로딩 후 프레임 높이가 정해진다.
 
 ## 관련 파일
+
+- `led-lighting-website/public/branding/df-korea-logo-white.png`
+- `output/logo-comments-20261005/README.md`
 
 - `led-lighting-website/src/components/products/{presentation.ts,presentation.spec.ts}`
 - `led-lighting-website/src/components/common/site/{PublicPageHeader,PublicAction}.vue`

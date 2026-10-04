@@ -7,14 +7,14 @@ interface Stat {
 }
 withDefaults(defineProps<{ stats?: Stat[] }>(), {
   stats: () => [
-    { value: '2013', label: '설립', description: '디에프코리아의 시작' },
-    { value: 'LED', label: '조명 제조', description: '빛을 개발하고 생산합니다' },
-    { value: '공간', label: '제품 선택', description: '설치 환경에 맞는 조명' },
-    { value: '상담', label: '필요한 구성', description: '제품과 사양을 함께 확인' },
+    { value: '10+', label: '회사 설립', icon: 'business' },
+    { value: '30+', label: '다양한 제품군', icon: 'category' },
+    { value: '50+', label: '인증', icon: 'verified' },
+    { value: '300+', label: '설치 현장', icon: 'construction' },
   ],
 })
-// These are source-backed identities, not animated estimates of installations,
-// certificates or product counts. Values remain readable before hydration.
+// The user requested the original homepage figures and labels verbatim.
+// Keep them visible in SSR instead of restoring the previous zero-first count animation.
 </script>
 <template>
   <section class="home-facts" aria-label="디에프코리아 소개">

@@ -1,0 +1,10 @@
+{
+  "mode": "built-in imagegen edit",
+  "transparent_background": true,
+  "original_name": "회사 로고.jpg",
+  "original_sha256": "3bd86ded3646df58c7e5856cdd35587e147253b16ac2f3994a93065820312cde",
+  "output": "led-lighting-website/public/branding/df-korea-logo-white.png",
+  "output_sha256": "10ba1160ea258886d14393de686c984dc182163b74e245208967e895900cb6c9",
+  "bytes": 449420,
+  "prompt": "Edit target: the original company logo in the supplied JPG. Make a clean monochrome white website logo on a truly transparent background. Exactly preserve its original DFi emblem silhouette, original letter shapes, original small person symbol and the words DEAR FRIEND KOREA, original proportions and layout. Change all the navy blue and red foreground pixels to solid pure white. Remove every white background pixel and all JPEG noise to clean alpha transparency, including holes within the emblem and text. The logo should have smoothly antialiased, clean continuous edges and clean transparent negative spaces. Absolutely no distressing, grunge, speckles, noise, texture, thin black outlines, stray pixels, cutouts inside solid strokes, shadows or gradients. Solid white foreground only; transparent everywhere else. Preserve original 338:221 canvas proportion and original artwork size relative to canvas. This is a precision cleanup and recoloring task, not a new logo design."
+}

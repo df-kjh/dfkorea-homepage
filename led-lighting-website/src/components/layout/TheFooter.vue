@@ -9,19 +9,6 @@ const links = [
 <template>
   <footer class="public-footer">
     <div class="public-container">
-      <div class="public-footer__top">
-        <div>
-          <p class="public-footer__eyebrow">LET’S MAKE LIGHT</p>
-          <h2>당신의 공간에 필요한 빛.</h2>
-          <p class="public-footer__description">제품과 조명에 관한 이야기를 들려주세요.</p>
-        </div>
-        <div class="public-footer__contact">
-          <a href="tel:0325282953">032-528-2953 <span aria-hidden="true">↗</span></a
-          ><a href="mailto:kjukym@dfkorealed.com"
-            >kjukym@dfkorealed.com <span aria-hidden="true">↗</span></a
-          >
-        </div>
-      </div>
       <div class="public-footer__middle">
         <NuxtLink to="/" class="public-footer__brand"
           >DF KOREA<span aria-hidden="true">.</span><small>LED LIGHTING</small></NuxtLink
@@ -51,57 +38,6 @@ const links = [
   background: #10160d;
   color: #e6e7d9;
 }
-.public-footer__top {
-  display: flex;
-  justify-content: space-between;
-  gap: 60px;
-  padding-bottom: 52px;
-  border-bottom: 1px solid #87936c30;
-}
-.public-footer__eyebrow {
-  margin: 0 0 21px;
-  color: #b9ae8b;
-  font-family: Arial, sans-serif;
-  font-size: 8px;
-  letter-spacing: 0.15em;
-}
-.public-footer h2 {
-  margin: 0;
-  font-size: clamp(27px, 3.1vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.07em;
-  line-height: 1.4;
-}
-.public-footer__description {
-  margin: 17px 0 0;
-  color: #849174;
-  font-size: 12px;
-  line-height: 1.7;
-  letter-spacing: -0.025em;
-}
-.public-footer__contact {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 11px;
-  min-width: 0;
-}
-.public-footer__contact > a {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 45px;
-  color: #c8ceb4;
-  font-family: Arial, sans-serif;
-  font-size: clamp(17px, 1.6vw, 23px);
-  line-height: 1.6;
-  letter-spacing: -0.035em;
-  overflow-wrap: anywhere;
-}
-.public-footer__contact > a > span {
-  color: #b7a377;
-  flex-shrink: 0;
-}
 .public-footer a:hover {
   color: #e4c99b;
 }
@@ -110,7 +46,6 @@ const links = [
   justify-content: space-between;
   align-items: center;
   gap: 35px;
-  padding-top: 35px;
 }
 .public-footer__brand {
   font-family: Arial, sans-serif;
@@ -182,24 +117,6 @@ const links = [
 @media (max-width: 700px) {
   .public-footer {
     padding-top: 43px;
-  }
-  .public-footer__top {
-    flex-direction: column;
-    gap: 31px;
-    padding-bottom: 34px;
-  }
-  .public-footer h2 {
-    font-size: 28px;
-  }
-  .public-footer__description {
-    font-size: 11px;
-  }
-  .public-footer__contact {
-    max-width: 320px;
-  }
-  .public-footer__contact > a {
-    font-size: 18px;
-    gap: 22px;
   }
   .public-footer__middle {
     flex-direction: column;

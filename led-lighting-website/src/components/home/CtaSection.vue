@@ -91,7 +91,6 @@ onBeforeUnmount(() => {
           >상담 문의하기 <span aria-hidden="true">↗</span></PublicAction
         >
       </div>
-      <p class="contact-note">제품 · 구성 · 견적<br />필요한 이야기를 들려주세요.</p>
     </div>
     <!-- Native modal keeps tab focus and Escape semantics without a second global overlay controller. -->
     <dialog
@@ -190,13 +189,6 @@ onBeforeUnmount(() => {
   line-height: 1.9;
   margin: 25px 0 36px;
 }
-.contact-note {
-  padding-top: 15px;
-  font-size: 11px;
-  line-height: 1.9;
-  color: #aaa48f;
-  text-align: right;
-}
 .contact-dialog {
   width: min(570px, calc(100vw - 40px));
   max-height: calc(100svh - 48px);
@@ -278,9 +270,6 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .contact-layout {
     grid-template-columns: 1fr 3fr;
-  }
-  .contact-note {
-    display: none;
   }
 }
 @media (max-width: 600px) {

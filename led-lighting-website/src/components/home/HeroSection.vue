@@ -62,12 +62,12 @@ function scrollDown() {
       </h1>
       <p class="hero-subtitle">{{ subtitle }}</p>
       <div class="hero-actions" data-test="hero-actions">
-        <PublicAction variant="light" @click="emit('primaryClick')"
-          >{{ primaryButtonText }} <span aria-hidden="true">↗</span></PublicAction
-        >
-        <PublicAction variant="outline" @click="emit('secondaryClick')"
-          >{{ secondaryButtonText }} <span aria-hidden="true">↗</span></PublicAction
-        >
+        <PublicAction variant="light" @click="emit('primaryClick')">{{
+          primaryButtonText
+        }}</PublicAction>
+        <PublicAction variant="outline" @click="emit('secondaryClick')">{{
+          secondaryButtonText
+        }}</PublicAction>
       </div>
     </div>
     <div class="hero-motion">
@@ -228,10 +228,10 @@ function scrollDown() {
 }
 .hero-actions :deep(.public-action) {
   font-size: 12px;
+  min-width: 128px;
   min-height: 49px;
   padding: 14px 22px;
   border-radius: 999px;
-  gap: 27px;
 }
 .hero-actions :deep(.public-action--outline) {
   color: #f0ece3;
@@ -339,8 +339,8 @@ function scrollDown() {
   }
   .hero-actions :deep(.public-action) {
     font-size: 11px;
+    min-width: 110px;
     padding: 13px 19px;
-    gap: 18px;
     min-height: 46px;
   }
   .hero-motion {
@@ -374,8 +374,8 @@ function scrollDown() {
     font-size: 11px;
   }
   .hero-actions :deep(.public-action) {
+    min-width: 100px;
     padding-inline: 15px;
-    gap: 12px;
     font-size: 10px;
   }
   .hero-scroll-control {

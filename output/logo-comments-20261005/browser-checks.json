@@ -1,0 +1,132 @@
+[
+  {
+    "case": "desktop-home",
+    "clientWidth": 1430,
+    "facts": "01회사 설립10+02다양한 제품군30+03인증50+04설치 현장300+",
+    "heroActions": [
+      "제품 보기",
+      "회사 소개"
+    ],
+    "logo": {
+      "loaded": true,
+      "naturalWidth": 1550,
+      "src": "/branding/df-korea-logo-white.png"
+    },
+    "removedContactNote": true,
+    "removedFooterTop": true,
+    "scrollWidth": 1430
+  },
+  {
+    "case": "desktop-facts-paper-header",
+    "facts": [
+      {
+        "label": "01회사 설립",
+        "value": "10+"
+      },
+      {
+        "label": "02다양한 제품군",
+        "value": "30+"
+      },
+      {
+        "label": "03인증",
+        "value": "50+"
+      },
+      {
+        "label": "04설치 현장",
+        "value": "300+"
+      }
+    ],
+    "logoBackground": "rgb(8, 9, 6)",
+    "tone": "paper"
+  },
+  {
+    "case": "hero-product-route-confirmed",
+    "url": "http://127.0.0.1:5192/products"
+  },
+  {
+    "case": "hero-about-route-confirmed",
+    "url": "http://127.0.0.1:5192/about"
+  },
+  {
+    "case": "desktop-footer",
+    "contactHeading": "다음 공간의 빛을, 함께.",
+    "footerText": "DF KOREA.LED LIGHTING회사소개제품인증소식회사 연혁NAVER BLOG ↗DF KOREA.(주)디에프코리아인천광역시 부평구 평천로 199번길 53 A동 2층FAX 032-551-2954© 2026 DF KOREA",
+    "removedContactNote": true,
+    "removedFooterTop": true
+  },
+  {
+    "case": "mobile-390",
+    "clientWidth": 380,
+    "heroButtons": [
+      {
+        "text": "제품 보기",
+        "width": 110
+      },
+      {
+        "text": "회사 소개",
+        "width": 110
+      }
+    ],
+    "logoLoaded": true,
+    "scrollWidth": 380
+  },
+  {
+    "case": "mobile-menu",
+    "expanded": "true",
+    "links": [
+      {
+        "href": "/about",
+        "text": "01회사소개↗"
+      },
+      {
+        "href": "/products",
+        "text": "02제품↗"
+      },
+      {
+        "href": "/certificates",
+        "text": "03인증↗"
+      },
+      {
+        "href": "/blog",
+        "text": "04소식↗"
+      }
+    ]
+  },
+  {
+    "case": "mobile-320",
+    "clientWidth": 310,
+    "heroActions": [
+      "제품 보기",
+      "회사 소개"
+    ],
+    "logoLoaded": true,
+    "logoRect": {
+      "bottom": 69,
+      "height": 58,
+      "left": 20,
+      "right": 142,
+      "top": 11,
+      "width": 122,
+      "x": 20,
+      "y": 11
+    },
+    "scrollWidth": 310
+  },
+  {
+    "case": "mobile-320-footer",
+    "clientWidth": 310,
+    "footerRect": {
+      "bottom": 740.21875,
+      "height": 397.203125,
+      "left": 0,
+      "right": 310,
+      "top": 343.015625,
+      "width": 310,
+      "x": 0,
+      "y": 343.015625
+    },
+    "removedContactNote": true,
+    "removedFooterTop": true,
+    "scrollWidth": 310
+  }
+]
