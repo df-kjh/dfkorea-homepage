@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-04 통합: 별도 `codex/liquid-light-site` 브랜치의 `e106a16`을 로컬 `main`에 병합했고 병합 후 소스 491개를 재검증했다. 기존 미커밋 시안 기록은 보존하며 원격 push·운영 배포는 하지 않았다.
+
 - 2026-10-04 최종 통합 검수: 소스 Vitest 64개 파일/491개, Nuxt 타입 검사, 운영 API를 지정한 빌드와 SEO/상세 앵커 검증을 통과했다. 실제 Chrome에서 기존 네 메뉴와 상세 경로·320px 가로 넘침·Hero/원본 자료를 확인했다. 로컬 검수 증거는 `output/site-redesign-20261004/README.md`를 따른다. 운영 배포와 실제 견적 접수는 수행하지 않았다.
 
 - 실제 Chrome 검수: 390px KS 분류 상세에서 원본 인증서 문서와 브라우저 PDF 툴바가 표시되는 것을 확인했다. 선택 문서의 원본 iframe title/src·select·다운로드 연결을 유지한다. 320px 인증 목록의 clientWidth/scrollWidth는 310/310으로 가로 넘침이 없었다. 증거: `output/site-redesign-20261004/certificates-detail-mobile.jpg`, `output/site-redesign-20261004/certificates-320.jpg`. 최종 `npm run type-check`와 인증/공통 UI 집중 테스트 18개가 통과했다.

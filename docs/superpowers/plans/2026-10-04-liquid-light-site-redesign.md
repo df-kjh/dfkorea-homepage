@@ -41,4 +41,4 @@ Owner main orchestrator; workers independent review/fix and docs updated by assi
 - [x] Present live Nuxt preview and real screenshots; reset viewport/keep only finaloutputtab.
 
 ## Integration ruling
-User explicitly requested separate branch then merge. Source work is on codex/liquid-light-site from local main978abf4. Commit only task-owned source/docs; prior uncommitted prototypes/doc records remain local. Main merge verification and final preview handoff pending; no remote push/deployment.
+User explicitly requested separate branch then merge. Source work is on codex/liquid-light-site from local main978abf4. Commit only task-owned source/docs; prior uncommitted prototypes/doc records remain local. Feature e106a16 fast-forward merged into local main; clean merge checkout prepared with existing installed dependencies and source64files/491tests PASS after merge. Default-viewport Chrome deliverable open; Codex browser queued. Existing dirty records preserved; no remote push/deployment.

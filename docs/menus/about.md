@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-04 통합: 별도 `codex/liquid-light-site` 브랜치의 `e106a16`을 로컬 `main`에 병합했고 병합 후 소스 491개를 재검증했다. 기존 미커밋 시안 기록은 보존하며 원격 push·운영 배포는 하지 않았다.
+
 - 2026-10-04 최종 통합 검수: 소스 Vitest 64개 파일/491개, Nuxt 타입 검사, 운영 API를 지정한 빌드와 SEO/상세 앵커 검증을 통과했다. 실제 Chrome에서 기존 네 메뉴와 상세 경로·320px 가로 넘침·Hero/원본 자료를 확인했다. 로컬 검수 증거는 `output/site-redesign-20261004/README.md`를 따른다. 운영 배포와 실제 견적 접수는 수행하지 않았다.
 
 - 실제 Chrome 검수: 320px 공개 홈·회사 소개·제품·인증·소식의 clientWidth/scrollWidth가 모두 310/310으로 일치해 페이지 가로 넘침이 없었다. 공개 페이지에서만 기존 body 최소 너비를 해제했으며 관리자 전역 CSS는 보존했다. 390px 모바일 메뉴의 네 실제 경로, ESC 뒤 토글 포커스 복귀, 제품 경로 이동 뒤 닫힘을 확인했다. 증거: `output/site-redesign-20261004/{about,products,certificates,blog}-320.jpg`.
