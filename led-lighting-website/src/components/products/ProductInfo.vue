@@ -20,7 +20,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   series: 'Smart Series',
   price: 0,
-  description: 'Complimentary shipping on orders over $500. Available for immediate dispatch.',
+  description: '',
   isNew: false,
   isFeatured: false,
 })
@@ -39,61 +39,90 @@ const formatPrice = (price: number) => {
 </script>
 
 <template>
-  <div class="lg:col-span-5 lg:sticky top-[100px]">
-    <div class="max-w-md">
-      <!-- Badges -->
-      <div v-if="isNew || isFeatured" class="flex gap-2 mb-4">
-        <ProductBadge v-if="isNew" type="new" />
-        <ProductBadge v-if="isFeatured" type="main" />
-      </div>
-
-      <!-- Series Badge -->
-      <span class="text-primary font-bold text-sm tracking-widest uppercase mb-4 block">
-        {{ series }}
-      </span>
-
-      <!-- Product Name -->
-      <h1 class="text-text-main text-5xl font-bold tracking-tight mb-4 leading-tight">
-        {{ productName }}
-      </h1>
-
-      <!-- Price -->
-      <p v-if="price > 0" class="text-text-main text-3xl font-bold mb-10">
-        {{ formatPrice(price) }}
-      </p>
-
-      <!-- Specs Grid -->
-      <div class="grid grid-cols-2 gap-4 mb-8">
-        <div
-          v-for="(spec, index) in specs"
-          :key="index"
-          class="bg-surface p-5 rounded-2xl border border-divider"
-        >
-          <span class="material-symbols-outlined text-primary mb-2">{{ spec.icon }}</span>
-          <p class="text-[10px] text-text-desc font-bold uppercase tracking-wider">
-            {{ spec.label }}
-          </p>
-          <p class="text-text-main font-bold text-sm">{{ spec.value }}</p>
-        </div>
-      </div>
-
-      <div v-if="$slots.actions" class="product-info-actions">
-        <slot name="actions" />
-      </div>
+  <div class="df-product-info">
+    <div v-if="isNew || isFeatured" class="df-product-badges">
+      <ProductBadge v-if="isNew" type="new" /><ProductBadge v-if="isFeatured" type="main" />
     </div>
+    <p class="df-product-series">{{ series }}</p>
+    <h1>{{ productName }}</h1>
+    <p v-if="price > 0" class="df-product-price">{{ formatPrice(price) }}</p>
+    <dl class="grid df-product-summary">
+      <div v-for="spec in specs" :key="spec.label">
+        <dt>{{ spec.label }}</dt>
+        <dd>{{ spec.value }}</dd>
+      </div>
+    </dl>
+    <div v-if="$slots.actions" class="product-info-actions"><slot name="actions" /></div>
   </div>
 </template>
 
 <style scoped>
-.material-symbols-outlined {
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 300,
-    'GRAD' 0,
-    'opsz' 24;
+.df-product-info {
+  min-width: 0;
+  position: sticky;
+  top: 112px;
+  align-self: start;
 }
-
+.df-product-badges {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.df-product-series {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #887b64;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  margin-bottom: 22px;
+}
+.df-product-info h1 {
+  font-size: clamp(34px, 3.2vw, 52px);
+  font-weight: 500;
+  line-height: 1.27;
+  letter-spacing: -0.06em;
+  overflow-wrap: anywhere;
+}
+.df-product-price {
+  margin-top: 24px;
+  font-size: 28px;
+}
+.df-product-summary {
+  display: block;
+  margin: 34px 0 30px;
+  border-top: 1px solid #d7cdbb;
+}
+.df-product-summary > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 20px;
+  padding: 15px 0;
+  border-bottom: 1px solid #ddd3c2;
+}
+.df-product-summary dt {
+  font-size: 11px;
+  color: #91816a;
+  line-height: 1.8;
+}
+.df-product-summary dd {
+  margin: 0;
+  font-size: 13px;
+  color: #464034;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
 .product-info-actions {
-  margin-top: 0.5rem;
+  margin-top: 12px;
+}
+@media (max-width: 800px) {
+  .df-product-info {
+    position: static;
+  }
+  .df-product-info h1 {
+    font-size: 35px;
+  }
+  .df-product-summary {
+    margin-top: 27px;
+  }
 }
 </style>

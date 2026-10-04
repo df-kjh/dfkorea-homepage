@@ -1,58 +1,44 @@
 <template>
-  <div class="blog bg-background font-inter min-h-screen">
-    <!-- Main Content -->
-    <main class="pt-32 pb-12 max-w-screen-xl mx-auto">
-      <!-- Header -->
+  <div class="blog">
+    <main class="df-news-main">
       <BlogHeader
-        title="회사 소식"
-        subtitle="최신 LED 기술 혁신, 신뢰할 수 있는 제품, 그리고 지속 가능성을 향한 여정"
-      />
-
-      <!-- Category Filter -->
-      <CategoryFilter
+        title="빛을 만드는 이야기."
+        subtitle="디에프코리아의 제품과 회사 소식을 전합니다."
+      /><CategoryFilter
         :categories="categories"
         :selected-category="selectedCategory"
         @category-change="handleCategoryChange"
       />
-
-      <div
-        v-if="fetchError && !loading"
-        class="mx-6 md:mx-12 p-8 rounded-xl bg-red-50"
-        role="alert"
-      >
-        <p>게시글을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p>
-        <BaseButton class="mt-4" @click="fetchPosts()">다시 시도</BaseButton>
+      <div class="df-news-count">
+        <span>{{
+          selectedCategory === '전체'
+            ? `전체 게시글 ${totalPosts}개`
+            : `불러온 게시글 중 ${filteredPosts.length}개`
+        }}</span>
+        <p v-if="selectedCategory !== '전체'">현재 불러온 게시글에서 분류합니다.</p>
       </div>
-      <!-- Loading State -->
+      <div v-if="fetchError && !loading" class="df-news-state" role="alert">
+        <p>게시글을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p>
+        <BaseButton @click="fetchPosts()">다시 시도</BaseButton>
+      </div>
       <LoadingSpinner
         v-else-if="loading && !refreshingSeed"
         message="게시글 목록을 불러오는 중..."
         class="py-20"
-      />
-
-      <!-- Empty State -->
-      <EmptyState
+      /><EmptyState
         v-else-if="filteredPosts.length === 0"
         description="검색 결과가 없습니다"
         class="py-20"
-      />
-
-      <!-- Blog Grid -->
-      <template v-else>
-        <BlogGrid :posts="displayedPosts" @post-click="viewPost" />
-
-        <!-- Loading More Indicator -->
-        <div v-if="loadingMore" class="py-10 text-center">
+      /><template v-else
+        ><BlogGrid :posts="displayedPosts" @post-click="viewPost" />
+        <div v-if="loadingMore" class="df-news-append">
           <LoadingSpinner message="게시글을 더 불러오는 중..." />
         </div>
-
-        <!-- Reobserve after page 1 refreshes, even if this sentinel stays in view. -->
-        <div v-if="hasMore && !loading" ref="observerTarget" class="h-4"></div>
-      </template>
+        <div v-if="hasMore && !loading" ref="observerTarget" class="h-4"></div
+      ></template>
     </main>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -170,7 +156,62 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* The routed list supplies its own container/inset; avoid nesting the global page inset. */
+.df-news-main :deep(.public-page-header) {
+  padding: 0 0 43px;
+}
+.df-news-main :deep(.public-container) {
+  padding-inline: 0;
+}
+
 .blog {
   width: 100%;
+  background: #f0ece3;
+  color: #29251e;
+}
+.df-news-main {
+  max-width: 1360px;
+  margin: auto;
+  padding: 120px 40px 90px;
+}
+.df-news-count {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 23px 0 37px;
+  font-size: 11px;
+  color: #99886c;
+  line-height: 1.8;
+}
+.df-news-state {
+  text-align: center;
+  padding: 65px 25px;
+  background: #e6dece;
+  line-height: 1.9;
+}
+.df-news-state button {
+  margin-top: 20px;
+}
+.df-news-append {
+  padding: 35px 0;
+}
+@media (max-width: 800px) {
+  .df-news-main {
+    padding: 108px 24px 50px;
+  }
+}
+@media (max-width: 640px) {
+  .df-news-count {
+    display: block;
+    margin-bottom: 27px;
+  }
+  .df-news-count p {
+    margin-top: 6px;
+  }
+}
+@media (max-width: 350px) {
+  .df-news-main {
+    padding-inline: 20px;
+  }
 }
 </style>

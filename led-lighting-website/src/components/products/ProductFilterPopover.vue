@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
 .product-filter-trigger {
   min-width: 106px;
   height: 50px;
-  border-color: #cfd8e6;
+  border-color: #cbbca2;
   font-size: 14px;
 }
 .product-filter-trigger .material-symbols-outlined {
@@ -134,8 +134,8 @@ onBeforeUnmount(() => {
   height: 22px;
   padding-inline: 6px;
   border-radius: 999px;
-  background: #0066ff;
-  color: #fff;
+  background: #4c412e;
+  color: #f6f1e7;
   font-size: 11px;
 }
 .product-filter-panel {
@@ -147,10 +147,10 @@ onBeforeUnmount(() => {
   max-height: min(620px, calc(100vh - 190px));
   overflow-y: auto;
   padding: 20px;
-  border: 1px solid #dce3ec;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 20px 55px rgb(23 42 72 / 18%);
+  border: 1px solid #d4c5ab;
+  border-radius: 4px;
+  background: #f6f1e7;
+  box-shadow: 0 20px 55px rgb(48 38 19 / 16%);
 }
 .product-filter-panel__header {
   display: flex;
@@ -159,13 +159,13 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 .product-filter-panel__header h2 {
-  color: #182234;
+  color: #342c20;
   font-size: 18px;
   font-weight: 700;
 }
 .product-filter-panel__header p {
   margin-top: 4px;
-  color: #637083;
+  color: #8d7c60;
   font-size: 12px;
 }
 .product-filter-panel__header button {
@@ -174,10 +174,10 @@ onBeforeUnmount(() => {
   width: 36px;
   height: 36px;
   border-radius: 9px;
-  color: #536177;
+  color: #827154;
 }
 .product-filter-panel__header button:focus-visible {
-  outline: 3px solid #91baff;
+  outline: 3px solid #a98954;
 }
 .product-filter-panel__actions {
   position: sticky;
@@ -186,8 +186,19 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin: 14px -20px -20px;
   padding: 14px 20px 20px;
-  border-top: 1px solid #e7ebf1;
-  background: #fff;
+  border-top: 1px solid #ded1ba;
+  background: #f6f1e7;
+}
+.product-filter-panel :deep(.q-filter-row > details),
+.product-filter-panel :deep(fieldset) {
+  border-color: #d4c4a8;
+  background: transparent;
+}
+.product-filter-panel :deep(.q-filters) {
+  color: #746142;
+}
+.product-filter-panel :deep(input) {
+  accent-color: #8d703f;
 }
 .product-filter-panel__apply {
   flex: 1;
@@ -219,7 +230,7 @@ onBeforeUnmount(() => {
     left: 16px;
     width: auto;
     max-height: min(72dvh, 620px);
-    border-radius: 18px;
+    border-radius: 5px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

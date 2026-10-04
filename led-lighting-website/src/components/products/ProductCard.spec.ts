@@ -21,7 +21,7 @@ const product: Product = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
-const mountProductCard = () => {
+const mountProductCard = (record: Product = product) => {
   const navigate = vi.fn()
   const NuxtLink = defineComponent({
     props: {
@@ -52,7 +52,7 @@ const mountProductCard = () => {
 
   return {
     wrapper: mount(ProductCard, {
-      props: { product },
+      props: { product: record },
       global: { stubs: { NuxtLink } },
     }),
     navigate,
@@ -60,6 +60,20 @@ const mountProductCard = () => {
 }
 
 describe('ProductCard', () => {
+  it('keeps PIPE component length visible without placeholder electrical/certification claims', () => {
+    const { wrapper } = mountProductCard({
+      ...product,
+      name: '연결 파이프',
+      modelName: 'PIPE',
+      dimensions: '1200,900',
+      power: [1],
+      colorTemp: [5700],
+      certifications: ['KS'],
+    })
+    expect(wrapper.text()).toContain('1200')
+    expect(wrapper.text()).not.toMatch(/1W|5700|KS/)
+    wrapper.unmount()
+  })
   it('renders a crawlable link to the product detail page', () => {
     const { wrapper } = mountProductCard()
 
@@ -78,3 +92,20 @@ describe('ProductCard', () => {
     wrapper.unmount()
   })
 })
+
+for (const modified of [
+  { metaKey: true },
+  { ctrlKey: true },
+  { shiftKey: true },
+  { altKey: true },
+  { button: 1 },
+]) {
+  it(`preserves native modified link activation ${JSON.stringify(modified)}`, () => {
+    const { wrapper } = mountProductCard()
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, ...modified })
+    wrapper.get('a[href="/products/product-1"]').element.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(wrapper.emitted('click')).toBeUndefined()
+    wrapper.unmount()
+  })
+}

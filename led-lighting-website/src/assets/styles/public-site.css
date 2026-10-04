@@ -1,0 +1,359 @@
+/* Public presentation is deliberately scoped: admin/Element Plus globals and
+   the teleported quote controller retain their existing palettes and contracts. */
+/* Modern public browsers support :has (Chrome 105+, Safari 15.4+, Firefox 121+).
+   Clear the legacy body minimum only while the public root is present: a 320px
+   viewport can have less content width after reserving its vertical scrollbar. */
+body:has(.public-site) {
+  min-width: 0;
+}
+.public-site {
+  --df-ink: #080906;
+  --df-paper: #f0ece3;
+  --df-champagne: #e4c99b;
+  --df-text: #293023;
+  --df-muted: #7b806e;
+  --df-line: #81876b35;
+  --df-gutter: clamp(24px, 5vw, 76px);
+  color: var(--df-text);
+  background: var(--df-paper);
+  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  color-scheme: light;
+}
+.public-site > main {
+  min-width: 0;
+}
+.public-site .public-container {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  padding-inline: var(--df-gutter);
+}
+.public-site :is(a, button, input, select, summary):focus-visible {
+  outline: 2px solid #b38952;
+  outline-offset: 5px;
+}
+.public-site :is([id], section) {
+  scroll-margin-top: 100px;
+}
+.public-site .public-eyebrow {
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  line-height: 1.6;
+  color: var(--df-muted);
+}
+.public-site .public-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  min-height: 48px;
+  padding: 13px 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.025em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.18s,
+    color 0.18s,
+    border-color 0.18s;
+}
+.public-site .public-action > [aria-hidden] {
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+}
+.public-site .public-action--dark {
+  color: #f2eee3;
+  background: #273021;
+  border-color: #273021;
+}
+.public-site .public-action--dark:hover {
+  background: #465337;
+  border-color: #465337;
+}
+.public-site .public-action--light {
+  color: #1b2115;
+  background: #f0e9d9;
+  border-color: #f0e9d9;
+}
+.public-site .public-action--light:hover {
+  background: var(--df-champagne);
+  border-color: var(--df-champagne);
+}
+.public-site .public-action--outline {
+  color: inherit;
+  background: transparent;
+  border-color: currentColor;
+}
+.public-site .public-action--outline:hover {
+  background: #b4ab8c15;
+}
+.public-site .public-action--text {
+  gap: 42px;
+  padding-inline: 0;
+  border-radius: 0;
+  border-bottom-color: var(--df-line);
+  background: transparent;
+  color: inherit;
+}
+.public-site .public-action--text:hover {
+  color: #987342;
+  border-bottom-color: #987342;
+}
+.public-site .public-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.public-site .public-page-header {
+  padding: 151px 0 62px;
+  background: var(--df-paper);
+}
+.public-site .public-page-header__rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: Arial, sans-serif;
+  font-size: 8px;
+  line-height: 1.6;
+  letter-spacing: 0.14em;
+  color: var(--df-muted);
+}
+.public-site .public-page-header__rail p {
+  margin: 0;
+}
+.public-site .public-page-header__content {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 70px;
+  align-items: end;
+  margin-top: 39px;
+}
+.public-site .public-page-header h1 {
+  margin: 0;
+  font-size: clamp(44px, 4.65vw, 68px);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.07em;
+  white-space: pre-line;
+  color: var(--df-text);
+}
+.public-site .public-page-header__aside > p {
+  margin: 0;
+  max-width: 460px;
+  color: var(--df-muted);
+  font-size: 13px;
+  line-height: 1.9;
+  letter-spacing: -0.025em;
+  white-space: pre-line;
+}
+.public-site .public-page-header__actions {
+  margin-top: 22px;
+}
+.public-site .public-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 32px;
+  margin: -26px 0 26px;
+  color: var(--df-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.public-site .public-back-link:hover {
+  color: #927044;
+}
+.public-site .public-status {
+  padding: 50px 24px;
+  text-align: center;
+  border-block: 1px solid var(--df-line);
+  color: var(--df-muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.public-site .public-status > p {
+  margin: 0;
+}
+.public-site .public-status .public-action {
+  margin-top: 21px;
+}
+.public-site .site-back-top {
+  background: #293622;
+  color: #f0e9d9;
+  box-shadow: 0 5px 20px #14210d24;
+}
+.public-site .site-back-top:hover {
+  background: #e4c99b;
+  color: #1f2919;
+}
+.public-site .public-skip {
+  position: fixed;
+  top: 12px;
+  left: 20px;
+  z-index: 100;
+  padding: 12px 20px;
+  background: #e4c99b;
+  color: #11180c;
+  transform: translateY(-180%);
+  font-size: 13px;
+}
+.public-site .public-skip:focus {
+  transform: translateY(0);
+}
+@media (max-width: 700px) {
+  .public-site {
+    --df-gutter: 24px;
+  }
+  .public-site .public-action {
+    min-height: 46px;
+    padding: 12px 19px;
+    font-size: 11px;
+    gap: 23px;
+  }
+  .public-site .public-action--text {
+    padding-inline: 0;
+    gap: 35px;
+  }
+  .public-site .public-page-header {
+    padding-top: 130px;
+    padding-bottom: 43px;
+  }
+  .public-site .public-page-header__rail {
+    font-size: 7px;
+    letter-spacing: 0.09em;
+  }
+  .public-site .public-page-header__content {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    margin-top: 30px;
+  }
+  .public-site .public-page-header h1 {
+    font-size: clamp(37px, 10vw, 49px);
+    line-height: 1.3;
+  }
+  .public-site .public-page-header__aside > p {
+    font-size: 12px;
+  }
+  .public-site .public-page-header__actions {
+    margin-top: 19px;
+  }
+  .public-site .public-back-link {
+    margin-top: -22px;
+    font-size: 10px;
+  }
+}
+@media (max-width: 350px) {
+  .public-site {
+    --df-gutter: 20px;
+  }
+  .public-site .public-action {
+    padding-inline: 16px;
+    font-size: 10px;
+    gap: 18px;
+  }
+  .public-site .public-action--text {
+    padding-inline: 0;
+  }
+  .public-site .public-page-header h1 {
+    font-size: 34px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-site *,
+  .public-site *::before,
+  .public-site *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* QuoteLauncher is teleported to body and only exists on public routes. Limit
+   these appearance overrides to its ID; keep all dimensions, z-index, safe
+   areas, focus behavior, input validation and submission controllers intact. */
+#quote-widget {
+  color: #293023;
+}
+#quote-widget .q-launcher {
+  color: #e4c99b;
+  background: #172112;
+  box-shadow: 0 6px 24px #14210d30;
+}
+#quote-widget .q-count {
+  color: #28371d;
+  background: #e4c99b;
+}
+#quote-widget .q-panel {
+  color: #293023;
+  background: #f0ece3;
+  border-color: #b5bea245;
+  box-shadow: 0 18px 65px #18250f2b;
+}
+#quote-widget .q-footer {
+  background: #f0ece3;
+  border-color: #a6b19145;
+}
+#quote-widget .q-header-icon {
+  color: #293620;
+  background: #e4c99b;
+}
+#quote-widget .q-steps {
+  border-color: #a6b19145;
+}
+#quote-widget .q-steps li[aria-current='step'] {
+  color: #455f2b;
+  border-color: #7a8b54;
+}
+#quote-widget .q-button {
+  color: #35452a;
+  background: #f6f2e9;
+  border-color: #acb4955e;
+}
+#quote-widget .q-button:hover {
+  background: #e8e8d9;
+}
+#quote-widget .q-button--primary {
+  color: #f0ece3;
+  background: #34472a;
+  border-color: #34472a;
+}
+#quote-widget .q-button--primary:hover {
+  background: #4d633e;
+  border-color: #4d633e;
+}
+#quote-widget .q-button--link {
+  color: #607447;
+  background: transparent;
+  border-color: transparent;
+}
+#quote-widget .q-status,
+#quote-widget .q-cart {
+  color: #52633c;
+  background: #e5e8d9;
+}
+#quote-widget .q-specification {
+  color: #52633c;
+  background: #ececde;
+  border-color: #b4c39a66;
+}
+#quote-widget .q-tags span,
+#quote-widget .q-badge {
+  color: #657747;
+  background: #e3e7d5;
+}
+#quote-widget .q-contact a {
+  color: #66794b;
+}
+#quote-widget input[type='checkbox'] {
+  accent-color: #647f41;
+}
+#quote-widget :is(button, a, summary, input, select, textarea):focus-visible {
+  outline-color: #ad8c52;
+}

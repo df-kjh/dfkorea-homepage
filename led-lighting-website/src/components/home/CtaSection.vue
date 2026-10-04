@@ -1,124 +1,6 @@
-<template>
-  <section class="relative py-32 px-6 bg-white overflow-hidden">
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-5">
-      <div
-        class="absolute inset-0"
-        style="
-          background-image: radial-gradient(circle at 2px 2px, #22a8c3 1px, transparent 0);
-          background-size: 40px 40px;
-        "
-      ></div>
-    </div>
-
-    <div class="relative max-w-4xl mx-auto text-center">
-      <!-- Title -->
-      <h2 class="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight tracking-tight">
-        {{ title }}
-      </h2>
-
-      <!-- Description -->
-      <p class="text-xl text-gray-600 mb-12 leading-relaxed max-w-2xl mx-auto">
-        {{ description }}
-      </p>
-
-      <!-- CTA Button -->
-      <button
-        @click="dialogVisible = true"
-        class="group inline-flex items-center gap-3 bg-primary text-white px-12 py-5 rounded-md font-bold text-base tracking-widest uppercase hover:bg-primary/90 transition-all hover:scale-105 shadow-lg"
-      >
-        <span class="material-symbols-outlined">call</span>
-        <span>상담 문의하기</span>
-      </button>
-    </div>
-
-    <!-- Contact Dialog -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition-all duration-300"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition-all duration-200"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="dialogVisible"
-          class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          @click.self="dialogVisible = false"
-        >
-          <Transition
-            enter-active-class="transition-all duration-300"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition-all duration-200"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-95"
-          >
-            <div
-              v-if="dialogVisible"
-              class="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <!-- Header -->
-              <div class="px-8 pt-8 pb-6 border-b border-gray-100">
-                <h3 class="text-2xl font-bold text-text-main">상담 문의 방법 선택</h3>
-                <button
-                  @click="dialogVisible = false"
-                  class="absolute top-6 right-6 size-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-text-sub"
-                >
-                  <span class="material-symbols-outlined">close</span>
-                </button>
-              </div>
-
-              <!-- Content -->
-              <div class="p-8 grid md:grid-cols-2 gap-4">
-                <button @click="handleQuoteContact" class="md:col-span-2 flex items-center justify-between p-6 rounded-2xl bg-primary text-white text-left hover:bg-primary/90 transition-colors">
-                  <span><strong class="block text-lg">온라인 견적</strong><span class="text-sm opacity-90">제품과 수량을 담아 견적을 요청하세요</span></span><span class="material-symbols-outlined" aria-hidden="true">request_quote</span>
-                </button>
-                <!-- Email Option -->
-                <button
-                  @click="handleEmailContact"
-                  class="group p-6 rounded-2xl border-2 border-gray-200 hover:border-primary hover:bg-primary/5 transition-all text-center"
-                >
-                  <div
-                    class="size-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all"
-                  >
-                    <span class="material-symbols-outlined text-3xl">email</span>
-                  </div>
-                  <h4 class="text-lg font-bold text-text-main mb-2">이메일 문의</h4>
-                  <p class="text-sm text-primary font-medium mb-3">{{ companyEmail }}</p>
-                  <span class="text-xs text-text-desc">
-                    {{ isMobile ? '지메일로 이동' : '이메일 복사' }}
-                  </span>
-                </button>
-
-                <!-- Phone Option -->
-                <button
-                  @click="handlePhoneContact"
-                  class="group p-6 rounded-2xl border-2 border-gray-200 hover:border-primary hover:bg-primary/5 transition-all text-center"
-                >
-                  <div
-                    class="size-16 mx-auto mb-4 rounded-full bg-green-50 flex items-center justify-center text-green-600 group-hover:bg-primary group-hover:text-white transition-all"
-                  >
-                    <span class="material-symbols-outlined text-3xl">call</span>
-                  </div>
-                  <h4 class="text-lg font-bold text-text-main mb-2">전화 문의</h4>
-                  <p class="text-sm text-primary font-medium mb-3">{{ companyPhone }}</p>
-                  <span class="text-xs text-text-desc">
-                    {{ isMobile ? '전화 앱으로 이동' : '전화번호 복사' }}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </Transition>
-        </div>
-      </Transition>
-    </Teleport>
-  </section>
-</template>
-
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, useId, onBeforeUnmount } from 'vue'
+import PublicAction from '@/components/common/site/PublicAction.vue'
 import { useQuoteDraft } from '@/composables/useQuoteDraft'
 import { useToast } from '@/composables/useToast'
 
@@ -128,61 +10,304 @@ interface Props {
   companyEmail?: string
   companyPhone?: string
 }
-
 const props = withDefaults(defineProps<Props>(), {
-  title: '제품 상담이 필요하신가요?',
-  description: '전문 컨설턴트가 최적의 LED 조명 솔루션을 제안해드립니다',
-  companyEmail: 'kjukym@hanmail.net',
+  title: '다음 공간의 빛을, 함께.',
+  description: '필요한 제품과 구성부터 차근히 살펴봅니다.\nDF KOREA에 조명 상담을 남겨주세요.',
+  companyEmail: 'kjukym@dfkorealed.com',
   companyPhone: '032-528-2953',
 })
-
 const quote = useQuoteDraft()
-const handleQuoteContact = (event: Event) => { dialogVisible.value = false; quote.open(event) }
 const toast = useToast()
-const dialogVisible = ref(false)
-
-// 모바일 기기 감지
-const isMobile = computed(() => {
-  if (typeof navigator === 'undefined') return false
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+const contactDialog = ref<HTMLDialogElement | null>(null)
+const dialogTitle = `home-contact-${useId()}`
+let opener: HTMLElement | null = null
+let disposed = false
+const isMobile = computed(
+  () =>
+    typeof navigator !== 'undefined' &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+)
+function openContact(event: Event) {
+  opener = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  contactDialog.value?.showModal()
+}
+function closeContact() {
+  contactDialog.value?.close()
+  if (opener?.isConnected) opener.focus({ preventScroll: true })
+}
+function handleQuoteContact() {
+  // Closing the chooser restores the visible CTA before the existing quote
+  // controller captures its opener, so quote-close never focuses a hidden option.
+  closeContact()
+  quote.open()
+}
+function backdrop(event: MouseEvent) {
+  const dialog = contactDialog.value
+  if (!dialog || event.target !== dialog) return
+  const rect = dialog.getBoundingClientRect()
+  if (
+    event.clientX < rect.left ||
+    event.clientX > rect.right ||
+    event.clientY < rect.top ||
+    event.clientY > rect.bottom
+  )
+    closeContact()
+}
+async function copyContact(value: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    if (disposed) return
+    toast.success(`${label}가 클립보드에 복사되었습니다`)
+    closeContact()
+  } catch (error) {
+    if (disposed) return
+    console.error(`Failed to copy ${label}:`, error)
+    toast.error(`${label} 복사에 실패했습니다`)
+  }
+}
+function handleEmailContact() {
+  if (isMobile.value)
+    window.location.href = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(props.companyEmail)}`
+  else void copyContact(props.companyEmail, '이메일 주소')
+}
+function handlePhoneContact() {
+  if (isMobile.value) window.location.href = `tel:${props.companyPhone.replace(/-/g, '')}`
+  else void copyContact(props.companyPhone, '전화번호')
+}
+onBeforeUnmount(() => {
+  disposed = true
+  contactDialog.value?.close()
 })
-
-// 이메일 문의 처리
-const handleEmailContact = async () => {
-  if (isMobile.value) {
-    // 모바일: 지메일 앱으로 이동
-    window.location.href = `https://mail.google.com/mail/?view=cm&fs=1&to=${props.companyEmail}`
-  } else {
-    // PC: 이메일 복사
-    try {
-      await navigator.clipboard.writeText(props.companyEmail)
-      toast.success('이메일 주소가 클립보드에 복사되었습니다')
-      dialogVisible.value = false
-    } catch (err) {
-      console.error('Failed to copy email:', err)
-      toast.error('이메일 주소 복사에 실패했습니다')
-    }
-  }
-}
-
-// 전화 문의 처리
-const handlePhoneContact = async () => {
-  // 전화번호에서 하이픈 제거
-  const phoneNumber = props.companyPhone.replace(/-/g, '')
-
-  if (isMobile.value) {
-    // 모바일: 전화 앱으로 이동
-    window.location.href = `tel:${phoneNumber}`
-  } else {
-    // PC: 전화번호 복사
-    try {
-      await navigator.clipboard.writeText(props.companyPhone)
-      toast.success('전화번호가 클립보드에 복사되었습니다')
-      dialogVisible.value = false
-    } catch (err) {
-      console.error('Failed to copy phone:', err)
-      toast.error('전화번호 복사에 실패했습니다')
-    }
-  }
-}
 </script>
+
+<template>
+  <section class="home-contact">
+    <div class="public-container contact-layout">
+      <p class="contact-eyebrow">LET'S MAKE LIGHT TOGETHER</p>
+      <div class="contact-copy">
+        <h2>{{ title }}</h2>
+        <p>{{ description }}</p>
+        <PublicAction data-contact-open variant="light" @click="openContact"
+          >상담 문의하기 <span aria-hidden="true">↗</span></PublicAction
+        >
+      </div>
+      <p class="contact-note">제품 · 구성 · 견적<br />필요한 이야기를 들려주세요.</p>
+    </div>
+    <!-- Native modal keeps tab focus and Escape semantics without a second global overlay controller. -->
+    <dialog
+      ref="contactDialog"
+      class="contact-dialog"
+      :aria-labelledby="dialogTitle"
+      @cancel.prevent="closeContact"
+      @click="backdrop"
+    >
+      <div class="contact-dialog-heading">
+        <p>CONTACT DF KOREA</p>
+        <h3 :id="dialogTitle">상담 문의 방법 선택</h3>
+        <button
+          type="button"
+          class="contact-close"
+          aria-label="문의 방법 창 닫기"
+          @click="closeContact"
+        >
+          ×
+        </button>
+      </div>
+      <div class="contact-options">
+        <PublicAction
+          data-contact-quote
+          class="contact-option contact-option-quote"
+          variant="dark"
+          @click="handleQuoteContact"
+          ><span
+            ><strong>온라인 견적</strong><small>제품과 수량을 담아 견적을 요청하세요</small></span
+          ><span aria-hidden="true">↗</span></PublicAction
+        >
+        <PublicAction class="contact-option" variant="outline" @click="handleEmailContact"
+          ><span
+            ><strong>이메일 문의</strong><small>{{ companyEmail }}</small
+            ><em>{{ isMobile ? '지메일로 이동' : '이메일 복사' }}</em></span
+          ><span aria-hidden="true">↗</span></PublicAction
+        >
+        <PublicAction class="contact-option" variant="outline" @click="handlePhoneContact"
+          ><span
+            ><strong>전화 문의</strong><small>{{ companyPhone }}</small
+            ><em>{{ isMobile ? '전화 앱으로 이동' : '전화번호 복사' }}</em></span
+          ><span aria-hidden="true">↗</span></PublicAction
+        >
+      </div>
+    </dialog>
+  </section>
+</template>
+
+<style scoped>
+.home-contact {
+  position: relative;
+  overflow: hidden;
+  padding: 120px 0;
+  background: #10120d;
+  color: #f0ece3;
+}
+.home-contact::before {
+  content: '';
+  position: absolute;
+  width: 750px;
+  height: 750px;
+  border: 1px solid #a3865833;
+  border-radius: 50%;
+  top: -410px;
+  right: -270px;
+  box-shadow:
+    0 0 0 55px #a3865807,
+    0 0 0 110px #a3865805;
+  pointer-events: none;
+}
+.contact-layout {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 3fr 1fr;
+  gap: 36px;
+  align-items: start;
+}
+.contact-eyebrow {
+  font:
+    9px/1.8 Arial,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: #b6a786;
+  padding-top: 13px;
+}
+.contact-copy h2 {
+  font-size: clamp(34px, 4.5vw, 62px);
+  font-weight: 400;
+  letter-spacing: -0.07em;
+  line-height: 1.4;
+}
+.contact-copy p {
+  white-space: pre-line;
+  color: #b2b1a2;
+  font-size: 14px;
+  line-height: 1.9;
+  margin: 25px 0 36px;
+}
+.contact-note {
+  padding-top: 15px;
+  font-size: 11px;
+  line-height: 1.9;
+  color: #aaa48f;
+  text-align: right;
+}
+.contact-dialog {
+  width: min(570px, calc(100vw - 40px));
+  max-height: calc(100svh - 48px);
+  padding: 0;
+  border: 1px solid #c6beab;
+  background: #f0ece3;
+  color: #25271d;
+  margin: auto;
+  overflow-y: auto;
+  box-shadow: 0 24px 90px #0005;
+}
+.contact-dialog::backdrop {
+  background: #050603b3;
+  backdrop-filter: blur(8px);
+}
+.contact-dialog-heading {
+  position: relative;
+  padding: 34px 34px 26px;
+  border-bottom: 1px solid #c9c3b466;
+}
+.contact-dialog-heading p {
+  font:
+    9px/1.6 Arial,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: #9a8059;
+  margin-bottom: 14px;
+}
+.contact-dialog-heading h3 {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  padding-right: 24px;
+}
+.contact-close {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 44px;
+  height: 44px;
+  font-size: 27px;
+  color: #73715f;
+}
+.contact-options {
+  display: grid;
+  gap: 14px;
+  padding: 26px 34px 34px;
+}
+.contact-options :deep(.contact-option) {
+  border-radius: 2px;
+  text-align: left;
+  width: 100%;
+  padding: 22px;
+  border-color: #beb8a5;
+}
+.contact-options :deep(.contact-option-quote) {
+  border-color: #273021;
+}
+.contact-option strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+}
+.contact-option small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.8;
+  opacity: 0.75;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+}
+.contact-option em {
+  display: block;
+  font-size: 10px;
+  font-style: normal;
+  opacity: 0.65;
+  margin-top: 10px;
+}
+@media (max-width: 900px) {
+  .contact-layout {
+    grid-template-columns: 1fr 3fr;
+  }
+  .contact-note {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .home-contact {
+    padding: 76px 0 88px;
+  }
+  .contact-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .contact-eyebrow {
+    padding-top: 0;
+  }
+  .contact-copy p {
+    font-size: 13px;
+  }
+  .contact-dialog-heading {
+    padding: 30px 22px 24px;
+  }
+  .contact-dialog-heading h3 {
+    font-size: 23px;
+  }
+  .contact-options {
+    padding: 22px;
+  }
+  .contact-options :deep(.contact-option) {
+    padding: 18px;
+  }
+}
+</style>

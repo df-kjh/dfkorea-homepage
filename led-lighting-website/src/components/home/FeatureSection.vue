@@ -1,159 +1,221 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import type { ComponentPublicInstance } from 'vue'
-
-interface FeatureSection {
-  title: string
-  description: string
-  images: [string, string]
-  align: 'left' | 'right'
-}
-
-// 3개 섹션 데이터
-const features: FeatureSection[] = [
+import PublicAction from '@/components/common/site/PublicAction.vue'
+const emit = defineEmits<{ ctaClick: [] }>()
+const features = [
   {
-    title: '믿을 수 있는<br/><span class="text-primary">검증된</span> 조명',
+    title: '빛을 만드는 기술.',
     description:
-      '10년간의 노하우로 검증된 완벽한 LED를 경험해보세요. 최소 40,000 시간 이상 지속되는 놀라운 수명으로 장기간 안정적인 조명 환경을 제공합니다.',
+      '조명은 제품의 구조와 사양에서 시작됩니다. 디에프코리아의 LED 조명을 살펴보고, 필요한 공간에 맞는 제품 구성을 찾아보세요.',
     images: ['/images/home/home-feature-1.webp', '/images/home/home-feature-2.webp'],
-    align: 'left',
+    label: 'MADE FOR LIGHT',
   },
   {
-    title: '다양한 <span class="text-primary">색 온도</span><br/>완벽한 재현',
+    title: '공간에 맞는 감각.',
     description:
-      '공간의 용도와 분위기에 맞춘 최적의 색 온도를 제공합니다. 따뜻한 백색부터 차가운 백색까지 다양한 옵션으로 원하는 분위기를 연출하세요.',
+      '밝기와 색온도, 조명의 형태가 공간의 인상을 만듭니다. 제품 자료에 등록된 사양과 선택 항목을 비교하며 원하는 분위기를 계획합니다.',
     images: ['/images/home/home-feature-3.jpg', '/images/home/home-feature-4.jpg'],
-    align: 'right',
+    label: 'LIGHT & SPACE',
   },
   {
-    title: '확실한<br/><span class="text-primary">사후 지원</span> 서비스',
+    title: '선정부터 상담까지.',
     description:
-      '제품 설치부터 유지보수까지 전문가의 체계적인 지원을 받으실 수 있습니다. (주)디에프코리아는 고객만족을 최우선으로 생각합니다.',
+      '설치 환경과 필요한 수량을 알려주세요. 문의 내용에 맞춰 제품 구성과 사양을 함께 확인하고, 조명 선택에 필요한 이야기를 나눕니다.',
     images: ['/images/home/home-feature-5.webp', '/images/home/home-feature-6.webp'],
-    align: 'left',
+    label: 'LET’S TALK LIGHT',
   },
 ]
-
-// refs - 3개 섹션을 각각 추적
-const sectionRefs = ref<HTMLElement[]>([])
-const isVisible = ref<boolean[]>([false, false, false])
-
-// ref 배열에 요소 할당하는 함수
-const setRef = (el: Element | ComponentPublicInstance | null, index: number) => {
-  if (el instanceof HTMLElement) {
-    sectionRefs.value[index] = el
+</script>
+<template>
+  <section class="home-features">
+    <div class="public-container">
+      <div class="features-intro">
+        <p class="section-kicker">FROM LIGHT TO LIFE</p>
+        <h2>빛에서 시작되는<br />공간의 변화.</h2>
+        <span>DF KOREA / LED LIGHTING</span>
+      </div>
+      <article
+        v-for="(feature, index) in features"
+        :key="feature.label"
+        class="feature-row"
+        :class="{ 'feature-row--reverse': index === 1 }"
+      >
+        <div class="feature-copy">
+          <p class="section-kicker">
+            <span>0{{ index + 1 }}</span
+            >{{ feature.label }}
+          </p>
+          <h3>{{ feature.title }}</h3>
+          <p class="feature-description">{{ feature.description }}</p>
+          <PublicAction variant="text" @click="emit('ctaClick')"
+            >제품 살펴보기 <span aria-hidden="true">↗</span></PublicAction
+          >
+        </div>
+        <div class="feature-visual">
+          <div class="feature-images">
+            <img
+              v-for="(image, imageIndex) in feature.images"
+              :key="image"
+              :src="image"
+              :alt="`조명 적용 공간 참고 이미지 ${index * 2 + imageIndex + 1}`"
+              loading="lazy"
+            />
+          </div>
+          <p>LIGHT IN EVERYDAY SPACES</p>
+        </div>
+      </article>
+    </div>
+  </section>
+</template>
+<style scoped>
+.home-features {
+  padding: 92px 0 42px;
+  background: var(--df-paper, #f0ece3);
+  color: var(--df-ink, #080906);
+}
+.section-kicker {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  line-height: 1.6;
+  margin: 0;
+  color: #968566;
+}
+.features-intro {
+  position: relative;
+  padding-bottom: 56px;
+  border-bottom: 1px solid var(--df-line, #d5cec1);
+}
+.features-intro h2 {
+  font-size: clamp(38px, 4.3vw, 62px);
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: -0.075em;
+  margin: 24px 0 0;
+}
+.features-intro > span {
+  position: absolute;
+  right: 0;
+  bottom: 60px;
+  font-size: 8px;
+  letter-spacing: 0.13em;
+  color: #91866f;
+}
+.feature-row {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  align-items: center;
+  gap: clamp(45px, 7vw, 110px);
+  padding: 74px 0;
+  border-bottom: 1px solid var(--df-line, #d5cec1);
+}
+.feature-row:last-child {
+  border-bottom: 0;
+}
+.feature-row--reverse {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+.feature-row--reverse .feature-copy {
+  order: 2;
+}
+.feature-row--reverse .feature-visual {
+  order: 1;
+}
+.feature-copy > .section-kicker {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.feature-copy > .section-kicker > span {
+  font-size: 8px;
+  color: #b3a388;
+}
+.feature-copy h3 {
+  font-size: clamp(28px, 3vw, 42px);
+  letter-spacing: -0.065em;
+  line-height: 1.25;
+  font-weight: 500;
+  margin: 26px 0 20px;
+}
+.feature-description {
+  font-size: 13px;
+  color: #7a7263;
+  line-height: 2;
+  letter-spacing: -0.03em;
+  max-width: 355px;
+  margin: 0 0 25px;
+}
+.feature-copy :deep(.public-action) {
+  font-size: 11px;
+}
+.feature-visual {
+  min-width: 0;
+}
+.feature-images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+.feature-images img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+  filter: saturate(0.78);
+}
+.feature-images img + img {
+  margin-top: 42px;
+}
+.feature-visual > p {
+  font-size: 7px;
+  color: #9c907a;
+  letter-spacing: 0.16em;
+  margin: 18px 0 0;
+}
+@media (max-width: 700px) {
+  .home-features {
+    padding: 61px 0 10px;
+  }
+  .features-intro {
+    padding-bottom: 36px;
+  }
+  .features-intro h2 {
+    font-size: 38px;
+    margin-top: 20px;
+  }
+  .features-intro > span {
+    display: none;
+  }
+  .feature-row,
+  .feature-row--reverse {
+    grid-template-columns: 1fr;
+    gap: 31px;
+    padding: 44px 0;
+  }
+  .feature-row--reverse .feature-copy,
+  .feature-row--reverse .feature-visual {
+    order: initial;
+  }
+  .feature-copy h3 {
+    font-size: 30px;
+    margin: 21px 0 17px;
+  }
+  .feature-description {
+    font-size: 12px;
+    margin-bottom: 18px;
+    max-width: none;
+  }
+  .feature-images {
+    gap: 10px;
+  }
+  .feature-images img + img {
+    margin-top: 27px;
+  }
+  .feature-visual > p {
+    font-size: 6px;
+    margin-top: 14px;
+  }
+  .section-kicker {
+    font-size: 8px;
   }
 }
-
-let observer: IntersectionObserver | null = null
-
-onMounted(() => {
-  observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const index = sectionRefs.value.findIndex((ref) => ref === entry.target)
-          if (index !== -1) {
-            isVisible.value[index] = true
-          }
-        }
-      })
-    },
-    {
-      threshold: 0.2, // 20% 이상 보이면 트리거
-    },
-  )
-
-  // 각 섹션 observe
-  sectionRefs.value.forEach((ref) => {
-    if (ref && observer) {
-      observer.observe(ref)
-    }
-  })
-})
-
-onUnmounted(() => {
-  if (observer) {
-    sectionRefs.value.forEach((ref) => {
-      if (ref) {
-        observer!.unobserve(ref)
-      }
-    })
-  }
-})
-</script>
-
-<template>
-  <div class="bg-white">
-    <!-- 3개 섹션 순회 -->
-    <section
-      v-for="(feature, index) in features"
-      :key="index"
-      :ref="(el) => setRef(el, index)"
-      class="py-16 md:py-24 px-6 overflow-hidden"
-    >
-      <div class="max-w-screen-xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-        <!-- 텍스트 영역 -->
-        <div
-          :class="[
-            'will-change-[opacity,transform]',
-            feature.align === 'right' ? 'order-2 lg:order-1' : 'order-2',
-          ]"
-          :style="{
-            opacity: isVisible[index] ? 1 : 0,
-            transform: isVisible[index] ? 'translateY(0)' : 'translateY(80px)',
-            transition: 'opacity 0.7s ease-out, transform 0.7s ease-out',
-          }"
-        >
-          <h2
-            class="text-gray-900 text-3xl md:text-4xl lg:text-6xl lg:leading-[1.2] font-bold mb-6"
-            v-html="feature.title"
-          ></h2>
-          <p class="text-gray-600 text-base md:text-lg leading-relaxed">
-            {{ feature.description }}
-          </p>
-        </div>
-
-        <!-- 이미지 영역 -->
-        <div :class="['relative', feature.align === 'right' ? 'order-1 lg:order-2' : 'order-1']">
-          <div class="relative z-10 grid grid-cols-2 gap-4">
-            <!-- 첫 번째 이미지 -->
-            <div
-              class="aspect-[9/16] bg-gray-100 rounded-xl overflow-hidden shadow-xl border border-gray-200 will-change-[opacity,transform]"
-              :style="{
-                backgroundImage: `url('${feature.images[0]}')`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                opacity: isVisible[index] ? 1 : 0,
-                transform: isVisible[index] ? 'translateY(0)' : 'translateY(80px)',
-                transition: 'opacity 0.7s ease-out, transform 0.7s ease-out',
-              }"
-            ></div>
-            <!-- 두 번째 이미지 (스태거 효과) -->
-            <div
-              :class="[
-                'aspect-[9/16] bg-gray-100 rounded-xl overflow-hidden shadow-xl border border-gray-200 will-change-[opacity,transform]',
-                index % 2 === 0 ? 'mt-12' : '-mt-12',
-              ]"
-              :style="{
-                backgroundImage: `url('${feature.images[1]}')`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                opacity: isVisible[index] ? 1 : 0,
-                transform: isVisible[index] ? 'translateY(0)' : 'translateY(80px)',
-                transition: 'opacity 0.7s ease-out 0.2s, transform 0.7s ease-out 0.2s',
-              }"
-            ></div>
-          </div>
-          <!-- 장식 배경 blur -->
-          <div
-            :class="[
-              'absolute size-80 bg-primary/20 blur-[100px] rounded-full',
-              feature.align === 'left' ? '-top-20 -left-20' : '-top-20 -right-20',
-            ]"
-          ></div>
-        </div>
-      </div>
-    </section>
-  </div>
-</template>
+</style>

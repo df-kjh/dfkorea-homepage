@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import BaseButton from '@/components/common/BaseButton.vue'
-import HangingBulbScene from './HangingBulbScene.vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import PublicAction from '@/components/common/site/PublicAction.vue'
+import { mountLightField, type LightFieldController } from './liquid-light/light-field'
 
 interface Props {
   title?: string
@@ -10,319 +10,381 @@ interface Props {
   primaryButtonText?: string
   secondaryButtonText?: string
 }
-
-withDefaults(defineProps<Props>(), {
-  title: 'Light Your Life.',
-  subtitle:
-    'Experience the future of architectural illumination. Precision-engineered for modern spaces.',
-  eyebrow: 'DF KOREA · ARCHITECTURAL LIGHTING',
+const props = withDefaults(defineProps<Props>(), {
+  title: '빛의 새로운 흐름.',
+  subtitle: '빛을 만드는 기술. 공간을 바꾸는 감각.\nDF KOREA의 LED 조명으로 시작됩니다.',
+  eyebrow: 'LIGHT, IN A NEW FORM',
   primaryButtonText: '제품 보기',
   secondaryButtonText: '회사 소개',
 })
-
-const emit = defineEmits<{
-  primaryClick: []
-  secondaryClick: []
-}>()
-
+const emit = defineEmits<{ primaryClick: []; secondaryClick: []; scrollDown: [] }>()
 const heroSection = ref<HTMLElement | null>(null)
+const canvas = ref<HTMLCanvasElement | null>(null)
+const motionControl = ref<HTMLButtonElement | null>(null)
+let controller: LightFieldController | null = null
+const headingLines = computed(() =>
+  props.title === '빛의 새로운 흐름.' ? ['빛의 새로운', '흐름.'] : [props.title],
+)
 
-const scrollDown = (): void => {
+onMounted(() => {
+  if (!heroSection.value || !canvas.value || !motionControl.value) return
+  // The field owns its static control label/aria nodes; Vue owns copy and route actions.
+  controller = mountLightField({
+    canvas: canvas.value,
+    hero: heroSection.value,
+    control: motionControl.value,
+  })
+})
+onBeforeUnmount(() => {
+  controller?.dispose()
+  controller = null
+})
+function scrollDown() {
   if (!heroSection.value) return
-  const prefersReducedMotion =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  emit('scrollDown')
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   window.scrollTo({
     top: window.scrollY + heroSection.value.getBoundingClientRect().bottom,
-    behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    behavior: reduced ? 'auto' : 'smooth',
   })
 }
 </script>
 
 <template>
-  <section ref="heroSection" class="hero-shell hero-shell--viewport-fill">
-    <div class="hero-ambient hero-ambient--left"></div>
-    <div class="hero-ambient hero-ambient--right"></div>
-    <div class="hero-grid-lines"></div>
-    <div
-      data-test="hero-transition"
-      class="hero-transition"
-      aria-hidden="true"
-    ></div>
-
-    <div
-      data-test="hero-layout"
-      class="absolute inset-0 z-10 mx-auto flex w-full max-w-[1440px] items-center justify-center gap-8 px-6 py-20 sm:relative sm:inset-auto sm:grid sm:h-full sm:justify-normal sm:pb-20 sm:pt-28 md:px-12 lg:grid-cols-2 lg:gap-4 lg:px-16 lg:pb-12 lg:pt-24 xl:px-24"
-    >
-      <div
-        data-test="hero-copy"
-        class="relative z-20 flex w-full flex-col items-center text-center sm:block sm:text-left lg:pr-8 xl:pr-14"
-      >
-        <p class="hero-eyebrow">{{ eyebrow }}</p>
-        <h1 class="hero-title">{{ title }}</h1>
-        <p class="hero-subtitle">{{ subtitle }}</p>
-
-        <div
-          data-test="hero-actions"
-          class="mt-9 flex flex-wrap justify-center gap-3 sm:justify-start md:mt-11"
+  <section ref="heroSection" class="hero-shell" data-light-hero aria-label="DF KOREA의 빛">
+    <div class="light-fallback" aria-hidden="true"></div>
+    <canvas ref="canvas" data-light-canvas aria-hidden="true"></canvas>
+    <div class="light-scrim" aria-hidden="true"></div>
+    <div class="hero-copy" data-test="hero-copy">
+      <p class="hero-eyebrow"><span aria-hidden="true"></span>{{ eyebrow }}</p>
+      <h1 class="hero-title" :aria-label="title">
+        <span v-for="(line, index) in headingLines" :key="index">{{ line }}</span>
+      </h1>
+      <p class="hero-subtitle">{{ subtitle }}</p>
+      <div class="hero-actions" data-test="hero-actions">
+        <PublicAction variant="light" @click="emit('primaryClick')"
+          >{{ primaryButtonText }} <span aria-hidden="true">↗</span></PublicAction
         >
-          <BaseButton
-            variant="primary"
-            size="large"
-            icon-right="arrow_forward"
-            custom-class="hero-button-primary"
-            @click="emit('primaryClick')"
-          >
-            {{ primaryButtonText }}
-          </BaseButton>
-          <BaseButton
-            variant="default"
-            size="large"
-            custom-class="hero-button-secondary"
-            @click="emit('secondaryClick')"
-          >
-            {{ secondaryButtonText }}
-          </BaseButton>
-        </div>
-
-        <div
-          class="mt-12 hidden items-center gap-4 text-[11px] font-medium tracking-[0.22em] text-white/36 md:flex"
+        <PublicAction variant="outline" @click="emit('secondaryClick')"
+          >{{ secondaryButtonText }} <span aria-hidden="true">↗</span></PublicAction
         >
-          <span class="h-px w-12 bg-cyan-100/35"></span>
-          LIGHT · EFFICIENCY · PRECISION
-        </div>
-      </div>
-
-      <div
-        data-test="hero-visual"
-        class="hero-visual pointer-events-none absolute inset-x-0 bottom-8 top-16 z-0 min-h-[340px] w-full opacity-[0.32] sm:pointer-events-auto sm:relative sm:inset-auto sm:min-h-[420px] sm:opacity-100 lg:h-[72vh] lg:min-h-0 lg:max-h-[760px]"
-      >
-        <HangingBulbScene />
       </div>
     </div>
-
+    <div class="hero-motion">
+      <p data-pointer-hint>정적 빛을 표시합니다</p>
+      <button
+        ref="motionControl"
+        type="button"
+        class="hero-motion-button"
+        data-motion-control
+        disabled
+        aria-label="정적 빛 표시"
+        aria-pressed="false"
+      >
+        <svg class="pause-mark" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M5 3v10M11 3v10" fill="none" stroke="currentColor" stroke-width="2" />
+        </svg>
+        <svg class="play-mark" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m5 3 8 5-8 5Z" fill="currentColor" />
+        </svg>
+        <span data-motion-label>정적 보기</span>
+      </button>
+    </div>
     <button
       type="button"
-      data-test="hero-scroll-down"
       class="hero-scroll-control"
+      data-test="hero-scroll-down"
       aria-label="다음 섹션으로 이동"
       @click="scrollDown"
     >
-      <span class="hero-scroll-control__line"></span>
-      <span class="material-symbols-outlined text-[20px]">south</span>
+      <span>SCROLL TO DISCOVER</span><span aria-hidden="true">↓</span>
     </button>
   </section>
 </template>
 
 <style scoped>
-.hero-shell {
-  position: relative;
-  min-height: 760px;
-  height: 100svh;
-  max-height: 1040px;
-  overflow: hidden;
-  isolation: isolate;
-  background:
-    radial-gradient(circle at 73% 45%, rgba(31, 88, 109, 0.22), transparent 33%),
-    linear-gradient(135deg, #111a21 0%, #080d12 55%, #05080b 100%);
-}
-
-.hero-transition {
-  position: absolute;
-  z-index: 4;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: clamp(140px, 18vh, 210px);
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(5, 8, 11, 0.18) 24%,
-    rgba(45, 51, 55, 0.44) 52%,
-    rgba(207, 210, 212, 0.82) 84%,
-    #ffffff 100%
-  );
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 34%, black 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 34%, black 100%);
-}
-
-.hero-ambient {
-  position: absolute;
-  border-radius: 999px;
-  pointer-events: none;
-  filter: blur(8px);
-}
-
-.hero-ambient--left {
-  top: 13%;
-  left: -10%;
-  width: 44vw;
-  height: 44vw;
-  background: radial-gradient(circle, rgba(63, 118, 141, 0.09), transparent 67%);
-}
-
-.hero-ambient--right {
-  top: 25%;
-  right: -8%;
-  width: 42vw;
-  height: 42vw;
-  background: radial-gradient(circle, rgba(139, 225, 255, 0.1), transparent 65%);
-}
-
-.hero-grid-lines {
+/* The page owns typography/layout. These layers only paint its light field. */
+[data-light-hero] .light-fallback,
+[data-light-hero] [data-light-canvas],
+[data-light-hero] .light-scrim {
   position: absolute;
   inset: 0;
-  opacity: 0.14;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 76px 76px;
-  mask-image: linear-gradient(to right, black, transparent 68%);
 }
-
-.hero-eyebrow {
-  margin-bottom: 1.25rem;
-  color: rgba(191, 236, 249, 0.7);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.24em;
+[data-light-hero] .light-fallback {
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 78% 26%, #80551934, transparent 46%),
+    radial-gradient(ellipse at 22% 85%, #bd762222, transparent 43%), #080906;
 }
-
-.hero-title {
-  max-width: 720px;
-  color: #f6f8f9;
-  font-size: clamp(3.25rem, 5.8vw, 6.8rem);
-  font-weight: 600;
-  line-height: 1.08;
-  letter-spacing: -0.065em;
-  text-wrap: balance;
-}
-
-.hero-subtitle {
-  max-width: 530px;
-  margin-top: 1.75rem;
-  color: rgba(227, 235, 239, 0.62);
-  font-size: clamp(1rem, 1.35vw, 1.25rem);
-  font-weight: 400;
-  line-height: 1.75;
-}
-
-.hero-shell :deep(.base-button.hero-button-primary),
-.hero-shell :deep(.base-button.hero-button-secondary) {
-  min-width: 148px;
-  border-radius: 999px;
-  padding: 0.9rem 1.65rem;
-  font-size: 0.95rem;
-}
-
-.hero-shell :deep(.base-button.hero-button-primary) {
-  border: 1px solid #eefbff;
-  background: #eefbff;
-  color: #0c151b;
-  box-shadow: 0 10px 34px rgba(122, 222, 255, 0.12);
-}
-
-.hero-shell :deep(.base-button.hero-button-primary:hover) {
-  border-color: white;
-  background: white;
-  box-shadow: 0 12px 42px rgba(122, 222, 255, 0.22);
-}
-
-.hero-shell :deep(.base-button.hero-button-secondary) {
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.035);
-  color: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(10px);
-}
-
-.hero-shell :deep(.base-button.hero-button-secondary:hover) {
-  border-color: rgba(255, 255, 255, 0.32);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.hero-scroll-control {
+[data-light-hero] .light-fallback::before,
+[data-light-hero] .light-fallback::after {
+  content: '';
   position: absolute;
-  z-index: 6;
-  right: clamp(1.5rem, 4vw, 4.5rem);
-  bottom: 2.1rem;
+  width: 150%;
+  height: 68%;
+  left: -25%;
+  top: 40%;
+  border: 2px solid #ffdb9d;
+  border-radius: 48%;
+  transform: rotate(-29deg);
+  box-shadow:
+    0 0 8px #fff0d4,
+    0 0 24px #db9c4c,
+    inset 0 0 30px #cf8a2818;
+  opacity: 0.7;
+}
+[data-light-hero] .light-fallback::after {
+  top: 47%;
+  height: 48%;
+  border-width: 12px;
+  filter: blur(10px);
+  box-shadow: 0 0 50px #f4c367;
+  opacity: 0.85;
+}
+[data-light-hero] [data-light-canvas] {
+  z-index: 1;
+  display: block;
+  opacity: 0;
+}
+[data-light-hero] [data-light-canvas][data-render-state='ready'] {
+  opacity: 1;
+}
+[data-light-hero] .light-scrim {
+  z-index: 2;
+  background:
+    linear-gradient(180deg, #05060355, transparent 20%, #07080517 62%, #070805c0),
+    radial-gradient(ellipse at 50% 39%, #03050233, transparent 61%);
+}
+
+.hero-shell {
+  position: relative;
+  isolation: isolate;
+  min-height: 760px;
+  height: 100svh;
+  max-height: 1250px;
+  overflow: hidden;
+  background: #080906;
+  color: #f0ece3;
+  display: grid;
+  place-items: center;
+}
+.hero-copy {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  width: 100%;
+  max-width: 900px;
+  padding: 100px 24px 140px;
+}
+.hero-eyebrow {
   display: flex;
-  min-width: 44px;
-  min-height: 44px;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.42);
-  cursor: pointer;
-  transition: color 200ms ease;
+  gap: 9px;
+  font-size: 10px;
+  letter-spacing: 0.23em;
+  color: #efdbc1;
+  margin: 0 0 31px;
 }
-
-.hero-scroll-control:hover {
-  color: rgba(255, 255, 255, 0.82);
+.hero-eyebrow > span {
+  width: 4px;
+  height: 4px;
+  background: #efd1a5;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #f5d099;
 }
-
-.hero-scroll-control__line {
+.hero-title {
+  font-size: clamp(68px, 7.9vw, 118px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.085em;
+  margin: 0;
+  text-shadow: 0 2px 30px #0005;
+}
+.hero-title > span {
   display: block;
-  width: 38px;
-  height: 1px;
-  background: currentColor;
 }
-
-@media (max-width: 1023px) {
+.hero-title > span + span {
+  color: #e6dccb;
+}
+.hero-subtitle {
+  white-space: pre-line;
+  color: #d4d7cb;
+  font-size: 13px;
+  line-height: 1.9;
+  letter-spacing: -0.03em;
+  margin: 30px 0 0;
+  text-shadow: 0 1px 15px #000;
+}
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 30px;
+}
+.hero-actions :deep(.public-action) {
+  font-size: 12px;
+  min-height: 49px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  gap: 27px;
+}
+.hero-actions :deep(.public-action--outline) {
+  color: #f0ece3;
+  border-color: #ffffff40;
+  background: #0d100b40;
+  backdrop-filter: blur(8px);
+}
+.hero-motion {
+  position: absolute;
+  z-index: 4;
+  bottom: 33px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  max-width: calc(100% - 44px);
+}
+.hero-motion p {
+  color: #c7c6b7;
+  font-size: 9px;
+  line-height: 1.8;
+  white-space: nowrap;
+  margin: 0 0 10px;
+}
+.hero-motion-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  min-width: 112px;
+  padding: 10px 18px;
+  border: 1px solid #ffffff2c;
+  border-radius: 999px;
+  background: #0809067d;
+  backdrop-filter: blur(12px);
+  color: #dfdece;
+  font-size: 10px;
+  cursor: pointer;
+}
+.hero-motion-button:disabled {
+  color: #a3a596;
+  cursor: default;
+}
+.hero-motion-button .play-mark {
+  display: none;
+}
+.hero-motion-button[aria-pressed='true'] .play-mark {
+  display: block;
+}
+.hero-motion-button[aria-pressed='true'] .pause-mark {
+  display: none;
+}
+.hero-scroll-control {
+  position: absolute;
+  z-index: 4;
+  bottom: 43px;
+  left: clamp(24px, 5vw, 72px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border: 0;
+  background: none;
+  color: #bfc3b4;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  padding: 0;
+  min-height: 40px;
+  cursor: pointer;
+}
+.hero-scroll-control > span:last-child {
+  font-size: 21px;
+}
+.hero-motion-button:focus-visible,
+.hero-scroll-control:focus-visible {
+  outline: 2px solid #e4c99b;
+  outline-offset: 5px;
+}
+@media (max-width: 700px) {
   .hero-shell {
-    min-height: 900px;
-    height: auto;
-  }
-
-  .hero-title {
-    max-width: 660px;
-  }
-}
-
-@media (max-width: 639px) {
-  .hero-shell--viewport-fill {
-    width: 100%;
-    min-height: max(820px, 100svh);
-    height: max(820px, 100svh);
+    min-height: max(800px, 100svh);
+    height: max(800px, 100svh);
     max-height: none;
   }
-
-  .hero-title {
-    margin-inline: auto;
-    font-size: clamp(2.8rem, 14vw, 4rem);
-    text-shadow: 0 3px 28px rgba(2, 5, 8, 0.9);
+  .hero-copy {
+    padding: 95px 22px 190px;
   }
-
-  .hero-subtitle {
-    max-width: 320px;
-    margin-top: 1.25rem;
-    margin-inline: auto;
-    line-height: 1.65;
-    text-shadow: 0 2px 18px rgba(2, 5, 8, 0.95);
-  }
-
   .hero-eyebrow {
-    text-shadow: 0 2px 14px rgba(2, 5, 8, 0.95);
+    font-size: 8px;
+    letter-spacing: 0.17em;
+    margin-bottom: 29px;
   }
-
-  .hero-visual {
-    mask-image: radial-gradient(ellipse 72% 58% at 50% 43%, black 8%, transparent 76%);
+  .hero-title {
+    font-size: clamp(53px, 12.7vw, 73px);
+    line-height: 1.12;
+    letter-spacing: -0.08em;
   }
-
+  .hero-subtitle {
+    font-size: 12px;
+    line-height: 1.9;
+    margin-top: 26px;
+  }
+  .hero-actions {
+    margin-top: 28px;
+    gap: 8px;
+  }
+  .hero-actions :deep(.public-action) {
+    font-size: 11px;
+    padding: 13px 19px;
+    gap: 18px;
+    min-height: 46px;
+  }
+  .hero-motion {
+    bottom: 112px;
+  }
+  .hero-motion p {
+    font-size: 8px;
+  }
   .hero-scroll-control {
-    right: 1rem;
-    bottom: 1rem;
+    bottom: 48px;
+    left: 24px;
+    font-size: 7px;
+    gap: 10px;
+  }
+  .hero-scroll-control > span:last-child {
+    font-size: 18px;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  :deep(.base-button),
+@media (max-width: 360px) {
+  .hero-copy {
+    padding: 100px 18px 195px;
+  }
+  .hero-title {
+    font-size: 50px;
+  }
+  .hero-eyebrow {
+    font-size: 7px;
+    letter-spacing: 0.13em;
+  }
+  .hero-subtitle {
+    font-size: 11px;
+  }
+  .hero-actions :deep(.public-action) {
+    padding-inline: 15px;
+    gap: 12px;
+    font-size: 10px;
+  }
   .hero-scroll-control {
+    left: 20px;
+    font-size: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-actions :deep(.public-action) {
     transition: none;
   }
 }

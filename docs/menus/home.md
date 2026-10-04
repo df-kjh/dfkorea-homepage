@@ -2,6 +2,17 @@
 
 ## 구현 완료
 
+- 2026-10-04 최종 통합 검수: 소스 Vitest 64개 파일/491개, Nuxt 타입 검사, 운영 API를 지정한 빌드와 SEO/상세 앵커 검증을 통과했다. 실제 Chrome에서 기존 네 메뉴와 상세 경로·320px 가로 넘침·Hero/원본 자료를 확인했다. 로컬 검수 증거는 `output/site-redesign-20261004/README.md`를 따른다. 운영 배포와 실제 견적 접수는 수행하지 않았다.
+
+### 2026-10-04 실제 Nuxt 홈 Liquid Light 리디자인
+
+- 실제 `/`의 `HomeView.vue`와 기존 홈 섹션 순서를 유지하면서 선택한 Liquid Light Hero를 Vue 컴포넌트와 타입 있는 소스 엔진으로 연결했다. 중앙 제목 `빛의 새로운 흐름.`과 앰버·샴페인 실크 흐름, 누르지 않은 마우스 이동의 국소 굽힘·밝기, 네 개 이하의 짧은 잔광과 빈 배경 클릭 파동을 단일 WebGL2 canvas/RAF로 처리한다. 제품 보기와 회사 소개는 각각 실제 `/products`와 `/about`으로 이동하며 다음 섹션 스크롤·`scrollDown` 이벤트를 유지한다.
+- 수동 정지는 시간·포인터·파동을 함께 동결한다. 동작 줄이기에서는 정적인 셰이더와 비활성 제어, WebGL 실패에서는 CSS 빛 대체 화면과 사실에 맞는 안내를 제공한다. hidden/offscreen·BFCache·컨텍스트 복구·SPA unmount에 대응하며 픽셀 비율과 렌더 픽셀을 제한한다. 라우트 이탈 시 GPU/RAF/이벤트/observer와 문서 진단값을 정리하고, 이전 인스턴스의 정리가 새 Hero 진단값을 지우지 않도록 소유권을 구분한다. native cursor와 수동 터치 스크롤을 유지한다.
+- 설립 `2013`과 LED 제조·제품 선택·상담 설명으로 확인되지 않은 설치·인증·제품 수를 대체했다. 기존 협력사 여덟 곳과 원본 로고, 여섯 개 공간 참고 이미지를 유지한다. 이미지가 자사 시공 사례라는 주장을 추가하지 않으며 콘텐츠는 observer나 애니메이션 없이 기본 표시된다. Feature의 제품 살펴보기 버튼은 실제 제품 페이지로 이동한다.
+- 주요 제품은 기존 `productsAPI.getFeatured()`의 실제 데이터를 사용하고 공통 제품 카드의 상세 이동과 가로 스크롤을 유지한다. 초기/리사이즈 후 좌우 이동 가능 여부를 반영하고 동작 줄이기에서는 즉시 스크롤한다. 조회 중·실제 빈 결과·조회 실패를 구분하며 실패에는 재시도와 전체 제품 링크를 제공한다. 화면을 떠난 뒤 도착한 응답이나 실패 알림은 게시하지 않는다.
+- 상담 선택은 native dialog의 키보드 포커스·Escape·배경 닫기를 사용하고 기존 온라인 견적 controller와 데스크톱 연락처 복사/알림·모바일 Gmail/전화 이동을 연결한다. 선택창을 닫은 뒤 견적 창이 보이는 상담 CTA를 포커스 복귀 대상으로 캡처한다. 홈 이메일은 실제 footer와 같은 `kjukym@dfkorealed.com`, 전화는 `032-528-2953`이다. 기존 `pages/index.vue`의 SEO/canonical과 전역 견적·알림·맨 위로 흐름을 유지한다.
+- 집중 Vitest 검사 6개 파일·25개와 Nuxt 타입 검사를 통과했다. 누르지 않은 hover, 수치/좌표 제한, 정지·leave·reduced·실패·cleanup, 중첩 라우트 진단 소유권, Hero mount/unmount·CTA·스크롤 이벤트, 제품 실패/재시도·늦은 알림 차단, 연락처 dialog·견적 진입·스크롤 불필요 상태를 검사한다. 실제 로컬 Nuxt 브라우저에서는 hydration 이후 Hero `ready`/`playing`·프레임 증가와 API 주요 제품 네 개 표시를 확인했다. 모의 WebGL 검사와 실제 GPU 관측을 구분하며 전체 페이지/모바일 검수는 최종 통합 기록을 따른다. 이 기록은 소스 통합이며 배포 완료를 의미하지 않는다.
+
 - 2026-09-07 Hero의 전구 모델을 4000K 중성백색 A형 LED 전구로 교체했다. 배포 전 프론트엔드 전체 44개 테스트 파일·294개 테스트를 통과했다.
 - 관련 회귀 테스트 21개, 타입·린트 검사와 프로덕션 빌드를 통과했다. 1440×1000 PC 및 390×844 모바일에서 WebGL 렌더링·호버 발광·가로 넘침을 확인하고 실제 컨텍스트 손실 시 CSS 폴백 전환을 검증했다. 빌드 검증 시 9월 3일의 오래된 `.vercel/output`을 잠시 분리해 새 `.output`을 검사한 뒤 원위치로 복원했다.
 
@@ -18,7 +29,10 @@
 - 견적 창은 PC에서 기본 80vw × 84dvh의 비모달 확대 창으로 표시하되 런처 위 가용 높이에 맞춰 제한한다. 헤더에서 440px로 축소할 수 있으며 창을 닫았다 열어도 선택 크기와 작성 내용을 유지한다. 실제 패널 너비가 760px 이상이면 기업/담당자, 제품 검색/사양·담은 목록, 직접입력, 요청 검토를 두 열로 배치한다. 모바일은 기존 하단 대화상자와 본문 스크롤, ESC·포커스 복귀·모바일 포커스 제한·동작 줄이기를 유지한다.
 - 기업 확인·제품 및 사진 선택·접수 확인·접수번호 성공 화면을 제공하고 실패 시 입력을 보존한다. 상세 흐름은 [온라인 견적 기능 현황](quote.md)에 기록한다.
 
-- HeroSection을 왼쪽 카피·CTA와 오른쪽 Three.js LED 전구 오브젝트의 2열 구성으로 표시한다.
+#### 이전 A형 전구 Hero (2026-10-04 Liquid Light로 교체, 소스 보존)
+
+- 아래 항목은 교체 전 Hero 구현과 검수 기록이다. 현재 홈은 위의 Liquid Light 소스 엔진을 사용하며 기존 전구 컴포넌트·검사는 보존한다.
+- 이전 HeroSection을 왼쪽 카피·CTA와 오른쪽 Three.js LED 전구 오브젝트의 2열 구성으로 표시했다.
 - 640px 미만 모바일에서는 Hero 높이를 `max(820px, 100svh)`로 유지하고 전용 레이아웃 레이어와 동일한 상하 패딩으로 카피와 CTA의 중심을 화면 정중앙에 배치한다. 3D 전구는 포인터 입력이 없는 32% 불투명도의 배경 레이어로 겹쳐 가장자리 페이드와 텍스트 그림자로 가독성을 유지한다.
 - 웹과 모바일 모두 Hero 하단에 마스킹된 블러와 다단계 그라데이션을 적용해 어두운 장면이 다음 흰색 통계 섹션으로 자연스럽게 전환된다.
 - 오른쪽 장면은 상단 가로 고정 구조 없이 화면 꼭대기에서 내려오는 단일 세로 전선과 불투명 확산 커버를 가진 LED 전구로 구성한다.
@@ -40,6 +54,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 현재 Nuxt Liquid Light는 화면 아트이며 실제 광학·RGB·센서·추가 색온도 기능을 의미하지 않는다. 참고한 Matthias Hurrle (@atzedent)의 noise/domain-warp 표기를 타입 있는 셰이더에 유지했으며 첨부에 라이선스가 명시되지 않아 CC0 또는 상업 라이선스 확인 완료로 표시하지 않는다. 실제 OS 설정 변경·GPU 오류 유발·BFCache hit·물리 터치 기기·FPS/광학 측정은 자동화된 생명주기 분기 검사와 별개다. 별도 프로토타입의 이전 브라우저 결과를 현재 Nuxt 검수로 대체하지 않는다.
+
 - 2026-09-06 Google Search Console(`kymkjh2002@gmail.com`)과 네이버 서치어드바이저에서 `https://dfkorealed.com` 소유권 및 사이트맵 등록을 확인했다. Google은 사이트맵 상태 `성공`, 발견된 페이지 145개로 갱신되었다. 긴급 반영이 필요한 URL만 각 도구에서 별도로 재수집을 요청한다.
 - 매월 Search Console과 서치어드바이저에서 색인 제외 사유, 크롤링 오류, 중복 canonical, 구조화 데이터 오류를 확인한다. 사이트맵 제출은 발견과 수집을 돕지만 검색 결과 노출이나 순위를 보장하지 않으므로 제목·본문·내부 링크 품질도 함께 관리한다.
 
@@ -47,12 +63,22 @@
 
 - 견적 UI와 실제 API 연결 코드는 구현했지만 국세청 운영 상호 검증, NAVER WORKS 실제 수신, 사진 임시 보관·운영 보유기간 확인 전에는 외부 운영 연동 완료로 표시하지 않는다. 연결 불가 시 재시도와 기존 전화·이메일 문의를 안내한다.
 
-- 현재 전구는 일반적인 A형 LED 전구를 참고한 브랜드용 절차 모델이다. 자사 제품 CAD·정확한 치수·내부 기판을 복제한 것은 아니며 4000K 표현은 화면과 톤매핑에 따른 시각적 근사다.
+- 보존된 이전 전구는 일반적인 A형 LED 전구를 참고한 브랜드용 절차 모델이다. 자사 제품 CAD·정확한 치수·내부 기판을 복제한 것은 아니며 4000K 표현은 화면과 톤매핑에 따른 시각적 근사다.
 - 전선 물리는 과도한 파동을 방지하기 위한 2차원 단일 진자 방식이므로 깊이 방향의 회전, 전선 휨, 복잡한 충돌은 지원하지 않는다.
 - 실제 제품 모델이 제공되면 현재 물리·밝기·렌더러 생명주기를 유지한 채 전구 메시와 재질만 교체해야 한다.
 - 저사양 기기별 실제 프레임 시간 데이터가 축적되면 픽셀 비율과 메시 세그먼트 기준을 추가 조정할 수 있다.
 
 ## 관련 파일
+
+- `led-lighting-website/src/views/HomeView.vue`
+- `led-lighting-website/src/components/home/{HeroSection,StatsSection,ClientsSection,FeatureSection,ProductCarousel,CtaSection}.vue`
+- `led-lighting-website/src/components/home/{HeroSection,ProductCarousel,CtaSection,HomeView-flow}.spec.ts`
+- `led-lighting-website/src/components/home/liquid-light/{light-field,pointer-field,light-shader}.ts`
+- `led-lighting-website/src/components/home/liquid-light/{light-field.spec.js,pointer-field.spec.ts}`
+- `led-lighting-website/src/components/common/site/{PublicAction,PublicPageHeader}.vue`
+- `led-lighting-website/src/assets/styles/public-site.css`
+- `docs/superpowers/specs/2026-10-04-liquid-light-site-redesign-design.md`
+- `docs/superpowers/plans/2026-10-04-liquid-light-site-redesign.md`
 
 - `led-lighting-website/src/views/HomeView.vue`
 - `led-lighting-website/src/views/list-indexing.spec.ts`
@@ -83,6 +109,8 @@
 - `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.spec.ts`
 
 ## 갱신 규칙
+
+- 실제 Nuxt 홈의 Hero/포인터·정지·정적 대체·SPA 정리, 홈 섹션·사실성·실제 제품 API 상태·상담 진입·연락처를 바꾸면 이 문서의 다섯 영역을 같은 작업에서 갱신한다. 공개 공통 셸 변경은 관련 메뉴 문서, 견적 동작 변경은 온라인 견적 문서를 함께 갱신한다. 운영 소스 적용·로컬 검수·배포와 독립 프로토타입 기록을 구분한다.
 
 - 대표 도메인, 홈의 제목·설명·canonical, robots 정책, 사이트맵 또는 공개 목록 상세 링크가 바뀌면 영향을 받는 제품·소식·인증 메뉴 문서와 함께 갱신한다.
 - 월간 색인 점검에서 오류나 제외 사유가 확인되면 원인, 조치, 재검증 결과를 이 문서와 관련 메뉴 문서에 기록한다.

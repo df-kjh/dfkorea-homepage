@@ -1,66 +1,47 @@
 <template>
-  <div class="products bg-background font-inter min-h-screen">
-    <!-- Header with Search -->
-    <main class="pt-32 pb-12 max-w-screen-xl mx-auto">
+  <div class="products df-collection-page">
+    <main class="df-products-main">
       <ProductsHeader
-        title="제품 목록"
+        title="공간에 맞는 빛."
         :total-items="totalProducts"
         :search-query="searchQuery"
         :filters="filters"
         :filter-options="filterOptions"
         @search="handleSearch"
         @apply-filters="applyFilters"
-      />
-
-      <!-- Category Filter -->
-      <CategoryFilter
+      /><CategoryFilter
         :categories="categoryLabels"
         :selected-category="selectedCategoryLabel"
         @category-change="handleCategoryChange"
       />
-
-      <div class="px-6 md:px-12 mb-8 max-w-3xl">
+      <div class="df-filter-summary">
         <ProductFilters v-model="filters" :options="filterOptions" :controls="false" />
-        <div class="flex flex-wrap gap-3 items-center">
+        <div class="df-filter-count">
           <QuoteButton variant="link" @click="resetFilters">검색 조건 초기화</QuoteButton
-          ><span class="text-sm text-gray-600">검색 결과 {{ totalProducts }}개</span>
+          ><span>검색 결과 {{ totalProducts }}개</span>
         </div>
-        <p v-if="filterError" class="text-sm text-red-700">
+        <p v-if="filterError" class="df-filter-error">
           검색 조건을 불러오지 못했습니다.
           <QuoteButton variant="link" @click="loadFilterOptions">다시 시도</QuoteButton>
         </p>
       </div>
-
-      <div
-        v-if="fetchError && !loading"
-        class="mx-6 md:mx-12 p-8 rounded-xl bg-red-50 text-gray-800"
-        role="alert"
-      >
+      <div v-if="fetchError && !loading" class="df-collection-state" role="alert">
         <p>제품을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.</p>
-        <QuoteButton class="mt-4" @click="fetchProducts()">다시 시도</QuoteButton>
+        <QuoteButton @click="fetchProducts()">다시 시도</QuoteButton>
       </div>
-      <!-- Loading State -->
       <LoadingSpinner
         v-else-if="loading && !refreshingSeed"
         message="제품 목록을 불러오는 중..."
         class="py-20"
-      />
-
-      <!-- Empty State -->
-      <EmptyState
+      /><EmptyState
         v-else-if="filteredProducts.length === 0"
         description="조건에 맞는 제품이 없습니다. 검색 조건을 초기화해 보세요."
         class="py-20"
-      />
-
-      <!-- Products Grid -->
-      <template v-else>
-        <ProductGrid :products="filteredProducts" @product-click="viewProductDetail" />
-
-        <!-- Keep the append footer's height stable across pending, failure and retry. -->
-        <div class="product-append-footer mx-6 md:mx-12" :aria-busy="loadingMore">
+      /><template v-else
+        ><ProductGrid :products="filteredProducts" @product-click="viewProductDetail" />
+        <div class="product-append-footer" :aria-busy="loadingMore">
           <p v-if="loadingMore" role="status">제품을 더 불러오는 중…</p>
-          <p v-else-if="appendError" role="alert" class="text-red-700">
+          <p v-else-if="appendError" role="alert">
             다음 제품을 불러오지 못했습니다. 현재 목록은 유지됩니다.
           </p>
           <QuoteButton
@@ -69,10 +50,8 @@
             @click="fetchProducts(currentPage + 1, true)"
             >다시 시도</QuoteButton
           >
-          <!-- Reobserve after page 1 refreshes, even if this sentinel stays in view. -->
-          <div v-if="hasMore && !loading" ref="observerTarget" class="h-4"></div>
-        </div>
-      </template>
+          <div v-if="hasMore && !loading" ref="observerTarget" class="h-4"></div></div
+      ></template>
     </main>
   </div>
 </template>
@@ -261,18 +240,68 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.products {
+  width: 100%;
+  overflow-anchor: none;
+  background: #f0ece3;
+  color: #29251e;
+}
+.df-products-main {
+  max-width: 1360px;
+  margin: auto;
+  padding: 120px 40px 60px;
+}
+.df-filter-summary {
+  padding: 18px 0 33px;
+}
+.df-filter-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border-bottom: 1px solid #d9cdbb;
+  padding-bottom: 20px;
+}
+.df-filter-count span {
+  font-size: 11px;
+  color: #8e7e65;
+}
+.df-filter-summary :deep(.q-btn) {
+  color: #7e6d53;
+  font-size: 11px;
+}
+.df-filter-error {
+  color: #8a3e30;
+  font-size: 12px;
+  margin-top: 15px;
+}
+.df-collection-state {
+  padding: 65px 25px;
+  text-align: center;
+  background: #e9e2d5;
+  line-height: 1.9;
+}
+.df-collection-state button {
+  margin-top: 20px;
+}
 .product-append-footer {
   min-height: 180px;
-  padding-block: 24px;
-  color: #637083;
+  padding-block: 30px;
+  color: #827158;
+  font-size: 13px;
   overflow-anchor: none;
 }
 .product-append-footer > p {
   margin-bottom: 16px;
 }
-.products {
-  width: 100%;
-  /* Appending changes only content below the existing grid; do not anchor to the loader. */
-  overflow-anchor: none;
+@media (max-width: 800px) {
+  .df-products-main {
+    padding: 108px 24px 40px;
+  }
+}
+@media (max-width: 350px) {
+  .df-products-main {
+    padding-inline: 20px;
+  }
 }
 </style>

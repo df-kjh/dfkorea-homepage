@@ -73,3 +73,20 @@ describe('BlogGrid', () => {
     wrapper.unmount()
   })
 })
+
+for (const modified of [
+  { metaKey: true },
+  { ctrlKey: true },
+  { shiftKey: true },
+  { altKey: true },
+  { button: 1 },
+]) {
+  it(`preserves native modified link activation ${JSON.stringify(modified)}`, () => {
+    const { wrapper } = mountBlogGrid()
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, ...modified })
+    wrapper.get('a[href="/blog/post-1"]').element.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(wrapper.emitted('postClick')).toBeUndefined()
+    wrapper.unmount()
+  })
+}

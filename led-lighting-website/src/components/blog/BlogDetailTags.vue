@@ -1,17 +1,27 @@
 <template>
-  <div class="flex flex-wrap gap-2 mt-16 pt-8 border-t border-gray-200">
-    <span
-      v-for="tag in tags"
-      :key="tag"
-      class="px-5 py-2 bg-surface text-text-sub text-[13px] font-medium rounded-full hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-    >
-      {{ tag }}
-    </span>
+  <div class="df-article-tags" aria-label="게시글 태그">
+    <span v-for="tag in tags" :key="tag">{{ tag }}</span>
   </div>
 </template>
-
 <script setup lang="ts">
 defineProps<{
   tags: string[]
 }>()
 </script>
+
+<style scoped>
+.df-article-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 45px;
+  padding-top: 26px;
+  border-top: 1px solid #d8ccb6;
+  color: #a18b66;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.df-article-tags span {
+  overflow-wrap: anywhere;
+}
+</style>

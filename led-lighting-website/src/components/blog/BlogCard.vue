@@ -1,215 +1,136 @@
-<template>
-  <el-card :body-style="{ padding: '0px' }" shadow="hover" class="blog-card">
-    <div class="blog-image">
-      <img :src="getImageUrl(post.image)" :alt="post.title" loading="lazy" />
-      <div class="blog-category">
-        <el-tag :type="categoryType">
-          {{ categoryName }}
-        </el-tag>
-      </div>
-    </div>
-    <div class="blog-content">
-      <div class="blog-meta">
-        <span>
-          <el-icon><Calendar /></el-icon>
-          {{ formattedDate }}
-        </span>
-        <span>
-          <el-icon><View /></el-icon>
-          {{ post.views }}
-        </span>
-      </div>
-      <h3 class="blog-title">{{ post.title }}</h3>
-      <p class="blog-excerpt">{{ post.excerpt }}</p>
-      <el-button type="primary" text @click="emit('view', post)">
-        자세히 보기
-        <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-      </el-button>
-    </div>
-  </el-card>
-</template>
-
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Calendar, View, ArrowRight } from '@element-plus/icons-vue'
+import type { Post } from '@/types'
 import { getImageUrl } from '@/utils/image'
-
-interface BlogPost {
-  id: string
-  title: string
-  excerpt: string
-  content: string
-  category: string
-  image: string
-  views: number
-  createdAt: string
-  updatedAt: string
+const props = defineProps<{ post: Post }>()
+const emit = defineEmits<{ click: [post: Post] }>()
+function handleClick(event: MouseEvent) {
+  // Ordinary clicks keep the list's view-count/navigation event. Modified clicks
+  // must keep the real href's native new-tab/window behavior without side effects.
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+    return
+  event.preventDefault()
+  emit('click', props.post)
 }
-
-interface Props {
-  post: BlogPost
-}
-
-interface Emits {
-  (e: 'view', post: BlogPost): void
-}
-
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
-
-const categoryMap: Record<string, string> = {
-  회사소식: '회사소식',
-  제품소식: '제품소식',
-  기술정보: '기술정보',
-  산업동향: '산업동향',
-}
-
-const categoryTypeMap: Record<string, '' | 'success' | 'info' | 'warning' | 'danger'> = {
-  회사소식: 'info',
-  제품소식: 'success',
-  기술정보: 'danger',
-  산업동향: 'warning',
-}
-
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-}
-
-const categoryName = computed(() => categoryMap[props.post.category] || '기타')
-const categoryType = computed(() => categoryTypeMap[props.post.category] || '')
-const formattedDate = computed(() => formatDate(props.post.createdAt))
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
 </script>
-
+<template>
+  <NuxtLink v-slot="{ href }" custom :to="`/blog/${post.id}`"
+    ><a :href="href ?? `/blog/${post.id}`" class="df-news-card" @click="handleClick"
+      ><div class="df-news-image">
+        <img
+          v-if="post.image"
+          :src="getImageUrl(post.image)"
+          :alt="post.title"
+          loading="lazy"
+        /><span v-else class="df-news-placeholder" aria-hidden="true">DF KOREA<br />NEWSROOM</span
+        ><span class="df-news-arrow" aria-hidden="true">↗</span>
+      </div>
+      <div class="df-news-meta">
+        <span>{{ post.category }}</span
+        ><time :datetime="post.createdAt">{{ formatDate(post.createdAt) }}</time>
+      </div>
+      <h3>{{ post.title }}</h3>
+      <p class="df-news-excerpt">{{ post.excerpt }}</p></a
+    ></NuxtLink
+  >
+</template>
 <style scoped>
-.blog-card {
-  border-radius: 20px;
-  overflow: hidden;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  border: 1px solid #e5e8eb;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+.df-news-card {
+  display: block;
+  min-width: 0;
+  color: #2b271f;
 }
-
-.blog-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-}
-
-.blog-image {
-  width: 100%;
-  height: 240px;
-  overflow: hidden;
-  background-color: var(--toss-light-gray);
+.df-news-image {
+  aspect-ratio: 1.55;
+  background: #e2dbcd;
   position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
 }
-
-.blog-image img {
+.df-news-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s;
 }
-
-.blog-card:hover .blog-image img {
-  transform: scale(1.05);
+.df-news-card:hover img {
+  transform: scale(1.035);
 }
-
-.blog-category {
+.df-news-placeholder {
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  line-height: 2;
+  color: #9f8c6b;
+}
+.df-news-arrow {
   position: absolute;
-  top: 15px;
-  left: 15px;
+  bottom: 15px;
+  right: 15px;
+  border-radius: 50%;
+  background: #f5efdfeb;
+  color: #514634;
+  width: 33px;
+  height: 33px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
 }
-
-.blog-content {
-  padding: 24px;
+.df-news-meta {
   display: flex;
-  flex-direction: column;
-  flex: 1;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 10px;
+  color: #998466;
+  margin-top: 22px;
 }
-
-.blog-meta {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 15px;
-  font-size: 0.9rem;
-  color: var(--toss-gray);
+.df-news-meta time {
+  color: #9d9381;
 }
-
-.blog-meta span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.df-news-card h3 {
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1.45;
+  margin-top: 14px;
+  overflow-wrap: anywhere;
 }
-
-.blog-meta .el-icon {
-  font-size: 16px;
-}
-
-.blog-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--toss-dark);
-  margin-bottom: 12px;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+.df-news-excerpt {
   display: -webkit-box;
+  -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  color: #8b806d;
+  font-size: 13px;
+  line-height: 1.9;
+  margin-top: 16px;
 }
-
-.blog-excerpt {
-  font-size: 0.95rem;
-  color: var(--toss-gray);
-  line-height: 1.6;
-  margin-bottom: 20px;
-  flex: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.df-news-card:focus-visible {
+  outline: 2px solid #987441;
+  outline-offset: 6px;
 }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .blog-image {
-    height: 200px;
+@media (max-width: 640px) {
+  .df-news-card h3 {
+    font-size: 23px;
   }
-
-  .blog-content {
-    padding: 20px;
+  .df-news-meta {
+    margin-top: 19px;
   }
-
-  .blog-title {
-    font-size: 1.15rem;
-  }
-
-  .blog-excerpt {
-    font-size: 0.9rem;
-  }
-
-  .blog-meta {
-    font-size: 0.85rem;
+  .df-news-excerpt {
+    font-size: 12px;
   }
 }
-
-@media (max-width: 480px) {
-  .blog-image {
-    height: 180px;
-  }
-
-  .blog-title {
-    font-size: 1.1rem;
+@media (prefers-reduced-motion: reduce) {
+  .df-news-image img {
+    transition: none;
   }
 }
 </style>

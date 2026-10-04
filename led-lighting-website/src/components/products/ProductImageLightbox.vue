@@ -61,7 +61,7 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <div
       v-if="image"
-      class="fixed inset-0 z-[9999] bg-black/90 flex flex-col"
+      class="fixed inset-0 z-[9999] bg-[#080906]/95 flex flex-col"
       role="dialog"
       aria-modal="true"
       :aria-label="`${title} 이미지 크게 보기`"
@@ -73,7 +73,7 @@ onBeforeUnmount(() => {
         </p>
         <button
           type="button"
-          class="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          class="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full bg-[#e4c99b]/15 hover:bg-[#e4c99b]/25 transition-colors"
           aria-label="이미지 상세보기 닫기"
           @click="close"
         >
@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
         <img :src="image.url" :alt="image.alt" class="max-w-full max-h-full object-contain" />
       </div>
 
-      <p v-if="image.description" class="px-4 pb-5 text-center text-sm md:text-base text-white/80">
+      <p v-if="image.description" class="px-4 pb-5 text-center text-sm md:text-base text-[#d7c8ad]">
         {{ image.description }}
       </p>
     </div>

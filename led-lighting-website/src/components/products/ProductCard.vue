@@ -1,90 +1,144 @@
 <script setup lang="ts">
-import BaseCard from '@/components/common/BaseCard.vue'
 import ProductBadge from '@/components/common/ProductBadge.vue'
 import type { Product } from '@/types'
 import { getFirstImageUrl } from '@/utils/image'
-import { formatWithUnit } from '@/constants/units'
-
-interface Props {
-  product: Product
-}
-
-const props = defineProps<Props>()
-
-const emit = defineEmits<{
-  click: [product: Product]
-}>()
-
-const handleClick = () => {
+import { productCardSummary, productCertificationLabels } from './presentation'
+const props = defineProps<{ product: Product }>()
+const emit = defineEmits<{ click: [product: Product] }>()
+function handleClick(event: MouseEvent) {
+  // Parent-owned selection preserves quote/home/list navigation on an ordinary
+  // click. Modified activation belongs to the real anchor (new tab/window).
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+    return
+  event.preventDefault()
   emit('click', props.product)
 }
-
-const getCertificationIcons = (product: Product): string[] => {
-  const icons: string[] = []
-
-  // certifications 배열 사용
-  if (product.certifications && product.certifications.length > 0) {
-    // KS 인증이 있으면 verified 아이콘
-    if (product.certifications.includes('KS')) {
-      icons.push('/images/certifications/ks.png')
-    }
-    // 고효율 인증이 있으면 energy 아이콘
-    if (product.certifications.includes('고효율')) {
-      icons.push('/images/certifications/high-efficency.png')
-    }
-    // 친환경 인증이 있으면 eco-friendly 아이콘
-    if(product.certifications.includes('친환경')) {
-      icons.push('/images/certifications/eco-friendly.webp')
-    }
-  }
-
-  return icons
-}
 </script>
-
 <template>
   <NuxtLink v-slot="{ href }" custom :to="`/products/${product.id}`">
-    <a :href="href ?? `/products/${product.id}`" class="block" @click.prevent="handleClick">
-      <BaseCard :clickable="true" :hoverable="true" :body-style="{ padding: '0' }">
-        <!-- Product Image -->
-        <div
-          class="aspect-[4/3] rounded-t-3xl overflow-hidden bg-white border-b border-divider relative"
-        >
-          <img
-            :src="getFirstImageUrl(product.images)"
-            :alt="product.name"
-            class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
+    <a :href="href ?? `/products/${product.id}`" class="df-product-card" @click="handleClick">
+      <div class="df-product-card__image">
+        <img :src="getFirstImageUrl(product.images)" :alt="product.name" loading="lazy" />
+        <div class="df-product-card__badges">
+          <ProductBadge v-if="product.isNew" type="new" /><ProductBadge
+            v-if="product.isFeatured"
+            type="main"
           />
-          <!-- Badges -->
-          <div class="absolute top-3 right-3 flex gap-2">
-            <ProductBadge v-if="product.isNew" type="new" />
-            <ProductBadge v-if="product.isFeatured" type="main" />
-          </div>
         </div>
-
-        <!-- Product Info -->
-        <div class="flex flex-col gap-1 p-4">
-          <h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">{{ product.name }}</h3>
-          <p class="text-sm text-text-desc font-medium overflow-hidden whitespace-nowrap text-ellipsis">
-            {{ formatWithUnit(product.power, 'power') }} /
-            {{ formatWithUnit(product.colorTemp, 'colorTemp') }} /
-            {{ formatWithUnit(product.lifespan, 'lifespan') }}
-          </p>
-
-          <!-- Certification Icons -->
-          <div class="flex gap-1 mt-2">
-            <span v-for="icon in getCertificationIcons(product)" :key="icon" class="w-6 h-6">
-              <img
-                :src="icon"
-                :alt="product.name + ' certification icon'"
-                class="w-full h-full object-contain"
-                loading="lazy"
-              />
-            </span>
-          </div>
-        </div>
-      </BaseCard>
+        <span class="df-product-card__arrow" aria-hidden="true">↗</span>
+      </div>
+      <div class="df-product-card__copy">
+        <p class="df-product-card__category">{{ product.category }}</p>
+        <h3>{{ product.name }}</h3>
+        <p class="df-product-card__model">{{ product.modelName }}</p>
+        <p class="df-product-card__spec">{{ productCardSummary(product) }}</p>
+        <p v-if="productCertificationLabels(product).length" class="df-product-card__certs">
+          인증 표기 · {{ productCertificationLabels(product).join(' / ') }}
+        </p>
+      </div>
     </a>
   </NuxtLink>
 </template>
+<style scoped>
+.df-product-card {
+  display: block;
+  color: #25251f;
+  min-width: 0;
+}
+.df-product-card__image {
+  position: relative;
+  aspect-ratio: 1.3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  overflow: hidden;
+}
+.df-product-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 24px;
+  transition: transform 0.35s;
+}
+.df-product-card:hover img {
+  transform: scale(1.035);
+}
+.df-product-card__badges {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  gap: 6px;
+}
+.df-product-card__arrow {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ddd4c4;
+  border-radius: 50%;
+  font-size: 19px;
+}
+.df-product-card__copy {
+  padding-top: 22px;
+}
+.df-product-card__category {
+  font-size: 11px;
+  color: #8a7d6d;
+  margin-bottom: 10px;
+}
+.df-product-card h3 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.df-product-card__model {
+  font-size: 11px;
+  color: #898276;
+  margin-top: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.df-product-card__spec {
+  font-size: 12px;
+  color: #686156;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+.df-product-card__certs {
+  font-size: 10px;
+  color: #8b816e;
+  margin-top: 8px;
+  line-height: 1.7;
+}
+.df-product-card:focus-visible {
+  outline: 2px solid #9b793f;
+  outline-offset: 6px;
+}
+@media (max-width: 640px) {
+  .df-product-card h3 {
+    font-size: 22px;
+  }
+  .df-product-card__image {
+    aspect-ratio: 1.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-product-card__image img {
+    transition: none;
+  }
+}
+</style>

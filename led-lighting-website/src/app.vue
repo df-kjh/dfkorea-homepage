@@ -1,8 +1,17 @@
 <template>
-  <div id="app" class="bg-background-dark min-h-screen flex flex-col text-white font-sans">
+  <div
+    id="app"
+    class="min-h-screen flex flex-col font-sans"
+    :class="
+      isAdminPage
+        ? 'bg-background-dark text-white'
+        : ['public-site', { 'is-home': route.path === '/' }]
+    "
+  >
+    <a v-if="!isAdminPage" class="public-skip" href="#public-content">본문으로 이동</a>
     <TheNavigation v-if="!isAdminPage" />
 
-    <main class="flex-1 w-full">
+    <main id="public-content" class="flex-1 w-full" tabindex="-1">
       <NuxtPage />
     </main>
 
@@ -11,7 +20,7 @@
     <button
       v-show="showBackTop && !isAdminPage"
       class="site-back-top fixed w-12 h-12 bg-primary text-background-white rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all hover:-translate-y-1 z-50"
-      aria-label="Back to top"
+      aria-label="페이지 맨 위로"
       @click="scrollToTop"
     >
       <span class="material-symbols-outlined">arrow_upward</span>
@@ -31,6 +40,7 @@ import TheNavigation from '@/components/layout/TheNavigation.vue'
 import TheFooter from '@/components/layout/TheFooter.vue'
 import QuoteLauncher from '@/components/quote/QuoteLauncher.vue'
 import ToastContainer from '@/components/common/ToastContainer.vue'
+import '@/assets/styles/public-site.css'
 
 const route = useRoute()
 const isAdminPage = computed(() => route.path.startsWith('/admin'))
@@ -43,7 +53,7 @@ const handleScroll = () => {
 const scrollToTop = () => {
   window.scrollTo({
     top: 0,
-    behavior: 'smooth',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
   })
 }
 

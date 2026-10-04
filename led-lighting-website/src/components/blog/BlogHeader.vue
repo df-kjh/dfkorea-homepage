@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicPageHeader from '@/components/common/site/PublicPageHeader.vue'
 interface Props {
   title?: string
   subtitle?: string
@@ -12,8 +13,6 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <header class="px-6 md:px-12 mb-12">
-    <h1 class="text-4xl md:text-5xl font-bold text-text-main tracking-tight">{{ title }}</h1>
-    <p class="text-text-sub mt-4 text-lg max-w-2xl">{{ subtitle }}</p>
-  </header>
+  <PublicPageHeader eyebrow="DF KOREA NEWSROOM" :title="title" :description="subtitle" index="04" />
 </template>
+<style scoped></style>

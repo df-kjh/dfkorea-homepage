@@ -19,22 +19,31 @@ const handleProductClick = (product: Product) => {
 </script>
 
 <template>
-  <div class="px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-12">
-    <div v-for="(product, index) in products" :key="product.id">
+  <div class="df-product-grid">
+    <div v-for="product in products" :key="product.id">
       <ProductCard :product="product" @click="handleProductClick" />
-
-      <!-- Divider (hidden on last item on mobile) -->
-      <hr class="mt-8 border-divider" :class="{ 'md:hidden': index === products.length - 1 }" />
     </div>
   </div>
 </template>
 
 <style scoped>
-.material-symbols-outlined {
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 300,
-    'GRAD' 0,
-    'opsz' 24;
+.df-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 48px 28px;
+}
+.df-product-grid > div {
+  min-width: 0;
+}
+@media (max-width: 1050px) {
+  .df-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .df-product-grid {
+    grid-template-columns: 1fr;
+    gap: 38px;
+  }
 }
 </style>

@@ -1,184 +1,267 @@
-<template>
-  <div class="w-full bg-background font-inter min-h-screen">
-    <!-- Navigation Header -->
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-      <div class="max-w-7xl mx-auto px-4 py-4">
-        <div class="flex items-center gap-4">
-          <button
-            @click="goBack"
-            class="flex items-center justify-center size-10 text-black rounded-lg"
-          >
-            <span class="material-symbols-outlined text-2xl">arrow_back</span>
-          </button>
-          <div class="flex-1">
-            <h1 class="text-xl font-bold text-primary">{{ categoryName }}</h1>
-            <p class="text-sm text-secondary">{{ certificates.length }}개의 인증서</p>
-          </div>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Loading State -->
-    <LoadingSpinner v-if="loading" message="인증서 정보를 불러오는 중..." :size="48" />
-
-    <!-- Error State -->
-    <div v-else-if="error" class="max-w-4xl mx-auto px-4 py-20 text-center">
-      <p class="text-red-500 text-lg mb-4">{{ error }}</p>
-      <button
-        @click="goBack"
-        class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-      >
-        목록으로 돌아가기
-      </button>
-    </div>
-
-    <!-- Empty State -->
-    <div v-else-if="certificates.length === 0" class="max-w-4xl mx-auto px-4 py-20 text-center">
-      <p class="text-gray-500 text-lg mb-4">해당 구분에 등록된 인증서가 없습니다.</p>
-      <button
-        @click="goBack"
-        class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-      >
-        목록으로 돌아가기
-      </button>
-    </div>
-
-    <!-- Certificates Content -->
-    <div v-else-if="selectedCertificate" class="max-w-7xl mx-auto px-4 py-8">
-      <!-- Selected Certificate -->
-      <!-- PDF Viewer -->
-      <!-- Download Button -->
-      <div class="pdf-controls flex justify-end gap-4">
-        <BaseSelectBox v-model="selectedCertificateId" :options="certificateOptions" />
-        <BaseButton
-          :disabled="!selectedCertificate.certificatePdf"
-          variant="primary"
-          icon-left="download"
-          @click="downloadPdf(selectedCertificate?.certificatePdf ?? '', selectedCertificate.name)"
-        >
-          <span v-if="!isMobile">다운로드</span>
-        </BaseButton>
-      </div>
-
-      <!-- PDF Content -->
-      <div v-if="selectedCertificate.certificatePdf" class="pdf-viewer-container">
-        <VuePdfEmbed :source="selectedCertificate.certificatePdf" class="pdf-embed" />
-      </div>
-
-      <!-- No PDF Message -->
-      <div v-else class="p-12 text-center bg-gray-50">
-        <span class="material-symbols-outlined text-gray-300 text-6xl mb-4">description</span>
-        <p class="text-gray-500">등록된 인증서 PDF가 없습니다.</p>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { certificatesAPI } from '@/api'
 import type { Certificate } from '@/types'
 import { normalizeCertificateCategory } from '@/utils/certificate-category'
-import { useResponsive } from '@/composables/useResponsive'
-import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import BaseSelectBox from '@/components/common/BaseSelectBox.vue'
-import BaseButton from '@/components/common/BaseButton.vue'
+import PublicPageHeader from '@/components/common/site/PublicPageHeader.vue'
+import PublicAction from '@/components/common/site/PublicAction.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 
 const emit = defineEmits<{ select: [certificate: Certificate | null] }>()
-const router = useRouter()
 const route = useRoute()
-const { isMobile } = useResponsive()
 const certificates = ref<Certificate[]>([])
 const selectedCertificateId = ref<string | null>(null)
 const loading = ref(true)
-const error = ref<string | null>(null)
-
-// Vue Router already decodes params; decoding again would break names containing %.
+const error = ref(false)
+const pdfError = ref(false)
+const pdfAttempt = ref(0)
+// Router params are already decoded; a second decode breaks literal % names.
 const categoryName = computed(() => normalizeCertificateCategory(String(route.params.id || '')))
-
-// 선택된 인증서 computed
-const selectedCertificate = computed(() => {
-  if (selectedCertificateId.value === null || certificates.value.length === 0) {
-    return null
-  }
-  return certificates.value.find((cert) => cert.id === selectedCertificateId.value) || null
+const selectedCertificate = computed(
+  () =>
+    certificates.value.find((certificate) => certificate.id === selectedCertificateId.value) ||
+    null,
+)
+watch(selectedCertificate, (certificate) => {
+  pdfError.value = false
+  pdfAttempt.value = 0
+  emit('select', certificate)
 })
-
-// 인증서 옵션 computed
-const certificateOptions = computed(() => {
-  return certificates.value.map((cert) => ({
-    label: cert.name,
-    value: cert.id,
-  }))
-})
-
-// The page owns all head tags; selection changes content metadata without a URL write.
-watch(selectedCertificate, (certificate) => emit('select', certificate))
-
-const fetchCertificates = async () => {
+function retryPdf() {
+  pdfError.value = false
+  pdfAttempt.value++
+}
+async function fetchCertificates() {
+  loading.value = true
+  error.value = false
   try {
-    loading.value = true
-    error.value = null
-    // 모든 인증서를 가져온 후 해당 category로 필터링
     const { data } = await certificatesAPI.getAll()
-    certificates.value = data.filter((cert: Certificate) => {
-      return normalizeCertificateCategory(cert.category) === categoryName.value
-    })
-
-    // 첫 번째 인증서를 기본으로 선택
-    if (certificates.value.length > 0 && certificates.value[0]) {
-      selectedCertificateId.value = certificates.value[0].id
-    }
-  } catch (err) {
-    console.error('Failed to fetch certificates:', err)
-    error.value = '인증서 정보를 불러오는데 실패했습니다.'
+    certificates.value = data.filter(
+      (certificate: Certificate) =>
+        normalizeCertificateCategory(certificate.category) === categoryName.value,
+    )
+    selectedCertificateId.value = certificates.value[0]?.id || null
+  } catch {
+    error.value = true
   } finally {
     loading.value = false
   }
 }
-
-const goBack = () => {
-  router.push('/certificates')
-}
-
-const downloadPdf = (pdfUrl: string, certificateName: string) => {
-  const link = document.createElement('a')
-  link.href = pdfUrl
-  link.download = `${certificateName}.pdf`
-  link.target = '_blank'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
-
-onMounted(() => {
-  fetchCertificates()
-})
+onMounted(fetchCertificates)
 </script>
-
+<template>
+  <div class="certificate-detail-page">
+    <PublicPageHeader
+      eyebrow="CERTIFICATE DOCUMENTS"
+      :title="categoryName"
+      index="03 / CERTIFICATES"
+      back-to="/certificates"
+      back-label="인증 목록으로"
+      description="등록 문서를 선택해 원본 인증 자료를 확인하세요."
+    />
+    <section class="public-container certificate-documents" aria-label="인증 원본 문서">
+      <div v-if="loading" class="public-status" role="status">
+        <p>인증서 정보를 불러오는 중입니다.</p>
+      </div>
+      <div v-else-if="error" class="public-status" role="alert">
+        <p>인증서 정보를 불러오지 못했습니다.</p>
+        <PublicAction data-certificate-retry @click="fetchCertificates"
+          >다시 불러오기 <span aria-hidden="true">↗</span></PublicAction
+        >
+      </div>
+      <div v-else-if="!certificates.length" class="public-status">
+        <p>해당 구분에 등록된 인증서가 없습니다.</p>
+        <PublicAction to="/certificates" variant="text"
+          >인증 목록으로 <span aria-hidden="true">↗</span></PublicAction
+        >
+      </div>
+      <template v-else-if="selectedCertificate">
+        <div class="certificate-document-controls">
+          <div>
+            <label for="certificate-document"
+              >인증 문서 선택 <span>{{ certificates.length }} DOCUMENTS</span></label
+            ><select id="certificate-document" v-model="selectedCertificateId">
+              <option
+                v-for="certificate in certificates"
+                :key="certificate.id"
+                :value="certificate.id"
+              >
+                {{ certificate.name }}
+              </option>
+            </select>
+          </div>
+          <PublicAction
+            v-if="selectedCertificate.certificatePdf"
+            :href="selectedCertificate.certificatePdf"
+            :download="`${selectedCertificate.name}.pdf`"
+            target="_blank"
+            rel="noopener noreferrer"
+            >PDF 다운로드 <span aria-hidden="true">↓</span></PublicAction
+          >
+        </div>
+        <div v-if="selectedCertificate.certificatePdf" class="certificate-pdf">
+          <div v-if="pdfError" class="certificate-pdf__fallback">
+            <div class="certificate-pdf__error" role="status">
+              <p>원본 PDF로 확인하세요.</p>
+              <PublicAction variant="light" data-pdf-retry @click="retryPdf"
+                >미리보기 다시 표시 <span aria-hidden="true">↗</span></PublicAction
+              >
+            </div>
+            <!-- Public object storage may allow navigation but omit fetch CORS.
+              A native document frame keeps the original accessible in that case. -->
+            <iframe
+              :src="selectedCertificate.certificatePdf"
+              :title="`${selectedCertificate.name} 원본 PDF`"
+              class="certificate-pdf__original"
+            />
+          </div>
+          <VuePdfEmbed
+            v-else
+            :key="`${selectedCertificate.id}-${pdfAttempt}`"
+            :source="selectedCertificate.certificatePdf"
+            class="certificate-pdf__pages"
+            @loading-failed="pdfError = true"
+            @rendering-failed="pdfError = true"
+          />
+        </div>
+        <div v-else class="public-status"><p>이 문서에 등록된 PDF가 없습니다.</p></div>
+        <p class="certificate-document-note">
+          원본 문서의 인증 범위와 내용을 확인해 주세요. PDF 다운로드는 원본 자료 링크로 연결됩니다.
+        </p>
+      </template>
+    </section>
+  </div>
+</template>
 <style scoped>
-.pdf-controls {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
+.certificate-detail-page {
+  min-height: 75vh;
+  background: var(--df-paper, #f0ece3);
 }
-
-.pdf-viewer-container {
+.certificate-documents {
+  padding-bottom: 76px;
+}
+.certificate-document-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 24px 0;
+  border-top: 1px solid var(--df-line);
+}
+.certificate-document-controls > div {
+  flex: 1;
+  max-width: 620px;
+  min-width: 0;
+}
+.certificate-document-controls label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 11px;
+  color: #73825e;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.certificate-document-controls label > span {
+  color: #929f7e;
+  font-family: Arial, sans-serif;
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+.certificate-document-controls select {
+  display: block;
   width: 100%;
-  min-height: 600px;
-  background: #525252;
+  min-height: 49px;
+  padding: 12px 35px 12px 16px;
+  border: 1px solid #8c9d6f52;
+  border-radius: 2px;
+  color: #3c4e2e;
+  background: #e7e8dd;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+}
+.certificate-document-controls .public-action {
+  flex-shrink: 0;
+}
+.certificate-pdf {
   display: flex;
   justify-content: center;
-  padding: 2rem 0;
+  min-height: 600px;
+  padding: 34px;
+  background: #5c6650;
+  border: 1px solid #72826355;
 }
-
-.pdf-embed {
+.certificate-pdf__pages {
   width: 100%;
-  max-width: 900px;
+  max-width: 850px;
+}
+.certificate-pdf__fallback {
+  width: 100%;
+}
+.certificate-pdf__original {
+  display: block;
+  width: 100%;
+  height: min(80vh, 1000px);
+  min-height: 540px;
+  border: 0;
+  background: #f0ece3;
+}
+.certificate-pdf__error {
+  padding: 0 0 24px;
+  color: #e5e9d8;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.certificate-pdf__error .public-action {
+  margin-top: 20px;
+}
+.certificate-pdf :deep(canvas) {
+  max-width: 100%;
+  height: auto !important;
+}
+.certificate-document-note {
+  margin: 20px 0 0;
+  color: #8e9b7b;
+  font-size: 9px;
+  line-height: 1.8;
+  letter-spacing: -0.025em;
+}
+@media (max-width: 700px) {
+  .certificate-documents {
+    padding-bottom: 49px;
+  }
+  .certificate-document-controls {
+    align-items: start;
+    flex-direction: column;
+    gap: 17px;
+    padding: 22px 0;
+  }
+  .certificate-document-controls > div {
+    width: 100%;
+    max-width: none;
+  }
+  .certificate-document-controls select {
+    font-size: 16px;
+  }
+  .certificate-document-controls label {
+    font-size: 9px;
+  }
+  .certificate-document-controls .public-action {
+    align-self: end;
+  }
+  .certificate-pdf {
+    padding: 14px 10px;
+    min-height: 380px;
+  }
+  .certificate-document-note {
+    font-size: 8px;
+  }
+  .certificate-pdf__original {
+    min-height: 430px;
+  }
 }
 </style>

@@ -16,21 +16,67 @@ const handleCategoryClick = (category: string) => {
 </script>
 
 <template>
-  <div class="px-6 md:px-12 mb-8">
-    <div class="flex flex-wrap gap-3">
-      <button
-        v-for="category in categories"
-        :key="category"
-        @click="handleCategoryClick(category)"
-        :class="[
-          'px-5 py-2.5 rounded-full text-sm font-bold transition-all',
-          selectedCategory === category
-            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-            : 'bg-surface text-text-sub hover:bg-primary/10 hover:text-primary border border-divider',
-        ]"
-      >
-        {{ category }}
-      </button>
-    </div>
+  <div class="df-categories" aria-label="분류">
+    <button
+      v-for="category in categories"
+      :key="category"
+      type="button"
+      :aria-pressed="selectedCategory === category"
+      :class="{ 'is-selected': selectedCategory === category }"
+      @click="handleCategoryClick(category)"
+    >
+      {{ category }}
+    </button>
   </div>
 </template>
+<style scoped>
+.df-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 21px 0;
+  border-top: 1px solid #d6c9b3;
+  border-bottom: 1px solid #d6c9b3;
+}
+.df-categories button {
+  min-height: 42px;
+  padding: 10px 20px;
+  border: 1px solid #d7c9b0;
+  border-radius: 999px;
+  background: transparent;
+  color: #8a7758;
+  font-size: 12px;
+  line-height: 1.6;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.df-categories button:hover {
+  background: #e6ddcb;
+}
+.df-categories button.is-selected {
+  background: #29291e;
+  border-color: #29291e;
+  color: #f3e8d2;
+}
+.df-categories button:focus-visible {
+  outline: 2px solid #92703d;
+  outline-offset: 4px;
+}
+@media (max-width: 640px) {
+  .df-categories {
+    gap: 7px;
+    padding-block: 17px;
+  }
+  .df-categories button {
+    padding: 9px 15px;
+    font-size: 11px;
+    min-height: 38px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-categories button {
+    transition: none;
+  }
+}
+</style>

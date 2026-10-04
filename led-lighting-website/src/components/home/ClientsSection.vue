@@ -1,20 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-
 interface Client {
   name: string
   logo: string
 }
-
-interface Props {
-  title?: string
-  subtitle?: string
-  clients?: Client[]
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  title: '신뢰받는 파트너',
-  subtitle: 'Trusted Partners',
+withDefaults(defineProps<{ title?: string; subtitle?: string; clients?: Client[] }>(), {
+  title: '함께해 온 파트너',
+  subtitle: 'PARTNERS',
   clients: () => [
     { name: '경찰청', logo: '/images/clients/경찰청.svg' },
     { name: '농협', logo: '/images/clients/농협 하나로마트.svg' },
@@ -26,78 +18,114 @@ const props = withDefaults(defineProps<Props>(), {
     { name: 'CGV', logo: '/images/clients/CGV.svg' },
   ],
 })
-
-// 로고가 충분히 보이도록 배열을 3번 복제
-const duplicatedClients = ref([...props.clients, ...props.clients, ...props.clients])
+const failedLogos = ref(new Set<string>())
 </script>
-
 <template>
-  <section class="py-16 md:py-20 px-6 bg-gray-50">
-    <div class="max-w-screen-xl mx-auto">
-      <!-- 타이틀 -->
-      <div class="text-center mb-12">
-        <p class="text-primary text-sm font-semibold uppercase tracking-wider mb-2">
-          {{ subtitle }}
-        </p>
-        <h2 class="text-gray-900 text-3xl md:text-4xl font-bold">{{ title }}</h2>
+  <section class="home-partners">
+    <div class="public-container">
+      <div class="partners-heading">
+        <p>{{ subtitle }}</p>
+        <h2>{{ title }}</h2>
       </div>
-
-      <!-- 무한 스크롤 로고 컨테이너 -->
-      <div class="relative overflow-hidden">
-        <!-- 좌측 그라디언트 페이드 -->
-        <div
-          class="absolute left-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-r from-gray-50 to-transparent z-10"
-        ></div>
-        <!-- 우측 그라디언트 페이드 -->
-        <div
-          class="absolute right-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-l from-gray-50 to-transparent z-10"
-        ></div>
-
-        <!-- 스크롤 애니메이션 래퍼 -->
-        <div class="flex animate-scroll hover:pause-animation">
-          <!-- 로고 아이템들 -->
-          <div
-            v-for="(client, index) in duplicatedClients"
-            :key="`client-${index}`"
-            class="flex-shrink-0 mx-6 md:mx-8 flex items-center justify-center"
-          >
-            <div
-              class="w-32 h-20 md:w-40 md:h-24 flex items-center justify-center bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-300"
-            >
-              <img
-                :src="client.logo"
-                :alt="`${client.name} 로고`"
-                class="max-w-full max-h-full object-contain grayscale hover:grayscale-0 transition-all duration-300"
-                @error="(e) => (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'40\'%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%23999\' font-family=\'Arial\' font-size=\'12\'%3E' + client.name + '%3C/text%3E%3C/svg%3E'"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <ul class="partners-grid">
+        <li v-for="client in clients" :key="client.name">
+          <span v-if="failedLogos.has(client.name)" class="partner-name">{{ client.name }}</span
+          ><img
+            v-else
+            :src="client.logo"
+            :alt="`${client.name} 로고`"
+            loading="lazy"
+            @error="failedLogos.add(client.name)"
+          />
+        </li>
+      </ul>
     </div>
   </section>
 </template>
-
 <style scoped>
-/* 무한 스크롤 애니메이션 */
-@keyframes scroll {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    /* 전체 길이의 1/3만큼 이동 (3번 복제했으므로) */
-    transform: translateX(calc(-100% / 3));
-  }
+.home-partners {
+  padding: 52px 0 61px;
+  background: #e9e4d9;
+  color: var(--df-ink, #080906);
 }
-
-.animate-scroll {
-  animation: scroll 30s linear infinite;
+.partners-heading {
   display: flex;
-  width: max-content;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 34px;
 }
-
-/* 호버 시 애니메이션 일시정지 */
-.pause-animation:hover {
-  animation-play-state: paused;
+.partners-heading p {
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  color: #9a8c73;
+  margin: 0;
+}
+.partners-heading h2 {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  margin: 0;
+  color: #79715f;
+}
+.partners-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 26px;
+  margin: 0;
+  padding: 0;
+}
+.partners-grid li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 58px;
+}
+.partners-grid img {
+  width: 100%;
+  height: 52px;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.65;
+  max-width: 125px;
+  mix-blend-mode: multiply;
+}
+.partner-name {
+  font-size: 12px;
+  color: #786f5c;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .partners-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 25px 35px;
+  }
+}
+@media (max-width: 600px) {
+  .home-partners {
+    padding: 36px 0 40px;
+  }
+  .partners-heading {
+    gap: 16px;
+    margin-bottom: 25px;
+  }
+  .partners-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px 19px;
+  }
+  .partners-grid img {
+    height: 37px;
+  }
+  .partners-grid li {
+    min-height: 42px;
+  }
+  .partners-heading h2 {
+    font-size: 11px;
+  }
+  .partner-name {
+    font-size: 9px;
+  }
 }
 </style>

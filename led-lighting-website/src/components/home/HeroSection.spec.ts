@@ -1,133 +1,66 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HeroSection from './HeroSection.vue'
+import { mountLightField } from './liquid-light/light-field'
 
-describe('HeroSection', () => {
-  const originalInnerHeight = window.innerHeight
-  const originalScrollY = window.scrollY
+vi.mock('./liquid-light/light-field', () => ({
+  mountLightField: vi.fn(() => ({ dispose: vi.fn() })),
+}))
 
+describe('Liquid Light Hero integration', () => {
   afterEach(() => {
     vi.restoreAllMocks()
-    vi.unstubAllGlobals()
-    Object.defineProperty(window, 'innerHeight', {
-      configurable: true,
-      value: originalInnerHeight,
-    })
-    Object.defineProperty(window, 'scrollY', {
-      configurable: true,
-      value: originalScrollY,
-    })
+    vi.clearAllMocks()
   })
-
   const mountHero = () =>
     mount(HeroSection, {
       props: {
-        title: '주차장을 밝히는 빛',
-        subtitle: 'LED 조명 솔루션',
-        primaryButtonText: '제품 확인',
+        title: '빛의 새로운 흐름.',
+        subtitle: '빛을 만드는 기술. 공간을 바꾸는 감각.',
+        primaryButtonText: '제품 보기',
+        secondaryButtonText: '회사 소개',
       },
-      global: {
-        stubs: {
-          HangingBulbScene: {
-            template: '<div data-test="hanging-bulb-stub" />',
-          },
-        },
-      },
+      global: { stubs: { HangingBulbScene: true, NuxtLink: { template: '<a><slot /></a>' } } },
     })
 
-  it('centers mobile copy over a subdued light and restores the split layout on wider screens', async () => {
+  it('keeps one accessible heading and routes the original two home actions', async () => {
     const wrapper = mountHero()
-
-    expect(wrapper.find('video').exists()).toBe(false)
-    expect(wrapper.get('.hero-shell').classes()).toContain('hero-shell--viewport-fill')
-    expect(wrapper.get('[data-test="hero-layout"]').classes()).toEqual(
-      expect.arrayContaining([
-        'absolute',
-        'inset-0',
-        'flex',
-        'py-20',
-        'sm:relative',
-        'sm:inset-auto',
-        'sm:grid',
-        'sm:h-full',
-        'sm:pb-20',
-        'sm:pt-28',
-        'lg:grid-cols-2',
-      ]),
-    )
-    expect(wrapper.get('[data-test="hero-copy"]').classes()).toEqual(
-      expect.arrayContaining(['items-center', 'text-center', 'sm:block', 'sm:text-left']),
-    )
-    expect(wrapper.get('[data-test="hero-actions"]').classes()).toEqual(
-      expect.arrayContaining(['justify-center', 'sm:justify-start']),
-    )
-    const visual = wrapper.get('[data-test="hero-visual"]')
-    expect(visual.classes()).toEqual(
-      expect.arrayContaining([
-        'pointer-events-none',
-        'absolute',
-        'opacity-[0.32]',
-        'sm:pointer-events-auto',
-        'sm:relative',
-        'sm:opacity-100',
-      ]),
-    )
-    expect(visual.find('[data-test="hanging-bulb-stub"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('주차장을 밝히는 빛')
-    expect(wrapper.text()).toContain('LED 조명 솔루션')
-
-    const buttons = wrapper.get('[data-test="hero-copy"]').findAll('button')
-    expect(buttons).toHaveLength(2)
-    expect(buttons[0]?.text()).toContain('제품 확인')
-    expect(buttons[1]?.text()).toContain('회사 소개')
-
-    await buttons[0]?.trigger('click')
-    await buttons[1]?.trigger('click')
-
+    expect(wrapper.findAll('h1')).toHaveLength(1)
+    expect(wrapper.get('h1').attributes('aria-label')).toBe('빛의 새로운 흐름.')
+    const actions = wrapper.get('[data-test="hero-actions"]').findAll('button')
+    await actions[0]!.trigger('click')
+    await actions[1]!.trigger('click')
     expect(wrapper.emitted('primaryClick')).toEqual([[]])
     expect(wrapper.emitted('secondaryClick')).toEqual([[]])
     wrapper.unmount()
   })
 
-  it('blends the Hero background into the following light section', () => {
+  it('mounts the field against actual hero/canvas/control refs and disposes on SPA unmount', () => {
     const wrapper = mountHero()
-    const transition = wrapper.get('[data-test="hero-transition"]')
-
-    expect(transition.attributes('aria-hidden')).toBe('true')
-    expect(transition.classes()).toContain('hero-transition')
-
+    expect(mountLightField).toHaveBeenCalledOnce()
+    expect(vi.mocked(mountLightField).mock.calls[0]![0]).toMatchObject({
+      hero: wrapper.get('[data-light-hero]').element,
+      canvas: wrapper.get('[data-light-canvas]').element,
+      control: wrapper.get('[data-motion-control]').element,
+    })
+    const controller = vi.mocked(mountLightField).mock.results[0]!.value
     wrapper.unmount()
+    expect(controller.dispose).toHaveBeenCalledOnce()
   })
 
-  it('smoothly scrolls down from the retained scroll control', async () => {
+  it.each([false, true])('retains discover scrolling with reduced-motion=%s', async (reduced) => {
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: reduced } as MediaQueryList)
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       bottom: 860,
     } as DOMRect)
-    Object.defineProperty(window, 'scrollY', { configurable: true, value: 120 })
     const wrapper = mountHero()
-
     await wrapper.get('[data-test="hero-scroll-down"]').trigger('click')
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 980, behavior: 'smooth' })
-    wrapper.unmount()
-  })
-
-  it('uses immediate scrolling when reduced motion is requested', async () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({ matches: true })),
-    )
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      bottom: 700,
-    } as DOMRect)
-    Object.defineProperty(window, 'scrollY', { configurable: true, value: 50 })
-    const wrapper = mountHero()
-
-    await wrapper.get('[data-test="hero-scroll-down"]').trigger('click')
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 750, behavior: 'auto' })
+    expect(wrapper.emitted('scrollDown')).toEqual([[]])
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: window.scrollY + 860,
+      behavior: reduced ? 'auto' : 'smooth',
+    })
     wrapper.unmount()
   })
 })

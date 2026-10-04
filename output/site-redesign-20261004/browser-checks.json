@@ -1,0 +1,312 @@
+[
+  {
+    "check": "hero-native-pointer-ripple-pause",
+    "data": {
+      "canvas": {
+        "fieldTime": "282.332",
+        "lightCanvas": "",
+        "motionState": "paused",
+        "pointerEvents": "3",
+        "pointerStrength": "0.8758",
+        "pointerX": "0.4236",
+        "pointerY": "-0.0517",
+        "renderFrames": "20585",
+        "renderReason": "",
+        "renderState": "ready",
+        "rippleEvents": "1",
+        "v-7f46aa6c": ""
+      }
+    }
+  },
+  {
+    "check": "product-search",
+    "data": {
+      "text": "PRODUCT COLLECTION\n\n02\n공간에 맞는 빛.\n\n공간에 맞는 조명, 선택의 기준을 선명하게.\n\n총 1개의 제품\n\nsearch\nclose\ntune\n필터\n전체\nCOB조명\n가로등\n계단표시등\n다운라이트\n몰드바\n방습등\n벽부등\n엣지평판\n원형센서\n원형직부\n주차장조명\n차량유도등\n칠판등\n크린룸조명\n파이프 팬던트\n검색 조건 초기화\n검색 결과 1개\nNEW\nMAIN\n↗\n\n몰드바\n\n몰드바 조명\n\nDF-MOL-40\n\n30W / 40W · 5700K\n\n인증 표기 · KS / 고효율 / V-CHECK",
+      "url": "http://127.0.0.1:5192/products"
+    }
+  },
+  {
+    "check": "product-power-filter",
+    "data": {
+      "text": "PRODUCT COLLECTION\n\n02\n공간에 맞는 빛.\n\n공간에 맞는 조명, 선택의 기준을 선명하게.\n\n총 15개의 제품\n\nsearch\ntune\n필터\n1\n전체\nCOB조명\n가로등\n계단표시등\n다운라이트\n몰드바\n방습등\n벽부등\n엣지평판\n원형센서\n원형직부\n주차장조명\n차량유도등\n칠판등\n크린룸조명\n파이프 팬던트\n40W ×\n검색 조건 초기화\n검색 결과 15개\n↗\n\n칠판등\n\n칠판등\n\nDF-REA-40\n\n40W / 18W · 5700K\n\n인증 표기 · KS / 고효율 / 친환경\n\n↗\n\n방습등\n\n방습등\n\nDF-WA-40\n\n40W / 50W · 5700K\n\n인증 표기 · KS / 고효율\n\n↗\n\nCOB조명\n\ncob 다운라이트\n\nDF-4K-25\n\n20W / 30W / 40W / 60W · 5700K / 4000K / 3000K\n\n인증 표기 · KS / 고효율\n\n↗\n\n계단표시등\n\n계단표시등\n\nDF-FP-1218\n\n40W · 5700K\n\n인증 표기 · KS\n\n↗\n\n차량유도등\n\n차량유도등\n\nDF-HAN13-40\n\n40W · 5700K\n\n인증 표기 · KS\n\n↗\n\n벽부등\n\n벽부등\n\nDF-WR-40\n\n25W / 40W / 50W · 5700K\n\n인증 표기 · KS / 고효율\n\nNEW\n↗\n\n크린룸조명\n\n크린룸 조명\n\nDF-CR-40\n\n40W / 25W · 5700K / 6500K\n\n인증 표기 · KS / 고효율\n\nNEW\nMAIN\n↗\n\n몰드바\n\n몰드바 조명\n\nDF-MOL-40\n\n30W / 40W · 5700K\n\n인증 표기 · KS / 고효율 / V-CHECK\n\nMAIN\n↗\n\n주차장조명\n\n주차장조명 디밍\n\nDF-RES-40\n\n40W / 22W / 18W · 5700K / 4000K / 3000K\n\n인증 표기 · KS / 고효율\n\n↗\n\n주차장조명\n\n주차장조명 상시\n\nDF-REA-40\n\n40W / 22W / 18W / 50"
+    }
+  },
+  {
+    "check": "product-lightbox-open",
+    "data": {
+      "dialog": "request_quote온라인 견적최대 24시간 이내 답변을 받으실 수 있습니다.close_fullscreen×1기업 정보2제품 선택3요청 확인먼저 기업 정보를 알려주세요사업자등록증에 기재된 정보로 입력해 주세요.사업자 정보회사명(상호) *사업자등록번호 *대표자명 *개업일자 *개인정보 수집·이용 안내 전문개인정보 안내를 불러오는 중입니다. 연결을 확인한 후 다시 시도해 주세요.[필수] 견적 상담을 위한 개인정보 수집·이용에 동의합니다.개인정보 안내 다시 불러오기 국세청 등록정보와 대조합니다. 신규 개업은 정보 반영이 늦을 수 있습니다. 회신받을 담당자견적을 안내받을 연락처를 입력해 주세요.담당자명 *전화번호 선택이메일 *어떤 제품이 필요하세요? 제품의 사양 선택을 누른 뒤, 사양과 수량을 확인해 견적 목록에 담아 주세요. 제품명 또는 모델명 검색 카테고리 전체 카테고리COB조명가로등계단표시등다운라이트몰드바방습등벽부등엣지평판원형센서원형직부주차장조명차량유도등칠판등크린룸조명파이프 팬던트소비전력 ⌄1W10W15W18W20W22W25W30W40W50W60W80W100W150W인증 ⌄KSV-CHECK고효율친환경색온도·옵션 더 보기색온도3000K4000K5700K6500K옵션개별디밍그룹디밍발전기 비상밧데리 비상센서검색 결과 25개조건 초기화파이프팬던트PIPE1WKS사양 선택칠판등DF-REA-4040W18WKS고효율친환경사양 선택가로등DF-ST-5050W100W150W고효율사양 선택방습등DF-WA-4040W50WKS고효율사양 선택cob 다운라이트DF-4K-2520W30W40W60WKS고효율사양 선택원형직부DF-CI-1515WKS고효율사양 선택원형센서DF-CIS-1515WKS고효율사양 선택다운라이트DF-DR-1510W15W20WKS고효율사양 선택제품 더 보기원하는 사양 직접 입력↗ 제품의 ‘사양 선택’을 눌러 필요한 사양을 입력하세요. 목록에 담은 제품은 이곳에서 확인할 수 있어요. ← 제품 검색으로 돌아가기원하는 사양을 알려주세요모르는 세부 사양은 비워두셔도 괜찮아요.제품 종류 / 이름 *소비전력(W) 선택수량(개) *색온도(K) 선택규격 / 크기 선택필요한 인증 선택여러 개는 쉼표로 구분해 주세요.요구 사양 설명 * 예시 사진 전체 0/3장JPEG, PNG, WebP · 장당 5MB 이하사진 선택견적 목록에 담기 목록에 담아야 요청에 포함됩니다. 검색으로 돌아가도 작성 중인 내용은 유지됩니다. 요청 내용을 확인해 주세요담당자가 사양과 수량을 확인해 견적을 안내드립니다.기업 정보수정대표자  · 개업  · 추가 요청사항 선택희망 납기일 선택요청 제품수정기업 정보에서 필수 동의를 확인해 주세요.개인정보 수집·이용 안내 전문개인정보 안내를 불러오는 중입니다. 연결을 확인한 후 다시 시도해 주세요.제품 선택하기 →",
+      "images": [
+        {
+          "loaded": true,
+          "src": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655540161-597818031.webp"
+        },
+        {
+          "loaded": true,
+          "src": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771610839275-316594605.webp"
+        }
+      ],
+      "url": "http://127.0.0.1:5192/products/30b50b2a-cd91-46bd-960e-9860f6c72de6?image=0"
+    }
+  },
+  {
+    "check": "product-quote-draft-added",
+    "data": {
+      "badge": "request_quote\n온라인 견적\n1",
+      "dialog": "request_quote\n온라인 견적\n1\nrequest_quote\n온라인 견적\n\n최대 24시간 이내 답변을 받으실 수 있습니다.\n\nclose_fullscreen\n×\n1기업 정보\n2제품 선택\n3요청 확인\n먼저 기업 정보를 알려주세요\n\n사업자등록증에 기재된 정보로 입력해 주세요.\n\n사업자 정보\n회사명(상호) *\n사업자등록번호 *\n대표자명 *\n개업일자 *\n개인정보 수집·이용 안내 전문\n[필수] 견적 상담을 위한 개인정보 수집·이용에 동의합니다.\n개인정보 안내 다시 불러오기\n\n국세청 등록정보와 대조합니다. 신규 개업은 정보 반영이 늦을 수"
+    }
+  },
+  {
+    "check": "certificate-selection",
+    "data": {
+      "alert": "PDF를 표시하지 못했습니다.\n다시 표시하거나 원본 PDF 링크를 확인해 주세요.\n\nPDF 다시 표시\n↗",
+      "canvases": [],
+      "download": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/certificates/document-1771574899709-385874439.pdf",
+      "selected": "45f5e49b-f95f-4e95-bbbb-63f883c1c4e7",
+      "url": "http://127.0.0.1:5192/certificates/KS"
+    }
+  },
+  {
+    "check": "news-loaded-category",
+    "data": {
+      "text": "DF KOREA NEWSROOM\n\n04\n빛을 만드는 이야기.\n\n디에프코리아의 제품과 회사 소식을 전합니다.\n\n전체\n회사소식\n제품소식\n기술정보\n산업동향\n불러온 게시글 중 0개\n\n현재 불러온 게시글에서 분류합니다.\n\ninbox\n\n검색 결과가 없습니다"
+    }
+  },
+  {
+    "check": "mobile-menu-escape",
+    "data": {
+      "expanded": "false",
+      "focused": "메뉴 열기"
+    }
+  },
+  {
+    "check": "products-mobile-route",
+    "data": {
+      "client": 380,
+      "h1": "공간에 맞는 빛.",
+      "menuExpanded": "false",
+      "scroll": 380,
+      "url": "http://127.0.0.1:5192/products"
+    }
+  },
+  {
+    "check": "hero-scroll-suspension",
+    "data": {
+      "canvas": {
+        "fieldTime": "30.124",
+        "lightCanvas": "",
+        "motionState": "suspended",
+        "pointerEvents": "1",
+        "pointerStrength": "0.4560",
+        "pointerX": "-0.1804",
+        "pointerY": "-0.2694",
+        "renderFrames": "2179",
+        "renderReason": "",
+        "renderState": "ready",
+        "rippleEvents": "0",
+        "v-7f46aa6c": ""
+      },
+      "header": "public-nav",
+      "scrollY": 844
+    }
+  },
+  {
+    "check": "about-320",
+    "data": {
+      "client": 310,
+      "h1": "공간의 빛을,\n함께 만듭니다.",
+      "scroll": 310,
+      "url": "http://127.0.0.1:5192/about"
+    }
+  },
+  {
+    "check": "products-320",
+    "data": {
+      "client": 310,
+      "h1": "공간에 맞는 빛.",
+      "scroll": 310,
+      "url": "http://127.0.0.1:5192/products"
+    }
+  },
+  {
+    "check": "certificates-320",
+    "data": {
+      "client": 310,
+      "h1": "빛을 만드는\n기준과 기록.",
+      "scroll": 310,
+      "url": "http://127.0.0.1:5192/certificates"
+    }
+  },
+  {
+    "check": "blog-320",
+    "data": {
+      "client": 310,
+      "h1": "빛을 만드는 이야기.",
+      "scroll": 310,
+      "url": "http://127.0.0.1:5192/blog"
+    }
+  },
+  {
+    "check": "home-contact-escape-focus",
+    "data": {
+      "canvas": {
+        "fieldTime": "38.150",
+        "lightCanvas": "",
+        "motionState": "suspended",
+        "pointerEvents": "0",
+        "pointerStrength": "0.0000",
+        "pointerX": "0.0000",
+        "pointerY": "0.0000",
+        "renderFrames": "2766",
+        "renderReason": "",
+        "renderState": "ready",
+        "rippleEvents": "0",
+        "v-7f46aa6c": ""
+      },
+      "focused": "상담 문의하기 ↗",
+      "open": false
+    }
+  },
+  {
+    "check": "hero-route-dispose-clean",
+    "data": {
+      "canvasCount": 0,
+      "rootStates": {},
+      "url": "http://127.0.0.1:5192/products"
+    }
+  },
+  {
+    "check": "reduced-motion",
+    "data": {
+      "canvas": {
+        "fieldTime": "0.000",
+        "lightCanvas": "",
+        "motionState": "reduced",
+        "pointerEvents": "0",
+        "pointerStrength": "0.0000",
+        "pointerX": "0.0000",
+        "pointerY": "0.0000",
+        "renderFrames": "2",
+        "renderReason": "",
+        "renderState": "ready",
+        "rippleEvents": "0",
+        "v-7f46aa6c": ""
+      },
+      "control": "<button type=\"button\" class=\"hero-motion-button\" data-motion-control=\"\" disabled=\"\" aria-label=\"정적 빛 표시 — 움직임 사용 불가\" aria-pressed=\"false\" data-v-7f46aa6c=\"\"><svg class=\"pause-mark\" width=\"12\" height=\"12\" viewBox=\"0 0 16 16\" aria-hidden=\"true\" data-v-7f46aa6c=\"\"><path d=\"M5 3v10M11 3v10\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" data-v-7f46aa6c=\"\"></path></svg><svg class=\"play-mark\" width=\"12\" height=\"12\" viewBox=\"0 0 16 16\" aria-hidden=\"true\" data-v-7f46aa6c=\"\"><path d=\"m5 3 8 5-8 5Z\" fill=\"currentColor\" data-v-7f46aa6c=\"\"></path></svg><span data-motion-label=\"\" data-v-7f46aa6c=\"\">움직임 줄임</span></button>",
+      "url": "http://127.0.0.1:5192/?reduced-motion=1"
+    }
+  },
+  {
+    "check": "gpu-fallback",
+    "data": {
+      "canvas": {
+        "fieldTime": "0.000",
+        "lightCanvas": "",
+        "motionState": "unavailable",
+        "pointerEvents": "0",
+        "pointerStrength": "0.0000",
+        "pointerX": "0.0000",
+        "pointerY": "0.0000",
+        "renderFrames": "0",
+        "renderReason": "diagnostic",
+        "renderState": "fallback",
+        "rippleEvents": "0",
+        "v-7f46aa6c": ""
+      },
+      "content": "LIGHT, IN A NEW FORM\n\n빛의 새로운\n흐름.\n\n빛을 만드는 기술. 공간을 바꾸는 감각.\nDF KOREA의 LED 조명으로 시작됩니다.\n\n제품 보기\n↗\n회사 소개\n↗\n\n정적 빛을 표시합니다\n\n정적 보기\nSCROLL TO DISCOVER\n↓",
+      "url": "http://127.0.0.1:5192/?fallback=1"
+    }
+  },
+  {
+    "check": "home-loaded-assets",
+    "data": {
+      "canvas": {
+        "fieldTime": "0.554",
+        "lightCanvas": "",
+        "motionState": "suspended",
+        "pointerEvents": "0",
+        "pointerStrength": "0.0000",
+        "pointerX": "0.0000",
+        "pointerY": "0.0000",
+        "renderFrames": "17",
+        "renderReason": "",
+        "renderState": "ready",
+        "rippleEvents": "0",
+        "v-7f46aa6c": ""
+      },
+      "images": [
+        {
+          "alt": "경찰청 로고",
+          "loaded": true
+        },
+        {
+          "alt": "농협 로고",
+          "loaded": true
+        },
+        {
+          "alt": "서울시설관리공단 로고",
+          "loaded": true
+        },
+        {
+          "alt": "셀트리온 로고",
+          "loaded": true
+        },
+        {
+          "alt": "인천공항 로고",
+          "loaded": true
+        },
+        {
+          "alt": "인하대 로고",
+          "loaded": true
+        },
+        {
+          "alt": "한솥 로고",
+          "loaded": true
+        },
+        {
+          "alt": "CGV 로고",
+          "loaded": true
+        },
+        {
+          "alt": "조명 적용 공간 참고 이미지 1",
+          "loaded": true
+        },
+        {
+          "alt": "조명 적용 공간 참고 이미지 2",
+          "loaded": true
+        },
+        {
+          "alt": "조명 적용 공간 참고 이미지 3",
+          "loaded": true
+        },
+        {
+          "alt": "조명 적용 공간 참고 이미지 4",
+          "loaded": true
+        },
+        {
+          "alt": "조명 적용 공간 참고 이미지 5",
+          "loaded": true
+        },
+        {
+          "alt": "조명 적용 공간 참고 이미지 6",
+          "loaded": true
+        },
+        {
+          "alt": "몰드바 조명",
+          "loaded": true
+        },
+        {
+          "alt": "주차장조명 디밍",
+          "loaded": true
+        },
+        {
+          "alt": "엣지평판 1280x320",
+          "loaded": true
+        },
+        {
+          "alt": "엣지 평판 640x320",
+          "loaded": true
+        }
+      ]
+    }
+  }
+]

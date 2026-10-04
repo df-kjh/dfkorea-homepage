@@ -1,57 +1,22 @@
 <template>
-  <header class="mb-12">
-    <!-- Category Badge -->
-    <div class="flex items-center gap-2 mb-6">
-      <span
-        class="bg-primary/10 text-primary text-[13px] font-bold px-3 py-1 rounded-full uppercase tracking-wider"
-      >
-        {{ category }}
-      </span>
-    </div>
-
-    <!-- Title -->
-    <h1
-      class="text-4xl md:text-5xl font-extrabold text-text-main leading-[1.15] tracking-tight mb-8"
-    >
-      {{ title }}
-    </h1>
-
-    <!-- Meta Information -->
-    <div class="flex items-center justify-between border-y border-gray-200 py-6">
-      <!-- Author Info -->
-      <div class="flex items-center gap-4">
-        <div
-          class="size-12 rounded-full bg-surface overflow-hidden flex items-center justify-center"
-        >
-          <span class="material-symbols-outlined text-text-sub text-2xl">person</span>
-        </div>
-        <div class="flex flex-col">
-          <span class="text-base font-bold text-text-main">{{ author }}</span>
-          <span class="text-sm text-text-desc">{{ formattedDate }}</span>
-        </div>
+  <header class="df-article-heading">
+    <p class="df-article-category">{{ category }}</p>
+    <h1>{{ title }}</h1>
+    <div class="df-article-meta">
+      <div>
+        <span>{{ author }}</span
+        ><time :datetime="createdAt">{{ formattedDate }}</time>
       </div>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2">
-        <button
-          class="p-2 hover:bg-surface rounded-full transition-colors text-text-sub"
-          @click="handleShare"
-          aria-label="공유하기"
-        >
-          <span class="material-symbols-outlined">share</span>
-        </button>
-        <button
-          class="p-2 hover:bg-surface rounded-full transition-colors text-text-sub"
-          @click="handleBookmark"
-          aria-label="북마크"
-        >
-          <span class="material-symbols-outlined">bookmark</span>
+      <div class="df-article-actions">
+        <button type="button" @click="handleShare" aria-label="공유하기">
+          <span class="material-symbols-outlined" aria-hidden="true">share</span></button
+        ><button type="button" @click="handleBookmark" aria-label="북마크" title="북마크 안내">
+          <span class="material-symbols-outlined" aria-hidden="true">bookmark</span>
         </button>
       </div>
     </div>
   </header>
 </template>
-
 <script setup lang="ts">
 import { computed } from 'vue'
 
@@ -84,3 +49,83 @@ const handleBookmark = () => {
   emit('bookmark')
 }
 </script>
+
+<style scoped>
+.df-article-heading {
+  margin-bottom: 45px;
+}
+.df-article-category {
+  color: #a18558;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  margin-bottom: 24px;
+}
+.df-article-heading h1 {
+  font-size: clamp(34px, 4vw, 57px);
+  font-weight: 500;
+  line-height: 1.28;
+  letter-spacing: -0.06em;
+  overflow-wrap: anywhere;
+}
+.df-article-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  margin-top: 32px;
+  padding: 20px 0;
+  border-top: 1px solid #d8ccb6;
+  border-bottom: 1px solid #d8ccb6;
+}
+.df-article-meta > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  color: #857352;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.df-article-meta time {
+  color: #a29276;
+}
+.df-article-actions {
+  display: flex;
+  gap: 8px;
+}
+.df-article-actions button {
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 39px;
+  border: 1px solid #d8ccb6;
+  border-radius: 50%;
+  background: transparent;
+  color: #897452;
+}
+.df-article-actions button:hover {
+  background: #e6daca;
+}
+.df-article-actions button:focus-visible {
+  outline: 2px solid #987540;
+  outline-offset: 4px;
+}
+.df-article-actions span {
+  font-size: 18px;
+}
+@media (max-width: 640px) {
+  .df-article-heading h1 {
+    font-size: 32px;
+  }
+  .df-article-heading {
+    margin-bottom: 30px;
+  }
+  .df-article-meta {
+    margin-top: 25px;
+    padding-block: 15px;
+  }
+  .df-article-meta > div:first-child {
+    gap: 7px;
+    flex-direction: column;
+  }
+}
+</style>

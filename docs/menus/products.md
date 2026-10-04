@@ -2,6 +2,16 @@
 
 ## 구현 완료
 
+- 2026-10-04 최종 통합 검수: 소스 Vitest 64개 파일/491개, Nuxt 타입 검사, 운영 API를 지정한 빌드와 SEO/상세 앵커 검증을 통과했다. 실제 Chrome에서 기존 네 메뉴와 상세 경로·320px 가로 넘침·Hero/원본 자료를 확인했다. 로컬 검수 증거는 `output/site-redesign-20261004/README.md`를 따른다. 운영 배포와 실제 견적 접수는 수행하지 않았다.
+
+### 2026-10-04 실제 Nuxt 제품 UI 재설계 (로컬 검수, 미배포)
+
+- 기존 `/products`·`/products/:id`를 Liquid Light의 paper/ink/champagne 제목·검색/분류·실물 사진 카드·원본 갤러리·요약/등록 사양표로 재설계했다. 실제 API의 SSR 첫 20개/클라이언트 갱신·서버 검색/사양 필터·세대 검사·무한 스크롤·추가 실패/재시도를 유지하며 운영 데이터를 스냅샷으로 대체하지 않았다.
+- 상세 SSR/404·canonical/Product JSON-LD·안전한 Markdown 표/이미지/링크·사진 image 쿼리/뒤로 가기/Escape 확대·견적 담기(상담 후 결정/수량 1)를 보존했다. 공통 presentation.ts는 원본 데이터를 변경하지 않고 PIPE 임시 전기 사양·인증을 제외해 모델/길이만 표시하며 0/누락 성능도 요약/사양표에서 제외한다.
+- 제품/소식/견적·Markdown 및 홈 수명주기 연결 집중 검사 17개 파일/100개와 수정한 Vue SFC 20개 script/template 컴파일을 통과했다. 실제 href의 Cmd/Ctrl/Shift/Alt/비주버튼 클릭은 브라우저에 맡기고, 일반 클릭은 기존 선택 이벤트를 유지한다. 실제 Chrome 로컬에서 몰드바 검색 1개·소비전력 40W 15개, PIPE 상세 원본 사진 2개·임시 사양 제외·image 쿼리/Escape·견적 초안 1개 열기를 확인했다. 운영 배포하지 않았다.
+
+### 이전 별도 프로토타입·운영 기록 (보존)
+
 - 2026-09-07 관리자 보안 보완: 제품명은 HTML로 해석하지 않고 텍스트로 표시한다. 제품 생성·수정·삭제와 이미지 업로드/삭제는 쿠키 기반 관리자 중계와 백엔드 JWT 검증을 거친다. 공개 목록·상세 GET은 로그인 없이 유지한다. 세션·제한사항은 [관리자 문서](admin.md)를 따른다.
 
 - 대표 도메인은 `https://dfkorealed.com`이다. 제품 목록은 `https://dfkorealed.com/products` canonical과 전용 제목·설명·`index, follow`·Open Graph·Twitter 메타데이터를 서버 렌더링 HTML에 제공한다.
@@ -41,9 +51,13 @@
 
 ## 미구현
 
+- 이번 로컬 검수에서 실제 견적 세션 생성·개인정보 입력/확인·접수/메일 발송은 수행하지 않았다. 기존 견적 API는 보존하며 검수용 중계는 견적 POST를 허용하지 않는다.
+
 - 사진 자체에 포함된 배경을 자동으로 잘라내는 기능은 제공하지 않는다.
 
 ## 부족하거나 개선이 필요한 기능
+
+- 2026-10-04 로컬 Origin CORS 제한은 loopback 검수 중계로 실제 공개 응답을 전달해 우회했으며 production API 설정은 변경하지 않았다. 개인정보 안내는 GET이 아닌 POST /quotes/sessions 반환값이라 중계에서 세션 연결 오류가 예상된다. 초안 1개/open/close/스타일 검수와 실제 접수를 구분하며 개인정보를 입력·전송하지 않았다. 옵션 조합/인증 적용은 상담 대상이다. 최종 통합 브라우저·타입·빌드 결과는 메인 기록을 따른다.
 
 - Vercel의 초기 목록 HTML은 빌드 시점 첫 페이지의 스냅샷이다. 초기 카드 변경은 재배포가 필요하고, 첫 페이지 밖 항목은 클라이언트 추가 로딩과 동적 사이트맵으로 발견한다. API 실패나 비어 있는 초기 목록으로 상세 링크를 만들 수 없으면 현재 운영 빌드 검증이 실패하므로 데이터/연결 상태를 확인해야 한다.
 - 2026-09-06 Google Search Console과 네이버 서치어드바이저의 사이트 등록 및 `https://dfkorealed.com/sitemap.xml` 제출을 확인했다. 새 제품은 동적 사이트맵에 자동 포함되며, 긴급 반영이 필요한 제품만 URL 검사·재수집을 요청한다.
@@ -60,6 +74,13 @@
 - 이미지가 로딩되기 전에는 고유 비율을 알 수 없어 로딩 후 프레임 높이가 정해진다.
 
 ## 관련 파일
+
+- `led-lighting-website/src/components/products/{presentation.ts,presentation.spec.ts}`
+- `led-lighting-website/src/components/common/site/{PublicPageHeader,PublicAction}.vue`
+- `led-lighting-website/src/assets/styles/public-site.css`
+- `docs/superpowers/specs/2026-10-04-liquid-light-site-redesign-design.md`
+- `docs/superpowers/plans/2026-10-04-liquid-light-site-redesign.md`
+- `.superpowers/sdd/2026-10-04-liquid-light-site-redesign/{README.md,preview-relay.py,progress.md}` (로컬 ignored 검수 자료)
 
 - `led-lighting-website/src/views/list-indexing.spec.ts`
 - `led-lighting-website/scripts/verify-search-indexing.mjs`
@@ -104,6 +125,8 @@
 - `led-lighting-website/src/components/products/ProductDescription.vue`
 
 ## 갱신 규칙
+
+- 실제 Nuxt 제품 레이아웃/카드·요약/PIPE 예외·사진 확대·견적 진입을 바꾸면 회귀/실제 검수 범위와 미배포 상태를 함께 기록한다. 별도 정적 시안 수치를 운영 경로 검증으로 재사용하지 않는다.
 
 - 제품 목록·상세의 제목·설명·canonical, 카드 링크 또는 사이트맵 URL 생성 방식이 바뀌면 이 문서와 홈·소식·인증 문서를 함께 검토해 갱신한다.
 - 월간 색인 점검에서 제품 URL의 오류나 제외 사유가 확인되면 조치와 재검증 결과를 기록한다.
