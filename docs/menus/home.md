@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 파트너 캐러셀: 기존 여덟 곳에 삼성바이오로직스·앰코코리아·LH 한국토지주택공사 공식 로고를 추가했다. 이전 CSS 무한 스크롤 방식을 현재 디자인에 맞춰 복원해 11개 로고를 44초 주기로 끊김 없이 순환한다. 마우스 올리기와 일시정지/재생 제어를 제공하며 반복 복제본은 보조기술에서 숨긴다. 동작 줄이기 설정에서는 모든 로고를 정적인 여러 줄 목록으로 표시한다.
+
 - 2026-10-05 추가 주석 반영: 공통 헤더의 로고 영역 배경을 투명하게 변경했다. 어두운 Hero에서는 흰색 로고를 유지하고 밝은 헤더에서는 CSS로 로고 글자를 어둡게 표시한다. 이미지·메뉴 경로·헤더 높이는 유지한다.
 
 - 2026-10-05 추가 주석 반영: Hero 제품 보기·회사 소개 버튼과 홈 상담 문의하기 버튼만 텍스트를 중앙 정렬했다. 상담 문의하기의 화살표를 제거했으며 버튼 크기·클릭 이벤트·상담 선택창·Hero 효과는 유지한다.
@@ -63,6 +65,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 파트너 로고는 `public/images/clients`의 정적 파일이다. 업체 목록 변경 시 ClientsSection과 에셋 출처 README를 함께 갱신한다. 신규 업체는 사용자가 지정한 파트너로 표시하며 API나 관리 화면을 추가하지 않는다.
+
 - 현재 Nuxt Liquid Light는 화면 아트이며 실제 광학·RGB·센서·추가 색온도 기능을 의미하지 않는다. 참고한 Matthias Hurrle (@atzedent)의 noise/domain-warp 표기를 타입 있는 셰이더에 유지했으며 첨부에 라이선스가 명시되지 않아 CC0 또는 상업 라이선스 확인 완료로 표시하지 않는다. 실제 OS 설정 변경·GPU 오류 유발·BFCache hit·물리 터치 기기·FPS/광학 측정은 자동화된 생명주기 분기 검사와 별개다. 별도 프로토타입의 이전 브라우저 결과를 현재 Nuxt 검수로 대체하지 않는다.
 
 - 2026-09-06 Google Search Console(`kymkjh2002@gmail.com`)과 네이버 서치어드바이저에서 `https://dfkorealed.com` 소유권 및 사이트맵 등록을 확인했다. Google은 사이트맵 상태 `성공`, 발견된 페이지 145개로 갱신되었다. 긴급 반영이 필요한 URL만 각 도구에서 별도로 재수집을 요청한다.
@@ -78,6 +82,9 @@
 - 저사양 기기별 실제 프레임 시간 데이터가 축적되면 픽셀 비율과 메시 세그먼트 기준을 추가 조정할 수 있다.
 
 ## 관련 파일
+
+- `led-lighting-website/src/components/home/ClientsSection.vue`, `ClientsSection.spec.ts`: 파트너 로고 순환과 일시정지/재생, 이미지 실패 대체, 복제 목록 접근성 검증.
+- `led-lighting-website/public/images/clients/{samsung-biologics,amkor-korea,lh}.svg`, `README.md`: 신규 원본 로고와 공식 출처·표시 범위 기록.
 
 - `led-lighting-website/public/branding/df-korea-logo-white.png`
 - `output/logo-comments-20261005/README.md`

@@ -1,42 +1,26 @@
-# 클라이언트 로고 이미지
+# 파트너 로고
 
-이 폴더에 파트너 기업 로고 이미지를 추가하세요.
+홈의 `src/components/home/ClientsSection.vue`에서 사용하는 정적 에셋이다.
+기존 경찰청·농협·서울시설관리공단·셀트리온·인천공항·인하대·한솥·CGV 로고를 유지하고,
+2026-10-05 사용자 요청에 따라 삼성바이오로직스·앰코코리아·LH를 추가했다.
 
-## 권장 사양
+## 신규 에셋 출처
 
-- **형식**: PNG (투명 배경) 또는 SVG
-- **크기**: 가로 400px × 세로 200px (비율 2:1)
-- **배경**: 투명 또는 흰색
-- **파일명**: 소문자, 하이픈으로 구분 (예: `samsung.png`, `lg.png`)
+공식 사이트가 직접 사용하는 SVG를 2026-10-05에 확보했다. 상표의 권리는 각 회사에 있다.
+컬러 원본을 파일로 보관하고 화면에서는 기존 파트너와 동일한 CSS 흑백 톤을 적용한다.
 
-## 현재 설정된 로고 목록
+| 파일 | 원본 출처 | 표시 처리 |
+| --- | --- | --- |
+| `samsung-biologics.svg` | [삼성바이오로직스 공식 로고](https://samsungbiologics.com/resources/front/en/images/logo.svg) | 공식 SVG는 흰색/컬러 버전이 세로로 붙은 스프라이트다. 경로와 색상을 유지하고 viewBox를 `0 44 122 44`로 한정해 아래 컬러 로고만 표시한다. |
+| `amkor-korea.svg` | [앰코 공식 한국 사이트의 로고](https://amkormarcomexternal.blob.core.windows.net/amkordotcom/theme-assets/Amkor-blue.svg) | 공식 컬러 SVG 그대로. 업체 이름/대체 텍스트는 앰코코리아. |
+| `lh.svg` | [LH 공식 사이트의 로고](https://www.lh.or.kr/main/img/layout/logo_main_ov.svg) | 메인 헤더의 컬러 CI 그대로. 슬로건 전용 `logo_sub_ov.svg`와 구별한다. |
 
-ClientsSection.vue에 다음 로고들이 기본으로 설정되어 있습니다:
+## 목록 갱신
 
-1. `samsung.png` - 삼성
-2. `lg.png` - LG
-3. `hyundai.png` - 현대
-4. `sk.png` - SK
-5. `lotte.png` - 롯데
-6. `gs.png` - GS
-7. `posco.png` - 포스코
-8. `shinsegae.png` - 신세계
+1. 투명 SVG/PNG를 이 폴더에 추가한다. 파일명은 영문 소문자와 하이픈을 사용한다.
+2. `ClientsSection.vue`의 기본 `clients` 목록을 갱신한다.
+3. 이 출처 기록과 `docs/menus/home.md`를 함께 갱신한다.
+4. 데스크톱/모바일에서 로고 로딩, 순환 경계, 정지/재생과 가로 넘침을 확인한다.
 
-## 로고 추가/변경 방법
-
-1. 이 폴더에 로고 이미지 파일 추가
-2. `/src/components/home/ClientsSection.vue` 파일 수정
-3. `clients` 배열에서 로고 정보 업데이트:
-
-```typescript
-clients: () => [
-  { name: '회사명', logo: '/images/clients/로고파일명.png' },
-  // ... 추가 로고
-]
-```
-
-## 주의사항
-
-- 로고 이미지가 없을 경우 회사명이 텍스트로 표시됩니다
-- 저작권이 있는 로고는 사용 권한을 확인하세요
-- 파일 크기는 가능한 100KB 이하로 최적화하세요
+목록은 두 그룹으로 렌더링하며 두 번째는 화면의 순환 연결용이다. 보조기술에서는 원본 목록만 읽는다.
+로고 로딩 실패 시 회사명을 표시하고, 동작 줄이기 설정에서는 복제본과 재생 제어를 숨기고 원본 전체를 정적인 목록으로 표시한다.
