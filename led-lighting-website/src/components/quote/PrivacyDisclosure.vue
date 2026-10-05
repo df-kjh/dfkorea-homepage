@@ -38,10 +38,11 @@ const { draft } = useQuoteDraft()
 </template>
 <style scoped>
 .q-privacy {
-  font-size: 12px;
+  font-size: var(--df-font-body, 17px);
   color: #586779;
   line-height: 1.7;
   margin: 10px 0;
+  overflow-wrap: anywhere;
 }
 .q-privacy summary {
   cursor: pointer;
@@ -49,6 +50,8 @@ const { draft } = useQuoteDraft()
   min-height: 32px;
   display: flex;
   align-items: center;
+  font-size: var(--df-font-label, 14px);
+  font-weight: var(--df-weight-control, 600);
 }
 .q-privacy p {
   margin: 10px 0;
@@ -57,5 +60,10 @@ const { draft } = useQuoteDraft()
   padding: 12px;
   background: #f5f7fa;
   border-radius: 9px;
+}
+@media (max-width: 700px) {
+  .q-privacy {
+    font-size: var(--df-font-body, 16px);
+  }
 }
 </style>

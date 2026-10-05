@@ -239,7 +239,8 @@ onBeforeUnmount(() => {
   min-height: 44px;
   color: inherit;
   text-decoration: none;
-  font-size: 11px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
   line-height: 1.5;
   letter-spacing: -0.025em;
 }
@@ -257,10 +258,9 @@ onBeforeUnmount(() => {
   color: #a4844f;
 }
 .public-nav__caption {
-  font-family: Arial, sans-serif;
-  font-size: 7px;
+  font-size: var(--df-font-meta, 13px);
   letter-spacing: 0.12em;
-  opacity: 0.5;
+  opacity: 0.8;
 }
 .public-nav__toggle {
   display: none;
@@ -345,7 +345,10 @@ onBeforeUnmount(() => {
     min-height: 55px;
     color: inherit;
     border-bottom: 1px solid #96a07d2b;
-    font-size: 15px;
+    font-size: var(--df-font-control, 15px);
+    font-weight: var(--df-weight-control, 600);
+    min-width: 0;
+    overflow-wrap: anywhere;
     text-decoration: none;
   }
   .public-nav__mobile > a:last-child {
@@ -360,9 +363,12 @@ onBeforeUnmount(() => {
     font-size: 18px;
   }
   .public-nav__number {
-    color: #929779;
-    font-family: Arial, sans-serif;
-    font-size: 8px;
+    color: #6c765b;
+    font-size: var(--df-font-meta, 13px);
+    flex-shrink: 0;
+  }
+  .public-nav[data-tone='ink'] .public-nav__number {
+    color: #a9b494;
   }
 }
 @media (max-width: 350px) {

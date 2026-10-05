@@ -25,9 +25,7 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
 <template>
   <section class="about-hero">
     <PublicPageHeader
-      :eyebrow="label"
       :title="heading"
-      index="01 / COMPANY"
       :description="
         subtitle ||
         '작은 광원에서 우리의 일상까지.\n빛을 만드는 기술과 공간을 생각하는 마음으로\n디에프코리아의 조명은 시작됩니다.'
@@ -97,17 +95,17 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
   bottom: 32px;
   margin: 0;
   font-family: Arial, sans-serif;
-  font-size: 9px;
   letter-spacing: 0.2em;
+  font-size: var(--df-font-meta, 13px);
 }
 .about-light-study > span {
   position: absolute;
   right: 37px;
   top: 31px;
   font-family: Arial, sans-serif;
-  font-size: 7px;
   letter-spacing: 0.15em;
   color: #7a876c;
+  font-size: var(--df-font-meta, 13px);
 }
 .about-supplied-image {
   overflow: hidden;
@@ -119,30 +117,34 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
 }
 .about-description {
   display: grid;
-  grid-template-columns: 1fr 1.1fr;
   gap: 80px;
   padding: 69px 0 76px;
   border-bottom: 1px solid var(--df-line);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
 }
 .about-description__name {
   margin: 22px 0 0;
   font-size: 22px;
   line-height: 1.5;
   letter-spacing: -0.04em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .about-description__since {
   margin: 12px 0 0;
-  color: var(--df-muted);
-  font-size: 11px;
   line-height: 1.6;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .about-description__text {
   margin: 0;
-  color: #7c846d;
-  font-size: 14px;
   line-height: 2;
   letter-spacing: -0.025em;
   white-space: pre-line;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
   .about-light-study {
@@ -161,12 +163,10 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
   .about-light-study > p {
     left: 22px;
     bottom: 24px;
-    font-size: 7px;
   }
   .about-light-study > span {
     right: 22px;
     top: 23px;
-    font-size: 6px;
   }
   .about-description {
     grid-template-columns: 1fr;
@@ -178,7 +178,6 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
     margin-top: 17px;
   }
   .about-description__text {
-    font-size: 12px;
     line-height: 1.95;
   }
 }

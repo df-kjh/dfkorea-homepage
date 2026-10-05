@@ -88,30 +88,35 @@ const formatDate = (value: string) =>
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  font-size: 10px;
-  color: #998466;
   margin-top: 22px;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  flex-wrap: wrap;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 .df-news-meta time {
-  color: #9d9381;
+  color: var(--df-muted, #625f50);
 }
 .df-news-card h3 {
   font-size: 27px;
-  font-weight: 500;
   letter-spacing: -0.045em;
   line-height: 1.45;
   margin-top: 14px;
   overflow-wrap: anywhere;
+  font-weight: 600;
 }
 .df-news-excerpt {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  color: #8b806d;
-  font-size: 13px;
   line-height: 1.9;
   margin-top: 16px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .df-news-card:focus-visible {
   outline: 2px solid #987441;
@@ -123,9 +128,6 @@ const formatDate = (value: string) =>
   }
   .df-news-meta {
     margin-top: 19px;
-  }
-  .df-news-excerpt {
-    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

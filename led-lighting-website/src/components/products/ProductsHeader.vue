@@ -40,11 +40,7 @@ const handleSearch = (query: string) => {
 
 <template>
   <div v-bind="$attrs" class="df-products-header">
-    <PublicPageHeader
-      eyebrow="PRODUCT COLLECTION"
-      :title="title"
-      description="공간에 맞는 조명, 선택의 기준을 선명하게."
-      index="02"
+    <PublicPageHeader :title="title" description="공간에 맞는 조명, 선택의 기준을 선명하게."
       ><template #actions
         ><p v-if="totalItems > 0" class="df-collection-total">
           총 {{ totalItems }}개의 제품
@@ -88,15 +84,17 @@ const handleSearch = (query: string) => {
   min-width: 0;
 }
 .df-collection-total {
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
   letter-spacing: 0.02em;
-  color: #8b7d65;
+  color: #70624c;
 }
 .products-search :deep(input) {
   background: transparent;
   border-color: #c5b89f;
   color: #302c24;
   border-radius: 0;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
 }
 .products-search :deep(input:focus) {
   border-color: #987340;

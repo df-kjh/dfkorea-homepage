@@ -69,16 +69,16 @@ const formatPrice = (price: number) => {
   margin-bottom: 22px;
 }
 .df-product-series {
-  font-size: 11px;
+  font-size: var(--df-font-label, 14px);
   letter-spacing: 0.06em;
-  color: #887b64;
+  color: #70614b;
   line-height: 1.8;
   overflow-wrap: anywhere;
   margin-bottom: 22px;
 }
 .df-product-info h1 {
   font-size: clamp(34px, 3.2vw, 52px);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.27;
   letter-spacing: -0.06em;
   overflow-wrap: anywhere;
@@ -94,19 +94,21 @@ const formatPrice = (price: number) => {
 }
 .df-product-summary > div {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 92px) minmax(0, 1fr);
   gap: 20px;
   padding: 15px 0;
   border-bottom: 1px solid #ddd3c2;
 }
 .df-product-summary dt {
-  font-size: 11px;
-  color: #91816a;
+  font-size: var(--df-font-label, 14px);
+  color: #746149;
+  overflow-wrap: anywhere;
   line-height: 1.8;
 }
 .df-product-summary dd {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
   color: #464034;
   line-height: 1.8;
   overflow-wrap: anywhere;

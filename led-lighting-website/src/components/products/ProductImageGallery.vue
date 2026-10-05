@@ -87,9 +87,10 @@ const handleImageClick = (url: string, index: number) => {
   font-size: 20px;
 }
 .df-image-description {
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
   line-height: 1.75;
-  color: #8a7b66;
+  color: #716149;
+  overflow-wrap: anywhere;
   text-align: center;
   margin-top: 12px;
 }

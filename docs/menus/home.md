@@ -2,6 +2,9 @@
 
 ## 구현 완료
 
+- 2026-10-05 가독성 조정: Noto Sans KR 본문 16–17px, 보조 정보 13–14px, 메뉴·버튼 15–16px와 600 굵기의 공통 기준을 적용했습니다. Hero의 제목 크기·셰이더·마우스 반응과 파트너 캐러셀 동작은 유지하고, 본문·안내·하단 메뉴를 보강했습니다.
+- 제품 캐러셀이 공유하는 제품 카드의 제품명·모델명·사양·인증 정보도 같은 가독성 기준과 장문 줄바꿈을 적용했습니다.
+
 - 2026-10-05 파트너 캐러셀: 기존 여덟 곳에 삼성바이오로직스·앰코코리아·LH 한국토지주택공사 공식 로고를 추가했다. 이전 CSS 무한 스크롤 방식을 현재 디자인에 맞춰 복원해 11개 로고를 44초 주기로 끊김 없이 순환한다. 마우스 올리기와 일시정지/재생 제어를 제공하며 반복 복제본은 보조기술에서 숨긴다. 동작 줄이기 설정에서는 모든 로고를 정적인 여러 줄 목록으로 표시한다.
 
 - 2026-10-05 추가 주석 반영: 공통 헤더의 로고 영역 배경을 투명하게 변경했다. 어두운 Hero에서는 흰색 로고를 유지하고 밝은 헤더에서는 CSS로 로고 글자를 어둡게 표시한다. 이미지·메뉴 경로·헤더 높이는 유지한다.
@@ -83,6 +86,8 @@
 
 ## 관련 파일
 
+- 공통 가독성 기준: `led-lighting-website/src/assets/styles/public-site.css`, `src/components/layout/TheNavigation.vue`, `src/components/layout/TheFooter.vue`.
+
 - `led-lighting-website/src/components/home/ClientsSection.vue`, `ClientsSection.spec.ts`: 파트너 로고 순환과 일시정지/재생, 이미지 실패 대체, 복제 목록 접근성 검증.
 - `led-lighting-website/public/images/clients/{samsung-biologics,amkor-korea}.svg`, `lh.png`, `README.md`: 신규 원본 로고와 공식 출처·표시 범위 기록.
 
@@ -128,6 +133,8 @@
 - `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.spec.ts`
 
 ## 갱신 규칙
+
+- 공통 글꼴 기준 변경 시 모바일 320/390/545px와 데스크톱에서 메뉴·CTA·하단 정보의 줄바꿈 및 가로 넘침을 확인하고 영향을 받는 공개 메뉴 문서를 함께 갱신합니다.
 
 - 실제 Nuxt 홈의 Hero/포인터·정지·정적 대체·SPA 정리, 홈 섹션·사실성·실제 제품 API 상태·상담 진입·연락처를 바꾸면 이 문서의 다섯 영역을 같은 작업에서 갱신한다. 공개 공통 셸 변경은 관련 메뉴 문서, 견적 동작 변경은 온라인 견적 문서를 함께 갱신한다. 운영 소스 적용·로컬 검수·배포와 독립 프로토타입 기록을 구분한다.
 

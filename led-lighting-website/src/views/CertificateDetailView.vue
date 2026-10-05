@@ -53,9 +53,7 @@ onMounted(fetchCertificates)
 <template>
   <div class="certificate-detail-page">
     <PublicPageHeader
-      eyebrow="CERTIFICATE DOCUMENTS"
       :title="categoryName"
-      index="03 / CERTIFICATES"
       back-to="/certificates"
       back-label="인증 목록으로"
       description="등록 문서를 선택해 원본 인증 자료를 확인하세요."
@@ -148,6 +146,7 @@ onMounted(fetchCertificates)
   gap: 30px;
   padding: 24px 0;
   border-top: 1px solid var(--df-line);
+  flex-wrap: wrap;
 }
 .certificate-document-controls > div {
   flex: 1;
@@ -160,15 +159,16 @@ onMounted(fetchCertificates)
   align-items: center;
   gap: 20px;
   margin-bottom: 11px;
-  color: #73825e;
-  font-size: 10px;
   line-height: 1.5;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
+  flex-wrap: wrap;
 }
 .certificate-document-controls label > span {
-  color: #929f7e;
   font-family: Arial, sans-serif;
-  font-size: 7px;
   letter-spacing: 0.1em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .certificate-document-controls select {
   display: block;
@@ -179,12 +179,14 @@ onMounted(fetchCertificates)
   border-radius: 2px;
   color: #3c4e2e;
   background: #e7e8dd;
-  font-size: 12px;
   line-height: 1.5;
   text-overflow: ellipsis;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
 }
 .certificate-document-controls .public-action {
   flex-shrink: 0;
+  max-width: 100%;
 }
 .certificate-pdf {
   display: flex;
@@ -213,8 +215,9 @@ onMounted(fetchCertificates)
   padding: 0 0 24px;
   color: #e5e9d8;
   text-align: center;
-  font-size: 12px;
   line-height: 1.8;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
 }
 .certificate-pdf__error .public-action {
   margin-top: 20px;
@@ -225,10 +228,10 @@ onMounted(fetchCertificates)
 }
 .certificate-document-note {
   margin: 20px 0 0;
-  color: #8e9b7b;
-  font-size: 9px;
   line-height: 1.8;
   letter-spacing: -0.025em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 @media (max-width: 700px) {
   .certificate-documents {
@@ -244,11 +247,9 @@ onMounted(fetchCertificates)
     width: 100%;
     max-width: none;
   }
+  /* Keep native select text at 16px so iOS focus does not zoom this document control. */
   .certificate-document-controls select {
-    font-size: 16px;
-  }
-  .certificate-document-controls label {
-    font-size: 9px;
+    font-size: max(16px, var(--df-font-control, 16px));
   }
   .certificate-document-controls .public-action {
     align-self: end;
@@ -256,9 +257,6 @@ onMounted(fetchCertificates)
   .certificate-pdf {
     padding: 14px 10px;
     min-height: 380px;
-  }
-  .certificate-document-note {
-    font-size: 8px;
   }
   .certificate-pdf__original {
     min-height: 430px;

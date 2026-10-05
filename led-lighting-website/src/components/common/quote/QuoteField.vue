@@ -15,16 +15,18 @@ defineProps<{ label: string; required?: boolean; optional?: boolean; hint?: stri
   flex-direction: column;
   gap: 6px;
   margin: 12px 0;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--df-font-label, 14px);
+  font-weight: var(--df-weight-control, 600);
   color: #283447;
   min-width: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .q-field small {
   font-weight: 400;
   color: #637083;
   margin-left: 5px;
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
 }
 .q-required {
   color: #0066ff;
@@ -40,8 +42,8 @@ defineProps<{ label: string; required?: boolean; optional?: boolean; hint?: stri
   background: #fff;
   color: #192332;
   font: inherit;
-  font-size: 14px;
-  font-weight: 400;
+  font-size: var(--df-font-body, 17px);
+  font-weight: var(--df-weight-body, 400);
   box-sizing: border-box;
 }
 .q-field :deep(textarea) {
@@ -54,11 +56,11 @@ defineProps<{ label: string; required?: boolean; optional?: boolean; hint?: stri
 .q-field :deep(input[type='checkbox']) {
   width: auto;
 }
-@media (max-width: 639px) {
+@media (max-width: 700px) {
   .q-field :deep(input),
   .q-field :deep(select),
   .q-field :deep(textarea) {
-    font-size: 16px;
+    font-size: var(--df-font-body, 16px);
   }
 }
 </style>

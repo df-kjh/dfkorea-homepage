@@ -4,8 +4,9 @@
   --q-panel-bottom: calc(var(--q-launcher-bottom) + 60px);
   font-family: 'Noto Sans KR', system-ui, sans-serif;
   color: #192332;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--df-font-body, 17px);
+  font-weight: var(--df-weight-body, 400);
+  line-height: 1.75;
   color-scheme: light;
 }
 #quote-widget * {
@@ -45,8 +46,8 @@
   border-radius: 999px;
   background: #0066ff;
   color: white;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
   box-shadow: 0 6px 24px #0066ff35;
   cursor: pointer;
   z-index: 10000;
@@ -59,7 +60,7 @@
   border-radius: 50%;
   background: white;
   color: #0066ff;
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
 }
 .q-panel {
   position: fixed;
@@ -77,7 +78,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 10001;
+  /* The mobile product popover sits above the launcher at 10001. Keep the
+     active quote panel above both it and the quote modal backdrop. */
+  z-index: 10002;
   outline: 0;
   transform-origin: bottom right;
 }
@@ -105,12 +108,13 @@
   flex-shrink: 0;
 }
 .q-header h2 {
-  font-size: 17px;
-  font-weight: 750;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
   margin: 0;
 }
 .q-header p {
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
   color: #657285;
   margin: 3px 0 0;
 }
@@ -134,7 +138,7 @@
   text-align: center;
   padding: 10px 0 12px;
   color: #69768a;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   border-bottom: 2px solid transparent;
 }
 .q-steps li > span {
@@ -143,7 +147,7 @@
 .q-steps li[aria-current='step'] {
   color: #0066ff;
   border-color: #0066ff;
-  font-weight: 700;
+  font-weight: var(--df-weight-control, 600);
 }
 .q-body {
   overflow-y: auto;
@@ -161,45 +165,48 @@
   border-top: 1px solid #e5eaf1;
   flex-shrink: 0;
   background: white;
+  flex-wrap: wrap;
 }
 .q-footer .q-button--primary {
   flex: 1;
 }
 .q-title {
-  font-size: 19px;
-  font-weight: 750;
+  font-size: 21px;
+  font-weight: 600;
   letter-spacing: -0.5px;
   margin: 0 0 7px;
   line-height: 1.4;
 }
 .q-help {
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   color: #637083;
   line-height: 1.65;
   margin: 6px 0 12px;
+  overflow-wrap: anywhere;
 }
 .q-small {
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
   margin-top: 10px;
 }
 .q-subtitle {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--df-font-label, 14px);
+  font-weight: var(--df-weight-control, 600);
   margin: 0;
 }
 .q-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 .q-check {
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   color: #5b697b;
   margin: 12px 0;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .q-check input {
   margin-top: 3px;
@@ -216,6 +223,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+}
+.q-row > * {
+  min-width: 0;
+  max-width: 100%;
 }
 .q-row .q-help {
   margin: 0;
@@ -224,7 +236,7 @@
   background: #edf4ff;
   padding: 11px 12px;
   border-radius: 9px;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   margin: 12px 0;
   color: #244a7d;
   overflow-wrap: anywhere;
@@ -237,12 +249,12 @@
   margin-top: 14px;
 }
 .q-error {
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   color: #a92b25;
   line-height: 1.6;
 }
 .q-contact {
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
   margin-top: 8px;
 }
 .q-contact a {
@@ -254,7 +266,7 @@
   background: #f6f8fb;
   border-radius: 10px;
   color: #647186;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   line-height: 1.7;
 }
 .q-product {
@@ -263,6 +275,7 @@
   padding: 14px 0;
   border-bottom: 1px solid #e6ebf2;
   align-items: center;
+  flex-wrap: wrap;
 }
 .q-thumb {
   width: 54px;
@@ -279,17 +292,19 @@
   font-size: 24px;
 }
 .q-product-info {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 0;
 }
 .q-product-info strong {
-  font-size: 13px;
+  font-size: var(--df-font-body, 17px);
+  font-weight: var(--df-weight-control, 600);
   display: block;
   overflow-wrap: anywhere;
 }
 .q-product-info small {
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
   color: #677386;
+  overflow-wrap: anywhere;
 }
 .q-tags {
   display: flex;
@@ -299,18 +314,20 @@
 }
 .q-tags span,
 .q-badge {
-  font-size: 10px;
+  font-size: var(--df-font-meta, 13px);
   background: #f0f4f9;
   border-radius: 4px;
   color: #56647a;
   padding: 2px 5px;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .q-product > button {
   min-height: 34px;
-  font-size: 11px;
+  font-size: var(--df-font-control, 16px);
   padding: 6px 8px;
   color: #0066ff;
+  margin-left: auto;
 }
 .q-custom-entry {
   margin-top: 16px !important;
@@ -332,13 +349,14 @@
   border-radius: 8px;
 }
 .q-choice-group legend {
-  font-size: 11px;
+  font-size: var(--df-font-label, 14px);
   padding: 0 4px;
 }
 .q-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .q-cart {
   background: #eef5ff;
@@ -352,17 +370,19 @@
   border-top: 1px solid #d9e4f4;
 }
 .q-cart-item strong {
-  font-size: 12px;
+  font-size: var(--df-font-body, 17px);
+  font-weight: var(--df-weight-control, 600);
   overflow-wrap: anywhere;
 }
 .q-item-spec {
-  font-size: 11px;
+  font-size: var(--df-font-label, 14px);
   line-height: 1.7;
   color: #5e6b7f;
   margin: 7px 0;
+  overflow-wrap: anywhere;
 }
 .q-item-description {
-  font-size: 12px;
+  font-size: var(--df-font-body, 17px);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -370,7 +390,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
 }
 .q-quantity input {
   width: 86px;
@@ -379,7 +399,7 @@
   background: #fff;
   border-radius: 7px;
   color: #1c293b;
-  font-size: 14px;
+  font-size: var(--df-font-body, 17px);
 }
 .q-upload {
   background: #f5f7fb;
@@ -397,9 +417,12 @@
   background: #fff;
   border: 1px solid #d7e0eb;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
   cursor: pointer;
   overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .q-file-label:focus-within {
   outline: 3px solid #91baff;
@@ -428,7 +451,7 @@
   border-radius: 8px;
 }
 .q-photo > p {
-  font-size: 10px;
+  font-size: var(--df-font-meta, 13px);
   overflow-wrap: anywhere;
   margin: 4px 0;
 }
@@ -438,7 +461,7 @@
   padding: 12px;
 }
 .q-summary > p {
-  font-size: 12px;
+  font-size: var(--df-font-body, 17px);
   color: #5c6b7f;
   line-height: 1.9;
   overflow-wrap: anywhere;
@@ -476,7 +499,7 @@
   position: fixed;
   inset: 0;
   background: #0a162d66;
-  z-index: 10000;
+  z-index: 10001;
 }
 #quote-widget.q-widget--with-back-top {
   --q-launcher-bottom: calc(var(--q-edge) + env(safe-area-inset-bottom, 0px) + 60px);
@@ -505,7 +528,7 @@
   padding: 16px;
 }
 .q-section-heading {
-  font-size: 15px;
+  font-size: 18px;
   margin-bottom: 12px;
 }
 .q-selection-sidebar .q-specification,
@@ -579,6 +602,23 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* Fallbacks remain readable when these components are mounted independently
+   of public-site.css; the teleported public widget receives the same tokens. */
+@media (max-width: 700px) {
+  #quote-widget,
+  .q-product-info strong,
+  .q-cart-item strong,
+  .q-item-description,
+  .q-quantity input,
+  .q-summary > p {
+    font-size: var(--df-font-body, 16px);
+  }
+  .q-launcher,
+  .q-product > button,
+  .q-file-label {
+    font-size: var(--df-font-control, 15px);
+  }
+}
 @media (max-width: 639px) {
   #quote-widget {
     --q-edge: 24px;
@@ -629,9 +669,6 @@
   }
   .q-body {
     padding: 18px 20px;
-  }
-  .q-quantity input {
-    font-size: 16px;
   }
   .q-panel-enter-from,
   .q-panel-leave-to {

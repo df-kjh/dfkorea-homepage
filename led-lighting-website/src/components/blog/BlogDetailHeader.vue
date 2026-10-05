@@ -55,17 +55,18 @@ const handleBookmark = () => {
   margin-bottom: 45px;
 }
 .df-article-category {
-  color: #a18558;
-  font-size: 11px;
   letter-spacing: 0.04em;
   margin-bottom: 24px;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .df-article-heading h1 {
   font-size: clamp(34px, 4vw, 57px);
-  font-weight: 500;
   line-height: 1.28;
   letter-spacing: -0.06em;
   overflow-wrap: anywhere;
+  font-weight: 600;
 }
 .df-article-meta {
   display: flex;
@@ -76,17 +77,20 @@ const handleBookmark = () => {
   padding: 20px 0;
   border-top: 1px solid #d8ccb6;
   border-bottom: 1px solid #d8ccb6;
+  flex-wrap: wrap;
 }
 .df-article-meta > div:first-child {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  color: #857352;
-  font-size: 11px;
   line-height: 1.8;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .df-article-meta time {
-  color: #a29276;
+  color: var(--df-muted, #625f50);
 }
 .df-article-actions {
   display: flex;

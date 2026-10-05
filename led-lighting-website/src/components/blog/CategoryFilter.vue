@@ -44,12 +44,15 @@ const handleCategoryClick = (category: string) => {
   border: 1px solid #d7c9b0;
   border-radius: 999px;
   background: transparent;
-  color: #8a7758;
-  font-size: 12px;
   line-height: 1.6;
   transition:
     background 0.2s,
     color 0.2s;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
+  color: var(--df-muted, #625f50);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .df-categories button:hover {
   background: #e6ddcb;
@@ -70,7 +73,6 @@ const handleCategoryClick = (category: string) => {
   }
   .df-categories button {
     padding: 9px 15px;
-    font-size: 11px;
     min-height: 38px;
   }
 }

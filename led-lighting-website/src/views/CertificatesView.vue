@@ -33,9 +33,7 @@ onMounted(fetchCertificates)
 <template>
   <div class="certificates-page">
     <PublicPageHeader
-      eyebrow="CERTIFICATE ARCHIVE"
       :title="'빛을 만드는\n기준과 기록.'"
-      index="03 / CERTIFICATES"
       :description="'디에프코리아의 등록 인증 자료를 살펴보세요.\n구분별로 문서를 선택해 원본 PDF를 확인할 수 있습니다.'"
     />
     <section class="public-container certificate-collection" aria-label="인증 구분별 자료">
@@ -101,18 +99,20 @@ onMounted(fetchCertificates)
   align-items: center;
   padding: 23px 0;
   border-top: 1px solid var(--df-line);
+  flex-wrap: wrap;
 }
 .certificate-collection__rail > p {
   margin: 0;
-  font-size: 11px;
   line-height: 1.6;
-  color: var(--df-muted);
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
 }
 .certificate-collection__rail > span {
-  color: #929982;
   font-family: Arial, sans-serif;
-  font-size: 7px;
   letter-spacing: 0.13em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .certificate-category-grid {
   display: grid;
@@ -141,10 +141,10 @@ onMounted(fetchCertificates)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #909d7b;
   font-family: Arial, sans-serif;
-  font-size: 8px;
   letter-spacing: 0.1em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .certificate-category__top > span:last-child {
   font-size: 20px;
@@ -160,27 +160,30 @@ onMounted(fetchCertificates)
 .certificate-category h2 {
   margin: 0;
   font-size: 20px;
-  font-weight: 500;
   line-height: 1.45;
   letter-spacing: -0.045em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .certificate-category > p {
   display: flex;
   justify-content: space-between;
   gap: 15px;
   margin: 16px 0 0;
-  color: #889477;
-  font-size: 10px;
   line-height: 1.7;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
+  flex-wrap: wrap;
 }
 .certificate-category > p > span {
-  font-size: 9px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
 }
 .certificate-collection__note {
   margin: 24px 0 0;
-  color: #979e88;
-  font-size: 9px;
   line-height: 1.8;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 @media (max-width: 1000px) {
   .certificate-category-grid {
@@ -209,9 +212,6 @@ onMounted(fetchCertificates)
   }
   .certificate-collection__rail > span {
     display: none;
-  }
-  .certificate-collection__note {
-    font-size: 8px;
   }
 }
 </style>

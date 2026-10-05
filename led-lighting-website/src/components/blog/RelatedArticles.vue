@@ -67,23 +67,28 @@ const formatDate = (dateString: string): string => {
   justify-content: space-between;
   gap: 25px;
   margin-bottom: 33px;
+  flex-wrap: wrap;
 }
 .df-related-heading p {
-  font-size: 9px;
   letter-spacing: 0.14em;
-  color: #a28a63;
   margin-bottom: 17px;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .df-related-heading h2 {
   font-size: 30px;
-  font-weight: 500;
   letter-spacing: -0.04em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .df-related-heading > a {
-  font-size: 11px;
-  color: #8e7450;
   border-bottom: 1px solid #bfab88;
   padding-block: 10px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
+  color: var(--df-muted, #625f50);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .df-related-heading > a span {
   margin-left: 25px;
@@ -103,8 +108,8 @@ const formatDate = (dateString: string): string => {
   background: #dcd0b9;
   overflow: hidden;
   color: #a18a64;
-  font-size: 12px;
   letter-spacing: 0.14em;
+  font-size: var(--df-font-meta, 13px);
 }
 .df-related-image img {
   width: 100%;
@@ -112,28 +117,30 @@ const formatDate = (dateString: string): string => {
   object-fit: cover;
 }
 .df-related-grid p {
-  font-size: 10px;
-  color: #a38c66;
   margin-top: 18px;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .df-related-grid h3 {
   font-size: 22px;
-  font-weight: 500;
   line-height: 1.45;
   letter-spacing: -0.04em;
   margin-top: 10px;
   overflow-wrap: anywhere;
+  font-weight: 600;
 }
 .df-related-grid time {
   display: block;
-  font-size: 10px;
-  color: #9b8b72;
   margin-top: 12px;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .df-related-empty {
   padding: 40px 0;
-  color: #95866e;
-  font-size: 13px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
 }
 @media (max-width: 640px) {
   .df-related {

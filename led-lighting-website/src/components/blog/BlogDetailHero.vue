@@ -32,8 +32,8 @@ defineProps<{
   justify-content: center;
   gap: 35px;
   color: #a38c63;
-  font-size: 14px;
   letter-spacing: 0.18em;
+  font-size: var(--df-font-meta, 13px);
 }
 @media (max-width: 640px) {
   .df-article-hero {
@@ -42,7 +42,6 @@ defineProps<{
   }
   .df-article-hero__empty {
     gap: 16px;
-    font-size: 10px;
   }
 }
 </style>

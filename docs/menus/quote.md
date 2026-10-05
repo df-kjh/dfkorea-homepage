@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 가독성 조정: body로 이동되는 온라인 견적 위젯에도 공통 본문 16–17px, 보조 정보 13–14px, 주요 제어 15–16px·600 굵기를 적용했습니다. 제품 선택·선택 사양·수량·입력 안내·요약 글씨를 보강하며 기존 필드·임시 저장·포커스·검증·제출 동작은 유지했습니다.
+
 - 2026-10-05 추가 주석 반영: Hero 제품 보기·회사 소개 버튼과 홈 상담 문의하기 버튼만 텍스트를 중앙 정렬했다. 상담 문의하기의 화살표를 제거했으며 버튼 크기·클릭 이벤트·상담 선택창·Hero 효과는 유지한다.
 
 - 2026-10-05 홈 상담 영역: 사용자 주석에 따라 상담 옆 보조 문구를 제거했다. 상담 문의하기 버튼·연락 방식 선택창과 온라인 견적 진입은 유지하며 접수 동작과 서버 계약을 변경하지 않았다.
@@ -62,6 +64,8 @@
 
 ## 관련 파일
 
+- 가독성 공통 기준: `led-lighting-website/src/assets/styles/public-site.css`, `src/components/quote/quote.css`, `src/components/common/quote/QuoteButton.vue`, `src/components/common/quote/QuoteField.vue`.
+
 - `output/logo-comments-20261005/README.md`
 
 - `led-lighting-website/src/app.vue`
@@ -93,6 +97,8 @@
 - `docs/superpowers/plans/2026-09-06-online-quote.md`
 
 ## 갱신 규칙
+
+- 위젯은 공개 레이아웃 밖으로 Teleport되므로 공통 글꼴 기준 변경 시 위젯 루트의 동일 토큰, 필터·제품 선택·입력·요약과 모바일 줄바꿈을 별도로 확인합니다.
 
 - 공개 사이트 팔레트·런처/패널 외형·홈/제품 상세 견적 진입·페이지 위로 버튼과의 배치를 변경하면 공개 전용 선택자 범위와 상태/통신 보존 및 실제 화면 검수 범위를 함께 기록한다.
 

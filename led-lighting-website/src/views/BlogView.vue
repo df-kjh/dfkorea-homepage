@@ -179,15 +179,19 @@ onMounted(() => {
   justify-content: space-between;
   gap: 20px;
   margin: 23px 0 37px;
-  font-size: 11px;
-  color: #99886c;
   line-height: 1.8;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
 }
 .df-news-state {
   text-align: center;
   padding: 65px 25px;
   background: #e6dece;
   line-height: 1.9;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
 }
 .df-news-state button {
   margin-top: 20px;

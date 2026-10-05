@@ -111,10 +111,11 @@ onBeforeUnmount(() => {
 }
 .products-heading h2 {
   font-size: clamp(38px, 4.8vw, 64px);
-  font-weight: 400;
   letter-spacing: -0.065em;
   line-height: 1.25;
   margin-top: 18px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .products-heading h2 span {
   color: #a6885a;
@@ -142,11 +143,14 @@ onBeforeUnmount(() => {
   margin-top: 34px;
   padding-top: 26px;
   border-top: 1px solid #b8b39e70;
+  flex-wrap: wrap;
 }
 .products-bottom p {
-  font-size: 12px;
   line-height: 1.8;
-  color: #787665;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .products-navigation {
   display: flex;

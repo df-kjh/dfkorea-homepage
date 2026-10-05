@@ -69,22 +69,24 @@ withDefaults(defineProps<{ title?: string; timeline?: TimelineItem[] }>(), {
 }
 .company-history__layout {
   display: grid;
-  grid-template-columns: 0.85fr 1.2fr;
   gap: 100px;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.2fr);
 }
 .company-history__intro h2 {
   margin: 26px 0 0;
   font-size: clamp(31px, 3.1vw, 44px);
   line-height: 1.4;
-  font-weight: 500;
   letter-spacing: -0.06em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .company-history__intro > p:not(.public-eyebrow) {
   margin: 24px 0 0;
-  color: var(--df-muted);
-  font-size: 12px;
   line-height: 1.9;
   letter-spacing: -0.025em;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
 }
 .company-history__intro .public-action {
   margin-top: 24px;
@@ -96,10 +98,10 @@ withDefaults(defineProps<{ title?: string; timeline?: TimelineItem[] }>(), {
 }
 .company-history__entries > li {
   display: grid;
-  grid-template-columns: 80px 1fr;
   gap: 32px;
   padding: 25px 0;
   border-bottom: 1px solid var(--df-line);
+  grid-template-columns: 96px minmax(0, 1fr);
 }
 .company-history__entries > li:first-child {
   padding-top: 0;
@@ -115,28 +117,31 @@ withDefaults(defineProps<{ title?: string; timeline?: TimelineItem[] }>(), {
   line-height: 1.5;
 }
 .company-history time > span {
-  color: #9c9f8b;
-  font-size: 10px;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .company-history h3 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
   line-height: 1.8;
   letter-spacing: -0.025em;
+  font-size: var(--df-font-body, 16px);
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .company-history__entries p {
   margin: 11px 0 0;
-  color: var(--df-muted);
-  font-size: 11px;
   line-height: 1.8;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .company-history__note {
   margin: 22px 0 0;
-  color: #959c85;
-  font-size: 9px;
   line-height: 1.8;
   letter-spacing: -0.02em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 @media (max-width: 850px) {
   .company-history__layout {
@@ -156,14 +161,13 @@ withDefaults(defineProps<{ title?: string; timeline?: TimelineItem[] }>(), {
     margin-top: 19px;
   }
   .company-history__intro > p:not(.public-eyebrow) {
-    font-size: 11px;
     margin-top: 19px;
   }
   .company-history__intro .public-action {
     margin-top: 16px;
   }
   .company-history__entries > li {
-    grid-template-columns: 63px 1fr;
+    grid-template-columns: 85px minmax(0, 1fr);
     gap: 18px;
     padding: 21px 0;
   }
@@ -171,15 +175,8 @@ withDefaults(defineProps<{ title?: string; timeline?: TimelineItem[] }>(), {
     font-size: 16px;
     gap: 7px;
   }
-  .company-history time > span {
-    font-size: 9px;
-  }
   .company-history h3 {
-    font-size: 12px;
     line-height: 1.9;
-  }
-  .company-history__note {
-    font-size: 8px;
   }
 }
 </style>

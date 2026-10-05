@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { CSSProperties } from 'vue'
 import type { ProductFilters, ProductFilterOptions } from '@/types/quote'
 import { emptyFilters } from '@/composables/quote-draft'
 import ProductFiltersForm from '@/components/common/quote/ProductFilters.vue'
@@ -9,6 +10,9 @@ const props = defineProps<{ modelValue: ProductFilters; options: ProductFilterOp
 const emit = defineEmits<{ apply: [value: ProductFilters] }>()
 const root = ref<HTMLElement | null>(null)
 const trigger = ref<InstanceType<typeof QuoteButton> | null>(null)
+const panel = ref<HTMLElement | null>(null)
+const panelStyle = ref<CSSProperties>()
+let visualViewport: VisualViewport | null = null
 const open = ref(false)
 const draft = ref<ProductFilters>(emptyFilters())
 const appliedCount = computed(() =>
@@ -23,6 +27,63 @@ function copyFilters(filters: ProductFilters): ProductFilters {
     options: [...filters.options],
   }
 }
+
+function updatePanelPosition() {
+  if (!open.value || !panel.value || typeof window === 'undefined') return
+  if (window.innerWidth > 639) {
+    panelStyle.value = undefined
+    return
+  }
+  const anchor = (trigger.value?.$el as HTMLElement | undefined)?.getBoundingClientRect()
+  if (!anchor) return
+  const visual = window.visualViewport
+  const viewportTop = visual?.offsetTop ?? 0
+  const viewportLeft = visual?.offsetLeft ?? 0
+  const viewportWidth = visual?.width ?? window.innerWidth
+  const viewportHeight = visual?.height ?? window.innerHeight
+  const inset = 16
+  const width = Math.max(0, Math.min(430, viewportWidth - inset * 2))
+  // Reflow at the target width before measuring: keyboard/zoom width changes
+  // can wrap labels and grow content, invalidating an above-trigger placement.
+  panel.value.style.width = `${width}px`
+  const topEdge = viewportTop + inset
+  const bottomEdge = viewportTop + viewportHeight - inset
+  const heightLimit = Math.max(0, Math.min(620, viewportHeight - inset * 2))
+  // scrollHeight includes all expanded filter rows even while max-height clips
+  // the panel. The extra 2px includes its border in the visible viewport clamp.
+  const contentHeight = Math.min(heightLimit, panel.value.scrollHeight + 2)
+  const below = Math.max(topEdge, anchor.bottom + 10)
+  const above = anchor.top - 10 - contentHeight
+  let top: number
+  let maxHeight = heightLimit
+  if (below + contentHeight <= bottomEdge) {
+    top = below
+    maxHeight = Math.min(heightLimit, bottomEdge - top)
+  } else if (above >= topEdge && above + contentHeight <= bottomEdge) {
+    top = above
+  } else {
+    // With a keyboard or expanded rows, neither side may fit. Keep the full
+    // scrollable panel inside the visible region, even if it overlaps the trigger.
+    top = Math.max(topEdge, Math.min(below, bottomEdge - contentHeight))
+  }
+  const left = Math.max(
+    viewportLeft + inset,
+    Math.min(anchor.right - width, viewportLeft + viewportWidth - inset - width),
+  )
+  panelStyle.value = {
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${width}px`,
+    maxHeight: `${maxHeight}px`,
+  }
+}
+
+function schedulePanelPosition() {
+  void nextTick(updatePanelPosition)
+}
+
+watch(open, schedulePanelPosition)
+watch(() => props.options, schedulePanelPosition, { deep: true })
 
 function toggle() {
   if (open.value) {
@@ -58,10 +119,19 @@ function onKeyDown(event: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('pointerdown', onPointerDown)
   document.addEventListener('keydown', onKeyDown)
+  window.addEventListener('resize', updatePanelPosition)
+  window.addEventListener('scroll', updatePanelPosition, { capture: true, passive: true })
+  visualViewport = window.visualViewport
+  visualViewport?.addEventListener('resize', updatePanelPosition)
+  visualViewport?.addEventListener('scroll', updatePanelPosition)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onPointerDown)
   document.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('resize', updatePanelPosition)
+  window.removeEventListener('scroll', updatePanelPosition, true)
+  visualViewport?.removeEventListener('resize', updatePanelPosition)
+  visualViewport?.removeEventListener('scroll', updatePanelPosition)
 })
 </script>
 
@@ -85,6 +155,9 @@ onBeforeUnmount(() => {
     <section
       v-if="open"
       id="product-filter-panel"
+      ref="panel"
+      :style="panelStyle"
+      @toggle.capture="schedulePanelPosition"
       class="product-filter-panel"
       role="dialog"
       aria-label="제품 필터"
@@ -122,7 +195,8 @@ onBeforeUnmount(() => {
   min-width: 106px;
   height: 50px;
   border-color: #cbbca2;
-  font-size: 14px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
 }
 .product-filter-trigger .material-symbols-outlined {
   font-size: 21px;
@@ -136,7 +210,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #4c412e;
   color: #f6f1e7;
-  font-size: 11px;
+  font-size: var(--df-font-meta, 13px);
 }
 .product-filter-panel {
   position: absolute;
@@ -146,7 +220,9 @@ onBeforeUnmount(() => {
   width: min(430px, calc(100vw - 48px));
   max-height: min(620px, calc(100vh - 190px));
   overflow-y: auto;
-  padding: 20px;
+  padding: 20px 20px 0;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
   border: 1px solid #d4c5ab;
   border-radius: 4px;
   background: #f6f1e7;
@@ -156,6 +232,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: start;
   justify-content: space-between;
+  overflow-wrap: anywhere;
   gap: 16px;
 }
 .product-filter-panel__header h2 {
@@ -165,14 +242,17 @@ onBeforeUnmount(() => {
 }
 .product-filter-panel__header p {
   margin-top: 4px;
-  color: #8d7c60;
-  font-size: 12px;
+  color: #746044;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  font-size: var(--df-font-label, 14px);
 }
 .product-filter-panel__header button {
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
+  flex: none;
   border-radius: 9px;
   color: #827154;
 }
@@ -181,10 +261,11 @@ onBeforeUnmount(() => {
 }
 .product-filter-panel__actions {
   position: sticky;
-  bottom: -20px;
+  bottom: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 14px -20px -20px;
+  margin: 14px -20px 0;
   padding: 14px 20px 20px;
   border-top: 1px solid #ded1ba;
   background: #f6f1e7;
@@ -195,7 +276,7 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 .product-filter-panel :deep(.q-filters) {
-  color: #746142;
+  color: #675235;
 }
 .product-filter-panel :deep(input) {
   accent-color: #8d703f;
@@ -223,13 +304,12 @@ onBeforeUnmount(() => {
   }
   .product-filter-panel {
     position: fixed;
-    top: auto;
-    right: 16px;
-    /* Reserve the full quote + back-to-top stack used after the page scrolls. */
-    bottom: max(156px, calc(136px + env(safe-area-inset-bottom)));
-    left: 16px;
-    width: auto;
-    max-height: min(72dvh, 620px);
+    /* Expanded mobile filters can cover the floating launcher and navigation.
+       Keep their actions above that UI (10000), below the quote modal (10002). */
+    z-index: 10001;
+    right: auto;
+    bottom: auto;
+    max-height: min(620px, calc(100dvh - 32px));
     border-radius: 5px;
   }
 }

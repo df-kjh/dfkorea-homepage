@@ -33,27 +33,28 @@ withDefaults(defineProps<Props>(), {
 <style scoped>
 .df-technical {
   display: grid;
-  grid-template-columns: 1fr 1.45fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
   gap: 80px;
   padding: 70px max(28px, calc((100vw - 1280px) / 2));
   background: #e8e2d5;
   border-top: 1px solid #d8cfbf;
 }
 .df-technical__heading p {
-  font-size: 9px;
+  font-size: var(--df-font-meta, 13px);
   letter-spacing: 0.15em;
-  color: #8a7a60;
+  color: #716047;
   margin-bottom: 19px;
 }
 .df-technical h2 {
   font-size: 32px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.04em;
   margin-bottom: 19px;
 }
 .df-technical__heading span {
-  font-size: 12px;
-  color: #827765;
+  font-size: var(--df-font-label, 14px);
+  color: #6f624e;
+  line-height: 1.8;
 }
 .df-technical dl {
   margin: 0;
@@ -67,13 +68,15 @@ withDefaults(defineProps<Props>(), {
   border-bottom: 1px solid #d4c9b7;
 }
 .df-technical dt {
-  font-size: 11px;
-  color: #8a7960;
+  font-size: var(--df-font-label, 14px);
+  color: #705c42;
+  overflow-wrap: anywhere;
   line-height: 1.7;
 }
 .df-technical dd {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
   line-height: 1.8;
   overflow-wrap: anywhere;
 }

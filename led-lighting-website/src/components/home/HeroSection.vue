@@ -185,10 +185,10 @@ function scrollDown() {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  font-size: 10px;
   letter-spacing: 0.23em;
   color: #efdbc1;
   margin: 0 0 31px;
+  font-size: var(--df-font-meta, 13px);
 }
 .hero-eyebrow > span {
   width: 4px;
@@ -214,26 +214,31 @@ function scrollDown() {
 .hero-subtitle {
   white-space: pre-line;
   color: #d4d7cb;
-  font-size: 13px;
   line-height: 1.9;
   letter-spacing: -0.03em;
   margin: 30px 0 0;
   text-shadow: 0 1px 15px #000;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  overflow-wrap: anywhere;
 }
 .hero-actions {
   display: flex;
   justify-content: center;
   gap: 10px;
   margin-top: 30px;
+  flex-wrap: wrap;
 }
 .hero-actions :deep(.public-action) {
   justify-content: center;
   text-align: center;
-  font-size: 12px;
-  min-width: 128px;
   min-height: 49px;
   padding: 14px 22px;
   border-radius: 999px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
+  min-width: 0;
+  max-width: 100%;
 }
 .hero-actions :deep(.public-action--outline) {
   color: #f0ece3;
@@ -252,10 +257,10 @@ function scrollDown() {
 }
 .hero-motion p {
   color: #c7c6b7;
-  font-size: 9px;
   line-height: 1.8;
-  white-space: nowrap;
   margin: 0 0 10px;
+  font-size: var(--df-font-meta, 13px);
+  white-space: normal;
 }
 .hero-motion-button {
   display: inline-flex;
@@ -270,8 +275,9 @@ function scrollDown() {
   background: #0809067d;
   backdrop-filter: blur(12px);
   color: #dfdece;
-  font-size: 10px;
   cursor: pointer;
+  font-size: var(--df-font-label, 14px);
+  font-weight: var(--df-weight-control, 600);
 }
 .hero-motion-button:disabled {
   color: #a3a596;
@@ -297,11 +303,11 @@ function scrollDown() {
   border: 0;
   background: none;
   color: #bfc3b4;
-  font-size: 8px;
   letter-spacing: 0.14em;
   padding: 0;
   min-height: 40px;
   cursor: pointer;
+  font-size: var(--df-font-meta, 13px);
 }
 .hero-scroll-control > span:last-child {
   font-size: 21px;
@@ -321,7 +327,6 @@ function scrollDown() {
     padding: 95px 22px 190px;
   }
   .hero-eyebrow {
-    font-size: 8px;
     letter-spacing: 0.17em;
     margin-bottom: 29px;
   }
@@ -331,7 +336,6 @@ function scrollDown() {
     letter-spacing: -0.08em;
   }
   .hero-subtitle {
-    font-size: 12px;
     line-height: 1.9;
     margin-top: 26px;
   }
@@ -340,21 +344,15 @@ function scrollDown() {
     gap: 8px;
   }
   .hero-actions :deep(.public-action) {
-    font-size: 11px;
-    min-width: 110px;
     padding: 13px 19px;
     min-height: 46px;
   }
   .hero-motion {
     bottom: 112px;
   }
-  .hero-motion p {
-    font-size: 8px;
-  }
   .hero-scroll-control {
     bottom: 48px;
     left: 24px;
-    font-size: 7px;
     gap: 10px;
   }
   .hero-scroll-control > span:last-child {
@@ -369,20 +367,13 @@ function scrollDown() {
     font-size: 50px;
   }
   .hero-eyebrow {
-    font-size: 7px;
     letter-spacing: 0.13em;
   }
-  .hero-subtitle {
-    font-size: 11px;
-  }
   .hero-actions :deep(.public-action) {
-    min-width: 100px;
     padding-inline: 15px;
-    font-size: 10px;
   }
   .hero-scroll-control {
     left: 20px;
-    font-size: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

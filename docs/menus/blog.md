@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 가독성 조정: 소식 목록·상세 상단의 영어·숫자 장식을 제거했습니다. 목록 분류·날짜·설명·상세 메타와 본문 크기·굵기를 보강하고 검색·분류·상세 이동·공유·북마크 및 실제 작성자 표기는 유지했습니다.
+
 - 2026-10-05 추가 주석 반영: 공통 헤더의 로고 영역 배경을 투명하게 변경했다. 어두운 Hero에서는 흰색 로고를 유지하고 밝은 헤더에서는 CSS로 로고 글자를 어둡게 표시한다. 이미지·메뉴 경로·헤더 높이는 유지한다.
 
 - 2026-10-05 주석 반영: 공통 헤더에 첨부한 회사 로고의 배경 제거·흰색 PNG를 적용했다. 밝은 헤더에는 로고 영역만 어두운 바탕을 두며 홈 링크·회사소개/제품/인증/소식 경로와 모바일 메뉴를 유지한다. 공통 푸터의 상단 문의 문구·전화·메일 영역을 제거하고 하단 메뉴·회사 주소·FAX·저작권은 유지한다.
@@ -37,6 +39,9 @@
 
 ## 관련 파일
 
+- 실제 Nuxt 소식 상세: `led-lighting-website/src/pages/blog/[id].vue`.
+- 공통 제목·가독성: `led-lighting-website/src/components/common/site/PublicPageHeader.vue`, `src/assets/styles/public-site.css`.
+
 - `led-lighting-website/public/branding/df-korea-logo-white.png`
 - `output/logo-comments-20261005/README.md`
 
@@ -62,6 +67,8 @@
 - `dfkorea-backend/src/seo/seo.module.ts`
 
 ## 갱신 규칙
+
+- 소식 글꼴 또는 제목 변경 시 목록·실제 Nuxt 상세를 모두 확인하고 장문 제목·날짜·작성자와 본문 링크의 좁은 화면 줄바꿈을 확인합니다.
 
 - 실제 Nuxt 소식 목록/활성 상세·공통 카드·분류 범위·공유/북마크 안내를 바꾸면 기능·제한·검수·미배포 상태를 함께 갱신한다. legacy BlogDetailView와 활성 Nuxt 페이지를 구분한다.
 

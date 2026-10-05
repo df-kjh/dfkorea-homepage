@@ -164,30 +164,31 @@ onBeforeUnmount(() => {
 .contact-layout {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 3fr 1fr;
   gap: 36px;
   align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr);
 }
 .contact-eyebrow {
-  font:
-    9px/1.8 Arial,
-    sans-serif;
+  font-size: var(--df-font-meta, 13px);
+  line-height: 1.8;
   letter-spacing: 0.14em;
   color: #b6a786;
   padding-top: 13px;
 }
 .contact-copy h2 {
   font-size: clamp(34px, 4.5vw, 62px);
-  font-weight: 400;
   letter-spacing: -0.07em;
   line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .contact-copy p {
   white-space: pre-line;
-  color: #b2b1a2;
-  font-size: 14px;
   line-height: 1.9;
   margin: 25px 0 36px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: #cfcec1;
 }
 .contact-copy :deep([data-contact-open]) {
   justify-content: center;
@@ -214,18 +215,18 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #c9c3b466;
 }
 .contact-dialog-heading p {
-  font:
-    9px/1.6 Arial,
-    sans-serif;
+  font-size: var(--df-font-meta, 13px);
+  line-height: 1.6;
   letter-spacing: 0.14em;
-  color: #9a8059;
+  color: var(--df-muted, #625f50);
   margin-bottom: 14px;
 }
 .contact-dialog-heading h3 {
   font-size: 26px;
-  font-weight: 500;
   letter-spacing: -0.05em;
   padding-right: 24px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .contact-close {
   position: absolute;
@@ -247,33 +248,39 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 22px;
   border-color: #beb8a5;
+  min-width: 0;
+  gap: 16px;
 }
 .contact-options :deep(.contact-option-quote) {
   border-color: #273021;
 }
+.contact-option > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .contact-option strong {
   display: block;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
 }
 .contact-option small {
   display: block;
-  font-size: 12px;
   line-height: 1.8;
-  opacity: 0.75;
   margin-top: 7px;
   overflow-wrap: anywhere;
+  font-size: var(--df-font-label, 14px);
+  opacity: 1;
 }
 .contact-option em {
   display: block;
-  font-size: 10px;
   font-style: normal;
-  opacity: 0.65;
   margin-top: 10px;
+  font-size: var(--df-font-meta, 13px);
+  opacity: 1;
 }
 @media (max-width: 900px) {
   .contact-layout {
-    grid-template-columns: 1fr 3fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
   }
 }
 @media (max-width: 600px) {
@@ -286,9 +293,6 @@ onBeforeUnmount(() => {
   }
   .contact-eyebrow {
     padding-top: 0;
-  }
-  .contact-copy p {
-    font-size: 13px;
   }
   .contact-dialog-heading {
     padding: 30px 22px 24px;

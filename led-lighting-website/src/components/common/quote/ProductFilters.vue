@@ -90,7 +90,7 @@ function toggle(key: keyof ProductFilters, value: string | number) {
 <style scoped>
 .q-filters {
   color: #263348;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
   margin: 10px 0;
 }
 .q-filter-row {
@@ -112,6 +112,8 @@ summary {
   display: flex;
   gap: 6px;
   justify-content: space-between;
+  font-weight: var(--df-weight-control, 600);
+  overflow-wrap: anywhere;
 }
 summary:focus-visible {
   outline: 3px solid #a8c9ff;
@@ -121,16 +123,20 @@ summary:focus-visible {
   flex-wrap: wrap;
   gap: 10px;
   padding: 10px;
-  font-size: 12px;
+  font-size: var(--df-font-label, 14px);
 }
 .q-filter-values label {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 28px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .q-filter-values input {
   accent-color: #0066ff;
+  flex-shrink: 0;
 }
 .q-more-filters {
   margin-top: 6px;
@@ -150,7 +156,7 @@ legend {
   margin-top: 8px;
 }
 .q-filter-chips button {
-  font-size: 11px;
+  font-size: var(--df-font-label, 14px);
   min-height: 32px;
   background: #eef5ff;
   color: #0066ff;

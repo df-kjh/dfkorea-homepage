@@ -32,9 +32,14 @@ describe('public site primitives', () => {
     expect(external.attributes('download')).toBe('문서.pdf')
     expect(external.attributes('target')).toBe('_blank')
   })
-  it('uses one text heading and keeps an actions slot and routed back link', () => {
+  it('shows the Korean page content and actions without the English and number decoration', () => {
     const wrapper = mount(PublicPageHeader, {
-      props: { eyebrow: 'DOCUMENTS', title: '기준과\n기록.', backTo: '/certificates' },
+      props: {
+        title: '기준과\n기록.',
+        description: '인증서와 문서를 확인하세요.',
+        backTo: '/certificates',
+      },
+      attrs: { eyebrow: 'DOCUMENTS', index: '03 / 05' },
       slots: { actions: '<button>선택하기</button>' },
       global: { stubs: { NuxtLink: link } },
     })
@@ -42,5 +47,8 @@ describe('public site primitives', () => {
     expect(wrapper.get('h1').text()).toBe('기준과\n기록.')
     expect(wrapper.get('a').attributes('href')).toBe('/certificates')
     expect(wrapper.get('button').text()).toBe('선택하기')
+    expect(wrapper.text()).toContain('인증서와 문서를 확인하세요.')
+    expect(wrapper.text()).not.toContain('DOCUMENTS')
+    expect(wrapper.text()).not.toContain('03 / 05')
   })
 })

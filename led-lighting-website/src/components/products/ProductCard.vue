@@ -94,33 +94,37 @@ function handleClick(event: MouseEvent) {
   padding-top: 22px;
 }
 .df-product-card__category {
-  font-size: 11px;
-  color: #8a7d6d;
+  font-size: var(--df-font-label, 14px);
+  color: #706353;
+  overflow-wrap: anywhere;
   margin-bottom: 10px;
 }
 .df-product-card h3 {
   font-size: 23px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.045em;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 .df-product-card__model {
-  font-size: 11px;
-  color: #898276;
+  font-size: var(--df-font-meta, 13px);
+  color: #72695b;
   margin-top: 12px;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
 .df-product-card__spec {
-  font-size: 12px;
-  color: #686156;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: #625a4d;
+  overflow-wrap: anywhere;
   margin-top: 8px;
   line-height: 1.8;
 }
 .df-product-card__certs {
-  font-size: 10px;
-  color: #8b816e;
+  font-size: var(--df-font-meta, 13px);
+  color: #706451;
+  overflow-wrap: anywhere;
   margin-top: 8px;
   line-height: 1.7;
 }

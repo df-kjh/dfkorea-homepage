@@ -81,19 +81,20 @@ const paused = ref(false)
   align-items: center;
   gap: 22px;
   margin-bottom: 34px;
+  flex-wrap: wrap;
 }
 .partners-heading p {
-  font-size: 8px;
   letter-spacing: 0.18em;
-  color: #9a8c73;
   margin: 0;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .partners-heading h2 {
-  font-size: 13px;
-  font-weight: 400;
   letter-spacing: -0.035em;
   margin: 0;
-  color: #79715f;
+  font-size: var(--df-font-body, 16px);
+  font-weight: 500;
+  color: var(--df-muted, #625f50);
 }
 .partners-heading :deep(.partners-control) {
   margin-left: auto;
@@ -101,9 +102,11 @@ const paused = ref(false)
   padding: 4px 0 4px 12px;
   gap: 8px;
   border: 0;
-  font-size: 10px;
-  color: #79715f;
-  white-space: nowrap;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
+  color: var(--df-muted, #625f50);
+  white-space: normal;
+  max-width: 100%;
 }
 .partners-carousel {
   overflow: hidden;
@@ -152,10 +155,10 @@ const paused = ref(false)
   mix-blend-mode: multiply;
 }
 .partner-name {
-  font-size: 12px;
-  color: #786f5c;
   text-align: center;
   overflow-wrap: anywhere;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
 }
 @keyframes partners-scroll {
   to {
@@ -180,12 +183,6 @@ const paused = ref(false)
   .partners-group li {
     flex-basis: 116px;
     min-height: 52px;
-  }
-  .partners-heading h2 {
-    font-size: 11px;
-  }
-  .partner-name {
-    font-size: 9px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

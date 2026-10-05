@@ -5,7 +5,7 @@
         <div class="df-detail-top">
           <PublicAction to="/products" variant="text"
             >제품 목록으로 <span aria-hidden="true">↖</span></PublicAction
-          ><span>DF KOREA / PRODUCT DETAIL</span>
+          >
         </div>
         <section class="df-detail-layout">
           <ProductImageGallery
@@ -237,11 +237,13 @@ useHead({
   color: #514532;
 }
 .product-description-content :deep(td) {
-  color: #78674e;
+  color: #6d5c43;
 }
 .product-description-content :deep(th),
 .product-description-content :deep(td) {
   border-color: #dcd0ba;
+  font-size: var(--df-font-body, 16px);
+  line-height: 1.8;
 }
 .product-description-content :deep(a) {
   color: #92703d;
@@ -251,6 +253,8 @@ useHead({
   width: 100%;
   background: #f0ece3;
   color: #29251e;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
 }
 .df-detail-shell {
   max-width: 1360px;
@@ -265,11 +269,6 @@ useHead({
   padding-bottom: 18px;
   border-bottom: 1px solid #d9cbb4;
 }
-.df-detail-top > span {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: #a18a63;
-}
 .df-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
@@ -279,9 +278,11 @@ useHead({
 .product-quote-button {
   width: 100%;
   min-height: 54px;
+  white-space: normal;
   border-radius: 999px;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
   background: #25251c;
   border-color: #25251c;
   color: #f6eddc;
@@ -294,8 +295,9 @@ useHead({
 }
 .product-quote-help {
   margin-top: 16px;
-  color: #8b7b64;
-  font-size: 11px;
+  color: #716149;
+  font-size: var(--df-font-label, 14px);
+  overflow-wrap: anywhere;
   line-height: 1.9;
 }
 .df-description-section {
@@ -308,21 +310,23 @@ useHead({
   margin: auto;
 }
 .df-description-kicker {
-  font-size: 9px;
-  color: #938166;
+  font-size: var(--df-font-meta, 13px);
+  color: #746044;
   letter-spacing: 0.15em;
   margin-bottom: 22px;
 }
 .df-description-inner > h2 {
   font-size: 34px;
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.04em;
   margin-bottom: 34px;
   overflow-wrap: anywhere;
 }
 .product-description-content :deep(p) {
-  font-size: 16px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  overflow-wrap: anywhere;
   line-height: 1.95;
   color: #6d6558;
   margin-bottom: 23px;
@@ -330,17 +334,19 @@ useHead({
 .product-description-content :deep(h1),
 .product-description-content :deep(h2) {
   font-size: 29px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.04em;
   margin: 38px 0 22px;
 }
 .product-description-content :deep(h3) {
   font-size: 23px;
-  font-weight: 500;
+  font-weight: 600;
   margin: 30px 0 16px;
 }
 .product-description-content :deep(ul) {
-  font-size: 15px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  overflow-wrap: anywhere;
   line-height: 1.9;
   color: #6d6558;
   margin: 0 0 25px;
@@ -371,9 +377,6 @@ useHead({
   }
   .df-description-inner > h2 {
     font-size: 28px;
-  }
-  .product-description-content :deep(p) {
-    font-size: 14px;
   }
 }
 @media (max-width: 350px) {

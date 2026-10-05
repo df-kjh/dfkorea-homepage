@@ -57,28 +57,30 @@ withDefaults(defineProps<{ stats?: Stat[] }>(), {
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 11px;
-  color: #77715f;
   letter-spacing: -0.02em;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
+  flex-wrap: wrap;
 }
 .fact-index {
-  font-size: 8px;
-  color: #aa9d84;
   letter-spacing: 0.04em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .fact dd {
   margin: 20px 0 10px;
   font-size: 43px;
   line-height: 1.12;
   letter-spacing: -0.06em;
-  font-weight: 500;
+  font-weight: 600;
 }
 .fact p {
   margin: 0;
-  color: #8b8371;
-  font-size: 11px;
   line-height: 1.7;
   letter-spacing: -0.025em;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
   .home-facts {
@@ -93,15 +95,11 @@ withDefaults(defineProps<{ stats?: Stat[] }>(), {
     border-left: 0;
   }
   .fact dt {
-    font-size: 10px;
     gap: 10px;
   }
   .fact dd {
     font-size: 35px;
     margin-top: 14px;
-  }
-  .fact p {
-    font-size: 10px;
   }
 }
 </style>

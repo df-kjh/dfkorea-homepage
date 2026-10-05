@@ -245,6 +245,8 @@ onMounted(() => {
   overflow-anchor: none;
   background: #f0ece3;
   color: #29251e;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
 }
 .df-products-main {
   max-width: 1360px;
@@ -258,21 +260,23 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 15px;
   border-bottom: 1px solid #d9cdbb;
   padding-bottom: 20px;
 }
 .df-filter-count span {
-  font-size: 11px;
-  color: #8e7e65;
+  font-size: var(--df-font-label, 14px);
+  color: #746149;
 }
-.df-filter-summary :deep(.q-btn) {
-  color: #7e6d53;
-  font-size: 11px;
+.df-filter-summary :deep(.q-button) {
+  color: #6f5c41;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
 }
 .df-filter-error {
   color: #8a3e30;
-  font-size: 12px;
+  font-size: var(--df-font-body, 16px);
   margin-top: 15px;
 }
 .df-collection-state {
@@ -287,8 +291,8 @@ onMounted(() => {
 .product-append-footer {
   min-height: 180px;
   padding-block: 30px;
-  color: #827158;
-  font-size: 13px;
+  color: #6f5c42;
+  font-size: var(--df-font-body, 16px);
   overflow-anchor: none;
 }
 .product-append-footer > p {

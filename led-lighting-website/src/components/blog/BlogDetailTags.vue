@@ -17,11 +17,12 @@ defineProps<{
   margin-top: 45px;
   padding-top: 26px;
   border-top: 1px solid #d8ccb6;
-  color: #a18b66;
-  font-size: 11px;
   line-height: 1.8;
+  font-size: var(--df-font-label, 14px);
+  color: var(--df-muted, #625f50);
 }
 .df-article-tags span {
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 </style>

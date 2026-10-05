@@ -4,7 +4,7 @@
       <div class="df-article-top">
         <PublicAction to="/blog" variant="text"
           >소식 목록으로 <span aria-hidden="true">↖</span></PublicAction
-        ><span>DF KOREA / NEWSROOM</span>
+        >
       </div>
       <BlogDetailHero :image="heroImage" :title="post.title" />
       <article class="df-article">
@@ -196,39 +196,40 @@ const handleBookmark = (): void => {
   margin: auto;
   padding: 0 24px;
 }
-.df-article-top > span {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: #a28a63;
-}
 .df-article {
   max-width: 800px;
   margin: auto;
   padding: 58px 24px 70px;
 }
 .article-content :deep(p) {
-  font-size: 16px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
   line-height: 2;
-  color: #6d6252;
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
   margin-bottom: 26px;
 }
 .article-content :deep(h1),
 .article-content :deep(h2) {
   font-size: 29px;
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.045em;
   margin: 38px 0 20px;
   overflow-wrap: anywhere;
 }
 .article-content :deep(h3) {
   font-size: 23px;
-  font-weight: 500;
+  font-weight: 600;
   margin: 30px 0 16px;
+  overflow-wrap: anywhere;
 }
-.article-content :deep(ul) {
-  font-size: 15px;
-  color: #6d6252;
+.article-content :deep(ul),
+.article-content :deep(ol) {
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
   line-height: 1.9;
   padding-left: 23px;
   margin-bottom: 25px;
@@ -243,6 +244,27 @@ const handleBookmark = (): void => {
   max-width: 100%;
   height: auto;
 }
+.article-content {
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  overflow-wrap: anywhere;
+}
+.article-content :deep(pre) {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre;
+}
+.article-content :deep(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: var(--df-font-body, 16px);
+}
+.article-content :deep(th),
+.article-content :deep(td) {
+  padding: 10px 12px;
+  white-space: normal;
+}
 .article-content :deep(a) {
   color: #946d31;
   text-decoration: underline;
@@ -254,14 +276,8 @@ const handleBookmark = (): void => {
   }
 }
 @media (max-width: 640px) {
-  .df-article-top > span {
-    display: none;
-  }
   .df-article {
     padding: 36px 24px 45px;
-  }
-  .article-content :deep(p) {
-    font-size: 14px;
   }
   .article-content :deep(h2) {
     font-size: 24px;

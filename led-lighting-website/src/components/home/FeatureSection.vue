@@ -73,11 +73,12 @@ const features = [
   color: var(--df-ink, #080906);
 }
 .section-kicker {
-  font-size: 9px;
   letter-spacing: 0.16em;
   line-height: 1.6;
   margin: 0;
-  color: #968566;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .features-intro {
   position: relative;
@@ -86,18 +87,19 @@ const features = [
 }
 .features-intro h2 {
   font-size: clamp(38px, 4.3vw, 62px);
-  font-weight: 500;
   line-height: 1.18;
   letter-spacing: -0.075em;
   margin: 24px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .features-intro > span {
   position: absolute;
   right: 0;
   bottom: 60px;
-  font-size: 8px;
   letter-spacing: 0.13em;
-  color: #91866f;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .feature-row {
   display: grid;
@@ -123,28 +125,33 @@ const features = [
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 .feature-copy > .section-kicker > span {
-  font-size: 8px;
-  color: #b3a388;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
 }
 .feature-copy h3 {
   font-size: clamp(28px, 3vw, 42px);
   letter-spacing: -0.065em;
   line-height: 1.25;
-  font-weight: 500;
   margin: 26px 0 20px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .feature-description {
-  font-size: 13px;
-  color: #7a7263;
   line-height: 2;
   letter-spacing: -0.03em;
   max-width: 355px;
   margin: 0 0 25px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: var(--df-weight-body, 400);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 .feature-copy :deep(.public-action) {
-  font-size: 11px;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
 }
 .feature-visual {
   min-width: 0;
@@ -166,10 +173,11 @@ const features = [
   margin-top: 42px;
 }
 .feature-visual > p {
-  font-size: 7px;
-  color: #9c907a;
   letter-spacing: 0.16em;
   margin: 18px 0 0;
+  font-size: var(--df-font-meta, 13px);
+  color: var(--df-muted, #625f50);
+  overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
   .home-features {
@@ -200,7 +208,6 @@ const features = [
     margin: 21px 0 17px;
   }
   .feature-description {
-    font-size: 12px;
     margin-bottom: 18px;
     max-width: none;
   }
@@ -211,11 +218,7 @@ const features = [
     margin-top: 27px;
   }
   .feature-visual > p {
-    font-size: 6px;
     margin-top: 14px;
-  }
-  .section-kicker {
-    font-size: 8px;
   }
 }
 </style>

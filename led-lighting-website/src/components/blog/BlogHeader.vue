@@ -13,6 +13,6 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <PublicPageHeader eyebrow="DF KOREA NEWSROOM" :title="title" :description="subtitle" index="04" />
+  <PublicPageHeader :title="title" :description="subtitle" />
 </template>
 <style scoped></style>

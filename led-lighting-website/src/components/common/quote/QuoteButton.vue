@@ -20,11 +20,14 @@ withDefaults(
   background: #fff;
   color: #243044;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
   cursor: pointer;
   transition: background 0.15s;
   line-height: 1.4;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .q-button:hover {
   background: #f0f5fc;
@@ -51,6 +54,11 @@ withDefaults(
 .q-button:focus-visible {
   outline: 3px solid #91baff;
   outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .q-button {
+    font-size: var(--df-font-control, 15px);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .q-button {

@@ -1,5 +1,14 @@
-/* Public presentation is deliberately scoped: admin/Element Plus globals and
-   the teleported quote controller retain their existing palettes and contracts. */
+/* Public presentation is deliberately scoped away from admin/Element Plus.
+   Repeat the token scope on the quote root because it is teleported to body. */
+.public-site,
+#quote-widget {
+  --df-font-body: 17px;
+  --df-font-label: 14px;
+  --df-font-meta: 13px;
+  --df-font-control: 16px;
+  --df-weight-body: 400;
+  --df-weight-control: 600;
+}
 /* Modern public browsers support :has (Chrome 105+, Safari 15.4+, Firefox 121+).
    Clear the legacy body minimum only while the public root is present: a 320px
    viewport can have less content width after reserving its vertical scrollbar. */
@@ -11,12 +20,15 @@ body:has(.public-site) {
   --df-paper: #f0ece3;
   --df-champagne: #e4c99b;
   --df-text: #293023;
-  --df-muted: #7b806e;
+  --df-muted: #5d654f;
   --df-line: #81876b35;
   --df-gutter: clamp(24px, 5vw, 76px);
   color: var(--df-text);
   background: var(--df-paper);
   font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  font-size: var(--df-font-body, 17px);
+  font-weight: var(--df-weight-body, 400);
+  line-height: 1.75;
   color-scheme: light;
 }
 .public-site > main {
@@ -35,8 +47,7 @@ body:has(.public-site) {
   scroll-margin-top: 100px;
 }
 .public-site .public-eyebrow {
-  font-family: Arial, sans-serif;
-  font-size: 9px;
+  font-size: var(--df-font-meta, 13px);
   font-weight: 500;
   letter-spacing: 0.15em;
   line-height: 1.6;
@@ -52,12 +63,15 @@ body:has(.public-site) {
   border: 1px solid transparent;
   border-radius: 999px;
   font: inherit;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--df-font-control, 16px);
+  font-weight: var(--df-weight-control, 600);
   line-height: 1.5;
   letter-spacing: -0.025em;
   text-decoration: none;
   cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   transition:
     background-color 0.18s,
     color 0.18s,
@@ -67,6 +81,7 @@ body:has(.public-site) {
   font-family: Arial, sans-serif;
   font-size: 18px;
   font-weight: 400;
+  flex-shrink: 0;
 }
 .public-site .public-action--dark {
   color: #f2eee3;
@@ -114,31 +129,20 @@ body:has(.public-site) {
   padding: 151px 0 62px;
   background: var(--df-paper);
 }
-.public-site .public-page-header__rail {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  font-family: Arial, sans-serif;
-  font-size: 8px;
-  line-height: 1.6;
-  letter-spacing: 0.14em;
-  color: var(--df-muted);
-}
-.public-site .public-page-header__rail p {
-  margin: 0;
-}
 .public-site .public-page-header__content {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: 70px;
   align-items: end;
-  margin-top: 39px;
+}
+.public-site .public-page-header__content > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .public-site .public-page-header h1 {
   margin: 0;
   font-size: clamp(44px, 4.65vw, 68px);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.07em;
   white-space: pre-line;
@@ -148,7 +152,7 @@ body:has(.public-site) {
   margin: 0;
   max-width: 460px;
   color: var(--df-muted);
-  font-size: 13px;
+  font-size: var(--df-font-body, 17px);
   line-height: 1.9;
   letter-spacing: -0.025em;
   white-space: pre-line;
@@ -160,12 +164,14 @@ body:has(.public-site) {
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  min-height: 32px;
+  min-height: 44px;
   margin: -26px 0 26px;
   color: var(--df-muted);
-  font-size: 11px;
+  font-size: var(--df-font-label, 14px);
   line-height: 1.5;
   text-decoration: none;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .public-site .public-back-link:hover {
   color: #927044;
@@ -175,7 +181,7 @@ body:has(.public-site) {
   text-align: center;
   border-block: 1px solid var(--df-line);
   color: var(--df-muted);
-  font-size: 13px;
+  font-size: var(--df-font-body, 17px);
   line-height: 1.8;
 }
 .public-site .public-status > p {
@@ -202,19 +208,23 @@ body:has(.public-site) {
   background: #e4c99b;
   color: #11180c;
   transform: translateY(-180%);
-  font-size: 13px;
+  font-size: var(--df-font-label, 14px);
 }
 .public-site .public-skip:focus {
   transform: translateY(0);
 }
 @media (max-width: 700px) {
+  .public-site,
+  #quote-widget {
+    --df-font-body: 16px;
+    --df-font-control: 15px;
+  }
   .public-site {
     --df-gutter: 24px;
   }
   .public-site .public-action {
     min-height: 46px;
     padding: 12px 19px;
-    font-size: 11px;
     gap: 23px;
   }
   .public-site .public-action--text {
@@ -225,28 +235,19 @@ body:has(.public-site) {
     padding-top: 130px;
     padding-bottom: 43px;
   }
-  .public-site .public-page-header__rail {
-    font-size: 7px;
-    letter-spacing: 0.09em;
-  }
   .public-site .public-page-header__content {
     grid-template-columns: 1fr;
     gap: 25px;
-    margin-top: 30px;
   }
   .public-site .public-page-header h1 {
     font-size: clamp(37px, 10vw, 49px);
     line-height: 1.3;
-  }
-  .public-site .public-page-header__aside > p {
-    font-size: 12px;
   }
   .public-site .public-page-header__actions {
     margin-top: 19px;
   }
   .public-site .public-back-link {
     margin-top: -22px;
-    font-size: 10px;
   }
 }
 @media (max-width: 350px) {
@@ -255,7 +256,6 @@ body:has(.public-site) {
   }
   .public-site .public-action {
     padding-inline: 16px;
-    font-size: 10px;
     gap: 18px;
   }
   .public-site .public-action--text {
