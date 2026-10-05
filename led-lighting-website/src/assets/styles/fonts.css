@@ -1,0 +1,21 @@
+/* Pretendard v1.3.9 by Kil Hyung-jin, distributed under the SIL OFL 1.1.
+   Serve the original variable font locally so every page uses the same asset. */
+@font-face {
+  font-family: 'Pretendard Variable';
+  src: url('/fonts/pretendard-v1.3.9/PretendardVariable.woff2') format('woff2');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-family-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, 'Segoe UI', sans-serif;
+}
+
+/* The editor library supplies its own UI fonts, including dialogs teleported
+   to body. Override those text surfaces while preserving monospace code. */
+body :is(.md-editor, .md-editor-modal-container, .md-editor-modal),
+body .md-editor .md-editor-preview {
+  font-family: var(--font-family-sans);
+}

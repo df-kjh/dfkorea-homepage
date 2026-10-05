@@ -108,7 +108,7 @@ onMounted(fetchCertificates)
   color: var(--df-muted, #625f50);
 }
 .certificate-collection__rail > span {
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   letter-spacing: 0.13em;
   font-size: var(--df-font-meta, 13px);
   color: var(--df-muted, #625f50);
@@ -141,7 +141,7 @@ onMounted(fetchCertificates)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   letter-spacing: 0.1em;
   font-size: var(--df-font-meta, 13px);
   color: var(--df-muted, #625f50);

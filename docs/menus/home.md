@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
+
 - 2026-10-05 가독성 조정: Noto Sans KR 본문 16–17px, 보조 정보 13–14px, 메뉴·버튼 15–16px와 600 굵기의 공통 기준을 적용했습니다. Hero의 제목 크기·셰이더·마우스 반응과 파트너 캐러셀 동작은 유지하고, 본문·안내·하단 메뉴를 보강했습니다.
 - 제품 캐러셀이 공유하는 제품 카드의 제품명·모델명·사양·인증 정보도 같은 가독성 기준과 장문 줄바꿈을 적용했습니다.
 
@@ -86,6 +88,8 @@
 
 ## 관련 파일
 
+- 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
+
 - 공통 가독성 기준: `led-lighting-website/src/assets/styles/public-site.css`, `src/components/layout/TheNavigation.vue`, `src/components/layout/TheFooter.vue`.
 
 - `led-lighting-website/src/components/home/ClientsSection.vue`, `ClientsSection.spec.ts`: 파트너 로고 순환과 일시정지/재생, 이미지 실패 대체, 복제 목록 접근성 검증.
@@ -133,6 +137,8 @@
 - `led-lighting-website/src/components/home/hanging-bulb/hangingBulbPhysics.spec.ts`
 
 ## 갱신 규칙
+
+- 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 
 - 공통 글꼴 기준 변경 시 모바일 320/390/545px와 데스크톱에서 메뉴·CTA·하단 정보의 줄바꿈 및 가로 넘침을 확인하고 영향을 받는 공개 메뉴 문서를 함께 갱신합니다.
 

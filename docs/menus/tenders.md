@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
+
 - 2026-09-07 관리자 보안 보완: 관리자 입찰 조회·설정·분석·수집·OAuth 승인 요청은 쿠키 기반 관리자 중계와 백엔드의 현재 계정 검증을 거친다. 외부 OAuth callback의 만료·일회용 state 검증은 유지한다. 세션·제한사항은 [관리자 문서](admin.md)를 따른다.
 
 - G2B에서 거부한 첨부 URL, 파일명만 있는 첨부, 정규화할 수 없는 면허·지역·품목 행과 제공된 규격·수량·단위 값 및 잘못된 숫자 필드는 안전한 오류 코드와 건수로 남긴다. URL·키·원문 값은 진단에 복제하지 않는다. 실제로 비어 있는 선택 필드는 오류로 보지 않는다. 파서도 누락/읽기 실패 자료를 UNKNOWN으로 전달하여 사양이 100%여도 `참여 추천`이 되지 않으며, 유용한 자료가 남으면 PARTIAL이다.
@@ -117,6 +119,8 @@
 
 ## 관련 파일
 
+- 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
+
 - `dfkorea-backend/.env.example`
 - `database-schema.md`
 - `dfkorea-backend/src/tenders/adapters/lh-html.ts`
@@ -174,6 +178,8 @@
 - `DEPLOYMENT.md`
 
 ## 갱신 규칙
+
+- 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 
 - 입찰 공고 메뉴의 조회, 필터, 상세 분석, 회사 자격, 검토, 진행 상태 갱신, 수신 설정 기능을 변경할 때 이 문서를 같은 변경에서 갱신한다.
 - 실제 입찰 API·메일 API 연동 상태가 바뀌면 `구현 완료`와 운영 한계 항목을 함께 조정한다.

@@ -112,7 +112,7 @@ withDefaults(defineProps<{ title?: string; timeline?: TimelineItem[] }>(), {
   align-items: baseline;
   padding-top: 1px;
   color: #4e5b3b;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   font-size: 18px;
   line-height: 1.5;
 }

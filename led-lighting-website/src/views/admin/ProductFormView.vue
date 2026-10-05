@@ -797,7 +797,7 @@ onBeforeUnmount(async () => {
 
 <style scoped>
 .font-display {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .text-primary {

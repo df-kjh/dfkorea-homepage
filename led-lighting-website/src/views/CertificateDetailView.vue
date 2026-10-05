@@ -165,7 +165,7 @@ onMounted(fetchCertificates)
   flex-wrap: wrap;
 }
 .certificate-document-controls label > span {
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   letter-spacing: 0.1em;
   font-size: var(--df-font-meta, 13px);
   color: var(--df-muted, #625f50);

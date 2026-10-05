@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
+
 - 2026-10-05 가독성·모바일 필터 조정: 제품 상단의 PRODUCT COLLECTION / 02 및 상세 페이지의 영어 장식을 제거했습니다. 제품명·모델명·인증·사양·필터 선택지의 글씨 크기와 굵기를 높이고 검색·분류·목록·상세·견적 기능은 유지했습니다.
 - 모바일 제품 필터는 하단 고정 여백을 제거하고 필터 버튼 근처에 표시됩니다. 보이는 화면의 위치·높이(visualViewport)에 따라 위치와 최대 높이를 계산하며 창 크기·스크롤·키보드로 줄어든 영역에 대응합니다. 패널 내부를 스크롤해 적용/초기화 버튼에 접근할 수 있으며 임시 선택→명시적 적용, Escape/닫기 포커스 복원, 바깥 클릭 닫기를 유지합니다. 모바일 필터는 고정 견적·맨 위로 버튼보다 앞에 표시하고 실제 견적 창은 필터보다 앞에 표시해 적용 버튼의 클릭 영역을 보호합니다.
 
@@ -86,6 +88,8 @@
 
 ## 관련 파일
 
+- 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
+
 - 모바일 필터 위치: `led-lighting-website/src/components/products/ProductFilterPopover.vue` 및 관련 런타임 테스트.
 - 실제 Nuxt 상세: `led-lighting-website/src/pages/products/[id].vue`.
 
@@ -142,6 +146,8 @@
 - `led-lighting-website/src/components/products/ProductDescription.vue`
 
 ## 갱신 규칙
+
+- 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 
 - 모바일 필터 수정 시 트리거 근처 배치, visualViewport 축소/오프셋, 폴백·리스너 해제, 임시 선택/적용/초기화·Escape 포커스 및 좁은 화면 줄바꿈을 함께 확인합니다.
 

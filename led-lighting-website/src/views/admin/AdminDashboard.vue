@@ -167,9 +167,8 @@ const handleLogout = async (): Promise<void> => {
 </script>
 
 <style scoped>
-/* Space Grotesk font - ensure it's loaded */
 .font-display {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 /* Primary color override for admin dashboard */

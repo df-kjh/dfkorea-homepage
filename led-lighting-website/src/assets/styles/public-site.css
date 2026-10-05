@@ -25,7 +25,7 @@ body:has(.public-site) {
   --df-gutter: clamp(24px, 5vw, 76px);
   color: var(--df-text);
   background: var(--df-paper);
-  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  font-family: var(--font-family-sans);
   font-size: var(--df-font-body, 17px);
   font-weight: var(--df-weight-body, 400);
   line-height: 1.75;
@@ -78,7 +78,7 @@ body:has(.public-site) {
     border-color 0.18s;
 }
 .public-site .public-action > [aria-hidden] {
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   font-size: 18px;
   font-weight: 400;
   flex-shrink: 0;

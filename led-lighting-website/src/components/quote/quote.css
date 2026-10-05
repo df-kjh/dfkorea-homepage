@@ -2,7 +2,7 @@
   --q-edge: 32px;
   --q-launcher-bottom: calc(var(--q-edge) + env(safe-area-inset-bottom, 0px));
   --q-panel-bottom: calc(var(--q-launcher-bottom) + 60px);
-  font-family: 'Noto Sans KR', system-ui, sans-serif;
+  font-family: var(--font-family-sans);
   color: #192332;
   font-size: var(--df-font-body, 17px);
   font-weight: var(--df-weight-body, 400);

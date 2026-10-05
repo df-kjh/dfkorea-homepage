@@ -359,7 +359,7 @@ onBeforeUnmount(() => {
   }
   .public-nav__mobile > a > span:last-child {
     margin-left: auto;
-    font-family: Arial, sans-serif;
+    font-family: inherit;
     font-size: 18px;
   }
   .public-nav__number {

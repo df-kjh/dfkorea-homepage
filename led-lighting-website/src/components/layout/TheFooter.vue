@@ -48,7 +48,7 @@ const links = [
   gap: 35px;
 }
 .public-footer__brand {
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   font-size: 21px;
   font-weight: 700;
   line-height: 1;
@@ -80,7 +80,7 @@ const links = [
 }
 .public-footer__wordmark {
   margin: 64px 0 30px;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   font-size: clamp(62px, 15vw, 230px);
   font-weight: 650;
   line-height: 0.85;

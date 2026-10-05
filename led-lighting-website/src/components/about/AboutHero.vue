@@ -94,7 +94,7 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
   left: 37px;
   bottom: 32px;
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   letter-spacing: 0.2em;
   font-size: var(--df-font-meta, 13px);
 }
@@ -102,7 +102,7 @@ const heading = computed(() => props.title.replace(/<br\s*\/?>/gi, '\n'))
   position: absolute;
   right: 37px;
   top: 31px;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   letter-spacing: 0.15em;
   color: #7a876c;
   font-size: var(--df-font-meta, 13px);

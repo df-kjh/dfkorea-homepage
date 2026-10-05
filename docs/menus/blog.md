@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
+
 - 2026-10-05 가독성 조정: 소식 목록·상세 상단의 영어·숫자 장식을 제거했습니다. 목록 분류·날짜·설명·상세 메타와 본문 크기·굵기를 보강하고 검색·분류·상세 이동·공유·북마크 및 실제 작성자 표기는 유지했습니다.
 
 - 2026-10-05 추가 주석 반영: 공통 헤더의 로고 영역 배경을 투명하게 변경했다. 어두운 Hero에서는 흰색 로고를 유지하고 밝은 헤더에서는 CSS로 로고 글자를 어둡게 표시한다. 이미지·메뉴 경로·헤더 높이는 유지한다.
@@ -39,6 +41,8 @@
 
 ## 관련 파일
 
+- 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
+
 - 실제 Nuxt 소식 상세: `led-lighting-website/src/pages/blog/[id].vue`.
 - 공통 제목·가독성: `led-lighting-website/src/components/common/site/PublicPageHeader.vue`, `src/assets/styles/public-site.css`.
 
@@ -67,6 +71,8 @@
 - `dfkorea-backend/src/seo/seo.module.ts`
 
 ## 갱신 규칙
+
+- 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 
 - 소식 글꼴 또는 제목 변경 시 목록·실제 Nuxt 상세를 모두 확인하고 장문 제목·날짜·작성자와 본문 링크의 좁은 화면 줄바꿈을 확인합니다.
 

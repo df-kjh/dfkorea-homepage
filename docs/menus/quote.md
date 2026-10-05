@@ -2,6 +2,9 @@
 
 ## 구현 완료
 
+- 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
+- 견적 위젯은 body로 Teleport되므로 전역 글꼴 토큰을 루트에 명시해 공개 페이지와 동일한 Pretendard를 적용합니다.
+
 - 2026-10-05 가독성 조정: body로 이동되는 온라인 견적 위젯에도 공통 본문 16–17px, 보조 정보 13–14px, 주요 제어 15–16px·600 굵기를 적용했습니다. 제품 선택·선택 사양·수량·입력 안내·요약 글씨를 보강하며 기존 필드·임시 저장·포커스·검증·제출 동작은 유지했습니다.
 
 - 2026-10-05 추가 주석 반영: Hero 제품 보기·회사 소개 버튼과 홈 상담 문의하기 버튼만 텍스트를 중앙 정렬했다. 상담 문의하기의 화살표를 제거했으며 버튼 크기·클릭 이벤트·상담 선택창·Hero 효과는 유지한다.
@@ -64,6 +67,8 @@
 
 ## 관련 파일
 
+- 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
+
 - 가독성 공통 기준: `led-lighting-website/src/assets/styles/public-site.css`, `src/components/quote/quote.css`, `src/components/common/quote/QuoteButton.vue`, `src/components/common/quote/QuoteField.vue`.
 
 - `output/logo-comments-20261005/README.md`
@@ -97,6 +102,8 @@
 - `docs/superpowers/plans/2026-09-06-online-quote.md`
 
 ## 갱신 규칙
+
+- 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 
 - 위젯은 공개 레이아웃 밖으로 Teleport되므로 공통 글꼴 기준 변경 시 위젯 루트의 동일 토큰, 필터·제품 선택·입력·요약과 모바일 줄바꿈을 별도로 확인합니다.
 

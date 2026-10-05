@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
+
 - 2026-09-07 메인 코드 `e797040`을 Vercel/Railway 운영에 반영했다. 익명 보호 API·CSRF·CORS와 공개 페이지를 포함한 운영 15개 검사를 통과했다.
 
 - 로그인 JWT를 브라우저 JavaScript에서 읽을 수 없는 HttpOnly·Secure·SameSite=Lax 호스트 쿠키로 관리한다. 로그인 응답은 사용자명만 반환하며 기존 localStorage 토큰을 제거한다.
@@ -29,12 +31,16 @@
 
 ## 관련 파일
 
+- 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
+
 - `dfkorea-backend/src/auth/`, `src/upload/`, `src/security/`, `src/main.ts`
 - `led-lighting-website/src/server/api/admin/`, `src/server/utils/admin-relay.ts`, `src/server/middleware/`
 - `led-lighting-website/src/api/client.ts`, `src/middleware/auth.ts`, `src/views/admin/`
 - `docs/security/2026-09-07-admin-hardening-report.md`, `DEPLOYMENT.md`
 
 ## 갱신 규칙
+
+- 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 
 - 관리자 경로, 쿠키, 만료, 권한 또는 저장소 경계가 변경되면 이 문서와 관련 메뉴 문서를 같이 갱신한다.
 - 기능의 테스트 근거와 운영 미검증 범위, 인증/제한 정책의 남은 한계를 함께 기록한다.

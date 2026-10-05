@@ -17,8 +17,9 @@ export default {
         'text-desc': '#8B95A1',
       },
       fontFamily: {
-        sans: ['Noto Sans KR', 'system-ui', 'sans-serif'],
-        noto: ['Noto Sans KR', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-family-sans)'],
+        // Keep the existing utility name compatible with older templates.
+        noto: ['var(--font-family-sans)'],
       },
       borderRadius: {
         sm: '2px',
