@@ -224,11 +224,26 @@ const collectTenders = async () => {
 
     const partialSources = data.sources.filter(({ status }) => status === 'PARTIAL')
     const partialSourceLabels = partialSources.map(({ source }) => TENDER_SOURCE_LABELS[source])
+    const lhCollectionDisabled = data.sources.some(
+      ({ source, status, errorCode }) =>
+        source === 'LH' && status === 'SKIPPED' && errorCode === 'FEATURE_DISABLED',
+    )
+    const failedSourcesMessage =
+      '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.'
+    const lhDisabledMessage =
+      'LH 수집은 운영 설정에서 비활성화되어 있습니다. 운영 환경에 LH_TENDER_ENABLED=true를 설정하고 재배포한 뒤 한 번만 수집하세요.'
     collectionFeedback.value =
       data.failedSources.length > 0
         ? {
             role: 'alert',
-            message: '일부 출처 수집에 실패했습니다. 성공한 공고는 최신 목록으로 반영했습니다.',
+            message: lhCollectionDisabled
+              ? `${failedSourcesMessage} ${lhDisabledMessage}`
+              : failedSourcesMessage,
+          }
+        : lhCollectionDisabled
+        ? {
+            role: 'alert',
+            message: lhDisabledMessage,
           }
         : partialSources.length > 0
           ? {
