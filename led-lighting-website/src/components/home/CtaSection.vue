@@ -87,9 +87,9 @@ onBeforeUnmount(() => {
       <div class="contact-copy">
         <h2>{{ title }}</h2>
         <p>{{ description }}</p>
-        <PublicAction data-contact-open variant="light" @click="openContact"
-          >상담 문의하기 <span aria-hidden="true">↗</span></PublicAction
-        >
+        <PublicAction data-contact-open variant="light" @click="openContact">
+          상담 문의하기
+        </PublicAction>
       </div>
     </div>
     <!-- Native modal keeps tab focus and Escape semantics without a second global overlay controller. -->
@@ -188,6 +188,10 @@ onBeforeUnmount(() => {
   font-size: 14px;
   line-height: 1.9;
   margin: 25px 0 36px;
+}
+.contact-copy :deep([data-contact-open]) {
+  justify-content: center;
+  text-align: center;
 }
 .contact-dialog {
   width: min(570px, calc(100vw - 40px));

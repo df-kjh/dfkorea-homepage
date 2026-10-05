@@ -213,20 +213,19 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 140px;
   height: 64px;
-  border-radius: 4px;
-  /* Keep the requested white logo legible when the header switches to paper. */
-  background: #080906;
+  background: transparent;
   text-decoration: none;
   flex-shrink: 0;
-}
-.public-nav[data-tone='ink'] .public-brand {
-  background: transparent;
 }
 .public-brand__logo {
   display: block;
   width: 128px;
   height: 64px;
   object-fit: contain;
+}
+.public-nav[data-tone='paper'] .public-brand__logo {
+  /* A transparent logo needs ink lettering against the light header surface. */
+  filter: brightness(0);
 }
 .public-nav__desktop {
   display: flex;

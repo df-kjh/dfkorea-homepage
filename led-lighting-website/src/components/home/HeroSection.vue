@@ -227,6 +227,8 @@ function scrollDown() {
   margin-top: 30px;
 }
 .hero-actions :deep(.public-action) {
+  justify-content: center;
+  text-align: center;
   font-size: 12px;
   min-width: 128px;
   min-height: 49px;
