@@ -84,7 +84,7 @@
 ## 관련 파일
 
 - `led-lighting-website/src/components/home/ClientsSection.vue`, `ClientsSection.spec.ts`: 파트너 로고 순환과 일시정지/재생, 이미지 실패 대체, 복제 목록 접근성 검증.
-- `led-lighting-website/public/images/clients/{samsung-biologics,amkor-korea,lh}.svg`, `README.md`: 신규 원본 로고와 공식 출처·표시 범위 기록.
+- `led-lighting-website/public/images/clients/{samsung-biologics,amkor-korea}.svg`, `lh.png`, `README.md`: 신규 원본 로고와 공식 출처·표시 범위 기록.
 
 - `led-lighting-website/public/branding/df-korea-logo-white.png`
 - `output/logo-comments-20261005/README.md`

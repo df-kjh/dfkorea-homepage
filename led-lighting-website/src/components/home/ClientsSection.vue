@@ -19,7 +19,7 @@ withDefaults(defineProps<{ title?: string; subtitle?: string; clients?: Client[]
     { name: 'CGV', logo: '/images/clients/CGV.svg' },
     { name: '삼성바이오로직스', logo: '/images/clients/samsung-biologics.svg' },
     { name: '앰코코리아', logo: '/images/clients/amkor-korea.svg' },
-    { name: 'LH 한국토지주택공사', logo: '/images/clients/lh.svg' },
+    { name: 'LH 한국토지주택공사', logo: '/images/clients/lh.png' },
   ],
 })
 const failedLogos = ref(new Set<string>())

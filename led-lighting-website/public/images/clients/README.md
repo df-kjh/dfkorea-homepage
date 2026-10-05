@@ -6,14 +6,14 @@
 
 ## 신규 에셋 출처
 
-공식 사이트가 직접 사용하는 SVG를 2026-10-05에 확보했다. 상표의 권리는 각 회사에 있다.
+공식 사이트가 직접 사용하는 SVG/PNG를 2026-10-05에 확보했다. 상표의 권리는 각 회사에 있다.
 컬러 원본을 파일로 보관하고 화면에서는 기존 파트너와 동일한 CSS 흑백 톤을 적용한다.
 
 | 파일 | 원본 출처 | 표시 처리 |
 | --- | --- | --- |
 | `samsung-biologics.svg` | [삼성바이오로직스 공식 로고](https://samsungbiologics.com/resources/front/en/images/logo.svg) | 공식 SVG는 흰색/컬러 버전이 세로로 붙은 스프라이트다. 경로와 색상을 유지하고 viewBox를 `0 44 122 44`로 한정해 아래 컬러 로고만 표시한다. |
 | `amkor-korea.svg` | [앰코 공식 한국 사이트의 로고](https://amkormarcomexternal.blob.core.windows.net/amkordotcom/theme-assets/Amkor-blue.svg) | 공식 컬러 SVG 그대로. 업체 이름/대체 텍스트는 앰코코리아. |
-| `lh.svg` | [LH 공식 사이트의 로고](https://www.lh.or.kr/main/img/layout/logo_main_ov.svg) | 메인 헤더의 컬러 CI 그대로. 슬로건 전용 `logo_sub_ov.svg`와 구별한다. |
+| `lh.png` | [LH 공식 CI 심벌](https://www.lh.or.kr/main/img/sub/box_icon_logo.png) · [CI 소개](https://www.lh.or.kr/menu.es?mid=a10702040100) | 공식 CI 소개의 투명 배경 심벌 원본 그대로. 헤더의 회사명 워드마크와 구별한다. |
 
 ## 목록 갱신
 
