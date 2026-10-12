@@ -25,7 +25,7 @@ it('opens an accessible contact dialog and returns to the original CTA on Escape
 it('uses the existing quote controller and the company mail from the real footer', async () => {
   const cta = mount(CtaSection, { attachTo: document.body })
   await cta.get('[data-contact-open]').trigger('click')
-  expect(cta.text()).toContain('kjukym@dfkorealed.com')
+  expect(cta.text()).toContain('kymkjh2002@dfkorealed.com')
   await cta.get('[data-contact-quote]').trigger('click')
   expect(boundary.open).toHaveBeenCalledOnce()
   expect((cta.get('dialog').element as HTMLDialogElement).open).toBe(false)
