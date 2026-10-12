@@ -13,7 +13,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   title: '다음 공간의 빛을, 함께.',
   description: '필요한 제품과 구성부터 차근히 살펴봅니다.\nDF KOREA에 조명 상담을 남겨주세요.',
-  companyEmail: 'kjukym@dfkorealed.com',
+  companyEmail: 'kymkjh2002@dfkorealed.com',
   companyPhone: '032-528-2953',
 })
 const quote = useQuoteDraft()

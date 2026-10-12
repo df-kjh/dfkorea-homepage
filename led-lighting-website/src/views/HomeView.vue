@@ -47,7 +47,7 @@
     <EmptyState v-else description="등록된 메인 제품이 없습니다" class="py-32" />
 
     <!-- CTA Section (기존 Contact Dialog 유지) -->
-    <CtaSection company-email="kjukym@dfkorealed.com" />
+    <CtaSection company-email="kymkjh2002@dfkorealed.com" />
   </div>
 </template>
 
