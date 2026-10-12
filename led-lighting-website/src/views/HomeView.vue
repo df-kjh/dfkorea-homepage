@@ -46,6 +46,8 @@
     />
     <EmptyState v-else description="등록된 메인 제품이 없습니다" class="py-32" />
 
+    <KindaSection />
+
     <!-- CTA Section (기존 Contact Dialog 유지) -->
     <CtaSection company-email="kymkjh2002@dfkorealed.com" />
   </div>
@@ -64,6 +66,7 @@ import StatsSection from '@/components/home/StatsSection.vue'
 import ClientsSection from '@/components/home/ClientsSection.vue'
 import FeatureSection from '@/components/home/FeatureSection.vue'
 import ProductCarousel from '@/components/home/ProductCarousel.vue'
+import KindaSection from '@/components/home/KindaSection.vue'
 
 // Keep existing components
 import CtaSection from '@/components/home/CtaSection.vue'
