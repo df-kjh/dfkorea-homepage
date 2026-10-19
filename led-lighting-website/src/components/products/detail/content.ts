@@ -12,6 +12,7 @@ import {
   productCertificationLabels,
 } from '../presentation'
 import { stripMarkdown } from '@/utils/seo'
+import { GENERATED_APPLICATION_CAPTION, resolveApplicationProfile } from './application-profiles'
 
 export const MOLDBAR_PRESET_ID = 'c2f1977b-3572-44c6-b6a7-d59a37b237f7'
 const presetAsset = (file: string) => `/images/product-detail/moldbar/${file}`
@@ -150,16 +151,50 @@ export function resolveProductDetail(product: Product) {
   const dimensionSpec = summary.find(
     (entry) => entry.label === '제품 규격' || entry.label === '길이 규격',
   )
-  // Only the approved moldbar has known linear geometry. Other shapes retain their registered text.
-  const dimensionParts = isMoldbar
-    ? product.dimensions?.match(
-        /^\s*(\d+(?:\.\d+)?)\s*[*xX×]\s*(\d+(?:\.\d+)?)\s*[*xX×]\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*$/i,
-      )
-    : null
-  const linearDimensions = dimensionParts ? dimensionParts.slice(1, 4) : null
-  const defaultFeatures = summary
-    .slice(0, 3)
-    .map((entry) => ({ title: entry.label, body: entry.value }))
+  const applicationProfile = isMoldbar ? undefined : resolveApplicationProfile(product)
+  const legacyIntroduction = legacyHeroDescription(product.description || '')
+  const originalOverview = registeredImages[0]
+  const defaultStructureImages =
+    registeredImages.length > 1
+      ? registeredImages.slice(1)
+      : registeredImages.map((image) => ({
+          ...image,
+          caption: image.caption || '등록된 제품 원본 사진 · 전체 형태를 확대해 살펴보세요.',
+        }))
+  const defaultApplication = {
+    title: '공간에 맞춰,\n빛의 흐름을 계획합니다.',
+    description:
+      applicationProfile?.description ||
+      `${product.name}의 설치 조건과 필요한 수량을 함께 확인합니다.\n현장 사진과 설치 위치를 바탕으로 적용 가능한 구성을 상담해 주세요.`,
+    image: applicationProfile?.image || originalOverview,
+    caption: applicationProfile
+      ? GENERATED_APPLICATION_CAPTION
+      : originalOverview
+        ? '등록된 제품 원본 사진입니다. 설치 공간은 현장 조건에 맞춰 상담해 주세요.'
+        : '등록된 제품 사진이 없습니다. 설치 조건과 제품 자료를 상담해 주세요.',
+  }
+  const defaultFeatures = [
+    {
+      title: connection ? '연결 구성에 맞춰 고르는 길이' : '공간에 맞춰 살펴보는 크기',
+      body: dimensionSpec?.value || '설치할 자리의 치수와 제품 규격을 상담해 주세요.',
+    },
+    {
+      title: connection ? '연결할 조명과 함께 확인' : '환경에 맞춰 고르는 사양',
+      body: connection
+        ? `${product.name}의 연결 방식과 사용할 조명의 구성을 함께 확인합니다.`
+        : summary
+            .filter((entry) => ['소비전력', '색온도'].includes(entry.label))
+            .map((entry) => `${entry.label} ${entry.value}`)
+            .join(' · ') || '희망 사양을 상담해 주세요.',
+    },
+    {
+      title: connection ? '설치 조건에 맞춰 계획' : '운영에 맞춰 정하는 제어',
+      body: connection
+        ? '천장 높이와 고정 위치, 필요한 길이를 함께 알려주세요.'
+        : controls.join(' · ') ||
+          '등록된 제어 옵션이 없습니다. 필요한 구성은 상담 시 확인해 주세요.',
+    },
+  ]
   const approved: Partial<ProductDetailContent> = isMoldbar
     ? {
         heroTitle: '공간을 따라,\n빛을 잇다.',
@@ -170,7 +205,7 @@ export function resolveProductDetail(product: Product) {
           alt: '몰드바 조명을 원본 제품 사진 기반으로 제작한 스튜디오 연출 이미지',
         },
         storyTitle: '빛이 필요한 곳에,\n길을 따라.',
-        structureImages: registeredImages.slice(1).map((image, index) => ({
+        structureImages: defaultStructureImages.map((image, index) => ({
           ...image,
           caption:
             image.caption ||
@@ -207,28 +242,38 @@ export function resolveProductDetail(product: Product) {
             url: presetAsset('moldbar-application.png'),
             alt: '몰드바 형태 조명을 배치한 주차 공간 적용 연출 예시',
           },
-          caption: 'AI로 제작한 적용 공간 예시입니다. 실제 시공 사례·조도 측정 결과가 아닙니다.',
+          caption: GENERATED_APPLICATION_CAPTION,
         },
         controlTitle: '필요한 곳을,\n원하는 방식으로.',
         dimensionsTitle: '설치 전,\n공간의 치수부터.',
       }
     : {}
+  const custom = sanitizeDetailContent(product.detailContent)
   const content = {
-    heroTitle: product.name,
-    heroDescription: legacyHeroDescription(product.description || ''),
-    heroImage: registeredImages[0],
-    storyTitle: `${product.name},\n자세히 살펴보세요.`,
+    heroTitle: '공간을 따라,\n빛을 잇다.',
+    heroDescription: applicationProfile
+      ? `${product.name}의 조명 계획.\n${applicationProfile.description}`
+      : legacyIntroduction,
+    heroImage: applicationProfile?.image || originalOverview,
+    storyTitle: '빛이 필요한 곳에,\n공간에 맞게.',
     storyImage: registeredImages[0],
     features: defaultFeatures,
-    structureTitle: '제품의 형태와\n세부 디테일.',
-    structureImages: registeredImages.slice(1),
-    controlTitle: '현장에 맞는\n제어 옵션.',
+    structureTitle: '가까이 볼수록,\n선명해지는 디테일.',
+    structureImages: defaultStructureImages,
+    application: defaultApplication,
+    controlTitle: '필요한 곳을,\n원하는 방식으로.',
     showControl: true,
-    dimensionsTitle: '공간에 맞는\n제품 규격.',
+    dimensionsTitle: '설치 전,\n공간의 치수부터.',
     showDimensions: true,
     ...approved,
-    ...sanitizeDetailContent(product.detailContent),
+    ...custom,
   }
+  const heroPresentation =
+    !custom.heroImage && (isMoldbar || applicationProfile) ? 'cover' : 'product'
+  // Keep the approved hero free of automatic notes; only an explicit admin caption opts in.
+  const heroCaption = custom.heroImage?.caption
+  const applicationPresentation =
+    custom.application || isMoldbar || applicationProfile ? 'scene' : 'reference'
   const allImages = [
     ...registeredImages,
     content.heroImage,
@@ -244,13 +289,15 @@ export function resolveProductDetail(product: Product) {
   }
   return {
     ...content,
+    heroPresentation,
+    heroCaption,
+    applicationPresentation,
     summary,
     technicalSpecs,
     certifications: productCertificationLabels(product),
     registeredImages,
     controls,
     dimensionSpec,
-    linearDimensions,
     gallery,
     connection,
     isMoldbar,

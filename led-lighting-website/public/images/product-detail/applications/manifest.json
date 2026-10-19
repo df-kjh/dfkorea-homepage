@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "createdDate": "2026-10-19",
+  "generated": true,
+  "generator": "image_gen",
+  "purpose": "AI-generated installation illustrations; not construction records or performance evidence.",
+  "captionRequired": "AI로 생성한 설치 연출 예시이며, 실제 시공 사진이나 성능을 증명하는 자료가 아닙니다.",
+  "assets": [
+    {
+      "key": "pipe-pendant",
+      "webPath": "/images/product-detail/applications/pipe-pendant-v1.png",
+      "referenceFile": "p01-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2048458,
+      "sha256": "df096e3eef37a2b9d198aa0010283701914c4305c368313b7c3b7838536f309d"
+    },
+    {
+      "key": "classroom",
+      "webPath": "/images/product-detail/applications/classroom-v1.png",
+      "referenceFile": "p02-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 1856056,
+      "sha256": "9cfeaa37fd90fbaa9c9ff44aba4f1226fec16c8dad564309cb0778a1a97f8d6f"
+    },
+    {
+      "key": "street",
+      "webPath": "/images/product-detail/applications/street-v1.png",
+      "referenceFile": "p03-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 940,
+      "byteSize": 2288215,
+      "sha256": "afab8c32178fa72d43c0b712583520d158cbb34f019262859a962e7760034581"
+    },
+    {
+      "key": "moisture-proof",
+      "webPath": "/images/product-detail/applications/moisture-proof-v1.png",
+      "referenceFile": "p04-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2160393,
+      "sha256": "7add7959885daffc83bb98652d63cd8981f2715b30be5d7d8f3913801457022a"
+    },
+    {
+      "key": "cob-retail",
+      "webPath": "/images/product-detail/applications/cob-retail-v1.png",
+      "referenceFile": "p05-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2006282,
+      "sha256": "4428e0399711398944cc19fc5bcc65dbe65e89a41e4e5b4818176f535bda7aa1"
+    },
+    {
+      "key": "round-ceiling",
+      "webPath": "/images/product-detail/applications/round-ceiling-v1.png",
+      "referenceFile": "p06-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2092124,
+      "sha256": "58a79dfa979bb90d4984d6ff423f9e6eb8223d98c35ca5a1fd660666e6d54bb6"
+    },
+    {
+      "key": "downlight",
+      "webPath": "/images/product-detail/applications/downlight-v1.png",
+      "referenceFile": "p08-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 1979885,
+      "sha256": "76e82a44edbf4b1f41e277efbea635de386f23c76055b602d39e20cd0cf4cd8b"
+    },
+    {
+      "key": "stair-sign",
+      "webPath": "/images/product-detail/applications/stair-sign-v1.png",
+      "referenceFile": "p09-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2365027,
+      "sha256": "33356f45368fde337a021a34750b91a0319e9bbaaeced01fa44bac7a73290c28"
+    },
+    {
+      "key": "parking-guidance",
+      "webPath": "/images/product-detail/applications/parking-guidance-v1.png",
+      "referenceFile": "p10-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2046848,
+      "sha256": "4dc5255f20aceb7628057dcaee90807a677cb073652c5d68dd1c25595e43599c"
+    },
+    {
+      "key": "wall-light",
+      "webPath": "/images/product-detail/applications/wall-light-v1.png",
+      "referenceFile": "p11-gallery-02.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2210942,
+      "sha256": "113e653a3c834c7d149b117ea95560b238de9fc7b875beefb41bbeb62f3f7dfc"
+    },
+    {
+      "key": "cleanroom",
+      "webPath": "/images/product-detail/applications/cleanroom-v1.png",
+      "referenceFile": "p12-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 1711349,
+      "sha256": "a570cbc4a7a40ccee0a3f5f27ed5ce17f58f2f303a885fb6986b403470125308"
+    },
+    {
+      "key": "parking-linear",
+      "webPath": "/images/product-detail/applications/parking-linear-v1.png",
+      "referenceFile": "p14-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2317794,
+      "sha256": "c6e188e8cf762f137ecaa30b4ce61da328066e736d0302f8872a5580696da152"
+    },
+    {
+      "key": "panel-square",
+      "webPath": "/images/product-detail/applications/panel-square-v1.png",
+      "referenceFile": "p17-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 940,
+      "byteSize": 2060921,
+      "sha256": "044f5e776d210b3b398899454bdb06840c805f7a4df3c1f9cd3c688da6945759"
+    },
+    {
+      "key": "panel-linear",
+      "webPath": "/images/product-detail/applications/panel-linear-v1.png",
+      "referenceFile": "p18-gallery-01.webp",
+      "generated": true,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "byteSize": 2096624,
+      "sha256": "34d6aa24eb60a3ddb24ff65480e8545eef5c24befe5d1eafce97cb9811f953d2"
+    }
+  ]
+}

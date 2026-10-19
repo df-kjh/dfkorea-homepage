@@ -53,6 +53,7 @@ const quote = (event: MouseEvent) => {
     <DetailDimensions
       v-if="detail.showDimensions && (detail.dimensionSpec || detail.dimensionImage)"
       :detail="detail"
+      :product="product"
       :preview="preview"
       @zoom="zoom"
     />

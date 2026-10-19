@@ -30,7 +30,7 @@ describe('shared product detail renderer', () => {
     expect(wrapper.find('h1').exists()).toBe(true)
     expect(wrapper.find('.detail-markdown h2').exists()).toBe(true)
     expect(wrapper.find('.detail-markdown img').exists()).toBe(true)
-    expect(wrapper.find('[data-section="dimensions"] svg').exists()).toBe(false)
+    expect(wrapper.find('[data-section="dimensions"] svg').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('몰드바')
     expect(wrapper.find('nav.section-nav').exists()).toBe(false)
   })
@@ -85,5 +85,86 @@ it('keeps the approved application and diagram attribution and structure caption
   expect(wrapper.text()).toContain('실제 비율·설치 도면과 다릅니다.')
   expect(wrapper.text()).toContain('곧게 이어지는 선형 바디')
   expect(wrapper.text()).toContain('끝단에서 살펴보는 구조')
-  expect(wrapper.text()).toContain('길이와 폭, 높이를 확인해')
+  expect(wrapper.text()).toContain('등록 규격을 확인해')
+})
+
+it('keeps story, one-photo structure, planning and original-image zoom in the common section order', async () => {
+  const wrapper = render(false, { category: '새 분류', dimensions: '' })
+  expect(
+    wrapper.findAll('[data-section]').map((section) => section.attributes('data-section')),
+  ).toEqual([
+    'story',
+    'structure',
+    'application',
+    'control',
+    'description',
+    'specifications',
+    'inquiry',
+  ])
+  expect(wrapper.get('[data-section="story"] h2').text()).toBe('빛이 필요한 곳에,\n공간에 맞게.')
+  expect(wrapper.get('[data-section="structure"] h2').text()).toBe(
+    '가까이 볼수록,\n선명해지는 디테일.',
+  )
+  expect(wrapper.get('[data-section="structure"] [data-image] img').attributes('src')).toBe(
+    'https://example.com/round.webp',
+  )
+  expect(wrapper.get('[data-section="application"]').text()).toContain('제품 원본 사진')
+  await wrapper.get('.detail-thumbnails button').trigger('click')
+  expect(wrapper.emitted('image-click')?.[0]).toEqual(['https://example.com/round.webp', 0])
+})
+
+import catalog from './__fixtures__/catalog.json'
+
+it.each(catalog)('renders the reviewed section flow for $product.name', ({ product }) => {
+  const wrapper = render(true, product as Product)
+  const sections = wrapper
+    .findAll('[data-section]')
+    .map((section) => section.attributes('data-section'))
+  expect(sections).toEqual([
+    'story',
+    'structure',
+    'application',
+    ...(product.modelName !== 'PIPE' && product.options.length ? ['control'] : []),
+    'dimensions',
+    'description',
+    'specifications',
+    'inquiry',
+  ])
+  expect(wrapper.get('[data-section="application"] img').attributes('src')).toMatch(
+    /^\/images\/product-detail\//,
+  )
+  expect(wrapper.get('.detail-application-note').text()).toContain(
+    '실제 시공 사례·조도 측정 결과가 아닙니다.',
+  )
+  expect(wrapper.findAll('.detail-thumbnails button')).toHaveLength(product.images.length)
+  if (product.images.length === 1)
+    expect(wrapper.findAll('.detail-structure-grid--single [data-image]')).toHaveLength(1)
+  if (product.id !== 'c2f1977b-3572-44c6-b6a7-d59a37b237f7') {
+    expect(wrapper.get('.detail-hero').classes()).toContain('detail-hero--cover')
+    expect(wrapper.find('.detail-hero-note').exists()).toBe(false)
+    expect(wrapper.get('.detail-hero-art').attributes('alt')).toContain('AI 설치 연출 예시')
+  }
+  wrapper.unmount()
+})
+
+it('keeps the real product identity inside the common slogan heading', () => {
+  const wrapper = render(true)
+  expect(wrapper.get('h1').text()).toContain('원형 센서등')
+  expect(wrapper.get('h1').text()).toContain('공간을 따라,\n빛을 잇다.')
+})
+
+it('preserves an explicit admin hero-image caption without generating a default note', () => {
+  const wrapper = render(true, {
+    detailContent: {
+      version: 1,
+      heroImage: {
+        url: '/images/custom-hero.png',
+        alt: '관리자가 지정한 사진',
+        caption: '관리자가 직접 입력한 사진 설명',
+      },
+    },
+  })
+  expect(wrapper.get('.detail-hero-note').text()).toBe('관리자가 직접 입력한 사진 설명')
+  expect(wrapper.get('.detail-hero-art').attributes('alt')).toBe('관리자가 지정한 사진')
+  expect(wrapper.get('.detail-application-note').text()).toContain('제품 원본 사진')
 })

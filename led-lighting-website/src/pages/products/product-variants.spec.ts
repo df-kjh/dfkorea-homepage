@@ -202,9 +202,9 @@ describe('public product family detail', () => {
       expect(choices.text()).toContain(family)
       expect(choices.get('[aria-current="page"]').text()).toContain(label)
       expect(choices.get('[aria-current="page"]').attributes('href')).toBe(`/products/${record.id}`)
-      expect(page.get('h1').text()).toBe(record.name)
+      expect(page.get('h1').text()).toContain(record.name)
       expect(page.get('.detail-spec-table').text()).toContain(record.modelName)
-      expect(page.get('.detail-hero-art').attributes('src')).toBe(
+      expect(page.get('.detail-story-photo img').attributes('src')).toBe(
         `http://localhost:3000${record.images[0]!.image}`,
       )
       expect(canonical().link[0].href.value).toBe(`https://dfkorealed.com/products/${record.id}`)
@@ -225,7 +225,7 @@ describe('public product family detail', () => {
     await flushPromises()
     expect(route.query).toEqual({})
     expect(document.querySelector('[role="dialog"]')).toBeNull()
-    expect(page.get('h1').text()).toBe('주차장조명 디밍')
+    expect(page.get('h1').text()).toContain('주차장조명 디밍')
     expect(page.get('nav [aria-current="page"]').text()).toContain('디밍형')
     expect(page.get('.detail-spec-table').text()).toContain('DF-RES-40')
     expect(page.text()).not.toMatch(/50W|친환경/)

@@ -1,0 +1,711 @@
+[
+  {
+    "product": {
+      "id": "30b50b2a-cd91-46bd-960e-9860f6c72de6",
+      "name": "파이프팬던트",
+      "category": "파이프 팬던트",
+      "modelName": "PIPE",
+      "dimensions": "1200,900,600,300",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655540161-597818031.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771610839275-316594605.webp",
+          "description": ""
+        }
+      ],
+      "power": [1],
+      "colorTemp": [5700],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "천장과 조명의 배치를 정할 때는 연결할 길이부터 맞춰보세요. PIPE 파이프 팬던트는 300·600·900·1200mm 길이로 구성되어, 설치 위치에 맞는 규격을 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "pipe-pendant"
+  },
+  {
+    "product": {
+      "id": "5b42165c-7186-4e6e-b2e8-b67223633468",
+      "name": "칠판등",
+      "category": "칠판등",
+      "modelName": "DF-REA-40",
+      "dimensions": "1200*60*45",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655542735-490097328.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655545122-213807085.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655547614-700583574.webp",
+          "description": ""
+        }
+      ],
+      "power": [40, 18],
+      "colorTemp": [5700],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "친환경"],
+      "description": "교실이나 강의실의 조명을 바꿀 때 칠판 앞은 따로 살펴볼 필요가 있습니다. DF-REA-40 칠판등은 칠판의 가로 방향에 맞춰 배치할 수 있는 1200mm 길이의 선형 제품입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "classroom"
+  },
+  {
+    "product": {
+      "id": "91302d00-bf8b-4669-b3ca-08c5c3cbfa41",
+      "name": "가로등",
+      "category": "가로등",
+      "modelName": "DF-ST-50",
+      "dimensions": "498*230*105",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655550617-500160935.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655552782-421841067.webp",
+          "description": ""
+        }
+      ],
+      "power": [50, 100, 150],
+      "colorTemp": [5700],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["고효율"],
+      "description": "가로등은 설치 높이와 도로 폭에 따라 필요한 구성이 달라집니다. DF-ST-50은 50W·100W·150W로 구성되어, 도로와 단지의 구역별 조명 계획에 맞춰 사양을 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "street"
+  },
+  {
+    "product": {
+      "id": "e91f1694-61ec-4aa2-a5ae-cf141da9675f",
+      "name": "방습등",
+      "category": "방습등",
+      "modelName": "DF-WA-40",
+      "dimensions": "1265*130*95",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655555282-440910531.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771524008605-499929236.webp",
+          "description": ""
+        }
+      ],
+      "power": [40, 50],
+      "colorTemp": [5700],
+      "options": ["발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "지하 공간이나 설비 구역에서는 밝기와 함께 사용 환경도 살펴야 합니다. DF-WA-40은 40W와 50W 중 필요한 소비전력을 선택할 수 있는 방습등입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "moisture-proof"
+  },
+  {
+    "product": {
+      "id": "84c6bf7f-5039-4e73-b4f0-e2185d02c8a5",
+      "name": "cob 다운라이트",
+      "category": "COB조명",
+      "modelName": "DF-4K-25",
+      "dimensions": "345*185*145",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655557446-224149958.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655559698-719807141.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655562035-35323662.webp",
+          "description": ""
+        }
+      ],
+      "power": [20, 30, 40, 60],
+      "colorTemp": [5700, 4000, 3000],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "매장과 로비의 조명은 공간을 어떻게 보여주고 싶은지부터 생각하면 선택이 쉬워집니다. DF-4K-25 COB 다운라이트는 네 가지 소비전력과 세 가지 색온도로 구성되어, 공간에 어울리는 빛의 색을 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "cob-retail"
+  },
+  {
+    "product": {
+      "id": "d4705d1d-7dab-4381-b83c-9c9026efa896",
+      "name": "원형직부",
+      "category": "원형직부",
+      "modelName": "DF-CI-15",
+      "dimensions": "240*62",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655564257-313813223.webp",
+          "description": ""
+        }
+      ],
+      "power": [15],
+      "colorTemp": [5700],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "다용도실이나 실내 보조 공간의 조명을 고를 때, 단정한 원형 제품을 찾으신다면 DF-CI-15를 살펴보세요. 240 × 62mm 크기에 15W, 5700K 사양을 담은 원형직부등입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "round-ceiling"
+  },
+  {
+    "product": {
+      "id": "bc46e6f3-2dd0-4c17-bf5b-0ee5b681b538",
+      "name": "원형센서",
+      "category": "원형센서",
+      "modelName": "DF-CIS-15",
+      "dimensions": "240*62",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655566420-857607902.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771489544758-794961927.webp",
+          "description": "발전기비상"
+        }
+      ],
+      "power": [15],
+      "colorTemp": [5700],
+      "options": ["발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "현관처럼 잠깐씩 드나드는 곳에는 센서형 조명을 고려해 보세요. DF-CIS-15는 별도 스위치 조작을 줄이고 싶은 공간을 위한 15W 원형센서등입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "round-ceiling"
+  },
+  {
+    "product": {
+      "id": "68638535-116f-4737-a5ed-ec6af24e3e71",
+      "name": "다운라이트",
+      "category": "다운라이트",
+      "modelName": "DF-DR-15",
+      "dimensions": "165 타공 150",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655568578-28317040.webp",
+          "description": "상시, 디밍, 발전기 비상"
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771489154420-195440919.webp",
+          "description": "밧데리비상"
+        }
+      ],
+      "power": [10, 15, 20],
+      "colorTemp": [5700, 4000],
+      "options": ["센서", "밧데리 비상", "발전기 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "다운라이트를 교체할 때 가장 먼저 확인할 것은 기존 타공 크기입니다. DF-DR-15는 외경 165mm, 타공 150mm 규격에 세 가지 소비전력을 갖춰, 설치 자리와 필요한 사양을 함께 맞출 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "downlight"
+  },
+  {
+    "product": {
+      "id": "09b2b075-526e-405d-8baf-cfae9265b5b3",
+      "name": "계단표시등",
+      "category": "계단표시등",
+      "modelName": "DF-FP-1218",
+      "dimensions": "1280*180*22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655571038-516310137.webp",
+          "description": "25W,40W,50W"
+        }
+      ],
+      "power": [40],
+      "colorTemp": [5700],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "계단실의 표시등은 사람이 오가는 방향과 눈에 들어오는 위치를 함께 살펴야 합니다. DF-FP-1218은 1280 × 180mm의 긴 형태를 갖춘 계단표시등으로, 계단실의 안내 위치에 맞춰 배치하는 제품입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "stair-sign"
+  },
+  {
+    "product": {
+      "id": "67d187d8-c5a8-467b-b5df-9d6bc8eb4c43",
+      "name": "차량유도등",
+      "category": "차량유도등",
+      "modelName": "DF-HAN13-40",
+      "dimensions": "1330*300*8,1560*300*8",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655573866-395438182.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771473001837-92500765.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1771473057812-979263204.webp",
+          "description": ""
+        }
+      ],
+      "power": [40],
+      "colorTemp": [5700],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "주차장 안내는 운전자가 어느 방향에서 들어오는지에 따라 배치가 달라집니다. DF-HAN13-40 차량유도등은 1330mm와 1560mm 두 가지 길이로, 안내 위치의 폭에 맞춰 선택하실 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "parking-guidance"
+  },
+  {
+    "product": {
+      "id": "a3516220-2b98-4bfa-87ad-0db77b572aac",
+      "name": "벽부등",
+      "category": "벽부등",
+      "modelName": "DF-WR-40",
+      "dimensions": "420(L)*170(W)*120(H)",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655575924-550809791.webp",
+          "description": "25W,40W,50W"
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655578293-651215709.webp",
+          "description": "개별 및 그룹디밍"
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655580636-465088291.webp",
+          "description": "리폼용 모듈"
+        }
+      ],
+      "power": [25, 40, 50],
+      "colorTemp": [5700],
+      "options": ["개별디밍", "센서", "밧데리 비상", "발전기 비상", "그룹디밍"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "복도와 계단실의 벽면 조명도 공간을 쓰는 방식에 맞춰 선택해 보세요. DF-WR-40 벽부등은 25W·40W·50W와 디밍·센서 옵션을 갖춰, 필요한 전력과 제어 기능을 함께 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "wall-light"
+  },
+  {
+    "product": {
+      "id": "40fb2fa3-c344-4547-9071-30d0905f64b9",
+      "name": "크린룸 조명",
+      "category": "크린룸조명",
+      "modelName": "DF-CR-40",
+      "dimensions": "1200*40*60",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655582970-774750601.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655585142-212184730.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655587525-653723281.webp",
+          "description": ""
+        }
+      ],
+      "power": [40, 25],
+      "colorTemp": [5700, 6500],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "크린룸 조명은 천장 설비와 작업 조건에 맞춰 고르는 것이 중요합니다. DF-CR-40은 길이 1200mm, 폭 40mm의 가느다란 선형 제품으로, 천장 설비 사이의 조명 배치를 계획할 때 살펴볼 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "cleanroom"
+  },
+  {
+    "product": {
+      "id": "c2f1977b-3572-44c6-b6a7-d59a37b237f7",
+      "name": "몰드바 조명",
+      "category": "몰드바",
+      "modelName": "DF-MOL-40",
+      "dimensions": "1200*58*60",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655589792-287752014.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655592036-137569404.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655594156-85655629.webp",
+          "description": ""
+        }
+      ],
+      "power": [30, 40],
+      "colorTemp": [5700],
+      "options": ["개별디밍", "센서", "그룹디밍"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "V-CHECK"],
+      "description": "조명을 일렬로 배치할 때는 제품의 길이와 제어 방식을 함께 정하면 계획이 수월해집니다. DF-MOL-40 몰드바 조명은 1200mm 길이에 30W·40W 사양을 갖춘 선형 제품입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "moldbar"
+  },
+  {
+    "product": {
+      "id": "f57d4c52-bae5-4f96-90e6-51300de6ec15",
+      "name": "광폭 주차장조명",
+      "category": "주차장조명",
+      "modelName": "DF-RE-80",
+      "dimensions": "1200*70*45",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655596352-754062530.webp",
+          "description": "1200*70(w)*45(h) 50w,80w"
+        }
+      ],
+      "power": [50, 80],
+      "colorTemp": [5700, 4000, 3000],
+      "options": ["발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "주차장마다 천장 높이와 차량 통로의 폭이 다릅니다. DF-RE-80 광폭 주차장조명은 50W·80W 사양을 갖춰, 구역별 조명 계획에 필요한 소비전력을 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "parking-linear"
+  },
+  {
+    "product": {
+      "id": "f6bfbddf-a3b8-4127-b352-6ba9c703e252",
+      "name": "주차장조명 디밍",
+      "category": "주차장조명",
+      "modelName": "DF-RES-40",
+      "dimensions": "1200*60*45",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655598603-775025138.webp",
+          "description": "m/w 디밍"
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655600820-926050415.webp",
+          "description": "pir 센서 디밍"
+        }
+      ],
+      "power": [40, 22, 18],
+      "colorTemp": [5700, 4000, 3000],
+      "options": ["개별디밍", "그룹디밍", "센서", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "주차장 조명을 구역별로 운영하고 싶다면 밝기 제어 방식부터 살펴보세요. DF-RES-40은 개별디밍과 그룹디밍 옵션을 갖춰, 한 대씩 또는 여러 대를 묶어 제어하는 운영 계획에 맞출 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "parking-linear"
+  },
+  {
+    "product": {
+      "id": "492784ba-6318-4687-b877-9edde0b96b32",
+      "name": "주차장조명 상시",
+      "category": "주차장조명",
+      "modelName": "DF-REA-40",
+      "dimensions": "1200*60*45",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655604512-584615677.webp",
+          "description": "1200*60(w)*45(h) 18w,22w,40w,50w"
+        }
+      ],
+      "power": [40, 22, 18, 50],
+      "colorTemp": [5700, 4000, 3000],
+      "options": ["개별디밍", "그룹디밍", "센서", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "친환경"],
+      "description": "주차장에는 지속적으로 조명을 켜두는 구역과 제어가 필요한 구역이 함께 있습니다. DF-REA-40은 상시 점등 구역을 위한 선형 조명으로, 네 가지 소비전력 중 현장에 필요한 사양을 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "parking-linear"
+  },
+  {
+    "product": {
+      "id": "6bcb142f-ec93-4250-a408-124aae95dc18",
+      "name": "엣지평판600*600 T BAR",
+      "category": "엣지평판",
+      "modelName": "DF-FPE-40S, DF-FPE-50S",
+      "dimensions": "598*598*22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655606752-641901715.webp",
+          "description": ""
+        }
+      ],
+      "power": [40, 50],
+      "colorTemp": [5700],
+      "options": ["개별디밍", "센서", "그룹디밍", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "친환경"],
+      "description": "천장 격자에 맞춰 조명을 정리하려면 실제 제품 치수부터 확인해 보세요. 600 × 600 T-BAR 엣지평판은 598 × 598 × 22mm 규격의 정사각형 제품으로, 사무실이나 교실의 격자 천장을 단정하게 구성하기 좋습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-square"
+  },
+  {
+    "product": {
+      "id": "b8f1f680-d324-46c4-a691-14bebd1959a4",
+      "name": "엣지평판 1200*300 TBAR",
+      "category": "엣지평판",
+      "modelName": "DF-FPE-40R,DF-FPE-50R",
+      "dimensions": "1198*298*22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655608837-695306003.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655610981-312237066.webp",
+          "description": "개별및 그룹디밍"
+        }
+      ],
+      "power": [40, 50],
+      "colorTemp": [5700],
+      "options": ["개별디밍", "센서", "그룹디밍", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "친환경"],
+      "description": "긴 직사각형 천장 격자에는 그 비율에 맞는 평판 조명을 살펴보세요. 1200 × 300 T-BAR 제품은 실제 크기 1198 × 298mm로, 천장의 길이 방향을 살리는 조명 배치를 계획하실 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-linear"
+  },
+  {
+    "product": {
+      "id": "3ed45855-3616-47ea-8b2a-a64e38109b89",
+      "name": "엣지평판 1280*640",
+      "category": "엣지평판",
+      "modelName": "DF-FPE-80R",
+      "dimensions": "1280X640X22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739900105-789968775.webp",
+          "description": ""
+        }
+      ],
+      "power": [80],
+      "colorTemp": [5700, 4000],
+      "options": [],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "사무실이나 회의실의 조명 배치를 계획할 때, 큰 평판 한 장의 비율이 공간의 인상을 정리해 줍니다. DF-FPE-80R은 1280 × 640mm 크기의 80W 엣지평판으로, 넓은 직사각형 면을 살린 천장 디자인에 어울립니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-linear"
+  },
+  {
+    "product": {
+      "id": "446291b5-3244-4915-89a4-d424961942f3",
+      "name": "엣지평판 1280x320",
+      "category": "엣지평판",
+      "modelName": "DF-FPE-40R, DF-FPE-50R, DF-FPS-40R, DF-FPMS-40R, DF-FPE-80R",
+      "dimensions": "1280x320x22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739937247-978627423.webp",
+          "description": "상시,개별,그룹디밍"
+        }
+      ],
+      "power": [40, 50, 80],
+      "colorTemp": [5700, 4000, 3000],
+      "options": ["그룹디밍", "개별디밍", "센서", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율"],
+      "description": "엣지평판 1280 × 320은 긴 직사각형 형태를 유지하면서 소비전력과 기능을 비교하고 싶은 현장에 어울립니다. 40W·50W·80W와 세 가지 색온도로 구성되어, 공간마다 필요한 사양을 같은 제품군 안에서 고를 수 있습니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-linear"
+  },
+  {
+    "product": {
+      "id": "e752d849-9d6b-45b1-97ff-f7a3816b63be",
+      "name": "엣지 평판 1280x180",
+      "category": "엣지평판",
+      "modelName": "DF-FP-1018",
+      "dimensions": "1280x180x22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739941714-217430609.webp",
+          "description": ""
+        }
+      ],
+      "power": [40],
+      "colorTemp": [4000, 5700],
+      "options": ["센서", "개별디밍", "그룹디밍", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "복도나 주방처럼 길이 방향으로 조명을 배치하고 싶을 때 DF-FP-1018을 살펴보세요. 폭 180mm에 길이 1280mm를 갖춘 40W 엣지평판으로, 좁은 폭을 살려 긴 구간에 배치하기 좋은 형태입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-linear"
+  },
+  {
+    "product": {
+      "id": "bdf827df-b0b8-457b-bfa3-3b5983de998b",
+      "name": "엣지 평판 320x320",
+      "category": "엣지평판",
+      "modelName": "DF-FP-3030",
+      "dimensions": "320x320x22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788655619667-570878813.webp",
+          "description": ""
+        }
+      ],
+      "power": [15],
+      "colorTemp": [5700],
+      "options": ["개별디밍", "그룹디밍", "센서"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "크기가 작은 평판 조명을 찾으신다면 320 × 320 엣지평판을 살펴보세요. DF-FP-3030은 15W 정사각형 제품으로, 현관이나 다용도실 등 실내 공간에 단정한 형태를 더해줍니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-square"
+  },
+  {
+    "product": {
+      "id": "eb1fc8bf-c065-4ac0-babf-4ebdd5d26190",
+      "name": "엣지 평판 640x640",
+      "category": "엣지평판",
+      "modelName": "DF-FPE-40S, DF-FPE-80S, DF-FPMS-40S, DF-FPE-50S",
+      "dimensions": "640x640x22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739946096-23021681.webp",
+          "description": "상시,개별,그룹 디밍"
+        }
+      ],
+      "power": [40, 50, 80],
+      "colorTemp": [5700],
+      "options": ["그룹디밍", "개별디밍", "센서"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "친환경"],
+      "description": "정사각형 조명을 일정한 간격으로 배치하면 천장 구성을 단정하게 정리하기 좋습니다. 엣지평판 640 × 640은 40W·50W·80W 사양을 갖춰, 사무실과 공용 공간을 같은 형태의 조명으로 구성할 수 있는 제품군입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-square"
+  },
+  {
+    "product": {
+      "id": "535f7211-2d04-4d3b-9516-489efc0c1c86",
+      "name": "엣지 평판 640x180",
+      "category": "엣지평판",
+      "modelName": "DF-FP-6018",
+      "dimensions": "640x180x22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739950718-872654310.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739952330-437499488.webp",
+          "description": ""
+        }
+      ],
+      "power": [25],
+      "colorTemp": [5700],
+      "options": ["센서", "개별디밍", "그룹디밍"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS"],
+      "description": "긴 조명이 부담스러운 자리에는 640 × 180 엣지평판을 살펴보세요. DF-FP-6018은 길이 640mm, 폭 180mm의 25W 제품으로, 짧은 통로나 실내 보조 공간에 어울리는 길쭉한 형태입니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-linear"
+  },
+  {
+    "product": {
+      "id": "89baa914-fb46-4546-bf2a-2579b303e403",
+      "name": "엣지 평판 640x320",
+      "category": "엣지평판",
+      "modelName": "DF-FPE-25R, DF-FPMS-25R",
+      "dimensions": "640x320x22",
+      "images": [
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739956363-974573527.webp",
+          "description": ""
+        },
+        {
+          "image": "https://pub-f283f491f3f549528f64be21c4b2ad55.r2.dev/dfkorea-uploads/products/image-1788739958099-450250852.webp",
+          "description": "개별및 그룹디밍"
+        }
+      ],
+      "power": [25],
+      "colorTemp": [5700],
+      "options": ["그룹디밍", "개별디밍", "센서", "발전기 비상", "밧데리 비상"],
+      "lifespan": 40000,
+      "ledChipManufacturer": "",
+      "certifications": ["KS", "고효율", "친환경"],
+      "description": "정사각형보다 길고 큰 평판보다는 작은 제품을 찾으신다면 640 × 320 엣지평판을 비교해 보세요. 25W, 두께 22mm의 직사각형 제품으로 주방이나 공용 공간에 단정한 비율을 더해줍니다.",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "applicationKey": "panel-linear"
+  }
+]
