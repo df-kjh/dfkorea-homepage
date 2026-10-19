@@ -1,0 +1,76 @@
+<script setup lang="ts">
+import { useId } from 'vue'
+import type { Product } from '@/types'
+import PublicAction from '@/components/common/site/PublicAction.vue'
+import DetailVariants from './DetailVariants.vue'
+import type { resolveProductDetail } from './content'
+defineProps<{
+  product: Product
+  detail: ReturnType<typeof resolveProductDetail>
+  preview: boolean
+}>()
+const titleId = useId()
+const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
+</script>
+<template>
+  <div class="detail-breadcrumb detail-container">
+    <PublicAction v-if="!preview" to="/products" variant="text">← 제품 목록</PublicAction
+    ><span v-else>제품 미리보기</span><span>{{ product.category }}</span>
+  </div>
+  <section
+    class="detail-hero"
+    :class="{
+      'detail-hero--product': !detail.isMoldbar,
+      'detail-hero--empty': !detail.heroImage,
+      'detail-hero--variants': !!product.variantGroup,
+    }"
+    :aria-labelledby="titleId"
+  >
+    <img
+      v-if="detail.heroImage"
+      class="detail-hero-art"
+      :src="detail.heroImage.url"
+      :alt="detail.heroImage.alt"
+      fetchpriority="high"
+    />
+    <div class="detail-hero-copy detail-container">
+      <p class="detail-model">
+        {{ product.modelName }} <span v-if="product.modelName">·</span> {{ product.name }}
+      </p>
+      <h1 :id="titleId">{{ detail.heroTitle }}</h1>
+      <p v-if="detail.heroDescription" class="detail-hero-description">
+        {{ detail.heroDescription }}
+      </p>
+      <DetailVariants :product="product" :preview="preview" />
+      <div class="detail-hero-actions">
+        <PublicAction
+          data-quote
+          variant="light"
+          :disabled="preview"
+          @click="!preview && emit('quote', $event)"
+          >견적에 담기 <span aria-hidden="true">↗</span></PublicAction
+        >
+      </div>
+    </div>
+    <div class="detail-hero-bottom detail-container">
+      <div>
+        <strong>{{ product.name }}</strong
+        ><span>{{ product.modelName }}</span>
+      </div>
+      <button
+        v-if="detail.heroImage && !preview"
+        type="button"
+        class="detail-zoom-action"
+        @click="emit('zoom', detail.heroImage!.url)"
+      >
+        사진 크게 보기 ↗
+      </button>
+    </div>
+  </section>
+  <dl v-if="detail.summary.length" class="detail-facts detail-container">
+    <div v-for="spec in detail.summary" :key="spec.label">
+      <dt>{{ spec.label }}</dt>
+      <dd>{{ spec.value }}</dd>
+    </div>
+  </dl>
+</template>

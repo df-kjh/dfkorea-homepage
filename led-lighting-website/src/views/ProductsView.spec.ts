@@ -109,12 +109,14 @@ describe('main catalog filters', () => {
     await flushPromises()
 
     expect(api.getPaginated).toHaveBeenCalledTimes(1)
-    expect(api.getPaginated).toHaveBeenCalledWith(1, 20, '', '전체', {
-      power: [40],
-      colorTemp: [],
-      certifications: ['KS'],
-      options: [],
-    })
+    expect(api.getPaginated).toHaveBeenCalledWith(
+      1,
+      20,
+      '',
+      '전체',
+      { power: [40], colorTemp: [], certifications: ['KS'], options: [] },
+      { groupVariants: true },
+    )
     wrapper.unmount()
   })
 })

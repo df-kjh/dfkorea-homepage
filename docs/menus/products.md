@@ -2,6 +2,18 @@
 
 ## 구현 완료
 
+- 공개 상세와 관리자 상세 미리보기는 기존 등록 사진의 주소 변환을 공유합니다. API 기준 루트 상대 등록 사진은 API 주소로 표시하며, 직접 작성한 상세 콘텐츠의 사이트 정적 이미지 경로와 원본·저장 요청은 유지합니다. API와 사이트 origin이 다른 회귀 환경에서 실제 미리보기 `img.src`와 저장 주소를 함께 검증합니다.
+- 800px 이하 화면·미리보기에서는 사진이 있는 일반 제품 전체에 히어로 사진 공간을 확보해 긴 직접 입력 소개 및 제품군 선택이 사진·견적 버튼과 겹치지 않도록 합니다. 승인된 몰드바 배경형 히어로와 PC 레이아웃은 유지합니다.
+
+- 2026-10-19 확정 제품군(로컬 구현, 미배포): 공개 목록의 SSR 첫 요청과 클라이언트 검색·필터·추가 로딩만 `groupVariants=true`를 요청합니다. 원형 조명(일반형/센서형)과 주차장 조명(상시형/디밍형)을 제품군 카드로 표시하고, 카드는 서버가 필터에 맞춰 선택한 원 SKU URL로 연결합니다. 사양은 그 SKU 기준임을 함께 표시하며 전력·인증·옵션을 합치지 않습니다. 25개 원 SKU를 유지하고 두 묶음의 공통 사양 검증을 통과한 공개 목록은 23개로 계산합니다.
+- 제품 상세의 구성 선택은 기존 각 SKU URL을 가진 키보드 접근 가능한 링크입니다. 선택 표시는 `aria-current`로 제공하며 사진·제품명·모델·사양·인증·옵션·견적 ID와 canonical/Product JSON-LD가 선택 SKU를 따릅니다. 구성 이동은 이전 사진의 `image` 쿼리를 넘기지 않고 각 제품의 확대 닫기/뒤로 가기 상태를 분리합니다. 주차장 50W·친환경 표기는 상시형에, 원형 비상 옵션은 센서형에만 유지합니다. 관리자 미리보기의 구성 선택은 이동하지 않는 텍스트로 표시합니다.
+- 일반 제품 히어로의 기본 소개는 기존 Markdown에서 제목·표·사진·옵션 목록을 제외한 첫 본문 문장을 사용합니다. 150자를 넘으면 단어 경계와 말줄임표로 줄이고, 원문 전체는 하단 기술 자료에 유지합니다. 승인된 몰드바 소개와 관리자가 직접 입력한 소개는 별도로 적용합니다.
+
+- 2026-10-19 공통 상세 템플릿(로컬 구현, 미배포): 모든 제품이 등록된 실제 제품명·사진·사양으로 같은 dark hero/cream/champagne 구성의 상세를 사용합니다. 선택적 version 1 `detailContent`로 제목·특징·사진·적용 이미지·제어/규격 표시를 덮어쓸 수 있습니다. 문구/사진 프리셋은 승인된 몰드바 ID `c2f1977b-3572-44c6-b6a7-d59a37b237f7`에만 적용합니다. 원형·평판·연결 구성품에 몰드바 사진·수치·선형 도식을 재사용하지 않습니다.
+- 사용자 주석 여덟 항목(히어로 연출 안내, 섹션 내비게이션, 소개 우측 설명, 소개 사진 하단 문구, 구조 우측 설명, 제어 우측 설명과 하단 안내, 규격 요약 하단 안내)을 공개 템플릿 및 정적 검토 HTML에서 제거했습니다. 적용 이미지의 AI 출처와 규격 도식의 출처는 유지했습니다. 새 immutable 검토 화면은 `moldbar-detail-v7.html`입니다.
+- 공통 렌더러는 사진/옵션/규격이 없는 섹션을 숨기고 일반 제품 사진을 contain 방식으로 표시합니다. PIPE는 기존 presentation helper로 모델·길이만 표시하며 전기·인증·제어 임시값을 제외합니다. 일반 제품의 미확인 형상을 도식으로 만들지 않고 등록 규격 텍스트나 업로드 도면을 표시합니다.
+- 기존 Markdown 설명·기술 이미지, canonical/Product JSON-LD/메타데이터, 갤러리 `?image`·뒤로 가기·확대 닫기, 실제 견적 초안 담기를 보존합니다. 관리자 미리보기에서는 이동·견적·확대 이벤트를 비활성화합니다. 새 이미지 URL은 HTTP(S) 또는 단일 루트 상대 경로만 허용하고 프로토콜 상대/역슬래시/실행형 URL과 잘못된 필드를 버립니다.
+
 - 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
 
 - 2026-10-05 가독성·모바일 필터 조정: 제품 상단의 PRODUCT COLLECTION / 02 및 상세 페이지의 영어 장식을 제거했습니다. 제품명·모델명·인증·사양·필터 선택지의 글씨 크기와 굵기를 높이고 검색·분류·목록·상세·견적 기능은 유지했습니다.
@@ -15,7 +27,7 @@
 
 - 2026-10-04 최종 통합 검수: 소스 Vitest 64개 파일/491개, Nuxt 타입 검사, 운영 API를 지정한 빌드와 SEO/상세 앵커 검증을 통과했다. 실제 Chrome에서 기존 네 메뉴와 상세 경로·320px 가로 넘침·Hero/원본 자료를 확인했다. 로컬 검수 증거는 `output/site-redesign-20261004/README.md`를 따른다. 운영 배포와 실제 견적 접수는 수행하지 않았다.
 
-### 2026-10-04 실제 Nuxt 제품 UI 재설계 (로컬 검수, 미배포)
+### 2026-10-04 실제 Nuxt 제품 UI 재설계 (로컬 검수)
 
 - 기존 `/products`·`/products/:id`를 Liquid Light의 paper/ink/champagne 제목·검색/분류·실물 사진 카드·원본 갤러리·요약/등록 사양표로 재설계했다. 실제 API의 SSR 첫 20개/클라이언트 갱신·서버 검색/사양 필터·세대 검사·무한 스크롤·추가 실패/재시도를 유지하며 운영 데이터를 스냅샷으로 대체하지 않았다.
 - 상세 SSR/404·canonical/Product JSON-LD·안전한 Markdown 표/이미지/링크·사진 image 쿼리/뒤로 가기/Escape 확대·견적 담기(상담 후 결정/수량 1)를 보존했다. 공통 presentation.ts는 원본 데이터를 변경하지 않고 PIPE 임시 전기 사양·인증을 제외해 모델/길이만 표시하며 0/누락 성능도 요약/사양표에서 제외한다.
@@ -62,11 +74,17 @@
 
 ## 미구현
 
+- 관리자가 제품군을 생성·변경하거나 이름 유사성으로 자동 묶는 기능은 제공하지 않습니다. 이번에는 검토·승인한 두 제품군만 서버 명세로 관리합니다.
+
 - 이번 로컬 검수에서 실제 견적 세션 생성·개인정보 입력/확인·접수/메일 발송은 수행하지 않았다. 기존 견적 API는 보존하며 검수용 중계는 견적 POST를 허용하지 않는다.
 
 - 사진 자체에 포함된 배경을 자동으로 잘라내는 기능은 제공하지 않는다.
 
 ## 부족하거나 개선이 필요한 기능
+
+- 운영 반영 절차는 [공식 배포 문서](../../DEPLOYMENT.md)를 따릅니다. 이 문서는 제품 기능과 검수 상태를 기록합니다.
+
+- 2026-10-19 상세 템플릿 검증은 공개 렌더러/안전한 콘텐츠/실제 페이지 통합/키보드 제어 테스트와 정적 시안 삭제 사항 검토를 포함합니다. 정적 시안은 로컬 output 검토 자료이며 CI 테스트에서 해당 비추적 HTML 파일을 읽지 않습니다. 제품군 검증은 네 기존 SKU 주소·선택·견적 전달·구성 이동 후 SEO/사진 이력과 공개 API 요청의 opt-in 범위를 확인합니다. 전체 타입·빌드·PC/모바일 통합 검수 결과는 `output/product-detail-template-20261019/` 최종 기록을 따릅니다. 이 작업에서 운영 API 저장·DB 변경·배포·실제 견적 제출은 실행하지 않았습니다.
 
 - 2026-10-05 검수 범위: 키보드로 줄어든 visualViewport·오프셋·이벤트 정리는 런타임 테스트로 확인합니다. 데스크톱 브라우저의 모바일 크기 검수는 실제 iOS/Android 가상 키보드 동작을 직접 검증하는 것은 아니므로 실제 기기 후속 확인이 필요합니다.
 
@@ -87,6 +105,21 @@
 - 이미지가 로딩되기 전에는 고유 비율을 알 수 없어 로딩 후 프레임 높이가 정해진다.
 
 ## 관련 파일
+
+- `led-lighting-website/src/utils/product-images.ts` (공개 상세·관리자 미리보기의 등록 사진 주소 변환)
+
+- `led-lighting-website/src/components/products/detail/DetailVariants.vue`
+- `led-lighting-website/src/pages/products/{product-variants,product-index}.spec.ts`
+- `led-lighting-website/src/components/products/ProductCard.vue`
+- `led-lighting-website/src/api/{index.ts,public-products.spec.ts}`
+- `output/product-detail-template-20261019/groups-frontend-report.md`
+
+- `led-lighting-website/src/types/product-detail.ts`
+- `led-lighting-website/src/components/products/detail/` (공통 모델·분리 섹션·스타일·회귀 테스트)
+- `led-lighting-website/public/images/product-detail/moldbar/` (승인된 연출 이미지 두 장)
+- `led-lighting-website/src/pages/products/product-detail.spec.ts`
+- `output/product-detail-template-20261019/public-report.md`
+- `output/moldbar-detail-example-20261019/{index.html,README.md,publish-preview.cjs}`
 
 - 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
 
@@ -146,6 +179,10 @@
 - `led-lighting-website/src/components/products/ProductDescription.vue`
 
 ## 갱신 규칙
+
+- 제품군 구성을 변경하면 원 SKU URL·필터 대표 SKU·선택 표시·사진·사양·인증·견적 스냅샷 범위를 함께 확인하고 견적 문서를 갱신합니다. 공개 목록 외 조회의 opt-in 기본값을 유지합니다.
+
+- 공통 상세/편집 콘텐츠 계약 변경 시 실제 Product 사양의 단일 원천·PIPE 예외·몰드바 ID 경계·누락 데이터·안전한 URL·사진 확대·SEO·견적·관리자 preview 비활성화를 함께 확인합니다. 사용자 삭제 주석과 남긴 출처 안내를 별개로 검증하고 정적 화면은 새 버전으로 보존합니다.
 
 - 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 

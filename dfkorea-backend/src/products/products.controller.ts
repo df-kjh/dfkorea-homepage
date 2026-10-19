@@ -27,7 +27,7 @@ export class ProductsController {
 
   @Get()
   async findAll(@Query() query: Record<string, unknown>) {
-    const { page, limit, search, category, ...filters } =
+    const { page, limit, search, category, groupVariants, ...filters } =
       parseProductQuery(query);
     if (page !== undefined && limit !== undefined) {
       return this.productsService.findAllPaginated(
@@ -36,9 +36,13 @@ export class ProductsController {
         search,
         category,
         filters,
+        groupVariants,
       );
     }
-    return this.productsService.findAll({ search, category, ...filters });
+    return this.productsService.findAll(
+      { search, category, ...filters },
+      groupVariants,
+    );
   }
 
   @Get("filter-options")

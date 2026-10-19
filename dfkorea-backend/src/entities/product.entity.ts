@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from "typeorm";
+import type { ProductDetailContent } from "../products/product-detail-content";
 
 @Entity("products")
 export class Product {
@@ -55,6 +56,18 @@ export class Product {
 
   @Column("text")
   description: string;
+
+  @Column("jsonb", { nullable: true })
+  detailContent?: ProductDetailContent | null;
+
+  // Read-time catalog metadata only. No column decorator: groups cannot be
+  // persisted, and each child stays an unchanged SKU without nested groups.
+  variantGroup?: {
+    id: string;
+    name: string;
+    primaryProductId: string;
+    variants: Array<{ label: string; product: Product }>;
+  };
 
   @Column({ default: false })
   isNew: boolean;

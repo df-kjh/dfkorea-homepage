@@ -35,11 +35,13 @@ export const productsAPI = {
     search?: string,
     category?: string,
     filters?: Partial<ProductFilters>,
+    options?: { groupVariants?: boolean },
   ) =>
     publicClient.get<PaginatedResponse<Product>>('/products', {
       params: {
         page,
         limit,
+        ...(options?.groupVariants && { groupVariants: true }),
         ...(search && { search }),
         ...(category && category !== '전체' && { category }),
         ...Object.fromEntries(

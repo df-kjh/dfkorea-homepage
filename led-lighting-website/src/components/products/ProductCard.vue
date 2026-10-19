@@ -36,7 +36,13 @@ function handleClick(event: MouseEvent) {
       </div>
       <div class="df-product-card__copy">
         <p class="df-product-card__category">{{ product.category }}</p>
-        <h3>{{ product.name }}</h3>
+        <h3>{{ product.variantGroup?.name || product.name }}</h3>
+        <p v-if="product.variantGroup" class="df-product-card__variants">
+          {{ product.variantGroup.variants.map((variant) => variant.label).join(' / ') }}
+        </p>
+        <p v-if="product.variantGroup" class="df-product-card__selection">
+          표시 사양 · {{ product.name }}
+        </p>
         <p class="df-product-card__model">{{ product.modelName }}</p>
         <p class="df-product-card__spec">{{ productCardSummary(product) }}</p>
         <p v-if="productCertificationLabels(product).length" class="df-product-card__certs">
@@ -110,6 +116,21 @@ function handleClick(event: MouseEvent) {
   font-size: var(--df-font-meta, 13px);
   color: #72695b;
   margin-top: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.df-product-card__variants {
+  margin-top: 10px;
+  font-size: var(--df-font-body, 16px);
+  font-weight: 600;
+  color: #62513c;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.df-product-card__selection {
+  margin-top: 10px;
+  font-size: var(--df-font-meta, 13px);
+  color: #72695b;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }

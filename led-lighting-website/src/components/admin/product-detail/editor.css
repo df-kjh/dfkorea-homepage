@@ -1,0 +1,224 @@
+.detail-editor {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  min-width: 0;
+}
+.detail-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.detail-editor h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+.detail-editor h3 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.detail-editor-header p,
+.detail-help {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #64717a;
+  margin-top: 8px;
+}
+.detail-mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-block: 24px;
+  padding: 16px;
+  background: #f5f8f9;
+  border-radius: 8px;
+}
+.detail-mode label,
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.detail-editor-fields {
+  min-width: 0;
+  display: grid;
+  gap: 28px;
+}
+.detail-editor-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  border-top: 1px solid #e6ebed;
+  padding-top: 24px;
+}
+.detail-field-stack {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.detail-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.detail-field label,
+.detail-image-field legend,
+.detail-repeat-item > legend {
+  font-size: 13px;
+  font-weight: 600;
+}
+.detail-field :is(input, textarea) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d7e0e4;
+  border-radius: 6px;
+  background: #f9fbfc;
+  padding: 11px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.detail-field :is(input, textarea):focus-visible {
+  outline: 2px solid #22a8c3;
+  outline-offset: 2px;
+}
+.detail-field [aria-invalid='true'] {
+  border-color: #b91c1c;
+}
+.detail-field-hint {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #73828d;
+  margin: 0;
+}
+.detail-field-error {
+  color: #b91c1c;
+}
+.detail-image-field {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.detail-image-field legend {
+  padding-bottom: 12px;
+}
+.detail-image-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+.detail-repeat-item {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  background: #f8fafb;
+  border: 1px solid #e2e8eb;
+  border-radius: 8px;
+}
+.detail-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid #b4c8d0;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a5566;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  justify-self: start;
+}
+.detail-button:hover {
+  background: #edf7fa;
+}
+.detail-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.detail-button:focus-visible {
+  outline: 2px solid #22a8c3;
+  outline-offset: 3px;
+}
+.detail-button-subtle {
+  border-color: transparent;
+  background: transparent;
+  color: #687a82;
+}
+.detail-errors {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.8;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.detail-errors p {
+  font-weight: 600;
+}
+.detail-errors ul {
+  list-style: disc;
+  padding-left: 20px;
+}
+.detail-preview-toolbar {
+  padding: 16px 24px;
+  background: #fff;
+  border-block: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.detail-preview-toolbar [aria-pressed='true'] {
+  background: #1a5566;
+  color: #fff;
+}
+.detail-preview-toolbar span {
+  font-size: 12px;
+  color: #687a82;
+}
+.detail-preview-scroll {
+  overflow: auto;
+  max-height: 72vh;
+  background: #e5e7eb;
+  padding: 18px;
+}
+.detail-preview-canvas {
+  max-width: none;
+  margin-inline: auto;
+  min-width: 320px;
+  background: #fff;
+}
+@media (max-width: 640px) {
+  .detail-editor {
+    padding: 18px;
+  }
+  .detail-image-grid {
+    grid-template-columns: 1fr;
+  }
+  .detail-mode {
+    align-items: start;
+    gap: 14px;
+  }
+  .detail-preview-scroll {
+    padding: 0;
+  }
+  .detail-preview-toolbar {
+    padding: 12px;
+  }
+  .detail-preview-canvas {
+    margin: 0;
+  }
+}

@@ -2,6 +2,13 @@
 
 ## 구현 완료
 
+- 2026-10-19 제품 등록·수정에 재사용 가능한 상세 템플릿 편집기를 추가했습니다. 공통 기본값 사용은 `detailContent: null`로 저장하며, 직접 편집에서는 히어로·소개·구조·제어·규격 제목, 소개 문구, 이미지 URL·업로드·대체텍스트·캡션, 특징 6개, 구조 이미지 6장, 선택적 적용 이미지, 제어·규격 표시를 설정합니다. 사양 수치는 기존 제품 필드만 사용합니다.
+- 제품 상세 콘텐츠를 복사해서 불러오고 생성·수정 요청 모두 명시적으로 전송합니다. 빈 선택 항목은 저장에서 제외하고 부분 입력·안전하지 않은 이미지 주소·문자/배열 제한 위반은 저장 전에 표시합니다. 공통 이미지 삭제 버튼은 이미지와 메타데이터를 함께 비우며, 초기화는 사양과 기존 Markdown 기술 자료를 유지합니다.
+- 저장 전 미리보기는 공개 `ProductDetailTemplate`을 그대로 사용합니다. PC·375px 모바일 너비를 지원하고, 견적 담기·사진 확대·페이지 이동은 비활성화합니다. 기존 인증된 `useImageUpload('products')`와 관리자 중계를 재사용합니다.
+- 미리보기와 공개 상세는 기존 등록 사진의 API 기준 주소 변환을 공유합니다. `Product.images`의 루트 상대 주소는 API에서 표시하고, 직접 작성한 상세 콘텐츠의 `/images/...`는 사이트 정적 경로를 유지합니다. 표시용 복사본만 변환하므로 원 API 데이터와 저장 요청의 이미지 주소는 유지합니다.
+- 모바일 미리보기와 공개 상세는 사진이 있는 일반 제품 전체에 히어로 사진 공간을 확보합니다. 직접 입력한 긴 소개나 제품군 선택이 사진·견적 버튼과 겹치지 않도록 하며, 몰드바의 승인된 배경형 히어로와 PC 배치는 유지합니다.
+- 실제 폼·공통 이미지 업로더·업로드 composable·상세 편집기·공개 렌더러를 조합한 16개 통합 테스트와 콘텐츠 경계 24개 테스트를 로컬 API 대체 환경에서 확인했습니다. 네트워크·라우터·Nuxt 실행 환경·외부 Markdown 위젯만 테스트 대역으로 대체했습니다.
+
 - 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
 
 - 2026-09-07 메인 코드 `e797040`을 Vercel/Railway 운영에 반영했다. 익명 보호 API·CSRF·CORS와 공개 페이지를 포함한 운영 15개 검사를 통과했다.
@@ -21,6 +28,9 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 상세 템플릿은 이번 작업 브랜치에 구현한 상태이며 운영 배포·운영 제품 저장·운영 DB 마이그레이션·R2 업로드는 실행하지 않았습니다. 브라우저 검수의 로그인·상품 저장은 원본 25개 카탈로그를 복사한 loopback API의 메모리에만 반영합니다. 실제 서버 DTO·필터·그룹화 서비스는 사용하지만 운영 인증 서버·DB·파일 저장소를 대체하므로 운영 연동 검증을 뜻하지 않습니다.
+- 상세 콘텐츠의 적용 이미지를 직접 등록하지 않으면 제품 기본값을 사용합니다. 승인된 몰드바 기본 적용 이미지는 공통 기본값에 포함되며, 다른 일반 제품은 기본 적용 이미지를 표시하지 않습니다. 현재 계약에는 기본 적용 이미지 하나만 따로 숨기는 스위치가 없습니다.
+
 - 로그인 제한은 프로세스 메모리 기반이다. 재시작 시 초기화되며 여러 replica 간 공유되지 않는다. BFF/프록시 원천은 함께 집계될 수 있어 공유 저장소 또는 신뢰 가능한 플랫폼 제한을 추가할 수 있다.
 - 로그아웃은 쿠키를 삭제한다. 이미 탈취된 bearer는 최대 1시간 유효하므로 긴급 시 JWT_SECRET 회전 또는 관리자 자격 변경이 필요하다.
 - 운영 호스팅의 요청 크기 제한에 맞춰 관리자 이미지/PDF는 4MiB로 제한한다. 더 큰 파일은 압축해야 하며, 대용량 지원은 별도 서명 업로드 기능이 필요하다. 공개 고객 견적 파일 경계는 변경하지 않는다.
@@ -31,6 +41,11 @@
 
 ## 관련 파일
 
+- 상세 편집기: `led-lighting-website/src/components/admin/product-detail/`, `src/views/admin/ProductFormView.vue`, `src/views/admin/ProductFormView.detail.spec.ts`.
+- 공개 공통 템플릿: `led-lighting-website/src/components/products/detail/ProductDetailTemplate.vue`, `src/types/product-detail.ts`.
+- 등록 사진 표시 주소 공통 처리: `led-lighting-website/src/utils/product-images.ts`.
+- 로컬 검증 보고서·loopback 도구: `output/product-detail-template-20261019/admin-report.md`, `local-qa-api.mjs` (작업 산출물이며 배포 코드 아님).
+
 - 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
 
 - `dfkorea-backend/src/auth/`, `src/upload/`, `src/security/`, `src/main.ts`
@@ -39,6 +54,8 @@
 - `docs/security/2026-09-07-admin-hardening-report.md`, `DEPLOYMENT.md`
 
 ## 갱신 규칙
+
+- 제품 상세 콘텐츠 계약·편집 필드·미리보기·저장·업로드 방식이 바뀌면 이 문서와 `docs/menus/products.md`를 함께 갱신하고 기존 사양·Markdown 보존, 생성/수정/초기화 및 공개 렌더러 미리보기를 검증합니다.
 
 - 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 

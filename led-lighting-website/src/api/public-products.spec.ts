@@ -8,6 +8,19 @@ afterEach(() => {
   localStorage.removeItem('admin_token')
 })
 describe('anonymous public catalog requests', () => {
+  it('groups only callers that explicitly request the public family catalog', async () => {
+    const queries: unknown[] = []
+    publicClient.defaults.adapter = async (config) => {
+      queries.push(config.params)
+      return { data: { data: [], total: 0 }, status: 200, statusText: 'OK', headers: {}, config }
+    }
+    await productsAPI.getPaginated(1, 20, '', '전체', undefined, { groupVariants: true })
+    await productsAPI.getPaginated(1, 20)
+    expect(queries).toEqual([
+      { page: 1, limit: 20, groupVariants: true },
+      { page: 1, limit: 20 },
+    ])
+  })
   it('sends no admin credentials and serializes nonempty spec filters as CSV', async () => {
     localStorage.setItem('admin_token', 'private-admin-token')
     publicClient.defaults.adapter = async (config) => {
