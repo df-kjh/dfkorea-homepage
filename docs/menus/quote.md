@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-19 상세 구성 통일(로컬 구현, 미배포): 전체 25개 원 제품의 공통 히어로/상담 버튼은 기존 원 Product와 MouseEvent를 전달하며 유형별 설치 연출로 견적 사양을 만들거나 원 SKU를 합치지 않습니다. 관리자 미리보기는 이동·사진 확대·견적 담기를 비활성화합니다.
+
 - 2026-10-19 확정 제품군(로컬 구현, 미배포): 공개 상세에서 일반형/센서형·상시형/디밍형을 선택하면 해당 원 SKU로 이동하며 `useQuoteDraft.addProduct`에는 제품군 표시명으로 덮어쓰지 않은 원 제품 ID·제품명·등록 사양을 전달합니다. 일반 원형에 센서형 비상 옵션을, 주차장 디밍형에 상시형 50W·친환경 표기를 합치지 않습니다. 견적 제품 선택기의 API 호출은 기존 원 SKU 목록 조회를 유지하고, 기존 제출 스냅샷과 열린 초안의 원 ID도 유지합니다.
 
 - 2026-10-19 제품 상세 공통 템플릿의 히어로와 하단 상담 버튼은 실제 `useQuoteDraft.addProduct(product, MouseEvent)`에 연결합니다. 기존 상담 후 결정 사양·수량 1·동일 사양 합산·전역 견적 열기 동작은 유지합니다. 관리자 상세 미리보기의 두 버튼은 비활성화하며 견적 초안이나 접수를 만들지 않습니다.
@@ -58,6 +60,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 이번 공통 콘텐츠·설치 이미지 변경은 로컬 테스트 범위입니다. 실제 견적 접수·사업자 확인·메일 발송·운영 데이터 저장·배포는 수행하지 않았습니다. 설치 연출은 실제 시공·성능 결과가 아니며 제품 선정과 옵션 조합은 등록 사양 및 상담을 기준으로 확인합니다.
+
 - 제품군별 네 기존 상세 주소의 원 Product 전달 및 구성 이동 후 견적 ID를 자동 검증했습니다. 실제 견적 접수·메일 발송이나 운영 저장·배포를 실행한 결과는 아닙니다. 제품군 관리 화면·새 그룹 자동 생성은 이번 범위 밖입니다.
 
 - 2026-10-19 상세 디자인 변경은 렌더러/실제 페이지 이벤트 연결 회귀 테스트로 확인했습니다. 실제 견적 제출·사업자 검증·메일 발송은 실행하지 않았으며 운영 배포도 하지 않았습니다. 전체 검수 증거는 `output/product-detail-template-20261019/`를 따릅니다.
@@ -74,6 +78,9 @@
 - 브라우저에 남아 있는 원본 사진과 개인정보는 새로고침하면 사라진다. 온라인 접수 불가 시 입력을 보관한 채 전화·이메일 문의와 재시도를 제공한다.
 
 ## 관련 파일
+
+- 공통 상세 이벤트 회귀: `led-lighting-website/src/components/products/detail/ProductDetailTemplate.spec.ts`, `led-lighting-website/src/pages/products/{product-detail,product-variants}.spec.ts`.
+- 이번 집중 검증 기록: `output/product-detail-consistency-20261019/content-report.md`.
 
 - `led-lighting-website/src/components/products/detail/DetailVariants.vue`
 - `led-lighting-website/src/pages/products/product-variants.spec.ts`

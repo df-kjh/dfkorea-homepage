@@ -20,7 +20,8 @@ const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
   <section
     class="detail-hero"
     :class="{
-      'detail-hero--product': !detail.isMoldbar,
+      'detail-hero--product': detail.heroPresentation === 'product',
+      'detail-hero--cover': detail.heroPresentation === 'cover',
       'detail-hero--empty': !detail.heroImage,
       'detail-hero--variants': !!product.variantGroup,
     }"
@@ -34,10 +35,12 @@ const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
       fetchpriority="high"
     />
     <div class="detail-hero-copy detail-container">
-      <p class="detail-model">
-        {{ product.modelName }} <span v-if="product.modelName">·</span> {{ product.name }}
-      </p>
-      <h1 :id="titleId">{{ detail.heroTitle }}</h1>
+      <h1 :id="titleId">
+        <span class="detail-model">
+          {{ product.modelName }} <span v-if="product.modelName">·</span> {{ product.name }}
+        </span>
+        <span class="detail-hero-title">{{ detail.heroTitle }}</span>
+      </h1>
       <p v-if="detail.heroDescription" class="detail-hero-description">
         {{ detail.heroDescription }}
       </p>
@@ -52,6 +55,7 @@ const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
         >
       </div>
     </div>
+    <p v-if="detail.heroCaption" class="detail-hero-note">{{ detail.heroCaption }}</p>
     <div class="detail-hero-bottom detail-container">
       <div>
         <strong>{{ product.name }}</strong

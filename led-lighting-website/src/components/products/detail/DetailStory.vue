@@ -37,7 +37,10 @@ const emit = defineEmits<{ zoom: [url: string] }>()
     data-section="structure"
   >
     <DetailHeading label="제품 구조" :title="detail.structureTitle" />
-    <div class="detail-structure-grid">
+    <div
+      class="detail-structure-grid"
+      :class="{ 'detail-structure-grid--single': detail.structureImages.length === 1 }"
+    >
       <DetailImage
         v-for="(image, index) in detail.structureImages"
         :key="`${image.url}-${index}`"
@@ -63,13 +66,23 @@ const emit = defineEmits<{ zoom: [url: string] }>()
       ><span>사진을 눌러<br />원본으로 살펴보세요.</span>
     </div>
   </section>
-  <section v-if="detail.application" class="detail-application" data-section="application">
-    <img :src="detail.application.image.url" :alt="detail.application.image.alt" loading="lazy" />
+  <section
+    v-if="detail.application"
+    class="detail-application"
+    :class="{ 'detail-application--reference': detail.applicationPresentation === 'reference' }"
+    data-section="application"
+  >
+    <img
+      v-if="detail.application.image"
+      :src="detail.application.image.url"
+      :alt="detail.application.image.alt"
+      loading="lazy"
+    />
     <p
-      v-if="detail.application.caption || detail.application.image.caption"
+      v-if="detail.application.caption || detail.application.image?.caption"
       class="detail-application-note"
     >
-      {{ detail.application.caption || detail.application.image.caption }}
+      {{ detail.application.caption || detail.application.image?.caption }}
     </p>
     <div class="detail-application-copy detail-container">
       <DetailHeading label="공간에 맞는 조명 계획" :title="detail.application.title" />

@@ -1,16 +1,27 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import DetailHeading from './DetailHeading.vue'
+import ControlSimulation from './ControlSimulation.vue'
 const props = defineProps<{ title: string; options: string[] }>()
 const selected = ref(Math.max(0, props.options.indexOf('그룹디밍')))
+watch(
+  () => props.options,
+  () => {
+    selected.value = Math.max(0, props.options.indexOf('그룹디밍'))
+  },
+  { deep: true },
+)
 const prefix = useId()
 const current = computed(() => props.options[selected.value] || props.options[0] || '')
 const description = computed(
   () =>
     ({
-      개별디밍: '필요한 조명을 한 대씩 제어하는 방식입니다.',
+      개별디밍: '격등으로 배치한 조명을 한 대씩 서로 다른 밝기로 제어하는 방식입니다.',
       그룹디밍: '같은 구역의 조명을 함께 제어하는 방식입니다.',
       센서: '감지 조건에 맞춰 작동하도록 구성하는 방식입니다.',
+      '발전기 비상': '꺼진 상태에서 1초 후 비상 전원으로 전환되어 계속 켜집니다.',
+      '밧데리 비상': '꺼진 상태에서 1초 후 배터리 전원으로 전환되어 계속 켜집니다.',
+      '배터리 비상': '꺼진 상태에서 1초 후 배터리 전원으로 전환되어 계속 켜집니다.',
     })[current.value] || `${current.value} 구성을 상담할 수 있습니다.`,
 )
 const select = (index: number) => {
@@ -69,20 +80,7 @@ const handleKey = (event: KeyboardEvent, index: number) => {
         <div class="detail-control-panel-header">
           <span>조명 배치 개념도</span><span>{{ current }} 선택 예시</span>
         </div>
-        <div class="detail-room-plan" role="img" :aria-label="`${current} 제어 방식 설명용 개념도`">
-          <span
-            v-for="lamp in 6"
-            :key="lamp"
-            :class="{
-              'is-on':
-                current === '그룹디밍'
-                  ? lamp <= 3
-                  : current === '개별디밍'
-                    ? lamp === 2
-                    : lamp <= 2,
-            }"
-          ></span>
-        </div>
+        <ControlSimulation :key="current" :option="current" />
         <div aria-live="polite">
           <h3>{{ current }}</h3>
           <p>{{ description }}</p>

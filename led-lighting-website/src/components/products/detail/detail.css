@@ -84,11 +84,28 @@
   z-index: -1;
   pointer-events: none;
 }
+.product-detail-template .detail-hero-note {
+  position: relative;
+  align-self: flex-end;
+  max-width: 310px;
+  margin: 40px clamp(20px, 5cqw, 76px) 0;
+  padding: 9px 13px;
+  background: #111810c9;
+  border: 1px solid #a0a39170;
+  color: #f0ecdf;
+  font-size: 12px;
+  line-height: 1.7;
+}
 .product-detail-template .detail-hero-copy {
   padding-top: 76px;
   width: 100%;
 }
+.product-detail-template .detail-hero-title {
+  display: block;
+}
 .product-detail-template .detail-model {
+  font-weight: 400;
+  line-height: 1.65;
   color: #d4c296;
   font-size: 13px;
   letter-spacing: 0.06em;
@@ -308,6 +325,12 @@
   margin-top: 50px;
   align-items: start;
 }
+.product-detail-template .detail-structure-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.product-detail-template .detail-structure-grid--single img {
+  max-height: 650px;
+}
 .product-detail-template .detail-thumbnails {
   display: flex;
   gap: 9px;
@@ -358,6 +381,14 @@
   background: linear-gradient(0deg, #0e140fe8, transparent 90%);
   z-index: -1;
 }
+.product-detail-template .detail-application--reference > img {
+  object-fit: contain;
+  padding: 28px 20px 300px;
+  background: #e5e3d9;
+}
+.product-detail-template .detail-application--reference:after {
+  background: linear-gradient(0deg, #182016 0, #182016f5 32%, transparent 72%);
+}
 .product-detail-template .detail-application-copy {
   padding-block: 57px;
   width: 100%;
@@ -380,8 +411,8 @@
   top: 24px;
   right: 32px;
   max-width: 260px;
-  font-size: 11px;
-  background: #111810a6;
+  font-size: 12px;
+  background: #111810d9;
   border: 1px solid #a0a39155;
   padding: 8px 12px;
   line-height: 1.8;
@@ -665,6 +696,11 @@
     max-width: 300px;
     font-size: 15px;
   }
+  .product-detail-template .detail-hero--cover:after {
+    /* Mobile copy crosses the full image width. Keep even long descriptions
+       legible over bright fixtures at every vertical position. */
+    background: linear-gradient(180deg, #0c100cdd 0%, #0c100cc9 55%, #0c100cbf 100%);
+  }
   .product-detail-template .detail-hero--product {
     min-height: 950px;
   }
@@ -689,7 +725,7 @@
   .product-detail-template .detail-hero--product:not(.detail-hero--empty) .detail-hero-copy {
     /* The mobile photo is anchored above the hero footer. Reserve its space
        after the copy for every pictured product, including long custom text
-       without family controls; the approved Moldbar background is separate. */
+       without family controls. Background scenes use the shared cover presentation. */
     padding-bottom: 460px;
   }
   .product-detail-template .detail-hero--empty {
