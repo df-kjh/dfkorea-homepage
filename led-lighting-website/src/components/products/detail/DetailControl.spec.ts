@@ -38,6 +38,7 @@ describe('registered control option concepts', () => {
     const wrapper = render(['개별디밍'])
     const lamps = wrapper.findAll('[data-lamp]')
     expect(lamps).toHaveLength(6)
+    expect(wrapper.findAll('button')).toHaveLength(1)
     expect(lamps.map((lamp) => lamp.attributes('data-powered'))).toEqual([
       'true',
       'false',
@@ -63,6 +64,7 @@ describe('registered control option concepts', () => {
     const wrapper = render()
     const lamps = wrapper.findAll('[data-lamp]')
     expect(lamps).toHaveLength(3)
+    expect(wrapper.findAll('button')).toHaveLength(options.length)
     expect(lamps.every((lamp) => lamp.classes().includes('is-dimming'))).toBe(true)
     expect(lamps.map((lamp) => (lamp.element as HTMLElement).style.animationDelay)).toEqual([
       '0s',
@@ -76,6 +78,9 @@ describe('registered control option concepts', () => {
     '%s turns on at exactly 1000 ms and remains bright',
     async (option) => {
       const wrapper = render([option])
+      expect(wrapper.findAll('button')).toHaveLength(1)
+      expect(wrapper.text()).not.toMatch(/1초\s*후/)
+      expect(wrapper.get('[role="img"]').attributes('aria-label')).not.toMatch(/1초\s*후/)
       expect(wrapper.find('[data-lamp].is-on').exists()).toBe(false)
       await tick(999)
       expect(wrapper.find('[data-lamp].is-on').exists()).toBe(false)
@@ -100,35 +105,6 @@ describe('registered control option concepts', () => {
     expect(wrapper.find('[data-lamp].is-on').exists()).toBe(false)
     await tick(1)
     expect(wrapper.findAll('[data-lamp].is-on')).toHaveLength(3)
-    wrapper.unmount()
-  })
-
-  it('pauses the emergency countdown, resumes its remaining time, and can restart it', async () => {
-    const wrapper = render(['발전기 비상'])
-    await tick(600)
-    expect(wrapper.find('[aria-label="애니메이션 일시정지"]').exists()).toBe(true)
-    await wrapper.get('[aria-label="애니메이션 일시정지"]').trigger('click')
-    await tick(2000)
-    expect(wrapper.find('[data-lamp].is-on').exists()).toBe(false)
-    await wrapper.get('[aria-label="애니메이션 재생"]').trigger('click')
-    await tick(399)
-    expect(wrapper.find('[data-lamp].is-on').exists()).toBe(false)
-    await tick(1)
-    expect(wrapper.findAll('[data-lamp].is-on')).toHaveLength(3)
-    await wrapper.get('[aria-label="애니메이션 다시보기"]').trigger('click')
-    expect(wrapper.find('[data-lamp].is-on').exists()).toBe(false)
-    await tick(1000)
-    expect(wrapper.findAll('[data-lamp].is-on')).toHaveLength(3)
-    wrapper.unmount()
-  })
-
-  it('pauses continuous dimming through the shared control', async () => {
-    const wrapper = render(['개별디밍'])
-    expect(wrapper.find('[data-play-state="running"]').exists()).toBe(true)
-    await wrapper.get('[aria-label="애니메이션 일시정지"]').trigger('click')
-    expect(wrapper.find('[data-play-state="paused"]').exists()).toBe(true)
-    await wrapper.get('[aria-label="애니메이션 재생"]').trigger('click')
-    expect(wrapper.find('[data-play-state="running"]').exists()).toBe(true)
     wrapper.unmount()
   })
 

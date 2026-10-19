@@ -8,36 +8,36 @@
   "assets": [
     {
       "key": "pipe-pendant",
-      "webPath": "/images/product-detail/applications/pipe-pendant-v1.png",
+      "webPath": "/images/product-detail/applications/pipe-pendant-v2.png",
       "referenceFile": "p01-gallery-01.webp",
       "generated": true,
       "format": "PNG",
       "width": 1672,
       "height": 941,
-      "byteSize": 2048458,
-      "sha256": "df096e3eef37a2b9d198aa0010283701914c4305c368313b7c3b7838536f309d"
+      "byteSize": 2113052,
+      "sha256": "73f4d4b98159f3f7eb17a556b0efe5095f251c787ac8e9634614b6890f5f49a5"
     },
     {
       "key": "classroom",
-      "webPath": "/images/product-detail/applications/classroom-v1.png",
+      "webPath": "/images/product-detail/applications/classroom-v2.png",
       "referenceFile": "p02-gallery-01.webp",
       "generated": true,
       "format": "PNG",
       "width": 1672,
       "height": 941,
-      "byteSize": 1856056,
-      "sha256": "9cfeaa37fd90fbaa9c9ff44aba4f1226fec16c8dad564309cb0778a1a97f8d6f"
+      "byteSize": 1889955,
+      "sha256": "aa2c9bd015ec187336c8b00812f7a2f50f5a3f0137a499292b87ba61d9a6591c"
     },
     {
       "key": "street",
-      "webPath": "/images/product-detail/applications/street-v1.png",
+      "webPath": "/images/product-detail/applications/street-v2.png",
       "referenceFile": "p03-gallery-01.webp",
       "generated": true,
       "format": "PNG",
       "width": 1672,
-      "height": 940,
-      "byteSize": 2288215,
-      "sha256": "afab8c32178fa72d43c0b712583520d158cbb34f019262859a962e7760034581"
+      "height": 941,
+      "byteSize": 2471359,
+      "sha256": "e78d6833beb3cec15f84c80d84646bf03bdc109a7ef3cc7f29a2d49be6f52360"
     },
     {
       "key": "moisture-proof",
@@ -96,36 +96,36 @@
     },
     {
       "key": "parking-guidance",
-      "webPath": "/images/product-detail/applications/parking-guidance-v1.png",
+      "webPath": "/images/product-detail/applications/parking-guidance-v2.png",
       "referenceFile": "p10-gallery-01.webp",
       "generated": true,
       "format": "PNG",
       "width": 1672,
       "height": 941,
-      "byteSize": 2046848,
-      "sha256": "4dc5255f20aceb7628057dcaee90807a677cb073652c5d68dd1c25595e43599c"
+      "byteSize": 1922719,
+      "sha256": "3575791c14240d786d2721fa74226f00d5ac43c5f563c63ad129be52ca3c1e72"
     },
     {
       "key": "wall-light",
-      "webPath": "/images/product-detail/applications/wall-light-v1.png",
+      "webPath": "/images/product-detail/applications/wall-light-v2.png",
       "referenceFile": "p11-gallery-02.webp",
       "generated": true,
       "format": "PNG",
       "width": 1672,
       "height": 941,
-      "byteSize": 2210942,
-      "sha256": "113e653a3c834c7d149b117ea95560b238de9fc7b875beefb41bbeb62f3f7dfc"
+      "byteSize": 2537829,
+      "sha256": "8b2cacf283736dfafadc79101753e5e1c632607e0317051e493328af1572d1fa"
     },
     {
       "key": "cleanroom",
-      "webPath": "/images/product-detail/applications/cleanroom-v1.png",
+      "webPath": "/images/product-detail/applications/cleanroom-v2.png",
       "referenceFile": "p12-gallery-01.webp",
       "generated": true,
       "format": "PNG",
       "width": 1672,
       "height": 941,
-      "byteSize": 1711349,
-      "sha256": "a570cbc4a7a40ccee0a3f5f27ed5ce17f58f2f303a885fb6986b403470125308"
+      "byteSize": 1705408,
+      "sha256": "2783543ff0e27417c255ccfa18cc2aee5c1d1f9aa6e1eea52334996eea9658ca"
     },
     {
       "key": "parking-linear",

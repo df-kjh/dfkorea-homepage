@@ -26,17 +26,27 @@ export interface ProductApplicationProfile {
 export const GENERATED_APPLICATION_CAPTION =
   'AI로 제작한 적용 공간 예시입니다. 실제 시공 사례·조도 측정 결과가 아닙니다.'
 
+const APPLICATION_IMAGE_VERSIONS: Partial<Record<ProductApplicationKey, 2>> = {
+  'pipe-pendant': 2,
+  classroom: 2,
+  street: 2,
+  'parking-guidance': 2,
+  'wall-light': 2,
+  cleanroom: 2,
+}
+
 const profile = (
   key: ProductApplicationKey,
   productIds: string[],
   space: string,
   description: string,
+  alt?: string,
 ): ProductApplicationProfile => ({
   key,
   productIds,
   image: {
-    url: `/images/product-detail/applications/${key}-v1.png`,
-    alt: `${space}에 제품 유형의 형태를 참고해 배치한 AI 설치 연출 예시`,
+    url: `/images/product-detail/applications/${key}-v${APPLICATION_IMAGE_VERSIONS[key] ?? 1}.png`,
+    alt: alt || `${space}에 제품 유형의 형태를 참고해 배치한 AI 설치 연출 예시`,
   },
   description,
 })
@@ -47,19 +57,19 @@ export const PRODUCT_APPLICATION_PROFILES: readonly ProductApplicationProfile[] 
   profile(
     'pipe-pendant',
     ['30b50b2a-cd91-46bd-960e-9860f6c72de6'],
-    '파이프 펜던트 구성 공간',
-    '파이프 길이와 연결할 조명의 위치를 확인하고, 천장 높이와 배치에 맞는 구성을 계획합니다.',
+    '주차장',
+    '주차장 천장의 고정 위치와 높이를 확인하고, 파이프 길이와 연결할 조명의 배치를 함께 계획합니다.',
   ),
   profile(
     'classroom',
     ['5b42165c-7186-4e6e-b2e8-b67223633468'],
     '칠판이 있는 교실',
-    '칠판의 위치와 설치 구간을 확인하고, 제품 규격과 필요한 수량을 함께 살펴봅니다.',
+    '칠판 위 벽면의 고정 위치와 조사 방향을 살펴보고, 제품 규격과 필요한 수량을 함께 확인합니다.',
   ),
   profile(
     'street',
     ['91302d00-bf8b-4669-b3ca-08c5c3cbfa41'],
-    '보행로 주변 외부 공간',
+    '도로와 보행로 주변 외부 공간',
     '설치 위치와 지지 구조를 확인하고, 등록된 가로등 사양을 바탕으로 배치를 상담합니다.',
   ),
   profile(
@@ -97,17 +107,18 @@ export const PRODUCT_APPLICATION_PROFILES: readonly ProductApplicationProfile[] 
     ['67d187d8-c5a8-467b-b5df-9d6bc8eb4c43'],
     '주차장 차량 이동 구간',
     '차량 이동 방향과 표시 위치를 살펴보고, 등록된 크기별 설치 조건을 함께 확인합니다.',
+    '주차장·PARKING 글씨와 우측 화살표를 표시한 차량유도등의 AI 설치 연출 예시',
   ),
   profile(
     'wall-light',
     ['a3516220-2b98-4bfa-87ad-0db77b572aac'],
-    '벽부 조명을 배치한 통로',
-    '벽면의 고정 위치와 통로 폭을 확인하고, 제품 크기에 맞는 설치 자리를 계획합니다.',
+    '주차장 램프',
+    '주차장 차량 램프의 벽면 고정 위치와 경사 구간을 확인하고, 제품 크기에 맞는 설치 자리를 계획합니다.',
   ),
   profile(
     'cleanroom',
     ['40fb2fa3-c344-4547-9071-30d0905f64b9'],
-    '작업 공간',
+    '클린룸 형태의 작업 공간',
     '작업 공간의 천장 구조와 설치 위치를 살펴봅니다. 현장에 필요한 청정도와 적용 조건은 별도로 확인합니다.',
   ),
   profile(

@@ -147,6 +147,24 @@ describe('detail image URL boundary', () => {
 
 import catalog from './__fixtures__/catalog.json'
 
+const applicationImages: Record<string, string> = {
+  moldbar: '/images/product-detail/moldbar/moldbar-application.png',
+  'pipe-pendant': '/images/product-detail/applications/pipe-pendant-v2.png',
+  classroom: '/images/product-detail/applications/classroom-v2.png',
+  street: '/images/product-detail/applications/street-v2.png',
+  'moisture-proof': '/images/product-detail/applications/moisture-proof-v1.png',
+  'cob-retail': '/images/product-detail/applications/cob-retail-v1.png',
+  'round-ceiling': '/images/product-detail/applications/round-ceiling-v1.png',
+  downlight: '/images/product-detail/applications/downlight-v1.png',
+  'stair-sign': '/images/product-detail/applications/stair-sign-v1.png',
+  'parking-guidance': '/images/product-detail/applications/parking-guidance-v2.png',
+  'wall-light': '/images/product-detail/applications/wall-light-v2.png',
+  cleanroom: '/images/product-detail/applications/cleanroom-v2.png',
+  'parking-linear': '/images/product-detail/applications/parking-linear-v1.png',
+  'panel-square': '/images/product-detail/applications/panel-square-v1.png',
+  'panel-linear': '/images/product-detail/applications/panel-linear-v1.png',
+}
+
 describe('consistent catalog detail defaults', () => {
   it.each(catalog)(
     'gives $product.name its own photos and mapped installation scene',
@@ -173,11 +191,7 @@ describe('consistent catalog detail defaults', () => {
       expect(detail.application?.caption).toBe(
         'AI로 제작한 적용 공간 예시입니다. 실제 시공 사례·조도 측정 결과가 아닙니다.',
       )
-      expect(detail.application?.image?.url).toBe(
-        applicationKey === 'moldbar'
-          ? '/images/product-detail/moldbar/moldbar-application.png'
-          : `/images/product-detail/applications/${applicationKey}-v1.png`,
-      )
+      expect(detail.application?.image?.url).toBe(applicationImages[applicationKey])
       if (applicationKey !== 'moldbar') {
         expect(detail.heroImage?.url).toBe(detail.application?.image?.url)
         expect(detail.heroDescription).toContain(product.name)

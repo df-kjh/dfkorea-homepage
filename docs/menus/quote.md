@@ -2,6 +2,8 @@
 
 ## 구현 완료
 
+- 2026-10-19 상세 주석 반영(로컬 구현, 미배포): h1 상단 모델·제품명 행과 히어로 사진 확대 버튼을 제거해도 기존 히어로 하단 제품명·모델명 및 히어로·하단 상담의 두 견적 버튼은 유지합니다. 실제 Product·원 SKU·MouseEvent 전달과 관리자 미리보기의 견적 비활성화를 집중 회귀 테스트로 확인합니다.
+
 - 2026-10-19 상세 구성 통일(로컬 구현, 미배포): 전체 25개 원 제품의 공통 히어로/상담 버튼은 기존 원 Product와 MouseEvent를 전달하며 유형별 설치 연출로 견적 사양을 만들거나 원 SKU를 합치지 않습니다. 관리자 미리보기는 이동·사진 확대·견적 담기를 비활성화합니다.
 
 - 2026-10-19 확정 제품군(로컬 구현, 미배포): 공개 상세에서 일반형/센서형·상시형/디밍형을 선택하면 해당 원 SKU로 이동하며 `useQuoteDraft.addProduct`에는 제품군 표시명으로 덮어쓰지 않은 원 제품 ID·제품명·등록 사양을 전달합니다. 일반 원형에 센서형 비상 옵션을, 주차장 디밍형에 상시형 50W·친환경 표기를 합치지 않습니다. 견적 제품 선택기의 API 호출은 기존 원 SKU 목록 조회를 유지하고, 기존 제출 스냅샷과 열린 초안의 원 ID도 유지합니다.
@@ -60,6 +62,8 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 이번 상세 UI 수정은 견적 사양·제품 ID·접수 계약을 변경하지 않습니다. 제어 개념도의 1000ms 지연은 제품의 전환 시간 보장이 아니며 실제 견적 제출·메일 발송·운영 저장·배포·하드웨어 연동은 이번 검증에 포함하지 않습니다.
+
 - 이번 공통 콘텐츠·설치 이미지 변경은 로컬 테스트 범위입니다. 실제 견적 접수·사업자 확인·메일 발송·운영 데이터 저장·배포는 수행하지 않았습니다. 설치 연출은 실제 시공·성능 결과가 아니며 제품 선정과 옵션 조합은 등록 사양 및 상담을 기준으로 확인합니다.
 
 - 제품군별 네 기존 상세 주소의 원 Product 전달 및 구성 이동 후 견적 ID를 자동 검증했습니다. 실제 견적 접수·메일 발송이나 운영 저장·배포를 실행한 결과는 아닙니다. 제품군 관리 화면·새 그룹 자동 생성은 이번 범위 밖입니다.
@@ -78,6 +82,8 @@
 - 브라우저에 남아 있는 원본 사진과 개인정보는 새로고침하면 사라진다. 온라인 접수 불가 시 입력을 보관한 채 전화·이메일 문의와 재시도를 제공한다.
 
 ## 관련 파일
+
+- 상세 주석 후 견적 회귀: `led-lighting-website/src/components/products/detail/ProductDetailTemplate.spec.ts`, `led-lighting-website/src/pages/products/{product-detail,product-variants}.spec.ts`, `output/product-detail-feedback-20261019/ui-report.md`.
 
 - 공통 상세 이벤트 회귀: `led-lighting-website/src/components/products/detail/ProductDetailTemplate.spec.ts`, `led-lighting-website/src/pages/products/{product-detail,product-variants}.spec.ts`.
 - 이번 집중 검증 기록: `output/product-detail-consistency-20261019/content-report.md`.
@@ -126,6 +132,8 @@
 - `docs/superpowers/plans/2026-09-06-online-quote.md`
 
 ## 갱신 규칙
+
+- 상세 히어로의 제품 표기나 버튼을 정리하면 실제 Product·MouseEvent 전달, 원 SKU 유지 및 미리보기 차단을 확인합니다. 설명용 제어 시뮬레이션을 견적 제품 성능이나 사양으로 변환하지 않습니다.
 
 - 제품군 선택·표시명 또는 조회 API가 바뀌면 견적에는 실제 선택 SKU의 ID/이름/사양이 남는지 확인하고 공개 그룹 목록과 견적 원 SKU 목록의 조회 범위를 함께 기록합니다.
 
