@@ -147,10 +147,14 @@ it.each(catalog)('renders the reviewed section flow for $product.name', ({ produ
   wrapper.unmount()
 })
 
-it('keeps the real product identity inside the common slogan heading', () => {
+it('keeps accessible product identity in the slogan heading and the existing hero footer', () => {
   const wrapper = render(true)
-  expect(wrapper.get('h1').text()).toContain('원형 센서등')
+  expect(wrapper.get('h1 .detail-visually-hidden').text()).toBe('원형 센서등')
   expect(wrapper.get('h1').text()).toContain('공간을 따라,\n빛을 잇다.')
+  expect(wrapper.find('h1 .detail-model').exists()).toBe(false)
+  expect(wrapper.get('.detail-hero-bottom').text()).toContain('원형 센서등')
+  expect(wrapper.get('.detail-hero-bottom').text()).toContain('DF-ROUND')
+  expect(wrapper.find('.detail-hero button:not([data-quote])').exists()).toBe(false)
 })
 
 it('preserves an explicit admin hero-image caption without generating a default note', () => {

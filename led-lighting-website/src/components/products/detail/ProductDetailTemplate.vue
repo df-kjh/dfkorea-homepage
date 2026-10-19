@@ -42,7 +42,6 @@ const quote = (event: MouseEvent) => {
       :detail="detail"
       :preview="preview"
       @quote="quote"
-      @zoom="zoom"
     />
     <DetailStory :detail="detail" :product-name="product.name" :preview="preview" @zoom="zoom" />
     <DetailControl
@@ -100,13 +99,6 @@ const quote = (event: MouseEvent) => {
               </tr>
             </tbody>
           </table>
-          <p class="detail-spec-note">
-            {{
-              detail.connection
-                ? '연결 구성품의 모델·길이 자료입니다. 전기 사양과 인증 적용은 연결할 조명에 맞춰 상담해 주세요.'
-                : '현재 제품에 등록된 사양입니다. 사양·옵션 조합의 공급 가능 여부와 인증 적용 범위는 모델별로 확인해 주세요.'
-            }}
-          </p>
         </div>
       </div>
     </section>

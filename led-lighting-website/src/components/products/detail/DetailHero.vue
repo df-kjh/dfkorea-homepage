@@ -10,7 +10,7 @@ defineProps<{
   preview: boolean
 }>()
 const titleId = useId()
-const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
+const emit = defineEmits<{ quote: [event: MouseEvent] }>()
 </script>
 <template>
   <div class="detail-breadcrumb detail-container">
@@ -36,9 +36,7 @@ const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
     />
     <div class="detail-hero-copy detail-container">
       <h1 :id="titleId">
-        <span class="detail-model">
-          {{ product.modelName }} <span v-if="product.modelName">·</span> {{ product.name }}
-        </span>
+        <span class="detail-visually-hidden">{{ product.name }}</span>
         <span class="detail-hero-title">{{ detail.heroTitle }}</span>
       </h1>
       <p v-if="detail.heroDescription" class="detail-hero-description">
@@ -61,14 +59,6 @@ const emit = defineEmits<{ quote: [event: MouseEvent]; zoom: [url: string] }>()
         <strong>{{ product.name }}</strong
         ><span>{{ product.modelName }}</span>
       </div>
-      <button
-        v-if="detail.heroImage && !preview"
-        type="button"
-        class="detail-zoom-action"
-        @click="emit('zoom', detail.heroImage!.url)"
-      >
-        사진 크게 보기 ↗
-      </button>
     </div>
   </section>
   <dl v-if="detail.summary.length" class="detail-facts detail-container">

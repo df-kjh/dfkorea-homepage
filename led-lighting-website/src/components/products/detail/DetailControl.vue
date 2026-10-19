@@ -19,9 +19,9 @@ const description = computed(
       개별디밍: '격등으로 배치한 조명을 한 대씩 서로 다른 밝기로 제어하는 방식입니다.',
       그룹디밍: '같은 구역의 조명을 함께 제어하는 방식입니다.',
       센서: '감지 조건에 맞춰 작동하도록 구성하는 방식입니다.',
-      '발전기 비상': '꺼진 상태에서 1초 후 비상 전원으로 전환되어 계속 켜집니다.',
-      '밧데리 비상': '꺼진 상태에서 1초 후 배터리 전원으로 전환되어 계속 켜집니다.',
-      '배터리 비상': '꺼진 상태에서 1초 후 배터리 전원으로 전환되어 계속 켜집니다.',
+      '발전기 비상': '꺼진 상태에서 비상 전원으로 전환되어 계속 켜집니다.',
+      '밧데리 비상': '꺼진 상태에서 배터리 전원으로 전환되어 계속 켜집니다.',
+      '배터리 비상': '꺼진 상태에서 배터리 전원으로 전환되어 계속 켜집니다.',
     })[current.value] || `${current.value} 구성을 상담할 수 있습니다.`,
 )
 const select = (index: number) => {
@@ -77,9 +77,6 @@ const handleKey = (event: KeyboardEvent, index: number) => {
         role="tabpanel"
         :aria-labelledby="`${prefix}-tab-${selected}`"
       >
-        <div class="detail-control-panel-header">
-          <span>조명 배치 개념도</span><span>{{ current }} 선택 예시</span>
-        </div>
         <ControlSimulation :key="current" :option="current" />
         <div aria-live="polite">
           <h3>{{ current }}</h3>
