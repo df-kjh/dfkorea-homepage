@@ -402,6 +402,8 @@
         </button>
       </section>
 
+      <ProductDetailEditor v-model="formData.detailContent" :product="previewProduct" :disabled="loading || saving" />
+
       <!-- 11. Description Card with Editor (기타 사항) -->
       <section
         class="bg-white rounded shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-50 overflow-hidden"
@@ -476,12 +478,14 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, provide } from 'vu
 import { useRouter, useRoute } from 'vue-router'
 import { adminOperationTimeoutMessage } from '@/utils/admin-operation-timeout'
 import { productsAPI } from '@/api'
-import type { Product } from '@/types'
+import type { Product, ProductDetailContent } from '@/types'
 import { useToast } from '@/composables/useToast'
 import { useImageUpload } from '@/composables/useImageUpload'
 import ImageUploader from '@/components/common/ImageUploader.vue'
 import BaseSelectBox from '@/components/common/BaseSelectBox.vue'
 import MarkdownEditor from '@/components/common/MarkdownEditor.vue'
+import ProductDetailEditor from '@/components/admin/product-detail/ProductDetailEditor.vue'
+import { cloneDetailContent, detailImageUrls, prepareDetailContent, validateDetailContent } from '@/components/admin/product-detail/editor-content'
 import { PRODUCT_UNITS } from '@/constants/units'
 import { productCategories } from '@/utils/category'
 
@@ -529,9 +533,16 @@ const formData = reactive({
   colorRendering: '',
   options: [] as string[],
   description: '',
+  detailContent: null as ProductDetailContent | null,
   isNew: false,
   isFeatured: false,
 })
+
+const previewProduct = computed<Product>(() => ({
+  ...formData,
+  createdAt: '',
+  updatedAt: '',
+}))
 
 // 메인 제품 개수 확인
 const featuredCount = computed(() => {
@@ -572,7 +583,11 @@ const fetchProduct = async (id: string): Promise<void> => {
   loading.value = true
   try {
     const { data } = await productsAPI.getOne(id)
-    Object.assign(formData, data)
+    // Nested arrays/objects from the API must not be mutated by editing or padding the form.
+    Object.assign(formData, JSON.parse(JSON.stringify(data)), {
+      detailContent: cloneDetailContent(data.detailContent),
+      options: [...(data.options || [])],
+    })
     // images 배열이 3개 미만이면 빈 항목으로 채움
     while (formData.images.length < 3) {
       formData.images.push({ image: '', description: '' })
@@ -633,6 +648,11 @@ const validateForm = (): boolean => {
     toast.error('기타 사항을 입력해주세요')
     return false
   }
+  const detailErrors = validateDetailContent(formData.detailContent)
+  if (detailErrors.length) {
+    toast.error(detailErrors[0]!.message)
+    return false
+  }
   return true
 }
 
@@ -648,6 +668,7 @@ const handlePublish = async (): Promise<void> => {
     const colorTemp = formData.colorTemp.filter((c) => c > 0)
     const luminanceEfficiency =
       formData.luminanceEfficiency > 0 ? formData.luminanceEfficiency : undefined
+    const detailContent = prepareDetailContent(formData.detailContent)
 
     if (isEditMode.value) {
       await productsAPI.update(formData.id, {
@@ -666,6 +687,7 @@ const handlePublish = async (): Promise<void> => {
         colorRendering: formData.colorRendering || undefined,
         options: formData.options,
         description: formData.description,
+        detailContent,
         isNew: formData.isNew,
         isFeatured: formData.isFeatured,
       })
@@ -687,6 +709,7 @@ const handlePublish = async (): Promise<void> => {
         colorRendering: formData.colorRendering || undefined,
         options: formData.options,
         description: formData.description,
+        detailContent,
         isNew: formData.isNew,
         isFeatured: formData.isFeatured,
       })
@@ -694,7 +717,10 @@ const handlePublish = async (): Promise<void> => {
     }
 
     // 등록 완료 후 사용되지 않은 임시 이미지 삭제
-    await imageUpload.cleanupUnusedImages(images.map((img) => img.image))
+    await imageUpload.cleanupUnusedImages([
+      ...images.map((img) => img.image),
+      ...detailImageUrls(detailContent),
+    ])
 
     const fromTab = route.query.from as string || 'products'
     router.push({ path: '/admin/dashboard', query: { tab: fromTab } })

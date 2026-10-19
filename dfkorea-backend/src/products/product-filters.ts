@@ -89,7 +89,15 @@ export const validateProductPagination = (
 
 export const parseProductQuery = (
   query: Record<string, unknown>,
-): ProductFilters & { page?: number; limit?: number } => {
+): ProductFilters & {
+  page?: number;
+  limit?: number;
+  groupVariants?: boolean;
+} => {
+  const grouped = readString(query.groupVariants, "groupVariants", 5);
+  if (grouped !== undefined && grouped !== "true" && grouped !== "false") {
+    throw new BadRequestException("groupVariants must be either true or false");
+  }
   const pageString = readString(query.page, "page", 16);
   const limitString = readString(query.limit, "limit", 3);
   const hasPaging = pageString !== undefined || limitString !== undefined;
@@ -108,6 +116,7 @@ export const parseProductQuery = (
   const limit = hasPaging ? Number(limitString) : undefined;
   if (hasPaging) validateProductPagination(page, limit);
   return {
+    groupVariants: grouped === undefined ? undefined : grouped === "true",
     page,
     limit,
     search: readString(query.search, "search", 200),
@@ -122,6 +131,7 @@ export const parseProductQuery = (
 export const filterProducts = (
   products: Product[],
   filters: ProductFilters,
+  additionalSearchNames: ReadonlyMap<string, string> = new Map(),
 ): Product[] => {
   const search = filters.search?.trim().toLowerCase();
   const category = filters.category?.trim();
@@ -138,9 +148,11 @@ export const filterProducts = (
       return false;
     if (
       search &&
-      ![product.name, product.modelName].some((value) =>
-        value?.toLowerCase().includes(search),
-      )
+      ![
+        product.name,
+        product.modelName,
+        additionalSearchNames.get(product.id),
+      ].some((value) => value?.toLowerCase().includes(search))
     )
       return false;
     // PostgreSQL numeric[]가 문자열 배열로 반환되는 경우에도 수치 기준으로 동일하게 비교한다.

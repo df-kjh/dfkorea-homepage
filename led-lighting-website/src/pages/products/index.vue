@@ -13,7 +13,7 @@ const siteUrl = config.public.siteUrl;
 const apiBaseUrl = normalizeBaseUrl(String(config.public.apiBaseUrl));
 const { data: initialPage } = await useFetch<PaginatedResponse<Product>>(`${apiBaseUrl}/products`, {
   key: "products-initial-page",
-  query: { page: 1, limit: 20 },
+  query: { page: 1, limit: 20, groupVariants: true },
 });
 const title = "제품 목록 | (주)디에프코리아 - 다양한 LED 조명 제품";
 const description =

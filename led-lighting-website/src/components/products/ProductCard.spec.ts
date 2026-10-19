@@ -60,6 +60,39 @@ const mountProductCard = (record: Product = product) => {
 }
 
 describe('ProductCard', () => {
+  it('shows the family and variant labels but links to the filtered representative SKU', async () => {
+    const dimming = { ...product, id: 'dimming', name: '주차장조명 디밍', certifications: ['KS'] }
+    const grouped = {
+      ...dimming,
+      variantGroup: {
+        id: 'parking-linear',
+        name: '주차장 조명',
+        primaryProductId: 'always-on',
+        variants: [
+          {
+            label: '상시형',
+            product: {
+              ...product,
+              id: 'always-on',
+              power: [40, 50],
+              certifications: ['KS', '친환경'],
+            },
+          },
+          { label: '디밍형', product: dimming },
+        ],
+      },
+    }
+    const { wrapper } = mountProductCard(grouped)
+    expect(wrapper.get('h3').text()).toBe('주차장 조명')
+    expect(wrapper.text()).toContain('상시형 / 디밍형')
+    expect(wrapper.get('a').attributes('href')).toBe('/products/dimming')
+    expect(wrapper.text()).toContain('40W')
+    expect(wrapper.text()).not.toMatch(/50W|친환경/)
+    await wrapper.get('a').trigger('click')
+    expect(wrapper.emitted('click')?.[0]?.[0]).toEqual(grouped)
+    expect(grouped.power).toEqual([40])
+    wrapper.unmount()
+  })
   it('keeps PIPE component length visible without placeholder electrical/certification claims', () => {
     const { wrapper } = mountProductCard({
       ...product,

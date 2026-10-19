@@ -160,6 +160,7 @@ const fetchProducts = async (
       searchQuery.value,
       selectedCategory.value,
       filters.value,
+      { groupVariants: true },
     )
 
     if (generation !== requestGeneration || disposed) return

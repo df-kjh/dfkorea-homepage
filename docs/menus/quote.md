@@ -2,6 +2,10 @@
 
 ## 구현 완료
 
+- 2026-10-19 확정 제품군(로컬 구현, 미배포): 공개 상세에서 일반형/센서형·상시형/디밍형을 선택하면 해당 원 SKU로 이동하며 `useQuoteDraft.addProduct`에는 제품군 표시명으로 덮어쓰지 않은 원 제품 ID·제품명·등록 사양을 전달합니다. 일반 원형에 센서형 비상 옵션을, 주차장 디밍형에 상시형 50W·친환경 표기를 합치지 않습니다. 견적 제품 선택기의 API 호출은 기존 원 SKU 목록 조회를 유지하고, 기존 제출 스냅샷과 열린 초안의 원 ID도 유지합니다.
+
+- 2026-10-19 제품 상세 공통 템플릿의 히어로와 하단 상담 버튼은 실제 `useQuoteDraft.addProduct(product, MouseEvent)`에 연결합니다. 기존 상담 후 결정 사양·수량 1·동일 사양 합산·전역 견적 열기 동작은 유지합니다. 관리자 상세 미리보기의 두 버튼은 비활성화하며 견적 초안이나 접수를 만들지 않습니다.
+
 - 2026-10-05 글꼴 통일: 공식 Pretendard v1.3.9 가변 WOFF2를 사이트에서 직접 제공하고 공통 글꼴 토큰을 적용했습니다. 메뉴·제목·본문·버튼·입력·숫자는 Pretendard를 사용하며 기존 글씨 크기·굵기·페이지 구조와 동작은 유지합니다. 아이콘 전용 글꼴과 Markdown 소스의 고정폭 글꼴은 용도에 맞게 유지합니다.
 - 견적 위젯은 body로 Teleport되므로 전역 글꼴 토큰을 루트에 명시해 공개 페이지와 동일한 Pretendard를 적용합니다.
 
@@ -54,6 +58,10 @@
 
 ## 부족하거나 개선이 필요한 기능
 
+- 제품군별 네 기존 상세 주소의 원 Product 전달 및 구성 이동 후 견적 ID를 자동 검증했습니다. 실제 견적 접수·메일 발송이나 운영 저장·배포를 실행한 결과는 아닙니다. 제품군 관리 화면·새 그룹 자동 생성은 이번 범위 밖입니다.
+
+- 2026-10-19 상세 디자인 변경은 렌더러/실제 페이지 이벤트 연결 회귀 테스트로 확인했습니다. 실제 견적 제출·사업자 검증·메일 발송은 실행하지 않았으며 운영 배포도 하지 않았습니다. 전체 검수 증거는 `output/product-detail-template-20261019/`를 따릅니다.
+
 - 이번 공개 사이트 리디자인의 견적 범위는 외형 CSS와 기존 진입 보존이다. 새 접수·사업자 확인·메일 발송을 실행하거나 외부 업무 흐름의 완료를 주장하지 않는다. footer 회사 이메일과 기존 견적 오류 문의 이메일의 차이는 원래 컨트롤러 범위로 남아 있다.
 
 - 확대·축소 및 입력 흐름은 1440×1000 PC와 390×844 모바일 브라우저에서 검증했다. 합성 제품 추가 로딩·오류·재시도 전후 스크롤 위치 일치를 확인했다. 메일 표는 PC·모바일 브라우저 미리보기 검증이며 실제 메일 클라이언트 수신 검증과 구분한다.
@@ -66,6 +74,15 @@
 - 브라우저에 남아 있는 원본 사진과 개인정보는 새로고침하면 사라진다. 온라인 접수 불가 시 입력을 보관한 채 전화·이메일 문의와 재시도를 제공한다.
 
 ## 관련 파일
+
+- `led-lighting-website/src/components/products/detail/DetailVariants.vue`
+- `led-lighting-website/src/pages/products/product-variants.spec.ts`
+- `output/product-detail-template-20261019/groups-frontend-report.md`
+
+- `led-lighting-website/src/components/products/detail/{ProductDetailTemplate,DetailHero}.vue`
+- `led-lighting-website/src/pages/products/[id].vue`
+- `led-lighting-website/src/pages/products/product-detail.spec.ts`
+- `output/product-detail-template-20261019/public-report.md`
 
 - 공통 글꼴: `led-lighting-website/src/assets/styles/fonts.css`, `src/assets/main.css`, `tailwind.config.js`, `nuxt.config.ts`, `public/fonts/pretendard-v1.3.9/` (원본 WOFF2·출처·SIL OFL 1.1).
 
@@ -102,6 +119,10 @@
 - `docs/superpowers/plans/2026-09-06-online-quote.md`
 
 ## 갱신 규칙
+
+- 제품군 선택·표시명 또는 조회 API가 바뀌면 견적에는 실제 선택 SKU의 ID/이름/사양이 남는지 확인하고 공개 그룹 목록과 견적 원 SKU 목록의 조회 범위를 함께 기록합니다.
+
+- 상세 템플릿의 견적 진입을 바꾸면 실제 Product 전달·원래 MouseEvent·미리보기 비활성화와 기존 초안 동작을 함께 검증하고 제품 메뉴 문서도 갱신합니다.
 
 - 공통 글꼴 변경 시 전역 토큰·Tailwind·견적 Teleport 루트와 공식 에셋/라이선스를 함께 관리하고 데스크톱·모바일의 실제 글꼴 로딩과 줄바꿈을 확인합니다.
 

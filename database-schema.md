@@ -1,5 +1,43 @@
 # Database Schema
 
+## `products`
+
+Existing product specification columns remain the source of truth for dimensions,
+power, lifespan, color temperature, LED chips, certifications and control options.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `detailContent` | jsonb | Nullable version 1 display content; no default, index, unique constraint or foreign key |
+
+`1792368000000-AddProductDetailContent` adds only the nullable `detailContent`
+column. There is no data rewrite or backfill; existing rows receive SQL NULL and
+keep their existing product fields. Its down migration drops only this column,
+which removes any custom display content saved after migration.
+
+The JSON shape has required `version: 1` and optional `heroTitle`,
+`heroDescription`, `heroImage`, `storyTitle`, `storyImage`, `features`,
+`structureTitle`, `structureImages`, `application`, `controlTitle`, `showControl`,
+`dimensionsTitle`, `showDimensions` and `dimensionImage`. Images contain required
+`url`/`alt` and optional `caption`; features contain required `title`/`body`;
+application contains required `title`/`image` and optional `description`/`caption`.
+Product create/update DTOs reject unknown nested properties and unsupported
+versions. Titles are limited to 160 characters, descriptions/bodies to 2000,
+URLs to 2048, alt text to 300 and captions to 500. Features and structure images
+each allow at most six items. Image URLs must be HTTP(S) or single-root relative
+paths and cannot contain backslashes, whitespace or control characters. Optional
+nested fields may be omitted; only `detailContent` itself accepts explicit null.
+Omitting `detailContent` on update preserves saved content, while explicit null
+clears it so the shared renderer uses its default product display.
+
+`Product.variantGroup` is response-only metadata, without a database column or
+write DTO field. The reviewed `round-ceiling` and `parking-linear` definitions
+live only in `src/products/catalog-groups.ts`. Reads validate current common
+specifications before grouping; missing members or divergent specifications fall
+back to separate SKUs. Raw list and featured APIs preserve existing records.
+Only `groupVariants=true` groups list results after per-SKU filtering and before
+pagination; single-product reads may include nonrecursive group members. No SKU
+is deleted, and power/certification/option arrays are never combined or stored.
+
 ## `admins`
 
 | Column | Type | Notes |

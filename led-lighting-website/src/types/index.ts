@@ -1,3 +1,10 @@
+import type { ProductDetailContent } from './product-detail'
+export type {
+  ProductDetailContent,
+  ProductDetailImage,
+  ProductDetailFeature,
+} from './product-detail'
+
 // ============================================
 // 공통 타입 정의
 // ============================================
@@ -70,21 +77,31 @@ export interface Product {
   colorRendering?: string // 연색성
   options?: string[] // 옵션 (개별디밍, 그룹디밍, 센서)
   description: string // 기타 사항 (마크다운)
+  detailContent?: ProductDetailContent | null
+  variantGroup?: ProductVariantGroup // 조회 전용 제품군; 각 구성의 원 SKU는 보존
   isNew?: boolean // 신제품 여부
   isFeatured?: boolean // 메인 제품 여부
   createdAt: string
   updatedAt: string
 }
 
+export interface ProductVariantGroup {
+  id: string
+  name: string
+  primaryProductId: string
+  // 구성 안에는 제품군을 중첩하지 않아 재귀 응답을 만들지 않습니다.
+  variants: Array<{ label: string; product: Omit<Product, 'variantGroup'> }>
+}
+
 /**
  * 제품 생성 DTO (id, createdAt, updatedAt 제외)
  */
-export type CreateProductDto = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+export type CreateProductDto = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'variantGroup'>
 
 /**
  * 제품 수정 DTO (id, createdAt, updatedAt 제외, 모든 필드 optional)
  */
-export type UpdateProductDto = Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>
+export type UpdateProductDto = Partial<CreateProductDto>
 
 // ============================================
 // Post 관련 타입

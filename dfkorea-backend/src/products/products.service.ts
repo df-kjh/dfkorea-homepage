@@ -4,6 +4,10 @@ import { CreateProductDto } from "./dto/product.dto";
 import { UpdateProductDto } from "./dto/product.dto";
 import { Product } from "../entities/product.entity";
 import {
+  groupProductVariants,
+  withProductVariantGroup,
+} from "./catalog-groups";
+import {
   filterProducts,
   getProductFilterOptions,
   ProductFilterOptions,
@@ -16,8 +20,14 @@ import {
 export class ProductsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async findAll(filters: ProductFilters = {}): Promise<Product[]> {
-    return filterProducts(await this.databaseService.getProducts(), filters);
+  async findAll(
+    filters: ProductFilters = {},
+    groupVariants = false,
+  ): Promise<Product[]> {
+    const products = await this.databaseService.getProducts();
+    return groupVariants
+      ? groupProductVariants(products, filters)
+      : filterProducts(products, filters);
   }
 
   async findFilterOptions(): Promise<ProductFilterOptions> {
@@ -30,6 +40,7 @@ export class ProductsService {
     search?: string,
     category?: string,
     filters: ProductSpecificationFilters = {},
+    groupVariants = false,
   ): Promise<{
     data: Product[];
     total: number;
@@ -38,13 +49,15 @@ export class ProductsService {
     totalPages: number;
   }> {
     validateProductPagination(page, limit);
-    const allProducts = filterProducts(
-      await this.databaseService.getProducts(),
-      {
-        ...filters,
-        search,
-        category,
-      },
+    const allProducts = (
+      await this.findAll(
+        {
+          ...filters,
+          search,
+          category,
+        },
+        groupVariants,
+      )
     ).sort((a, b) => {
       // 등록 시각이 같아도 페이지 경계의 제품이 조회마다 바뀌지 않도록 ID를 보조 정렬 키로 사용한다.
       const dateOrder =
@@ -76,7 +89,8 @@ export class ProductsService {
 
   async findOne(id: string): Promise<Product | undefined> {
     const products = await this.databaseService.getProducts();
-    return products.find((product) => product.id === id);
+    const product = products.find((candidate) => candidate.id === id);
+    return product ? withProductVariantGroup(product, products) : undefined;
   }
 
   async create(createProductDto: CreateProductDto): Promise<Product> {

@@ -4,9 +4,11 @@ import {
   IsOptional,
   IsBoolean,
   IsArray,
+  IsObject,
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { ProductDetailContentDto } from "./product-detail-content.dto";
 
 export class ProductImageDto {
   @IsString()
@@ -81,6 +83,12 @@ export class CreateProductDto {
   @IsNotEmpty()
   description: string; // 기타 사항 (마크다운)
 
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ProductDetailContentDto)
+  detailContent?: ProductDetailContentDto | null;
+
   @IsBoolean()
   @IsOptional()
   isNew?: boolean; // 신제품 여부
@@ -152,6 +160,12 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   description?: string; // 기타 사항 (마크다운)
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ProductDetailContentDto)
+  detailContent?: ProductDetailContentDto | null;
 
   @IsBoolean()
   @IsOptional()
