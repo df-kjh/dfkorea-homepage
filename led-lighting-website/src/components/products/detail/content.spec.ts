@@ -188,9 +188,7 @@ describe('consistent catalog detail defaults', () => {
       for (const image of product.images)
         expect(detail.gallery.some((entry) => entry.url === image.image)).toBe(true)
       expect(detail.application?.title).toBe('공간에 맞춰,\n빛의 흐름을 계획합니다.')
-      expect(detail.application?.caption).toBe(
-        'AI로 제작한 적용 공간 예시입니다. 실제 시공 사례·조도 측정 결과가 아닙니다.',
-      )
+      expect(detail.application?.caption).toBeUndefined()
       expect(detail.application?.image?.url).toBe(applicationImages[applicationKey])
       if (applicationKey !== 'moldbar') {
         expect(detail.heroImage?.url).toBe(detail.application?.image?.url)

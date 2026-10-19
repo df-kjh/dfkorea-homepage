@@ -71,7 +71,7 @@ describe('shared product detail renderer', () => {
   })
 })
 
-it('keeps the approved application and diagram attribution and structure captions', () => {
+it('omits the automatic application note and keeps diagram attribution and structure captions', () => {
   const wrapper = render(true, {
     id: 'c2f1977b-3572-44c6-b6a7-d59a37b237f7',
     dimensions: '1200*58*60',
@@ -81,7 +81,7 @@ it('keeps the approved application and diagram attribution and structure caption
       { image: 'https://example.com/three.webp', description: '' },
     ],
   })
-  expect(wrapper.text()).toContain('AI로 제작한 적용 공간 예시입니다.')
+  expect(wrapper.find('.detail-application-note').exists()).toBe(false)
   expect(wrapper.text()).toContain('실제 비율·설치 도면과 다릅니다.')
   expect(wrapper.text()).toContain('곧게 이어지는 선형 바디')
   expect(wrapper.text()).toContain('끝단에서 살펴보는 구조')
@@ -133,9 +133,7 @@ it.each(catalog)('renders the reviewed section flow for $product.name', ({ produ
   expect(wrapper.get('[data-section="application"] img').attributes('src')).toMatch(
     /^\/images\/product-detail\//,
   )
-  expect(wrapper.get('.detail-application-note').text()).toContain(
-    '실제 시공 사례·조도 측정 결과가 아닙니다.',
-  )
+  expect(wrapper.find('.detail-application-note').exists()).toBe(false)
   expect(wrapper.findAll('.detail-thumbnails button')).toHaveLength(product.images.length)
   if (product.images.length === 1)
     expect(wrapper.findAll('.detail-structure-grid--single [data-image]')).toHaveLength(1)

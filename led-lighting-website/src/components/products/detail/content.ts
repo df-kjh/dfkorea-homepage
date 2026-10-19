@@ -12,7 +12,7 @@ import {
   productCertificationLabels,
 } from '../presentation'
 import { stripMarkdown } from '@/utils/seo'
-import { GENERATED_APPLICATION_CAPTION, resolveApplicationProfile } from './application-profiles'
+import { resolveApplicationProfile } from './application-profiles'
 
 export const MOLDBAR_PRESET_ID = 'c2f1977b-3572-44c6-b6a7-d59a37b237f7'
 const presetAsset = (file: string) => `/images/product-detail/moldbar/${file}`
@@ -168,7 +168,7 @@ export function resolveProductDetail(product: Product) {
       `${product.name}의 설치 조건과 필요한 수량을 함께 확인합니다.\n현장 사진과 설치 위치를 바탕으로 적용 가능한 구성을 상담해 주세요.`,
     image: applicationProfile?.image || originalOverview,
     caption: applicationProfile
-      ? GENERATED_APPLICATION_CAPTION
+      ? undefined
       : originalOverview
         ? '등록된 제품 원본 사진입니다. 설치 공간은 현장 조건에 맞춰 상담해 주세요.'
         : '등록된 제품 사진이 없습니다. 설치 조건과 제품 자료를 상담해 주세요.',
@@ -242,7 +242,6 @@ export function resolveProductDetail(product: Product) {
             url: presetAsset('moldbar-application.png'),
             alt: '몰드바 형태 조명을 배치한 주차 공간 적용 연출 예시',
           },
-          caption: GENERATED_APPLICATION_CAPTION,
         },
         controlTitle: '필요한 곳을,\n원하는 방식으로.',
         dimensionsTitle: '설치 전,\n공간의 치수부터.',
