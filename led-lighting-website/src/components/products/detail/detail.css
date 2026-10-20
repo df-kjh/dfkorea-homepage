@@ -2,6 +2,8 @@
   --detail-paper: #f0ece3;
   --detail-ink: #293021;
   --detail-line: #cdc7b7;
+  --detail-max-width: 1440px;
+  --detail-gutter: clamp(20px, 5cqw, 76px);
   background: var(--detail-paper);
   color: #292d23;
   font-family: var(--df-font-family, Pretendard, sans-serif);
@@ -36,9 +38,13 @@
   outline-offset: 5px;
 }
 .product-detail-template .detail-container {
-  padding-inline: clamp(20px, 5cqw, 76px);
-  max-width: 1440px;
-  margin-inline: auto;
+  width: 100%;
+  /* Keep section backgrounds full width while aligning their content with
+     the hero and application copy, including embedded admin previews. */
+  padding-inline: max(
+    var(--detail-gutter),
+    calc((100% - var(--detail-max-width)) / 2 + var(--detail-gutter))
+  );
 }
 .product-detail-template .detail-section {
   padding-block: 100px;
